@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PersonKind {
+  STUDENT
+  STAFF
+}
+
+enum CardStatus {
+  NOT_PRINTED
+  PRINTING
+  PRINTED
+  PARTIALLY_PRINTED
+  REPRINT_REQUIRED
+  REPRINTED
+}
+
+enum PrintBatchStatus {
+  DRAFT
+  READY
+  PRINTING
+  COMPLETED
+  PARTIAL
+  CANCELLED
+}
+
+enum PrintItemResult {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum PrintType {
+  ORIGINAL
+  REPRINT
+}
+
+enum ReprintReason {
+  LOST
+  DAMAGED
+  STORED
+  INCORRECT_INFORMATION
+  OTHER
+}
+
+enum ReprintRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PRINTED
+  COMPLETED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model CardRecord {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  personKind     PersonKind @map("person_kind")
+  personId       String     @map("person_id")
+  personCode     String     @map("person_code")
+  fullName       String     @map("full_name")
+  photoUrl       String?    @map("photo_url")
+  className      String?    @map("class_name")
+  educationLevel String?    @map("education_level")
+  role           String?
+  department     String?
+  gender         String?
+  academicYear   String?    @map("academic_year")
+  status         CardStatus @default(NOT_PRINTED)
+  printCount     Int        @default(0) @map("print_count")
+  lastPrintedAt  DateTime?  @map("last_printed_at")
+  lastPrintedBy  String?    @map("last_printed_by")
+  lastBatchNumber String?   @map("last_batch_number")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  batchItems      PrintBatchItem[]
+  events          PrintEvent[]
+  reprintRequests ReprintRequest[]
+
+  @@unique([organizationId, personKind, personId])
+  @@index([organizationId, status])
+  @@index([organizationId, personKind])
+  @@map("card_records")
+}
+
+model PrintBatch {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  batchNumber    String           @unique @map("batch_number")
+  personKind     PersonKind       @map("person_kind")
+  status         PrintBatchStatus @default(DRAFT)
+  totalCards     Int              @default(0) @map("total_cards")
+  successCount   Int              @default(0) @map("success_count")
+  failedCount    Int              @default(0) @map("failed_count")
+  createdBy      String           @map("created_by")
+  createdByEmail String?          @map("created_by_email")
+  printerName    String?          @map("printer_name")
+  notes          String?
+  confirmedAt    DateTime?        @map("confirmed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  items PrintBatchItem[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("print_batches")
+}
+
+model PrintBatchItem {
+  id            String          @id @default(uuid())
+  batchId       String          @map("batch_id")
+  cardRecordId  String          @map("card_record_id")
+  sortOrder     Int             @default(0) @map("sort_order")
+  printType     PrintType       @default(ORIGINAL) @map("print_type")
+  result        PrintItemResult @default(PENDING)
+  failureReason String?         @map("failure_reason")
+  confirmedAt   DateTime?       @map("confirmed_at")
+
+  batch      PrintBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  cardRecord CardRecord @relation(fields: [cardRecordId], references: [id])
+
+  @@index([batchId])
+  @@map("print_batch_items")
+}
+
+model PrintEvent {
+  id               String    @id @default(uuid())
+  organizationId   String    @map("organization_id")
+  cardRecordId     String    @map("card_record_id")
+  batchId          String?   @map("batch_id")
+  batchNumber      String?   @map("batch_number")
+  eventType        String    @map("event_type")
+  printType        PrintType @default(ORIGINAL) @map("print_type")
+  result           String    @default("SUCCESS")
+  performedBy      String    @map("performed_by")
+  performedByEmail String?   @map("performed_by_email")
+  printerName      String?   @map("printer_name")
+  failureReason    String?   @map("failure_reason")
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  cardRecord CardRecord @relation(fields: [cardRecordId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([cardRecordId])
+  @@map("print_events")
+}
+
+model ReprintRequest {
+  id               String               @id @default(uuid())
+  organizationId   String               @map("organization_id")
+  cardRecordId     String               @map("card_record_id")
+  personKind       PersonKind           @map("person_kind")
+  reason           ReprintReason
+  description      String?
+  status           ReprintRequestStatus @default(PENDING)
+  requestedBy      String               @map("requested_by")
+  requestedByEmail String?              @map("requested_by_email")
+  reviewedBy       String?              @map("reviewed_by")
+  reviewedByEmail  String?              @map("reviewed_by_email")
+  rejectionReason  String?              @map("rejection_reason")
+  reviewedAt       DateTime?            @map("reviewed_at")
+  completedAt      DateTime?            @map("completed_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  cardRecord CardRecord @relation(fields: [cardRecordId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
+  @@map("reprint_requests")
+}
+
+enum PhotoImportJobStatus {
+  QUEUED
+  ANALYZING
+  READY
+  IMPORTING
+  COMPLETED
+  FAILED
+}
+
+enum PhotoImportRowStatus {
+  MATCHED
+  MISSING
+  UNKNOWN
+  DUPLICATE
+  INVALID
+  SKIPPED
+  IMPORTED
+  FAILED
+}
+
+enum ExistingPhotoPolicy {
+  ONLY_MISSING
+  REPLACE
+}
+
+model PhotoImportJob {
+  id                  String               @id @default(uuid())
+  organizationId      String               @map("organization_id")
+  status              PhotoImportJobStatus @default(QUEUED)
+  excelPath           String?              @map("excel_path")
+  zipPath             String?              @map("zip_path")
+  workDir             String?              @map("work_dir")
+  photoIdRegex        String               @default("^[A-Za-z0-9_-]+$") @map("photo_id_regex")
+  existingPhotoPolicy ExistingPhotoPolicy  @default(ONLY_MISSING) @map("existing_photo_policy")
+  stats               Json?
+  errorMessage        String?              @map("error_message")
+  createdBy           String               @map("created_by")
+  createdByEmail      String?              @map("created_by_email")
+  confirmedAt         DateTime?            @map("confirmed_at")
+  completedAt         DateTime?            @map("completed_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  rows PhotoImportRow[]
+
+  @@index([organizationId, createdAt])
+  @@index([status, createdAt])
+  @@map("photo_import_jobs")
+}
+
+model PhotoImportRow {
+  id           String                @id @default(uuid())
+  jobId        String                @map("job_id")
+  photoId      String?               @map("photo_id")
+  studentId    String?               @map("student_id")
+  studentCode  String?               @map("student_code")
+  studentName  String?               @map("student_name")
+  status       PhotoImportRowStatus
+  fileName     String?               @map("file_name")
+  filePath     String?               @map("file_path")
+  fileHash     String?               @map("file_hash")
+  message      String?
+  hasExistingPhoto Boolean           @default(false) @map("has_existing_photo")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  job PhotoImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@index([jobId, photoId])
+  @@map("photo_import_rows")
+}

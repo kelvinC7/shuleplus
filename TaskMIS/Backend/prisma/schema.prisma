@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum AssignmentType {
+  INDIVIDUAL
+  TEAM
+  DEPARTMENT
+  ROLE
+}
+
+enum WorkflowTriggerType {
+  MANUAL
+  AUTO_ON_CREATE
+  AUTO_ON_STATUS_CHANGE
+  EVENT_BASED
+  SCHEDULED
+}
+
+enum WorkflowStepType {
+  APPROVAL
+  REVIEW
+  EXECUTION
+  NOTIFICATION
+  CONDITION
+  PARALLEL_SPLIT
+  PARALLEL_JOIN
+  WAIT
+}
+
+enum WorkflowInstanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  CANCELLED
+  FAILED
+}
+
+enum StepInstanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  SKIPPED
+  WAITING
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_OVERDUE
+  DEADLINE_APPROACHING
+  WORKFLOW_APPROVAL_REQUIRED
+  WORKFLOW_APPROVED
+  WORKFLOW_REJECTED
+  COMMENT_ADDED
+  MENTION
+  ESCALATION
+  STATUS_CHANGE
+  GENERAL
+}
+
+enum TimeEntryType {
+  TIMER
+  MANUAL
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  settings        Setting[]
+  taskAttachments TaskAttachment[]
+  activityLogs    ActivityLog[]
+
+  @@map("tenants")
+}
+
+model Department {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("departments")
+}
+
+model Task {
+  id              String         @id @default(uuid())
+  organizationId  String         @map("organization_id")
+  title           String
+  description     String?
+  category        String?
+  priority        TaskPriority   @default(MEDIUM)
+  status          TaskStatus     @default(TODO)
+  approvalStatus  ApprovalStatus @default(NOT_REQUIRED) @map("approval_status")
+  createdById     String         @map("created_by_id")
+  createdByName   String?        @map("created_by_name")
+  assignedToId    String?        @map("assigned_to_id")
+  assignedToName  String?        @map("assigned_to_name")
+  assignedType    AssignmentType @default(INDIVIDUAL) @map("assigned_type")
+  departmentId    String?        @map("department_id")
+  startDate       DateTime?      @map("start_date")
+  dueDate         DateTime?      @map("due_date")
+  completedAt     DateTime?      @map("completed_at")
+  estimatedHours  Decimal?       @map("estimated_hours") @db.Decimal(8, 2)
+  actualHours     Decimal?       @map("actual_hours") @db.Decimal(8, 2)
+  progress        Int            @default(0)
+  tags            String[]
+  parentTaskId    String?        @map("parent_task_id")
+  workflowId      String?        @map("workflow_id")
+  isRecurring     Boolean        @default(false) @map("is_recurring")
+  recurringConfig Json?          @map("recurring_config")
+  metadata        Json           @default("{}")
+  deletedAt       DateTime?      @map("deleted_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  parentTask        Task?              @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  subtasks          Task[]             @relation("TaskHierarchy")
+  comments          TaskComment[]
+  attachments       TaskAttachment[]
+  dependencies      TaskDependency[]   @relation("DependsOn")
+  dependentOn       TaskDependency[]   @relation("DependencyFor")
+  checklistItems    ChecklistItem[]
+  timeEntries       TimeEntry[]
+  workflowInstances WorkflowInstance[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, assignedToId])
+  @@index([organizationId, priority])
+  @@index([organizationId, dueDate])
+  @@index([parentTaskId])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  taskId         String   @map("task_id")
+  userId         String   @map("user_id")
+  userName       String   @map("user_name")
+  content        String
+  mentions       String[]
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  taskId         String   @map("task_id")
+  filename       String
+  filePath       String   @map("file_path")
+  mimeType       String?  @map("mime_type")
+  fileSize       Int?     @map("file_size")
+  uploadedById   String   @map("uploaded_by_id")
+  uploadedByName String?  @map("uploaded_by_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+model TaskDependency {
+  id             String @id @default(uuid())
+  organizationId String @map("organization_id")
+  taskId         String @map("task_id")
+  dependsOnId    String @map("depends_on_id")
+  dependencyType String @default("finish_to_start") @map("dependency_type")
+
+  task      Task @relation("DependsOn", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("DependencyFor", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@map("task_dependencies")
+}
+
+model ChecklistItem {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  taskId         String   @map("task_id")
+  title          String
+  isCompleted    Boolean  @default(false) @map("is_completed")
+  order          Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("checklist_items")
+}
+
+model Workflow {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  name           String
+  description    String?
+  triggerType    WorkflowTriggerType @default(MANUAL) @map("trigger_type")
+  triggerEvent   String?             @map("trigger_event")
+  isActive       Boolean             @default(true) @map("is_active")
+  version        Int                 @default(1)
+  createdBy      String              @map("created_by")
+  metadata       Json                @default("{}")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  steps     WorkflowStep[]
+  instances WorkflowInstance[]
+
+  @@index([organizationId])
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  workflowId     String           @map("workflow_id")
+  name           String
+  type           WorkflowStepType
+  order          Int
+  assigneeRole   String?          @map("assignee_role")
+  assigneeId     String?          @map("assignee_id")
+  conditions     Json?
+  config         Json?
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  workflow  Workflow               @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  instances WorkflowStepInstance[]
+
+  @@index([workflowId])
+  @@map("workflow_steps")
+}
+
+model WorkflowInstance {
+  id             String                 @id @default(uuid())
+  organizationId String                 @map("organization_id")
+  workflowId     String                 @map("workflow_id")
+  taskId         String?                @map("task_id")
+  status         WorkflowInstanceStatus @default(PENDING)
+  startedBy      String                 @map("started_by")
+  startedAt      DateTime               @default(now()) @map("started_at")
+  completedAt    DateTime?              @map("completed_at")
+  currentStepId  String?                @map("current_step_id")
+  metadata       Json                   @default("{}")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  workflow Workflow               @relation(fields: [workflowId], references: [id])
+  task     Task?                  @relation(fields: [taskId], references: [id])
+  steps    WorkflowStepInstance[]
+
+  @@index([organizationId])
+  @@index([workflowId])
+  @@index([taskId])
+  @@map("workflow_instances")
+}
+
+model WorkflowStepInstance {
+  id             String             @id @default(uuid())
+  organizationId String             @map("organization_id")
+  instanceId     String             @map("instance_id")
+  stepId         String             @map("step_id")
+  status         StepInstanceStatus @default(PENDING)
+  assigneeId     String?            @map("assignee_id")
+  assigneeName   String?            @map("assignee_name")
+  comments       String?
+  decidedAt      DateTime?          @map("decided_at")
+  startedAt      DateTime?          @map("started_at")
+  completedAt    DateTime?          @map("completed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step     WorkflowStep     @relation(fields: [stepId], references: [id])
+
+  @@index([instanceId])
+  @@map("workflow_step_instances")
+}
+
+model WorkflowTemplate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  category       String?
+  stepsConfig    Json     @map("steps_config")
+  isSystem       Boolean  @default(false) @map("is_system")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@map("workflow_templates")
+}
+
+model Notification {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  userId         String           @map("user_id")
+  type           NotificationType
+  title          String
+  message        String
+  taskId         String?          @map("task_id")
+  workflowId     String?          @map("workflow_id")
+  isRead         Boolean          @default(false) @map("is_read")
+  metadata       Json             @default("{}")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@index([organizationId, userId])
+  @@index([organizationId, userId, isRead])
+  @@map("notifications")
+}
+
+model TimeEntry {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  taskId         String        @map("task_id")
+  userId         String        @map("user_id")
+  userName       String?       @map("user_name")
+  entryType      TimeEntryType @default(TIMER) @map("entry_type")
+  startTime      DateTime      @map("start_time")
+  endTime        DateTime?     @map("end_time")
+  duration       Int           @default(0)
+  description    String?
+  isBillable     Boolean       @default(false) @map("is_billable")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("time_entries")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, key])
+  @@map("settings")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  userName       String?  @map("user_name")
+  entityType     String   @map("entity_type")
+  entityId       String   @map("entity_id")
+  action         String
+  details        Json?
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}

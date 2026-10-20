@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  WARNING
+  MAINTENANCE
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+  OFFLINE
+}
+
+enum EventType {
+  ENTRY
+  EXIT
+  ATTENDANCE
+  RE_ENTRY
+  UNKNOWN_CARD
+  BLOCKED_CARD
+  DUPLICATE_SCAN
+  INVALID_CARD
+  OFFLINE_EVENT
+  MANUAL_OVERRIDE
+}
+
+enum CommandStatus {
+  PENDING
+  SENT
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum FirmwareStatus {
+  CURRENT
+  UPDATE_AVAILABLE
+  CRITICAL
+  ROLLING_OUT
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  province         String?
+  district         String?
+  sector           String?
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  devices              RfidReaderDevice[]
+  cardEvents           CardEvent[]
+  unknownCards         UnknownCard[]
+  deviceCommands       DeviceCommand[]
+  deviceAlerts         DeviceAlert[]
+  deviceLogs           DeviceLog[]
+  configProfiles       ConfigProfile[]
+  firmwareVersions     FirmwareVersion[]
+
+  @@map("tenants")
+}
+
+model RfidReaderDevice {
+  id                  String       @id @default(uuid())
+  organizationId      String       @map("organization_id")
+  deviceName          String       @map("device_name")
+  deviceCode          String       @map("device_code")
+  serialNumber        String?      @map("serial_number")
+  deviceType          String       @default("Gate Reader") @map("device_type")
+  firmwareVersion     String?      @map("firmware_version")
+  location            String
+  gateEntrance        String?      @map("gate_entrance")
+  attendanceZone      String?      @map("attendance_zone")
+  installationDate    DateTime?    @map("installation_date")
+  status              DeviceStatus @default(OFFLINE)
+  syncStatus          SyncStatus   @default(PENDING) @map("sync_status")
+  lastSeenAt          DateTime?    @map("last_seen_at")
+  ipAddress           String?      @map("ip_address")
+  macAddress          String?      @map("mac_address")
+  wifiSsid            String?      @map("wifi_ssid")
+  wifiSignalDbm       Int?         @map("wifi_signal_dbm")
+  wifiQuality         String?      @map("wifi_quality")
+  batteryLevel        Int?         @map("battery_level")
+  batteryCharging     Boolean      @default(false) @map("battery_charging")
+  batteryVoltage      Float?       @map("battery_voltage")
+  batteryUpdatedAt    DateTime?    @map("battery_updated_at")
+  storageTotalMb      Int?         @map("storage_total_mb")
+  storageUsedMb       Int?         @map("storage_used_mb")
+  pendingOfflineEvents Int         @default(0) @map("pending_offline_events")
+  todayScans          Int          @default(0) @map("today_scans")
+  timeZone            String?      @map("time_zone")
+  deviceClock         DateTime?    @map("device_clock")
+  clockSynced         Boolean      @default(true) @map("clock_synced")
+  serverConnected     Boolean      @default(false) @map("server_connected")
+  lastHeartbeatAt     DateTime?    @map("last_heartbeat_at")
+  lastSyncAt          DateTime?    @map("last_sync_at")
+  serverResponseMs    Int?         @map("server_response_ms")
+  pendingEvents       Int          @default(0) @map("pending_events")
+  failedEvents        Int          @default(0) @map("failed_events")
+  authToken           String?      @map("auth_token")
+  deviceSecret        String?      @map("device_secret")
+  configProfileId     String?      @map("config_profile_id")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  tenant         Tenant          @relation(fields: [organizationId], references: [organizationId])
+  configProfile  ConfigProfile?  @relation(fields: [configProfileId], references: [id], onDelete: SetNull)
+  cardEvents     CardEvent[]
+  deviceCommands DeviceCommand[]
+  deviceAlerts   DeviceAlert[]
+  deviceLogs     DeviceLog[]
+
+  @@unique([organizationId, deviceCode])
+  @@index([organizationId, status])
+  @@map("rfid_reader_devices")
+}
+
+model CardEvent {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  deviceId       String     @map("device_id")
+  eventCode      String     @map("event_code")
+  cardUid        String     @map("card_uid")
+  studentId      String?    @map("student_id")
+  studentName    String?    @map("student_name")
+  timestamp      DateTime
+  eventType      EventType  @map("event_type")
+  readerLocation String?    @map("reader_location")
+  direction      String?
+  readQuality    Int?       @map("read_quality")
+  syncStatus     SyncStatus @default(SYNCED) @map("sync_status")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  tenant Tenant           @relation(fields: [organizationId], references: [organizationId])
+  device RfidReaderDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, timestamp])
+  @@index([deviceId])
+  @@map("card_events")
+}
+
+model UnknownCard {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  cardUid        String   @map("card_uid")
+  deviceCode     String?  @map("device_code")
+  location       String?
+  attempts       Int      @default(1)
+  lastSeenAt     DateTime @map("last_seen_at")
+  status         String   @default("open")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, cardUid])
+  @@index([organizationId])
+  @@map("unknown_cards")
+}
+
+model DeviceCommand {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  deviceId       String        @map("device_id")
+  commandCode    String        @map("command_code")
+  command        String
+  category       String?
+  issuedBy       String?       @map("issued_by")
+  status         CommandStatus @default(PENDING)
+  response       String?
+  requiresConfirm Boolean      @default(false) @map("requires_confirm")
+  completedAt    DateTime?     @map("completed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant           @relation(fields: [organizationId], references: [organizationId])
+  device RfidReaderDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, deviceId])
+  @@map("device_commands")
+}
+
+model DeviceAlert {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  deviceId       String?       @map("device_id")
+  alertType      String        @map("alert_type")
+  title          String
+  message        String
+  severity       AlertSeverity @default(WARNING)
+  acknowledged   Boolean       @default(false)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant            @relation(fields: [organizationId], references: [organizationId])
+  device RfidReaderDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("device_alerts")
+}
+
+model DeviceLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  deviceId       String   @map("device_id")
+  category       String   @default("general")
+  level          String   @default("INFO")
+  message        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant           @relation(fields: [organizationId], references: [organizationId])
+  device RfidReaderDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, deviceId])
+  @@map("device_logs")
+}
+
+model ConfigProfile {
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  name           String
+  description    String?
+  isGlobal       Boolean  @default(false) @map("is_global")
+  settings       Json     @default("{}")
+  deviceCount    Int      @default(0) @map("device_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant?            @relation(fields: [organizationId], references: [organizationId])
+  devices RfidReaderDevice[]
+
+  @@index([organizationId])
+  @@map("config_profiles")
+}
+
+model FirmwareVersion {
+  id             String         @id @default(uuid())
+  organizationId String?        @map("organization_id")
+  version        String
+  releaseNotes   String?        @map("release_notes")
+  deviceCount    Int            @default(0) @map("device_count")
+  status         FirmwareStatus @default(CURRENT)
+  rolloutPct     Int            @default(0) @map("rollout_pct")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([version])
+  @@map("firmware_versions")
+}

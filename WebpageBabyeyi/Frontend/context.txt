@@ -1,0 +1,82 @@
+﻿
+=== HandoffStudent @ -1 ===
+
+=== fromFees @ -1 ===
+
+=== initialStudent @ 4521 ===
+T(e){var t,a,i,x,h,N,T,W,H,U,q,K,V,G,Q,J,Z,X,$;let{school:ee,open:et,onClose:ea,initialStudent:es}=e,[el,en]=(0,l.useState)(!1),[er,ei]=(0,l.useState)(1),[eo,ec]=(0,l.useState)(!1),[ed,ex]=(0,l.useState)(""),[eu,em]=(0,l.useState)(null),[eh,ep]=(0,l.useState)(!1),[eb,ej]=(0,l.use
+
+=== Applicant already verified @ 13005 ===
+assName:"mt-0.5 h-4 w-4 shrink-0 text-teal-600"}),(0,s.jsxs)("span",{children:["Applicant already verified from ",(0,s.jsx)("strong",{children:"Pay Fees"})," at"," ",(0,s.jsx)("strong",{children:ee.name}),". Add optional supporting details below."]})]}):(0,s.jsxs)(s.Fragment,{chi
+
+=== STEPS @ -1 ===
+
+=== FREQUENCIES @ -1 ===
+
+=== DISBURSEMENTS @ -1 ===
+
+=== RWANDA_BANKS @ -1 ===
+
+=== flowErrorBoxClass @ -1 ===
+
+=== flowInfoBoxClass @ -1 ===
+
+=== RequestLoanModal @ 105 ===
+kChunk_N_E=self.webpackChunk_N_E||[]).push([[692],{3692:(e,t,a)=>{a.r(t),a.d(t,{RequestLoanModal:()=>T});var s=a(5155),l=a(2115),n=a(4269),r=a(4326);let i="http://localhost:3099/api";async function o(e){try{let t=await fetch("".concat(i,"/fees/loans/types?organizationId=").concat
+
+=== function T( @ 4432 ===
+eview"},{label:"Verification",short:"Verify"},{label:"Submitted",short:"Done"}];function T(e){var t,a,i,x,h,N,T,W,H,U,q,K,V,G,Q,J,Z,X,$;let{school:ee,open:et,onClose:ea,initialStudent:es}=e,[el,en]=(0,l.useState)(!1),[er,ei]=(0,l.useState)(1),[eo,ec]=(0,l.useState)(!1),[ed,ex]=(0
+
+=== short: @ 4201 ===
+text-[11px] text-ink-400",children:l}):null]})}let O=r.Z2,Y=[{label:"Applicant",short:"Applicant"},{label:"Loan Type",short:"Loan Type"},{label:"Amount",short:"Amount"},{label:"Repayment",short:"Repayment"},{label:"Review",short:"Review"},{label:"Verification",short:"Verify"},{la
+
+=== Applicant @ 4190 ===
+Name:"mt-1 text-[11px] text-ink-400",children:l}):null]})}let O=r.Z2,Y=[{label:"Applicant",short:"Applicant"},{label:"Loan Type",short:"Loan Type"},{label:"Amount",short:"Amount"},{label:"Repayment",short:"Repayment"},{label:"Review",short:"Review"},{label:"Verification",short:"V
+
+=== Loan Type @ 4228 ===
+hildren:l}):null]})}let O=r.Z2,Y=[{label:"Applicant",short:"Applicant"},{label:"Loan Type",short:"Loan Type"},{label:"Amount",short:"Amount"},{label:"Repayment",short:"Repayment"},{label:"Review",short:"Review"},{label:"Verification",short:"Verify"},{label:"Submitted",short:"Done
+
+=== Verification @ 4368 ===
+},{label:"Repayment",short:"Repayment"},{label:"Review",short:"Review"},{label:"Verification",short:"Verify"},{label:"Submitted",short:"Done"}];function T(e){var t,a,i,x,h,N,T,W,H,U,q,K,V,G,Q,J,Z,X,$;let{school:ee,open:et,onClose:ea,initialStudent:es}=e,[el,en]=(0,l.useState)(!1)
+
+=== Submitted @ 4406 ===
+},{label:"Review",short:"Review"},{label:"Verification",short:"Verify"},{label:"Submitted",short:"Done"}];function T(e){var t,a,i,x,h,N,T,W,H,U,q,K,V,G,Q,J,Z,X,$;let{school:ee,open:et,onClose:ea,initialStudent:es}=e,[el,en]=(0,l.useState)(!1),[er,ei]=(0,l.useState)(1),[eo,ec]=(0,
+
+=== termsAccepted @ -1 ===
+
+=== otpSent @ -1 ===
+
+=== otpCode @ -1 ===
+
+=== loanOpen @ -1 ===
+
+=== guarantor @ 12004 ===
+:void 0,accountNumber:"BANK"===eU?eJ:void 0,accountHolder:"BANK"===eU?eX:void 0,guarantorName:ew,guarantorPhone:ek,guarantorRelation:eC,purpose:eg});tt({applicationNumber:l.applicationNumber,totalPayable:l.totalPayable,principal:l.principal,status:l.status}),ei(7)}catch(e){e7(e i
+
+=== disbursement @ 11850 ===
+ear)?t:"",term:null!=(a=eu.term)?a:"",principal:tu,periodMonths:eD,frequency:eW,disbursement:eU,phone:"MOBILE_MONEY"===eU?s:void 0,bankName:"BANK"===eU?eG:void 0,accountNumber:"BANK"===eU?eJ:void 0,accountHolder:"BANK"===eU?eX:void 0,guarantorName:ew,guarantorPhone:ek,guarantorRe
+
+=== PAY_SCHOOL_DIRECTLY @ 1457 ===
+:"Every week"},{id:"QUARTERLY",label:"Quarterly",sub:"Every 3 months"}],f=[{id:"PAY_SCHOOL_DIRECTLY",label:"Pay school directly",sub:"Clear fees at the school"},{id:"MOBILE_MONEY",label:"My Mobile Money",sub:"MTN \xb7 Airtel"},{id:"BANK",label:"My Bank Account",sub:"Direct deposi
+
+=== MOBILE_MONEY @ 1543 ===
+HOOL_DIRECTLY",label:"Pay school directly",sub:"Clear fees at the school"},{id:"MOBILE_MONEY",label:"My Mobile Money",sub:"MTN \xb7 Airtel"},{id:"BANK",label:"My Bank Account",sub:"Direct deposit"}];function N(e){let{path:t,className:a}=e;return(0,s.jsx)("svg",{viewBox:"0 0 24 24
+
+=== BANK @ 1609 ===
+school"},{id:"MOBILE_MONEY",label:"My Mobile Money",sub:"MTN \xb7 Airtel"},{id:"BANK",label:"My Bank Account",sub:"Direct deposit"}];function N(e){let{path:t,className:a}=e;return(0,s.jsx)("svg",{viewBox:"0 0 24 24",fill:"none",className:a,stroke:"currentColor",strokeWidth:1.8,st
+
+=== SCHOOL_FEES_LOAN @ 7906 ===
+,s,l,n;let r=await o(e.organizationId);eB(r);let i=null!=(a=null!=(t=r.find(e=>"SCHOOL_FEES_LOAN"===e.code))?t:r[0])?a:null;eA(i);let c=await (0,d.wN)({organizationId:e.organizationId,academicYear:null!=(s=e.academicYear)?s:"",term:null!=(l=e.term)?l:"",className:e.className,stud
+
+=== step === @ -1 ===
+
+=== er=== @ -1 ===
+
+=== ei(7) @ 12183 ===
+ationNumber,totalPayable:l.totalPayable,principal:l.principal,status:l.status}),ei(7)}catch(e){e7(e instanceof Error?e.message:"We could not submit your application.")}finally{e8(!1)}}}if(!et||!el)return null;let tg=7===er;return(0,s.jsxs)(r.k3,{open:et,mounted:el,onClose:e6?()=>
+
+=== ei(6) @ 36251 ===
+(2):void td():2===er?void ei(3):3===er?void ei(4):4===er?void ei(5):5===er?void ei(6):6===er?void tN():void ea()},nextLabel:1===er?eu?"Continue":"Find student":2===er?eP?"LoadingΓÇª":"Continue":3===er||4===er?"Continue":5===er?"Request verification":6===er?e6?"SubmittingΓÇª":"Verify 
+
+=== STEPS SLICE ===
+ ",{className:"flex items-center justify-between py-1.5",children:[(0,s.jsx)("span",{className:"text-[13px] text-slate-500",children:t}),(0,s.jsx)("span",{className:(0,n.cn)("text-[13px]",l?"font-extrabold text-[#000435]":"font-semibold text-[#000435]"),children:a})]})}function F(e){let{label:t,children:a,hint:l}=e;return(0,s.jsxs)("div",{children:[(0,s.jsx)("label",{className:r.v,children:t}),a,l?(0,s.jsx)("p",{className:"mt-1 text-[11px] text-ink-400",children:l}):null]})}let O=r.Z2,Y=[{label:"Applicant",short:"Applicant"},{label:"Loan Type",short:"Loan Type"},{label:"Amount",short:"Amount"},{label:"Repayment",short:"Repayment"},{label:"Review",short:"Review"},{label:"Verification",short:"Verify"},{label:"Submitted",short:"Done"}];function T(e){var t,a,i,x,h,N,T,W,H,U,q,K,V,G,Q,J,Z,X,$;let{school:ee,open:et,onClose:ea,initialStudent:es}=e,[el,en]=(0,l.useState)(!1),[er,ei]=(0,l.useState)(1),[eo,ec]=(0,l.useState)(!1),[ed,ex]=(0,l.useState)(""),[eu,em]=(0,l.useState)(null),[eh,ep]=(0,l.useState)(!1),[eb,ej]=(0,l.useState)(null),[ef,eN]=(0,l.useState)(!1),[eg,ev]=(0,l.useState)(""),[ew,ey]=(0,l.useState)(""),[ek,eM]=(0,l.useState)(""),[eC,eS]=(0,l.useState)(""),[eL,eB]=(0,l.useState)([]),[eE,eA]=(0,l.useState)(null),[eI,eR]=(0,l.useState)(0),[eP,eF]=(0,l.useState)(!1),[eO,eY]=(0,l

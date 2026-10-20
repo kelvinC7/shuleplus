@@ -1,0 +1,278 @@
+{
+  "baseDomain": "shuleplus.rw",
+  "stagingDomain": "staging.shuleplus.rw",
+  "platform": {
+    "marketing": "",
+    "app": "app",
+    "api": "api",
+    "notificationsApi": "notifications-api"
+  },
+  "modules": [
+    {
+      "slug": "academic",
+      "subdomain": "academic",
+      "name": "Academic Module",
+      "shortName": "Academic",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "student-management",
+      "subdomain": "studentmanagement",
+      "name": "Student Management",
+      "shortName": "Students",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "teacher-portal",
+      "subdomain": "ticha",
+      "name": "Teacher Portal",
+      "shortName": "Ticha",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "school-fees",
+      "subdomain": "fees",
+      "name": "School Fees",
+      "shortName": "Fees",
+      "category": "Finance",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "finance",
+      "subdomain": "finance",
+      "name": "Finance",
+      "shortName": "Finance",
+      "category": "Finance",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "school-budget",
+      "subdomain": "budget",
+      "name": "Budget Management",
+      "shortName": "Budget",
+      "category": "Finance",
+      "healthCheckUrl": "/health"
+    },
+    {
+      "slug": "payroll",
+      "subdomain": "payroll",
+      "name": "Payroll",
+      "shortName": "Pay",
+      "category": "Finance",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "hr",
+      "subdomain": "hr",
+      "name": "HR Management",
+      "shortName": "HR",
+      "category": "Human Resources",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "attendance",
+      "subdomain": "attendance",
+      "name": "Digital Attendance",
+      "shortName": "Digital",
+      "category": "Education",
+      "healthCheckUrl": "/health"
+    },
+    {
+      "slug": "leave",
+      "subdomain": "leave",
+      "name": "Leave Management",
+      "shortName": "Leave",
+      "category": "Human Resources",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "action-plan",
+      "subdomain": "action-plan",
+      "name": "Action Plan MIS",
+      "shortName": "AP",
+      "category": "Productivity",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "procurement-mis",
+      "subdomain": "procurement",
+      "name": "Procurement MIS",
+      "shortName": "Proc",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "inventory",
+      "subdomain": "inventory",
+      "name": "Inventory MIS",
+      "shortName": "Inventory",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "school-uniform",
+      "subdomain": "uniform",
+      "name": "School Uniform MIS",
+      "shortName": "Uniform",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "assets-portal",
+      "subdomain": "assets",
+      "name": "Assets Portal",
+      "shortName": "Assets",
+      "category": "Operations",
+      "healthCheckUrl": "/health"
+    },
+    {
+      "slug": "transport",
+      "subdomain": "transport",
+      "name": "Transport",
+      "shortName": "Transport",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "canteen",
+      "subdomain": "canteen",
+      "name": "School Canteen",
+      "shortName": "Canteen",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "cafeteria",
+      "subdomain": "canteen",
+      "name": "Cafeteria",
+      "shortName": "Cafe",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "schoolmaterial",
+      "subdomain": "materials",
+      "name": "School Materials",
+      "shortName": "Materials",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "shulekit-mis",
+      "subdomain": "materials",
+      "name": "ShuleKit",
+      "shortName": "ShuleKit",
+      "category": "Operations",
+      "healthCheckUrl": "/health"
+    },
+    {
+      "slug": "library",
+      "subdomain": "library",
+      "name": "Library",
+      "shortName": "Library",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "timetable",
+      "subdomain": "timetable",
+      "name": "Timetable",
+      "shortName": "TT",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "mini-website",
+      "subdomain": "website",
+      "name": "School Mini-Website",
+      "shortName": "Website",
+      "category": "Intelligence",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "parent-mis",
+      "subdomain": "parents",
+      "name": "Parent Portal",
+      "shortName": "Parent",
+      "category": "Communication",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "dashboard",
+      "subdomain": "dashboard",
+      "name": "School Dashboard",
+      "shortName": "Dashboard",
+      "category": "Intelligence",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "nesa",
+      "subdomain": "nesa",
+      "name": "NESA Dashboard",
+      "shortName": "NESA",
+      "category": "Governance",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "babyeyi",
+      "subdomain": "babyeyi",
+      "name": "Circular (Babyeyi) Wizard",
+      "shortName": "Circulars",
+      "category": "Communication",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "circulars",
+      "subdomain": "babyeyi",
+      "name": "Circular (Babyeyi) Wizard",
+      "shortName": "Circulars",
+      "category": "Communication",
+      "healthCheckUrl": "/api/health",
+      "aliasOf": "babyeyi",
+      "enabled": false
+    },
+    {
+      "slug": "kaziavance",
+      "subdomain": "kazi",
+      "name": "KaziAdvance",
+      "shortName": "Kazi",
+      "category": "Finance",
+      "healthCheckUrl": "/health"
+    },
+    {
+      "slug": "task-module",
+      "subdomain": "tasks",
+      "name": "Task MIS",
+      "shortName": "Task",
+      "category": "Productivity",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "student-discipline",
+      "subdomain": "discipline",
+      "name": "Student Discipline",
+      "shortName": "SD",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "sample-module",
+      "subdomain": "demo",
+      "name": "Sample Module",
+      "shortName": "Demo",
+      "category": "Productivity",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "print-card",
+      "subdomain": "printcard",
+      "name": "Print Card",
+      "shortName": "Print Card",
+      "category": "Operations",
+      "healthCheckUrl": "/api/health"
+    }
+  ]
+}

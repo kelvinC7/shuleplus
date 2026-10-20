@@ -1,0 +1,46 @@
+/*
+ * ShulePlus Design System — Typography scale
+ * Single source of truth for type styles. Prefer the <Typography> React
+ * components (src/components/typography.tsx); these utility classes exist for
+ * cases where a component wrapper is impractical.
+ *
+ * Scale:
+ *   Display Large  48px / 700   Display        36px / 700
+ *   Page Title     30px / 700   Section Title  24px / 600
+ *   Card Title     20px / 600   Subtitle       18px / 500
+ *   Body           16px / 400   Secondary      14px / 400
+ *   Small          12px / 400   Caption        11px / 500
+ */
+
+@layer utilities {
+  .type-display-lg {
+    @apply text-5xl leading-tight font-bold tracking-tight;
+  }
+  .type-display {
+    @apply text-4xl leading-tight font-bold tracking-tight;
+  }
+  .type-page-title {
+    @apply text-3xl leading-tight font-bold tracking-tight;
+  }
+  .type-section-title {
+    @apply text-2xl leading-snug font-semibold;
+  }
+  .type-card-title {
+    @apply text-xl leading-snug font-semibold;
+  }
+  .type-subtitle {
+    @apply text-lg font-medium;
+  }
+  .type-body {
+    @apply text-base font-normal;
+  }
+  .type-secondary {
+    @apply text-sm font-normal;
+  }
+  .type-small {
+    @apply text-xs font-normal;
+  }
+  .type-caption {
+    @apply text-[11px] font-medium tracking-wide;
+  }
+}

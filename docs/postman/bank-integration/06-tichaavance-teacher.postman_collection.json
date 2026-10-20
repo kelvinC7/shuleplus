@@ -1,0 +1,395 @@
+{
+  "info": {
+    "name": "ShulePlus — 6. TichaAvance Teacher (TichaPortal)",
+    "description": "# TichaAvance — Teacher Flow (TichaPortal BFF)\n\nSame paths used by **ticha.shuleplus.rw** — proxied to KaziAvance.\n\n## Scopes\n- `ticha.read` — dashboard, catalog, history\n- `ticha.write` — submit advance requests\n\n## Flow\n1. Dashboard → 2. Catalog → 3. Calculator → 4. Submit request → 5. Track workflow\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "advance_request_id",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Teacher Dashboard",
+      "description": "",
+      "item": [
+        {
+          "name": "BFF Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/api/health",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Teacher Dashboard (Kazi)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/employee/dashboard",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "employee",
+                "dashboard"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Salary History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/employee/salary-history",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "employee",
+                "salary-history"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Advance History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/employee/advance-history",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "employee",
+                "advance-history"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Approval Workflow Timeline",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/employee/workflow",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "employee",
+                "workflow"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "My Payslip (Payroll+HR)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/teacher-portal/staff/payroll/my",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "teacher-portal",
+                "staff",
+                "payroll",
+                "my"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Submit Advance Request",
+      "description": "",
+      "item": [
+        {
+          "name": "Cashout Catalog",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/advance/catalog",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "advance",
+                "catalog"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Repayment Calculator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/advance/calculator",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "advance",
+                "calculator"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"desiredAmount\": 500000,\n  \"repaymentMonths\": 6\n}"
+            }
+          }
+        },
+        {
+          "name": "Submit Advance Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/advance/requests",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "advance",
+                "requests"
+              ]
+            },
+            "description": "Multipart with signature in production. JSON body for API testing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500000,\n  \"months\": 6,\n  \"purpose\": \"Emergency\",\n  \"description\": \"Partner API test\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const id = json?.id || json?.data?.id;",
+                  "if (id) pm.environment.set(\"advance_request_id\", id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Pending Request",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{ticha_api_url}}/kazi/api/advance/requests/{{advance_request_id}}",
+              "host": [
+                "{{ticha_api_url}}"
+              ],
+              "path": [
+                "kazi",
+                "api",
+                "advance",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

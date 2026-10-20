@@ -1,0 +1,469 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum EntityStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum WalletStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionStatus {
+  SUCCESS
+  PENDING
+  FAILED
+}
+
+enum CashoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+  REJECTED
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum OnboardingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  schoolCode       String?      @map("school_code")
+  schoolProfile    Json?        @map("school_profile")
+  status           TenantStatus @default(ACTIVE)
+  connectedAt      DateTime?    @map("connected_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  studentWallets  StudentWallet[]
+  menuItems       MenuItem[]
+  sales           Sale[]
+  inventoryItems  InventoryItem[]
+  purchaseOrders  PurchaseOrder[]
+  cashoutRequests CashoutRequest[]
+  notifications   CanteenNotification[]
+  settings        Setting[]
+  activityLogs    ActivityLog[]
+
+  @@map("canteen_tenants")
+}
+
+/// Maps IAM users to their role inside the canteen module.
+model CanteenProfile {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  phone          String?
+  role           String
+  supplierId     String?  @map("supplier_id")
+  driverId       String?  @map("driver_id")
+  schoolCode     String?  @map("school_code")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("canteen_profiles")
+}
+
+/// Student card wallet. A student is a record from the Academic module.
+model StudentWallet {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  studentId      String       @map("student_id")
+  studentCode    String       @map("student_code")
+  fullName       String       @map("full_name")
+  className      String?      @map("class_name")
+  cardCode       String       @unique @map("card_code")
+  rfidUid        String?      @map("rfid_uid")
+  photoUrl       String?      @map("photo_url")
+  balanceRwf     Decimal      @default(0) @map("balance_rwf") @db.Decimal(12, 2)
+  status         WalletStatus @default(ACTIVE)
+  lastSyncAt     DateTime?    @map("last_sync_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  tenant     Tenant              @relation(fields: [organizationId], references: [organizationId])
+  transactions WalletTransaction[]
+  sales       Sale[]
+
+  @@unique([organizationId, studentId])
+  @@index([organizationId])
+  @@index([cardCode])
+  @@index([studentCode])
+  @@map("canteen_student_wallets")
+}
+
+model WalletTransaction {
+  id            String            @id @default(uuid())
+  walletId      String            @map("wallet_id")
+  organizationId String           @map("organization_id")
+  type          TransactionType
+  status        TransactionStatus @default(SUCCESS)
+  amount        Decimal           @db.Decimal(12, 2)
+  balanceAfter  Decimal           @map("balance_after") @db.Decimal(12, 2)
+  reference     String?
+  note          String?
+  createdById   String?           @map("created_by_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  wallet StudentWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([organizationId])
+  @@map("canteen_wallet_transactions")
+}
+
+model Supplier {
+  id             String       @id @default(uuid())
+  supplierCode   String       @unique @map("supplier_code")
+  companyName    String       @map("company_name")
+  businessName   String?      @map("business_name")
+  category       String?
+  tinNumber      String?      @map("tin_number")
+  contactPerson  String?      @map("contact_person")
+  phone          String?
+  email          String?
+  province       String?
+  district       String?
+  logoUrl        String?      @map("logo_url")
+  status         EntityStatus @default(PENDING)
+  approvedAt     DateTime?    @map("approved_at")
+  createdById    String?      @map("created_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  products         SupplierProduct[]
+  staff            SupplierStaff[]
+  drivers          Driver[]
+  purchaseOrders   PurchaseOrder[]
+  deliveries       Delivery[]
+  onboardingRequest OnboardingRequest?
+
+  @@index([status])
+  @@map("canteen_suppliers")
+}
+
+model SupplierStaff {
+  id          String   @id @default(uuid())
+  supplierId  String   @map("supplier_id")
+  userId      String   @map("user_id")
+  email       String?
+  phone       String?
+  fullName    String?  @map("full_name")
+  role        String   @default("staff")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, userId])
+  @@index([userId])
+  @@map("canteen_supplier_staff")
+}
+
+/// Products that a supplier offers to canteens.
+model SupplierProduct {
+  id           String   @id @default(uuid())
+  supplierId   String   @map("supplier_id")
+  name         String
+  category     String?
+  unit         String?
+  price        Decimal  @db.Decimal(12, 2)
+  description  String?
+  imageUrl     String?  @map("image_url")
+  status       EntityStatus @default(ACTIVE)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("canteen_supplier_products")
+}
+
+/// Menu items a school canteen sells to students.
+model MenuItem {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  name           String
+  category       String?
+  price          Decimal      @db.Decimal(12, 2)
+  description    String?
+  imageUrl       String?      @map("image_url")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("canteen_menu_items")
+}
+
+model Sale {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  saleNumber     String?  @map("sale_number")
+  walletId       String   @map("wallet_id")
+  studentId      String   @map("student_id")
+  studentName    String   @map("student_name")
+  studentCode    String?  @map("student_code")
+  className      String?  @map("class_name")
+  amount         Decimal  @db.Decimal(12, 2)
+  items          Json?
+  operatorId     String?  @map("operator_id")
+  operatorName   String?  @map("operator_name")
+  schoolCode     String?  @map("school_code")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  wallet StudentWallet @relation(fields: [walletId], references: [id])
+  tenant Tenant        @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([walletId])
+  @@index([studentId])
+  @@map("canteen_sales")
+}
+
+model InventoryItem {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  quantity       Decimal  @db.Decimal(12, 2)
+  unit           String?  @default("pcs")
+  reorderLevel   Decimal? @default(0) @map("reorder_level") @db.Decimal(12, 2)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("canteen_inventory_items")
+}
+
+model PurchaseOrder {
+  id              String      @id @default(uuid())
+  organizationId  String      @map("organization_id")
+  orderNumber     String      @map("order_number")
+  supplierId      String      @map("supplier_id")
+  supplierName    String      @map("supplier_name")
+  status          OrderStatus @default(PENDING)
+  items           Json?
+  totalAmount     Decimal     @db.Decimal(12, 2)
+  notes           String?
+  createdById     String?     @map("created_by_id")
+  createdByName   String?     @map("created_by_name")
+  deliveryId      String?     @map("delivery_id")
+  deliveryStatus  DeliveryStatus? @map("delivery_status")
+  schoolCode      String?     @map("school_code")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [organizationId], references: [organizationId])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  delivery Delivery? @relation(fields: [deliveryId], references: [id])
+
+  @@unique([organizationId, orderNumber])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("canteen_purchase_orders")
+}
+
+model Driver {
+  id                  String       @id @default(uuid())
+  driverCode          String       @unique @map("driver_code")
+  supplierId          String       @map("supplier_id")
+  fullName            String       @map("full_name")
+  phone               String?
+  vehicleType         String?      @map("vehicle_type")
+  plateNumber         String?      @map("plate_number")
+  idNumber            String?      @map("id_number")
+  status              EntityStatus @default(ACTIVE)
+  isAvailable         Boolean      @default(true) @map("is_available")
+  currentLocation     Json?        @map("current_location")
+  currentDeliveryId   String?      @map("current_delivery_id")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  supplier   Supplier   @relation(fields: [supplierId], references: [id])
+  deliveries Delivery[]
+
+  @@index([supplierId])
+  @@map("canteen_drivers")
+}
+
+model Delivery {
+  id                    String         @id @default(uuid())
+  deliveryCode          String         @unique @map("delivery_code")
+  driverId              String         @map("driver_id")
+  supplierId            String         @map("supplier_id")
+  orderIds              Json?
+  destination           String?
+  destinationSchoolCode String?        @map("destination_school_code")
+  estimatedArrival      DateTime?      @map("estimated_arrival")
+  status                DeliveryStatus @default(ASSIGNED)
+  currentLocation       Json?          @map("current_location")
+  notes                 String?
+  deliveredAt           DateTime?      @map("delivered_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  driver   Driver   @relation(fields: [driverId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  purchaseOrders PurchaseOrder[]
+
+  @@index([driverId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("canteen_deliveries")
+}
+
+model CashoutRequest {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  canteenId      String?       @map("canteen_id")
+  schoolCode     String?       @map("school_code")
+  amount         Decimal       @db.Decimal(12, 2)
+  method         String
+  status         CashoutStatus @default(PENDING)
+  operatorId     String?       @map("operator_id")
+  operatorName   String?       @map("operator_name")
+  processedById  String?       @map("processed_by_id")
+  processedAt    DateTime?     @map("processed_at")
+  note           String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("canteen_cashout_requests")
+}
+
+model OnboardingRequest {
+  id             String           @id @default(uuid())
+  organizationId String?          @map("organization_id")
+  entityType     String           @map("entity_type") // canteen | supplier
+  status         OnboardingStatus @default(PENDING)
+  metadata       Json?
+  supplierId     String?          @unique @map("supplier_id")
+  schoolCode     String?          @map("school_code")
+  isLive         Boolean          @default(false) @map("is_live")
+  approvedById   String?          @map("approved_by_id")
+  approvedAt     DateTime?        @map("approved_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([status])
+  @@map("canteen_onboarding_requests")
+}
+
+model CanteenNotification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  message        String
+  type           String
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("canteen_notifications")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, key])
+  @@map("canteen_settings")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("canteen_activity_logs")
+}
+
+model ImageAsset {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  referenceType  String   @map("reference_type")
+  referenceId    String?  @map("reference_id")
+  fileName       String   @map("file_name")
+  fileUrl        String   @map("file_url")
+  uploadedBy     String?  @map("uploaded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@map("canteen_image_assets")
+}

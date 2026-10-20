@@ -1,0 +1,458 @@
+{
+  "info": {
+    "name": "ShulePlus — 3. WebpageBabyeyi (Public BFF)",
+    "description": "# WebpageBabyeyi — babyeyi.rw Backend-for-Frontend\n\nPublic parent-facing **Backend-for-Frontend** used by **babyeyi.rw**.\n\n## Base URL\n`{{babyeyi_bff_url}}` (e.g. `https://babyeyi-api.shuleplus.rw/api`)\n\nProxies to Student Management, School Fees Portal, and Babyeyi Wizard — same paths as the public website.\n\n## Pay fees via BFF\nlookup → fees → pay → status → receipt (public; no OAuth required).\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health & Directory",
+      "description": "BFF status and school directory.",
+      "item": [
+        {
+          "name": "BFF Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/health",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "School Directory",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/school-registrations",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "school-registrations"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student Lookup",
+      "description": "BFF wrapper for student search.",
+      "item": [
+        {
+          "name": "Student Lookup (GET)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/students/lookup?code={{student_code}}",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "students",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "{{student_code}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.id) pm.environment.set(\"student_id\", d.id);",
+                  "if (d?.studentCode) pm.environment.set(\"student_code\", d.studentCode);",
+                  "if (d?.organizationId) pm.environment.set(\"organization_id\", d.organizationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Babyeyi Lookup (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/babyeyi/lookup",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "babyeyi",
+                "lookup"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{student_code}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.id) pm.environment.set(\"student_id\", d.id);",
+                  "if (d?.studentCode) pm.environment.set(\"student_code\", d.studentCode);",
+                  "if (d?.organizationId) pm.environment.set(\"organization_id\", d.organizationId);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pay Fees (BFF)",
+      "description": "Full public payment flow through babyeyi.rw BFF.",
+      "item": [
+        {
+          "name": "Get Student Fees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/student-fees?organizationId={{organization_id}}&studentCode={{student_code}}&academicYear={{academic_year}}&term={{term}}",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "fees",
+                "student-fees"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                },
+                {
+                  "key": "studentCode",
+                  "value": "{{student_code}}"
+                },
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Initiate Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/payments/initiate",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "fees",
+                "payments",
+                "initiate"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organization_id}}\",\n  \"studentCode\": \"{{student_code}}\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\",\n  \"amount\": 5000,\n  \"method\": \"MOMO\",\n  \"phone\": \"0788123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const ref = json?.data?.reference ?? json?.reference;",
+                  "if (ref) { pm.environment.set(\"payment_reference\", ref); console.log(\"payment_reference=\" + ref); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/payments/{{payment_reference}}/status",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "fees",
+                "payments",
+                "{{payment_reference}}",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Receipt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/receipts/{{receipt_number}}",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "fees",
+                "receipts",
+                "{{receipt_number}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Babyeyi Circulars",
+      "description": "Fee document fallback when no structure exists.",
+      "item": [
+        {
+          "name": "Circular Options (years/terms)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/circulars/options?organizationId={{organization_id}}",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "circulars",
+                "options"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Circular",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/circulars?organizationId={{organization_id}}&academicYear={{academic_year}}&term={{term}}",
+              "host": [
+                "{{babyeyi_bff_url}}"
+              ],
+              "path": [
+                "circulars"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                },
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

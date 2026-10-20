@@ -1,0 +1,294 @@
+{
+  "info": {
+    "name": "ShulePlus — 2. Student Management API",
+    "description": "# Student Management API\n\nDirect **Student Management** backend API (`{{students_api_url}}`).\n\n## Public vs authenticated\n- **Public lookup** — no token (`/public/students/lookup`)\n- **Students / classes / parents** — school session JWT (org admin / service); coordinate with ShulePlus for production auth\n\nBase: `{{students_api_url}}`\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Public — Parent PIN (ParentMIS / USSD)",
+      "description": "5-digit PIN auth used by Parent Portal and USSD integrations.",
+      "item": [
+        {
+          "name": "Parent auth status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/status?phone={{parent_phone}}",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "status"],
+              "query": [{ "key": "phone", "value": "{{parent_phone}}" }]
+            }
+          }
+        },
+        {
+          "name": "Parent login (PIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{parent_phone}}\",\n  \"pin\": \"{{parent_pin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/login",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public — Student Lookup",
+      "description": "No org header needed; code embeds school prefix.",
+      "item": [
+        {
+          "name": "Lookup Student by Code",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{students_api_url}}/public/students/lookup?code={{student_code}}",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "public",
+                "students",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "{{student_code}}"
+                }
+              ]
+            },
+            "description": "",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.id) pm.environment.set(\"student_id\", d.id);",
+                  "if (d?.studentCode) pm.environment.set(\"student_code\", d.studentCode);",
+                  "if (d?.organizationId) pm.environment.set(\"organization_id\", d.organizationId);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Students — Authenticated",
+      "description": "Requires school IAM Bearer token + tenant context.",
+      "item": [
+        {
+          "name": "List Students",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/students?academicYear={{academic_year}}&page=1&limit=20",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "students"
+              ],
+              "query": [
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Student by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/students/{{student_id}}",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "students",
+                "{{student_id}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Student",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/students",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Student\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"2015-03-12\",\n  \"classId\": \"{{class_id}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Classes & Parents",
+      "description": "Supporting endpoints for enrollment context.",
+      "item": [
+        {
+          "name": "List Classes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/classes",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "classes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "List Parents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/parents",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "parents"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

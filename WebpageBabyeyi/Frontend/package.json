@@ -1,0 +1,36 @@
+{
+  "name": "babyeyi-web-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
+    "dev": "npm run clean && next dev -p 3016",
+    "dev:fast": "next dev -p 3016",
+    "build": "npm run clean && next build",
+    "build:fast": "next build",
+    "start": "next start -p 3016",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "jsqr": "^1.4.0",
+    "next": "^15.3.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.10",
+    "@types/node": "^22.15.32",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.4",
+    "tailwindcss": "^4.1.10",
+    "typescript": "^5.8.3"
+  }
+}

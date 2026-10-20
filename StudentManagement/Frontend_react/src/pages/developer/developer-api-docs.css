@@ -1,0 +1,336 @@
+.devapi-root {
+  min-height: 100vh;
+  background: #f4f6fb;
+  color: #000435;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.devapi-loading,
+.devapi-forbidden {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.devapi-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #00043520;
+  border-top-color: #fcb038;
+  border-radius: 50%;
+  animation: devapi-spin 0.8s linear infinite;
+}
+
+@keyframes devapi-spin {
+  to { transform: rotate(360deg); }
+}
+
+.devapi-header {
+  background: linear-gradient(135deg, #000435 0%, #1a2a6c 100%);
+  color: #fff;
+  padding: 2rem 2rem 1.5rem;
+}
+
+.devapi-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.devapi-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #fcb038;
+  margin: 0;
+}
+
+.devapi-header h1 {
+  margin: 0.25rem 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.devapi-version {
+  font-size: 0.85rem;
+  background: #fcb038;
+  color: #000435;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.devapi-tagline {
+  margin: 0.5rem 0 0;
+  opacity: 0.85;
+  max-width: 520px;
+  font-size: 0.95rem;
+}
+
+.devapi-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.devapi-select {
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.devapi-btn {
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.devapi-btn-primary {
+  background: #fcb038;
+  color: #000435;
+}
+
+.devapi-btn-outline {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.35);
+  color: #fff;
+}
+
+.devapi-meta-grid {
+  max-width: 1200px;
+  margin: 1.5rem auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+
+.devapi-meta-grid span {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.devapi-meta-grid code,
+.devapi-meta-grid strong {
+  font-size: 0.85rem;
+}
+
+.devapi-status { color: #4ade80; }
+
+.devapi-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .devapi-layout { grid-template-columns: 1fr; }
+}
+
+.devapi-sidebar {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #00043512;
+  padding: 0.75rem;
+  height: fit-content;
+  position: sticky;
+  top: 1rem;
+}
+
+.devapi-nav-item,
+.devapi-subnav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: #00043599;
+}
+
+.devapi-nav-item.active,
+.devapi-subnav-item.active {
+  background: #000435;
+  color: #fcb038;
+  font-weight: 600;
+}
+
+.devapi-subnav {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #00043510;
+}
+
+.devapi-subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.devapi-method {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.devapi-method-get { background: #dcfce7; color: #166534; }
+.devapi-method-post { background: #dbeafe; color: #1e40af; }
+.devapi-method-put { background: #fef3c7; color: #92400e; }
+.devapi-method-patch { background: #fce7f3; color: #9d174d; }
+.devapi-method-delete { background: #fee2e2; color: #991b1b; }
+
+.devapi-panel {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #00043512;
+  padding: 1.5rem;
+}
+
+.devapi-endpoint-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.devapi-endpoint-header code {
+  font-size: 0.9rem;
+  background: #f4f6fb;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+}
+
+.devapi-desc { color: #00043599; line-height: 1.6; }
+
+.devapi-scope {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+  padding: 0.65rem 1rem;
+  background: #f4f6fb;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.devapi-scope code {
+  background: #000435;
+  color: #fcb038;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.devapi-param {
+  margin: 0.75rem 0;
+}
+
+.devapi-param label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.devapi-param input {
+  width: 100%;
+  border: 1px solid #00043520;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.devapi-code {
+  background: #000435;
+  color: #fcb038;
+  padding: 1rem;
+  border-radius: 12px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.devapi-response { color: #86efac; }
+
+.devapi-try-result {
+  margin-top: 1rem;
+  color: #e2e8f0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.devapi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.devapi-actions .devapi-btn-primary {
+  background: #000435;
+  color: #fcb038;
+}
+
+.devapi-actions .devapi-btn-outline {
+  border: 1px solid #00043525;
+  color: #000435;
+}
+
+.devapi-steps {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.devapi-steps li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #00043508;
+}
+
+.devapi-steps li span {
+  background: #fcb038;
+  color: #000435;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}

@@ -1,0 +1,63 @@
+{
+  "name": "shuleplus-iam-backend",
+  "version": "1.0.0",
+  "description": "ShulePlus (Babyeyi) Identity & Access Management Service",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "node scripts/ensure-prisma.js && tsx watch src/server.ts",
+    "build": "prisma generate && tsc && node scripts/copy-generated.mjs",
+    "start": "node dist/server.js",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "tsx prisma/seed-runner.ts",
+    "seed:inventory": "tsx prisma/seed-inventory.ts",
+    "seed:cafeteria": "tsx prisma/seed-cafeteria.ts",
+    "seed:school-fees": "tsx prisma/seed-school-fees.ts",
+    "seed:assets-portal": "tsx prisma/seed-assets-portal.ts",
+    "seed:school-budget": "tsx prisma/seed-school-budget.ts",
+    "seed:attendance": "tsx prisma/seed-attendance.ts",
+    "seed:transport": "tsx prisma/seed-transport.ts",
+    "prisma:import-locations": "tsx prisma/scripts/import-rwanda-locations.ts",
+    "migrate:staff-ids": "tsx scripts/migrate-staff-employee-ids.ts"
+  },
+  "keywords": [
+    "iam",
+    "authentication",
+    "shuleplus",
+    "babyeyi"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.6.1",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^9.0.1",
+    "otplib": "^13.4.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^11.1.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.32",
+    "@types/nodemailer": "^8.0.1",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^10.0.0",
+    "prisma": "^6.9.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

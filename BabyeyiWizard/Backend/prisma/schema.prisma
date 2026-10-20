@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum CircularStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum ApprovalStage {
+  DIRECTOR
+  ACCOUNTANT
+  DISTRICT
+  NESA
+}
+
+enum ApprovalAction {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum NotificationType {
+  DIRECTOR_APPROVED
+  PAYMENT_UPDATED
+  REQUIREMENT_ADDED
+  CIRCULAR_PUBLISHED
+  QR_GENERATED
+  QR_SCANNED
+  VERIFICATION_REPORT
+  VERIFICATION_ALERT
+  PARENT_DOWNLOADED
+  COMMENT_ADDED
+  REMINDER
+  SYSTEM
+}
+
+enum AssetType {
+  LOGO
+  STAMP
+  SIGNATURE
+  OTHER_LOGO
+  LETTERHEAD
+  FOOTER
+}
+
+enum SchoolOwnership {
+  GOVERNMENT
+  GOVERNMENT_AIDED
+  PRIVATE
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  schoolProfile SchoolProfile?
+  circulars     Circular[]
+  templates     Template[]
+  assets        SchoolAsset[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@map("tenants")
+}
+
+model SchoolProfile {
+  id               String          @id @default(uuid())
+  organizationId   String          @unique @map("organization_id")
+  schoolName       String          @map("school_name")
+  schoolCode       String?         @map("school_code")
+  ownershipType    SchoolOwnership @default(GOVERNMENT) @map("ownership_type")
+  academicYear     String          @default("2025-2026") @map("academic_year")
+  principalName    String?         @map("principal_name")
+  province         String?
+  district         String?
+  sector           String?
+  cell             String?
+  village          String?
+  logoPath         String?         @map("logo_path")
+  stampPath        String?         @map("stamp_path")
+  signaturePath    String?         @map("signature_path")
+  otherLogoPath    String?         @map("other_logo_path")
+  letterheadPath   String?         @map("letterhead_path")
+  footerPath       String?         @map("footer_path")
+  themeColor       String          @default("#FCB038") @map("theme_color")
+  fontFamily       String          @default("Montserrat") @map("font_family")
+  verificationStatus String        @default("pending") @map("verification_status")
+  schoolStatus     String          @default("active") @map("school_status")
+  settings         Json            @default("{}")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@map("school_profiles")
+}
+
+model Circular {
+  id                String         @id @default(uuid())
+  organizationId    String         @map("organization_id")
+  academicYear      String         @map("academic_year")
+  term              String
+  className         String         @map("class_name")
+  classes           Json           @default("[]")
+  educationLevel    String?        @map("education_level")
+  schoolCategory    String         @map("school_category")
+  ownershipType     String         @map("ownership_type")
+  feeTargetStudents String         @default("public") @map("fee_target_students")
+  province          String?
+  district          String?
+  sector            String?
+  cell              String?
+  village           String?
+  language          String         @default("en")
+  parentMessage     String?        @map("parent_message") @db.Text
+  payments          Json           @default("[]")
+  requirements      Json           @default("[]")
+  banks             Json           @default("[]")
+  classReqs         Json           @default("[]") @map("class_reqs")
+  otherInfos        Json           @default("[]") @map("other_infos")
+  leaders           Json           @default("[]")
+  status            CircularStatus @default(DRAFT)
+  version           Int            @default(1)
+  publishedBy       String?        @map("published_by")
+  publishedAt       DateTime?      @map("published_at")
+  qrCodePath        String?        @map("qr_code_path")
+  qrHash            String?        @map("qr_hash")
+  pdfPath           String?        @map("pdf_path")
+  requestIncrease   Boolean        @default(false) @map("request_increase")
+  increaseReason    String?        @map("increase_reason")
+  increaseDesc      String?        @map("increase_desc") @db.Text
+  requestReasons    Json           @default("[]") @map("request_reasons")
+  nesaStatus        String?        @map("nesa_status")
+  totalFee          Decimal        @default(0) @map("total_fee") @db.Decimal(14, 2)
+  nesaLimit         Decimal?       @map("nesa_limit") @db.Decimal(14, 2)
+  authorId          String?        @map("author_id")
+  authorName        String?        @map("author_name")
+  isFavorite        Boolean        @default(false) @map("is_favorite")
+  downloadCount     Int            @default(0) @map("download_count")
+  viewCount         Int            @default(0) @map("view_count")
+  qrScanCount       Int            @default(0) @map("qr_scan_count")
+  shareCount        Int            @default(0) @map("share_count")
+  announcements     Json           @default("[]")
+  includeAnnouncements Boolean     @default(false) @map("include_announcements")
+  includeSchoolDescription Boolean @default(false) @map("include_school_description")
+  descriptionLines  Json           @default("[]") @map("description_lines")
+  contentI18n       Json           @default("{}") @map("content_i18n")
+  translationStatus String         @default("pending") @map("translation_status")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  tenant       Tenant              @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+  versions     CircularVersion[]
+  approvals    CircularApproval[]
+  activities   CircularActivity[]
+  comments     CircularComment[]
+  collaborators CircularCollaborator[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([academicYear])
+  @@map("circulars")
+}
+
+model CircularVersion {
+  id           String   @id @default(uuid())
+  circularId   String   @map("circular_id")
+  version      Int
+  snapshot     Json
+  changeType   String   @map("change_type")
+  changedBy    String?  @map("changed_by")
+  changedByName String? @map("changed_by_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+
+  @@index([circularId])
+  @@map("circular_versions")
+}
+
+model CircularApproval {
+  id           String         @id @default(uuid())
+  circularId   String         @map("circular_id")
+  stage        ApprovalStage
+  action       ApprovalAction @default(PENDING)
+  requestedBy  String?        @map("requested_by")
+  approverName String?        @map("approver_name")
+  reason       String?        @db.Text
+  notes        String?        @db.Text
+  actedAt      DateTime?      @map("acted_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+
+  @@index([circularId])
+  @@index([stage, action])
+  @@map("circular_approvals")
+}
+
+model CircularActivity {
+  id          String   @id @default(uuid())
+  circularId  String   @map("circular_id")
+  eventType   String   @map("event_type")
+  description String
+  actorName   String?  @map("actor_name")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+
+  @@index([circularId])
+  @@map("circular_activities")
+}
+
+model CircularComment {
+  id         String   @id @default(uuid())
+  circularId String   @map("circular_id")
+  authorName String   @map("author_name")
+  content    String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+
+  @@index([circularId])
+  @@map("circular_comments")
+}
+
+model CircularCollaborator {
+  id         String   @id @default(uuid())
+  circularId String   @map("circular_id")
+  userName   String   @map("user_name")
+  role       String
+  isEditing  Boolean  @default(false) @map("is_editing")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+
+  @@index([circularId])
+  @@map("circular_collaborators")
+}
+
+model Template {
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  name           String
+  category       String
+  schoolType     String   @map("school_type")
+  description    String?
+  previewData    Json     @default("{}") @map("preview_data")
+  isSystem       Boolean  @default(false) @map("is_system")
+  isFavorite     Boolean  @default(false) @map("is_favorite")
+  usageCount     Int      @default(0) @map("usage_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant? @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([category])
+  @@map("templates")
+}
+
+model SchoolAsset {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  assetType      AssetType @map("asset_type")
+  fileName       String    @map("file_name")
+  filePath       String    @map("file_path")
+  mimeType       String?   @map("mime_type")
+  fileSize       Int?      @map("file_size")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("school_assets")
+}
+
+model Notification {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  type           NotificationType
+  title          String
+  message        String
+  circularId     String?          @map("circular_id")
+  isRead         Boolean          @default(false) @map("is_read")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model RequirementCatalog {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  quantity    String  @default("1")
+  category    String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@map("requirement_catalog")
+}
+
+model NesaFeeLimit {
+  id       String  @id @default(uuid())
+  level    String
+  term     String
+  category String
+  district String?
+  limitRwf Decimal @map("limit_rwf") @db.Decimal(14, 2)
+
+  @@unique([level, term, category, district])
+  @@map("nesa_fee_limits")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  action         String
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  actorName      String?  @map("actor_name")
+  details        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("audit_logs")
+}
+
+model RegisteredClass {
+  id             String @id @default(uuid())
+  organizationId String @map("organization_id")
+  label          String
+  educationLevel String @map("education_level")
+
+  @@unique([organizationId, label])
+  @@index([organizationId])
+  @@map("registered_classes")
+}

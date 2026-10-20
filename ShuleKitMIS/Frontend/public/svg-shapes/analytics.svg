@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/>
+      <stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+<rect x="12" y="36" width="10" height="16" rx="2" fill="url(#gN)" opacity="0.9"/>
+  <rect x="27" y="24" width="10" height="28" rx="2" fill="url(#gA)" opacity="0.95"/>
+  <rect x="42" y="14" width="10" height="38" rx="2" fill="url(#gT)" opacity="0.9"/>
+  <path d="M14 30 L30 18 L46 22" stroke="url(#gN)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.45"/>
+  <circle cx="46" cy="22" r="3.5" fill="url(#gA)"/>
+</svg>

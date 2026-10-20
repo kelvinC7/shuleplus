@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum CardStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  LOST
+  BLOCKED
+  EXPIRED
+  TEMPORARY
+  REPLACED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+  DISABLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  PERMISSION
+  HALF_DAY
+  ENTERED_ONLY
+  EXITED_ONLY
+  EARLY_DEPARTURE
+  SUSPENDED
+  WEEKEND
+  HOLIDAY
+}
+
+enum TapDirection {
+  ENTRY
+  EXIT
+}
+
+enum PermissionType {
+  LATE_ARRIVAL
+  EARLY_DEPARTURE
+  MEDICAL
+  LEAVE
+  EVENT
+  EMERGENCY_PICKUP
+}
+
+enum PermissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  APP
+  WHATSAPP
+  PUSH
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model Tenant {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model AttendanceSettings {
+  id                      String   @id @default(cuid())
+  organizationId          String   @unique @map("organization_id")
+  enableEntry             Boolean  @default(true) @map("enable_entry")
+  enableExit              Boolean  @default(true) @map("enable_exit")
+  enableLateDetection     Boolean  @default(true) @map("enable_late_detection")
+  enableParentNotify      Boolean  @default(true) @map("enable_parent_notify")
+  enableSms               Boolean  @default(true) @map("enable_sms")
+  enableEmail             Boolean  @default(true) @map("enable_email")
+  enableWhatsapp          Boolean  @default(false) @map("enable_whatsapp")
+  enablePush              Boolean  @default(true) @map("enable_push")
+  enableWeekend           Boolean  @default(false) @map("enable_weekend")
+  enableHoliday           Boolean  @default(false) @map("enable_holiday")
+  enableTeacherNotify     Boolean  @default(false) @map("enable_teacher_notify")
+  enableAutoReports       Boolean  @default(true) @map("enable_auto_reports")
+  schoolStarts            String   @default("07:00") @map("school_starts")
+  lateStarts              String   @default("07:15") @map("late_starts")
+  schoolEnds              String   @default("17:00") @map("school_ends")
+  maxExitTime             String   @default("18:00") @map("max_exit_time")
+  weekendStart            String   @default("08:00") @map("weekend_start")
+  attendanceClosingTime   String   @default("09:00") @map("attendance_closing_time")
+  graceMinutes            Int      @default(15) @map("grace_minutes")
+  academicYear            String   @default("2025-2026") @map("academic_year")
+  term                    String   @default("Term 1")
+  schoolName              String?  @map("school_name")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("attendance_settings")
+}
+
+enum AttendanceScheduleScope {
+  SCHOOL
+  CLASS
+}
+
+enum AttendanceScheduleRecurrence {
+  EVERY_DAY
+  WEEKDAYS
+  SPECIFIC_DATE
+}
+
+model AttendanceScheduleRule {
+  id             String                       @id @default(cuid())
+  organizationId String                       @map("organization_id")
+  name           String
+  scope          AttendanceScheduleScope
+  className      String?                      @map("class_name")
+  recurrence     AttendanceScheduleRecurrence
+  weekdays       Json?                        @map("weekdays")
+  specificDate   DateTime?                    @map("specific_date") @db.Date
+  schoolStarts   String?                      @map("school_starts")
+  lateStarts     String?                      @map("late_starts")
+  schoolEnds     String?                      @map("school_ends")
+  staffStarts    String?                      @map("staff_starts")
+  staffEnds      String?                      @map("staff_ends")
+  effectiveFrom  DateTime?                    @map("effective_from") @db.Date
+  effectiveTo    DateTime?                    @map("effective_to") @db.Date
+  reason         String?
+  isActive       Boolean                      @default(true) @map("is_active")
+  createdBy      String?                      @map("created_by")
+  updatedBy      String?                      @map("updated_by")
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, scope, className])
+  @@map("attendance_schedule_rules")
+}
+
+model RfidCard {
+  id               String     @id @default(cuid())
+  organizationId   String     @map("organization_id")
+  cardNumber       String     @map("card_number")
+  uid              String?
+  qrPayload        String?    @map("qr_payload")
+  status           CardStatus @default(PENDING)
+  studentId        String?    @map("student_id")
+  studentCode      String?    @map("student_code")
+  studentName      String?    @map("student_name")
+  className        String?    @map("class_name")
+  level            String?
+  isTemporary      Boolean    @default(false) @map("is_temporary")
+  replacedCardId   String?    @map("replaced_card_id")
+  issuedAt         DateTime?  @map("issued_at")
+  activatedAt      DateTime?  @map("activated_at")
+  expiresAt        DateTime?  @map("expires_at")
+  blockedAt        DateTime?  @map("blocked_at")
+  blockedReason    String?    @map("blocked_reason")
+  lostAt           DateTime?  @map("lost_at")
+  notes            String?
+  usageCount       Int        @default(0) @map("usage_count")
+  lastUsedAt       DateTime?  @map("last_used_at")
+  deletedAt        DateTime?  @map("deleted_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  history      CardHistory[]
+  attendance   AttendanceRecord[]
+  replacements CardReplacement[]  @relation("OldCard")
+
+  @@unique([organizationId, cardNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, studentId])
+  @@map("rfid_cards")
+}
+
+model CardHistory {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  cardId         String   @map("card_id")
+  action         String
+  detail         String?
+  actorUserId    String?  @map("actor_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  card RfidCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, cardId])
+  @@map("card_history")
+}
+
+model CardReplacement {
+  id             String     @id @default(cuid())
+  organizationId String     @map("organization_id")
+  oldCardId      String     @map("old_card_id")
+  newCardNumber  String?    @map("new_card_number")
+  reason         String?
+  status         String     @default("PENDING")
+  requestedBy    String?    @map("requested_by")
+  processedAt    DateTime?  @map("processed_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  oldCard RfidCard @relation("OldCard", fields: [oldCardId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("card_replacements")
+}
+
+model RfidDevice {
+  id               String       @id @default(cuid())
+  organizationId   String       @map("organization_id")
+  deviceCode       String       @map("device_code")
+  name             String
+  location         String       @default("")
+  gateName         String?      @map("gate_name")
+  apiKey           String?      @unique @map("api_key")
+  status           DeviceStatus @default(OFFLINE)
+  direction        TapDirection @default(ENTRY)
+  batteryPercent   Int?         @map("battery_percent")
+  signalQuality    String?      @map("signal_quality")
+  firmwareVersion  String?      @map("firmware_version")
+  wifiSsid         String?      @map("wifi_ssid")
+  wifiPassword     String?      @map("wifi_password")
+  lastSeenAt       DateTime?    @map("last_seen_at")
+  lastSyncAt       DateTime?    @map("last_sync_at")
+  studentsToday    Int          @default(0) @map("students_today")
+  notes            String?
+  deletedAt        DateTime?    @map("deleted_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  logs       DeviceLog[]
+  attendance AttendanceRecord[]
+
+  @@unique([organizationId, deviceCode])
+  @@index([organizationId, status])
+  @@map("rfid_devices")
+}
+
+model DeviceLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  deviceId       String   @map("device_id")
+  event          String
+  detail         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  device RfidDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, deviceId])
+  @@map("device_logs")
+}
+
+/** Idempotent gate tap ids from ESP32 offline queue (prevents duplicate inserts on retry). */
+model GateSyncEvent {
+  eventId        String   @id @map("event_id")
+  organizationId String   @map("organization_id")
+  deviceId       String   @map("device_id")
+  cardNumber     String   @map("card_number")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, deviceId])
+  @@index([createdAt])
+  @@map("gate_sync_events")
+}
+
+model AttendanceRecord {
+  id             String           @id @default(cuid())
+  organizationId String           @map("organization_id")
+  cardId         String?          @map("card_id")
+  deviceId       String?          @map("device_id")
+  studentId      String?          @map("student_id")
+  studentCode    String?          @map("student_code")
+  studentName    String
+  className      String?          @map("class_name")
+  level          String?
+  cardNumber     String?          @map("card_number")
+  deviceCode     String?          @map("device_code")
+  gateName       String?          @map("gate_name")
+  schoolName     String?          @map("school_name")
+  academicYear   String?          @map("academic_year")
+  term           String?
+  direction      TapDirection
+  status         AttendanceStatus @default(PRESENT)
+  lessonDate     DateTime         @map("lesson_date") @db.Date
+  entryTime      DateTime?        @map("entry_time")
+  exitTime       DateTime?        @map("exit_time")
+  durationMins   Int?             @map("duration_mins")
+  isWeekend      Boolean          @default(false) @map("is_weekend")
+  isHoliday      Boolean          @default(false) @map("is_holiday")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  card   RfidCard?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  device RfidDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, lessonDate])
+  @@index([organizationId, studentId, lessonDate])
+  @@index([organizationId, status, lessonDate])
+  @@map("attendance_records")
+}
+
+model ParentContact {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  studentId      String?  @map("student_id")
+  studentCode    String?  @map("student_code")
+  studentName    String
+  className      String?  @map("class_name")
+  parentName     String   @map("parent_name")
+  relationship   String   @default("GUARDIAN")
+  phone          String?
+  email          String?
+  whatsapp       String?
+  isEmergency    Boolean  @default(false) @map("is_emergency")
+  notifySms      Boolean  @default(true) @map("notify_sms")
+  notifyEmail    Boolean  @default(true) @map("notify_email")
+  notifyWhatsapp Boolean  @default(false) @map("notify_whatsapp")
+  notifyPush     Boolean  @default(true) @map("notify_push")
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  notifications ParentNotification[]
+  permissions   PermissionRequest[]
+
+  @@index([organizationId, studentId])
+  @@map("parent_contacts")
+}
+
+model ParentNotification {
+  id             String              @id @default(cuid())
+  organizationId String              @map("organization_id")
+  parentId       String?             @map("parent_id")
+  studentName    String              @map("student_name")
+  channel        NotificationChannel @default(APP)
+  title          String
+  message        String
+  sentAt         DateTime?           @map("sent_at")
+  status         String              @default("QUEUED")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  parent ParentContact? @relation(fields: [parentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("parent_notifications")
+}
+
+model PermissionRequest {
+  id             String           @id @default(cuid())
+  organizationId String           @map("organization_id")
+  parentId       String?          @map("parent_id")
+  studentId      String?          @map("student_id")
+  studentName    String           @map("student_name")
+  className      String?          @map("class_name")
+  type           PermissionType
+  reason         String?
+  forDate        DateTime         @map("for_date") @db.Date
+  status         PermissionStatus @default(PENDING)
+  reviewedBy     String?          @map("reviewed_by")
+  reviewNote     String?          @map("review_note")
+  reviewedAt     DateTime?        @map("reviewed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  parent ParentContact? @relation(fields: [parentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@map("permission_requests")
+}
+
+model SecurityAlert {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  severity       AlertSeverity @default(WARNING)
+  title          String
+  message        String
+  relatedType    String?       @map("related_type")
+  relatedId      String?       @map("related_id")
+  resolved       Boolean       @default(false)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([organizationId, resolved, createdAt])
+  @@map("security_alerts")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  actorUserId    String?  @map("actor_user_id")
+  action         String
+  entityType     String?  @map("entity_type")
+  entityId       String?  @map("entity_id")
+  detail         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}

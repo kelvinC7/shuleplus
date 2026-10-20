@@ -1,0 +1,4 @@
+-- Add verification-related notification types
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'QR_SCANNED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'VERIFICATION_REPORT';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'VERIFICATION_ALERT';

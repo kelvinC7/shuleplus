@@ -1,0 +1,217 @@
+name: Deploy Modules
+
+# Push deploys only when DEPLOY_ENABLED=true (repo variable) and a self-hosted
+# runner is registered on the production server. Without both, detect-changes
+# still runs but deploy is skipped — avoids SSH timeout failures from GitHub-hosted runners.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: Redeploy every module (ignore path filter)
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      authentication: ${{ steps.out.outputs.authentication }}
+      academic: ${{ steps.out.outputs.academic }}
+      teacherportal: ${{ steps.out.outputs.teacherportal }}
+      schoolfeesportal: ${{ steps.out.outputs.schoolfeesportal }}
+      budget: ${{ steps.out.outputs.budget }}
+      payroll: ${{ steps.out.outputs.payroll }}
+      hr: ${{ steps.out.outputs.hr }}
+      attendance: ${{ steps.out.outputs.attendance }}
+      actionplanmis: ${{ steps.out.outputs.actionplanmis }}
+      procurementmis: ${{ steps.out.outputs.procurementmis }}
+      inventorymis: ${{ steps.out.outputs.inventorymis }}
+      assetsportal: ${{ steps.out.outputs.assetsportal }}
+      cafeteria: ${{ steps.out.outputs.cafeteria }}
+      timetable: ${{ steps.out.outputs.timetable }}
+      parentmis: ${{ steps.out.outputs.parentmis }}
+      nesadashboard: ${{ steps.out.outputs.nesadashboard }}
+      babyeyiwizard: ${{ steps.out.outputs.babyeyiwizard }}
+      kaziavance: ${{ steps.out.outputs.kaziavance }}
+      studentdiscpline: ${{ steps.out.outputs.studentdiscpline }}
+      samplemodule: ${{ steps.out.outputs.samplemodule }}
+      shulekitmis: ${{ steps.out.outputs.shulekitmis }}
+      taskmis: ${{ steps.out.outputs.taskmis }}
+      schooluniformmis: ${{ steps.out.outputs.schooluniformmis }}
+      library: ${{ steps.out.outputs.library }}
+      studentmanagement: ${{ steps.out.outputs.studentmanagement }}
+      miniwebsite: ${{ steps.out.outputs.miniwebsite }}
+      webpagebabyeyi: ${{ steps.out.outputs.webpagebabyeyi }}
+      scripts: ${{ steps.out.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: inputs.force_all != true
+        with:
+          filters: |
+            authentication: ['Authentication/**']
+            academic: ['Academic/**']
+            teacherportal: ['TeacherPortal/**', 'TichaPortal/**']
+            schoolfeesportal: ['SchoolFeesPortal/**']
+            budget: ['Budget/**']
+            payroll: ['Payroll/**']
+            hr: ['HR/**']
+            attendance: ['Attendance/**']
+            actionplanmis: ['ActionPlanMIS/**']
+            procurementmis: ['ProcurementMIS/**']
+            inventorymis: ['InventoryMIS/**']
+            assetsportal: ['AssetsPortal/**']
+            cafeteria: ['Cafeteria/**']
+            timetable: ['Timetable/**']
+            parentmis: ['ParentMIS/**']
+            nesadashboard: ['NesaDashboard/**']
+            babyeyiwizard: ['BabyeyiWizard/**']
+            kaziavance: ['KaziAvance/**']
+            studentdiscpline: ['StudentDiscpline/**']
+            samplemodule: ['SampleModule/**']
+            shulekitmis: ['ShuleKitMIS/**']
+            taskmis: ['TaskMIS/**']
+            schooluniformmis: ['SchoolUniformMIS/**']
+            library: ['Library/**']
+            studentmanagement: ['StudentManagement/**']
+            miniwebsite: ['MiniWebsite/**']
+            webpagebabyeyi: ['WebpageBabyeyi/**']
+            scripts: ['scripts/redeploy-module.sh', 'scripts/redeploy-authentication.sh', 'scripts/restart-auth-web.sh', 'scripts/generate-shuleplus-apex-nginx.sh', 'scripts/verify-auth-apex-static.sh', 'scripts/deploy-all-modules.sh', 'scripts/ci-deploy-changed.sh', 'scripts/deploy-babyeyi-rw.sh', 'scripts/fix-babyeyi-shuleplus.sh', 'scripts/verify-babyeyi-host.sh', 'scripts/generate-nginx-modules.sh', 'scripts/ensure-shuleplus-tls.sh', 'scripts/run-ticha-portal.sh', 'scripts/check-ticha-portal-links.mjs', 'config/subdomains.json']
+
+      - id: out
+        shell: bash
+        env:
+          FORCE_ALL: ${{ inputs.force_all == true }}
+          F_AUTHENTICATION: ${{ steps.filter.outputs.authentication }}
+          F_ACADEMIC: ${{ steps.filter.outputs.academic }}
+          F_TEACHERPORTAL: ${{ steps.filter.outputs.teacherportal }}
+          F_SCHOOLFEESPORTAL: ${{ steps.filter.outputs.schoolfeesportal }}
+          F_BUDGET: ${{ steps.filter.outputs.budget }}
+          F_PAYROLL: ${{ steps.filter.outputs.payroll }}
+          F_HR: ${{ steps.filter.outputs.hr }}
+          F_ATTENDANCE: ${{ steps.filter.outputs.attendance }}
+          F_ACTIONPLANMIS: ${{ steps.filter.outputs.actionplanmis }}
+          F_PROCUREMENTMIS: ${{ steps.filter.outputs.procurementmis }}
+          F_INVENTORYMIS: ${{ steps.filter.outputs.inventorymis }}
+          F_ASSETSPORTAL: ${{ steps.filter.outputs.assetsportal }}
+          F_CAFETERIA: ${{ steps.filter.outputs.cafeteria }}
+          F_TIMETABLE: ${{ steps.filter.outputs.timetable }}
+          F_PARENTMIS: ${{ steps.filter.outputs.parentmis }}
+          F_NESADASHBOARD: ${{ steps.filter.outputs.nesadashboard }}
+          F_BABYEYIWIZARD: ${{ steps.filter.outputs.babyeyiwizard }}
+          F_KAZIAVANCE: ${{ steps.filter.outputs.kaziavance }}
+          F_STUDENTDISCPLINE: ${{ steps.filter.outputs.studentdiscpline }}
+          F_SAMPLEMODULE: ${{ steps.filter.outputs.samplemodule }}
+          F_SHULEKITMIS: ${{ steps.filter.outputs.shulekitmis }}
+          F_TASKMIS: ${{ steps.filter.outputs.taskmis }}
+          F_SCHOOLUNIFORMMIS: ${{ steps.filter.outputs.schooluniformmis }}
+          F_LIBRARY: ${{ steps.filter.outputs.library }}
+          F_STUDENTMANAGEMENT: ${{ steps.filter.outputs.studentmanagement }}
+          F_MINIWEBSITE: ${{ steps.filter.outputs.miniwebsite }}
+          F_WEBPAGEBABYEYI: ${{ steps.filter.outputs.webpagebabyeyi }}
+          F_SCRIPTS: ${{ steps.filter.outputs.scripts }}
+        run: |
+          set_mod() {
+            local key="$1" val="$2"
+            if [ "$FORCE_ALL" = "true" ]; then
+              echo "${key}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "${key}=${val:-false}" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          set_mod authentication "$F_AUTHENTICATION"
+          set_mod academic "$F_ACADEMIC"
+          set_mod teacherportal "$F_TEACHERPORTAL"
+          set_mod schoolfeesportal "$F_SCHOOLFEESPORTAL"
+          set_mod budget "$F_BUDGET"
+          set_mod payroll "$F_PAYROLL"
+          set_mod hr "$F_HR"
+          set_mod attendance "$F_ATTENDANCE"
+          set_mod actionplanmis "$F_ACTIONPLANMIS"
+          set_mod procurementmis "$F_PROCUREMENTMIS"
+          set_mod inventorymis "$F_INVENTORYMIS"
+          set_mod assetsportal "$F_ASSETSPORTAL"
+          set_mod cafeteria "$F_CAFETERIA"
+          set_mod timetable "$F_TIMETABLE"
+          set_mod parentmis "$F_PARENTMIS"
+          set_mod nesadashboard "$F_NESADASHBOARD"
+          set_mod babyeyiwizard "$F_BABYEYIWIZARD"
+          set_mod kaziavance "$F_KAZIAVANCE"
+          set_mod studentdiscpline "$F_STUDENTDISCPLINE"
+          set_mod samplemodule "$F_SAMPLEMODULE"
+          set_mod shulekitmis "$F_SHULEKITMIS"
+          set_mod taskmis "$F_TASKMIS"
+          set_mod schooluniformmis "$F_SCHOOLUNIFORMMIS"
+          set_mod library "$F_LIBRARY"
+          set_mod studentmanagement "$F_STUDENTMANAGEMENT"
+          set_mod miniwebsite "$F_MINIWEBSITE"
+          set_mod webpagebabyeyi "$F_WEBPAGEBABYEYI"
+          set_mod scripts "$F_SCRIPTS"
+
+  deploy:
+    needs: detect-changes
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: self-hosted
+    timeout-minutes: 120
+    steps:
+      - name: Pull latest and redeploy changed modules
+        env:
+          CHANGED_AUTHENTICATION: ${{ needs.detect-changes.outputs.authentication }}
+          CHANGED_ACADEMIC: ${{ needs.detect-changes.outputs.academic }}
+          CHANGED_TEACHERPORTAL: ${{ needs.detect-changes.outputs.teacherportal }}
+          CHANGED_SCHOOLFEESPORTAL: ${{ needs.detect-changes.outputs.schoolfeesportal }}
+          CHANGED_BUDGET: ${{ needs.detect-changes.outputs.budget }}
+          CHANGED_PAYROLL: ${{ needs.detect-changes.outputs.payroll }}
+          CHANGED_HR: ${{ needs.detect-changes.outputs.hr }}
+          CHANGED_ATTENDANCE: ${{ needs.detect-changes.outputs.attendance }}
+          CHANGED_ACTIONPLANMIS: ${{ needs.detect-changes.outputs.actionplanmis }}
+          CHANGED_PROCUREMENTMIS: ${{ needs.detect-changes.outputs.procurementmis }}
+          CHANGED_INVENTORYMIS: ${{ needs.detect-changes.outputs.inventorymis }}
+          CHANGED_ASSETSPORTAL: ${{ needs.detect-changes.outputs.assetsportal }}
+          CHANGED_CAFETERIA: ${{ needs.detect-changes.outputs.cafeteria }}
+          CHANGED_TIMETABLE: ${{ needs.detect-changes.outputs.timetable }}
+          CHANGED_PARENTMIS: ${{ needs.detect-changes.outputs.parentmis }}
+          CHANGED_NESADASHBOARD: ${{ needs.detect-changes.outputs.nesadashboard }}
+          CHANGED_BABYEYIWIZARD: ${{ needs.detect-changes.outputs.babyeyiwizard }}
+          CHANGED_KAZIAVANCE: ${{ needs.detect-changes.outputs.kaziavance }}
+          CHANGED_STUDENTDISCPLINE: ${{ needs.detect-changes.outputs.studentdiscpline }}
+          CHANGED_SAMPLEMODULE: ${{ needs.detect-changes.outputs.samplemodule }}
+          CHANGED_SHULEKITMIS: ${{ needs.detect-changes.outputs.shulekitmis }}
+          CHANGED_TASKMIS: ${{ needs.detect-changes.outputs.taskmis }}
+          CHANGED_SCHOOLUNIFORMMIS: ${{ needs.detect-changes.outputs.schooluniformmis }}
+          CHANGED_LIBRARY: ${{ needs.detect-changes.outputs.library }}
+          CHANGED_STUDENTMANAGEMENT: ${{ needs.detect-changes.outputs.studentmanagement }}
+          CHANGED_MINIWEBSITE: ${{ needs.detect-changes.outputs.miniwebsite }}
+          CHANGED_WEBPAGEBABYEYI: ${{ needs.detect-changes.outputs.webpagebabyeyi }}
+          CHANGED_SCRIPTS: ${{ needs.detect-changes.outputs.scripts }}
+        run: |
+          REPO=/root/apps/shuleplus/ShulePlus
+          cd "$REPO"
+          git fetch origin main
+          git reset --hard origin/main
+          chmod +x scripts/*.sh
+          bash scripts/ci-deploy-changed.sh
+
+  deploy-disabled-notice:
+    needs: detect-changes
+    if: vars.DEPLOY_ENABLED != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy skipped
+        run: |
+          echo "::notice title=Deploy skipped::Set repository variable DEPLOY_ENABLED=true and install a self-hosted runner on the production server. See docs/DEPLOY.md."
+          echo "Changed modules would have been deployed if enabled:"
+          echo "  authentication=${{ needs.detect-changes.outputs.authentication }}"
+          echo "  academic=${{ needs.detect-changes.outputs.academic }}"
+          echo "  webpagebabyeyi=${{ needs.detect-changes.outputs.webpagebabyeyi }}"
+          echo "  miniwebsite=${{ needs.detect-changes.outputs.miniwebsite }}"
+          echo "  (see detect-changes job for full list)"

@@ -1,0 +1,41 @@
+import { Router } from 'express';
+import { examPlanningController } from '../controllers/exam-planning.controller';
+import { authenticate, requireModuleLicense } from '../middleware/auth.middleware';
+import { requireTenant } from '../middleware/tenant.middleware';
+
+const router = Router();
+router.use(authenticate, requireModuleLicense, requireTenant);
+
+router.get('/catalog', (req, res, next) => examPlanningController.catalog(req, res, next));
+router.get('/dashboard', (req, res, next) => examPlanningController.dashboard(req, res, next));
+router.get('/invigilator-staff', (req, res, next) => examPlanningController.listStaff(req, res, next));
+router.post('/invigilator-staff', (req, res, next) => examPlanningController.addStaff(req, res, next));
+router.get('/org-users', (req, res, next) => examPlanningController.orgUsers(req, res, next));
+router.get('/', (req, res, next) => examPlanningController.list(req, res, next));
+router.post('/', (req, res, next) => examPlanningController.create(req, res, next));
+router.get('/:id', (req, res, next) => examPlanningController.get(req, res, next));
+router.put('/:id/setup', (req, res, next) => examPlanningController.setup(req, res, next));
+router.post('/:id/generate', (req, res, next) => examPlanningController.generate(req, res, next));
+router.post('/:id/seating', (req, res, next) => examPlanningController.seating(req, res, next));
+router.post('/:id/seats/move', (req, res, next) => examPlanningController.moveSeat(req, res, next));
+router.get('/:id/invigilators/directory', (req, res, next) => examPlanningController.directory(req, res, next));
+router.post('/:id/invigilators/room', (req, res, next) => examPlanningController.setRoomInvigilators(req, res, next));
+router.post('/:id/invigilators', (req, res, next) => examPlanningController.invigilators(req, res, next));
+router.post('/:id/invigilators/override', (req, res, next) => examPlanningController.overrideInvigilator(req, res, next));
+router.post('/:id/invigilators/check-in', (req, res, next) => examPlanningController.checkInInvigilator(req, res, next));
+router.post('/:id/invigilators/replace', (req, res, next) => examPlanningController.replaceInvigilator(req, res, next));
+router.post('/:id/reschedule', (req, res, next) => examPlanningController.reschedule(req, res, next));
+router.post('/:id/move', (req, res, next) => examPlanningController.move(req, res, next));
+router.post('/:id/publish', (req, res, next) => examPlanningController.publish(req, res, next));
+router.post('/:id/status', (req, res, next) => examPlanningController.status(req, res, next));
+router.get('/:id/live', (req, res, next) => examPlanningController.live(req, res, next));
+router.get('/:id/reports', (req, res, next) => examPlanningController.reports(req, res, next));
+router.post('/:id/conflicts/resolve-all', (req, res, next) => examPlanningController.resolveAll(req, res, next));
+router.post('/:id/conflicts/:conflictId/resolve', (req, res, next) => examPlanningController.resolve(req, res, next));
+router.delete('/:id', (req, res, next) => examPlanningController.remove(req, res, next));
+router.post('/schedules/:scheduleId/start', (req, res, next) => examPlanningController.start(req, res, next));
+router.post('/attendance/check-in', (req, res, next) => examPlanningController.checkIn(req, res, next));
+router.post('/attendance/submit', (req, res, next) => examPlanningController.submit(req, res, next));
+router.post('/attendance/exit', (req, res, next) => examPlanningController.exit(req, res, next));
+
+export default router;

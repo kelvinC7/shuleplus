@@ -1,0 +1,40 @@
+.form-stepper {
+  display: flex;
+  align-items: center;
+}
+
+.form-stepper__step {
+  position: relative;
+  padding: 6px 20px 6px 30px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%, 10% 50%);
+  margin-right: -10px;
+  transition: all 0.2s;
+  cursor: pointer;
+  user-select: none;
+}
+
+.form-stepper__step:last-child {
+  margin-right: 0;
+}
+
+.form-stepper__step--first {
+  clip-path: polygon(0% 0%, 90% 0%, 100% 50%, 90% 100%, 0% 100%);
+  padding-left: 15px;
+}
+
+.form-stepper__step--active {
+  background: #001f3f;
+  color: white;
+  z-index: 10;
+}
+
+.form-stepper__step--completed {
+  background: #e2e8f0;
+  color: #001f3f;
+}

@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum FinancialYearStatus {
+  Draft
+  Active
+  Closed
+}
+
+enum BuildingStatus {
+  Finished
+  WorkingProgress
+}
+
+enum AssetHealthStatus {
+  Used
+  NotUsedOld
+}
+
+enum EntryMode {
+  year_setup
+  legacy
+}
+
+enum AssetAdjustmentType {
+  cost_increase
+  cost_decrease
+  accumulated_dep_increase
+  accumulated_dep_decrease
+  annual_dep_increase
+  annual_dep_decrease
+  total_dep_increase
+  total_dep_decrease
+}
+
+model Tenant {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model AssetCategory {
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  name             String
+  icon             String?
+  description      String?
+  depreciationRate Float     @map("depreciation_rate")
+  deletedAt        DateTime? @map("deleted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  yearBalances YearCategoryBalance[]
+  assets       Asset[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("asset_categories")
+}
+
+model FinancialYear {
+  id               String              @id @default(cuid())
+  organizationId   String              @map("organization_id")
+  year             Int
+  startDate        DateTime            @map("start_date")
+  endDate          DateTime            @map("end_date")
+  description      String?
+  depMethod        String              @default("Diminishing") @map("dep_method")
+  autoCarryForward Boolean             @default(true) @map("auto_carry_forward")
+  lockPreviousYear Boolean             @default(true) @map("lock_previous_year")
+  status           FinancialYearStatus @default(Draft)
+  totalOpening     Float               @default(0) @map("total_opening")
+  totalPurchases   Float               @default(0) @map("total_purchases")
+  totalClosing     Float               @default(0) @map("total_closing")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  categoryBalances YearCategoryBalance[]
+
+  @@unique([organizationId, year])
+  @@index([organizationId, status])
+  @@map("financial_years")
+}
+
+model YearCategoryBalance {
+  id                           String @id @default(cuid())
+  organizationId               String @map("organization_id")
+  financialYearId              String @map("financial_year_id")
+  categoryId                   String? @map("category_id")
+  categoryName                 String @map("category_name")
+  openingBalance               Float  @default(0) @map("opening_balance")
+  lastYearClosing              Float? @map("last_year_closing")
+  purchases                    Float  @default(0)
+  accumulatedDepreciationStart Float  @default(0) @map("accumulated_depreciation_start")
+  annualDepreciation           Float  @default(0) @map("annual_depreciation")
+  closingBalance               Float  @default(0) @map("closing_balance")
+  depreciationRate             Float  @map("depreciation_rate")
+
+  financialYear FinancialYear  @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  category      AssetCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([financialYearId, categoryName])
+  @@index([organizationId, categoryName])
+  @@map("year_category_balances")
+}
+
+model Asset {
+  id                      String             @id @default(cuid())
+  organizationId          String             @map("organization_id")
+  assetCode               String             @map("asset_code")
+  assetName               String             @map("asset_name")
+  sku                     String?
+  serialNumber            String?            @map("serial_number")
+  labelTag                String?            @map("label_tag")
+  categoryName            String             @map("category_name")
+  categoryId              String?            @map("category_id")
+  location                String             @default("")
+  locationLabel           String             @default("") @map("location_label")
+  buildingStatus          BuildingStatus?    @map("building_status")
+  registerYear            Int                @map("register_year")
+  openingAmount           Float              @default(0) @map("opening_amount")
+  unitPrice               Float              @default(0) @map("unit_price")
+  saleBalance             Float              @default(0) @map("sale_balance")
+  applySaleBalance        Boolean            @default(false) @map("apply_sale_balance")
+  landProvince            String?            @map("land_province")
+  landDistrict            String?            @map("land_district")
+  landSector              String?            @map("land_sector")
+  landCellule             String?            @map("land_cellule")
+  landVillage             String?            @map("land_village")
+  landUpi                 String?            @map("land_upi")
+  totalBalance            Float              @default(0) @map("total_balance")
+  accumulatedDepreciation Float              @default(0) @map("accumulated_depreciation")
+  depRate                 Float              @default(0) @map("dep_rate")
+  annualDep               Float              @default(0) @map("annual_dep")
+  totalDep                Float              @default(0) @map("total_dep")
+  netBookValue            Float              @default(0) @map("net_book_value")
+  originalTotalBalance    Float?             @map("original_total_balance")
+  originalAccumulatedDep  Float?             @map("original_accumulated_dep")
+  originalDepRate         Float?             @map("original_dep_rate")
+  taxAmount               Float?             @map("tax_amount")
+  priceInclTax            Float?             @map("price_incl_tax")
+  applyTax                Boolean            @default(false) @map("apply_tax")
+  purchaseDate            DateTime?          @map("purchase_date")
+  conditionCode           String?            @map("condition_code")
+  supplier                String?
+  receiptRefs             String?            @map("receipt_refs")
+  quantity                Int                @default(1)
+  assetHealthStatus       AssetHealthStatus  @default(Used) @map("asset_health_status")
+  assetsStatus            String?            @map("assets_status")
+  entryMode               EntryMode?         @map("entry_mode")
+  firstTime               Boolean?           @map("first_time")
+  replacedByAssetId       String?            @map("replaced_by_asset_id")
+  replacesAssetId         String?            @map("replaces_asset_id")
+  deletedAt               DateTime?          @map("deleted_at")
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
+
+  category     AssetCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  adjustments  AssetAdjustment[]
+  assignments  AssetAssignment[]
+  maintenance  AssetMaintenance[]
+  transfers    AssetTransfer[]
+  replacements AssetReplacement[] @relation("OldAsset")
+
+  @@unique([organizationId, assetCode, registerYear])
+  @@index([organizationId, registerYear, categoryName])
+  @@index([organizationId, deletedAt])
+  @@map("asset_register")
+}
+
+model AssetAdjustment {
+  id              String              @id @default(cuid())
+  organizationId  String              @map("organization_id")
+  assetId         String              @map("asset_id")
+  assetCode       String              @map("asset_code")
+  registerYear    Int                 @map("register_year")
+  adjustmentType  AssetAdjustmentType @map("adjustment_type")
+  amount          Float
+  reason          String
+  note            String?
+  adjustmentDate  DateTime            @map("adjustment_date")
+  previousValue   Float?              @map("previous_value")
+  newValue        Float?              @map("new_value")
+  createdByUserId String              @map("created_by_user_id")
+  createdByEmail  String?             @map("created_by_email")
+  createdByName   String?             @map("created_by_name")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, assetCode])
+  @@index([organizationId, assetId])
+  @@index([organizationId, assetCode, registerYear])
+  @@map("asset_adjustments")
+}
+
+model AssetAssignment {
+  id                 String    @id @default(cuid())
+  organizationId     String    @map("organization_id")
+  assetId            String    @map("asset_id")
+  assigneeName       String?   @map("assignee_name")
+  department         String?
+  location           String?
+  assignDate         DateTime  @map("assign_date")
+  expectedReturnDate DateTime? @map("expected_return_date")
+  returnedAt         DateTime? @map("returned_at")
+  returnCondition    String?   @map("return_condition")
+  returnNotes        String?   @map("return_notes")
+  notes              String?
+  status             String    @default("Active")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("asset_assignments")
+}
+
+model AssetMaintenance {
+  id            String    @id @default(cuid())
+  organizationId String   @map("organization_id")
+  assetId       String    @map("asset_id")
+  description   String
+  provider      String?   @default("Internal")
+  priority      String?
+  dueDate       DateTime? @map("due_date")
+  estimatedCost Float?    @map("estimated_cost")
+  status        String    @default("Open")
+  extensionLog  Json?     @map("extension_log")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("asset_maintenance")
+}
+
+model AssetTransfer {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  assetId        String   @map("asset_id")
+  fromLocation   String?  @map("from_location")
+  toLocation     String?  @map("to_location")
+  fromDepartment String?  @map("from_department")
+  toDepartment   String?  @map("to_department")
+  transferDate   DateTime @map("transfer_date")
+  authorizedBy   String?  @map("authorized_by")
+  receivedBy     String?  @map("received_by")
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("asset_transfers")
+}
+
+model AssetReplacement {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  oldAssetId     String   @map("old_asset_id")
+  newAssetId     String?  @map("new_asset_id")
+  reason         String?
+  status         String   @default("Pending")
+  pendingPayload Json?    @map("pending_payload")
+  rejectReason   String?  @map("reject_reason")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  oldAsset Asset @relation("OldAsset", fields: [oldAssetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("asset_replacements")
+}

@@ -1,0 +1,339 @@
+{
+  "info": {
+    "name": "ShulePlus — 1. End-to-End Pay Fees Flow",
+    "description": "# End-to-End School Fees Payment (Direct Module APIs)\n\nComplete parent payment journey — same backend routes as ShulePlus landing / babyeyi.rw.\n\n## Prerequisites\n1. Import environment variables (`students_api_url`, `fees_api_url`, `organization_id`)\n2. Set `student_code`, `academic_year`, `term`\n\n## Flow\n1. Lookup student → 2. Load fees → 3. Initiate payment → 4. Poll status → 5. Get receipt\n\n## Base URLs\n- Student lookup: `{{students_api_url}}/public/students/lookup`\n- Fees & payments: `{{fees_api_url}}/public/...`\n\n> **Note:** Use `method` (MOMO | CARD | BANK), not `channel`, when initiating payments. Public routes need **no Bearer token**.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "student_code",
+      "value": "04001042426"
+    },
+    {
+      "key": "academic_year",
+      "value": "2025-2026"
+    },
+    {
+      "key": "term",
+      "value": "Term 1"
+    },
+    {
+      "key": "payment_reference",
+      "value": ""
+    },
+    {
+      "key": "receipt_number",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Step 1 — Student Lookup",
+      "description": "Find the student before loading fees.",
+      "item": [
+        {
+          "name": "1.1 Lookup Student (Student Management)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{students_api_url}}/public/students/lookup?code={{student_code}}",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "public",
+                "students",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "{{student_code}}"
+                }
+              ]
+            },
+            "description": "Public lookup by ShuleCode / SDMS code. Returns student id, name, class, organizationId.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.id) pm.environment.set(\"student_id\", d.id);",
+                  "if (d?.studentCode) pm.environment.set(\"student_code\", d.studentCode);",
+                  "if (d?.organizationId) pm.environment.set(\"organization_id\", d.organizationId);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Step 2 — Load Fees",
+      "description": "Resolve fee structure and outstanding balance.",
+      "item": [
+        {
+          "name": "2.1 Get Student Fees (School Fees Portal)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{fees_api_url}}/public/student-fees?organizationId={{organization_id}}&studentCode={{student_code}}&academicYear={{academic_year}}&term={{term}}&autoBill=1",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "student-fees"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                },
+                {
+                  "key": "studentCode",
+                  "value": "{{student_code}}"
+                },
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                },
+                {
+                  "key": "autoBill",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Returns fee lines, total, paid, remaining. Creates bill if autoBill=1.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "2.2 Fallback — Babyeyi Circular (optional)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{babyeyi_wizard_api_url}}/public/circulars?organizationId={{organization_id}}&academicYear={{academic_year}}&term={{term}}",
+              "host": [
+                "{{babyeyi_wizard_api_url}}"
+              ],
+              "path": [
+                "public",
+                "circulars"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                },
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                }
+              ]
+            },
+            "description": "Used when no active fee structure exists — returns Babyeyi document fee lines.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 3 — Initiate Payment",
+      "description": "Start MoMo, card, or bank payment.",
+      "item": [
+        {
+          "name": "3.1 Initiate MoMo Payment",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{fees_api_url}}/public/payments/initiate",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "payments",
+                "initiate"
+              ]
+            },
+            "description": "Creates PENDING payment. Send Idempotency-Key; same key+body replays 201, different body → 409.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organization_id}}\",\n  \"studentCode\": \"{{student_code}}\",\n  \"studentName\": \"Test Student\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\",\n  \"amount\": 5000,\n  \"method\": \"MOMO\",\n  \"phone\": \"0788123456\",\n  \"provider\": \"MTN\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const ref = json?.data?.reference ?? json?.reference;",
+                  "if (ref) { pm.environment.set(\"payment_reference\", ref); console.log(\"payment_reference=\" + ref); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 Initiate Bank Transfer Payment",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{fees_api_url}}/public/payments/initiate",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "payments",
+                "initiate"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organization_id}}\",\n  \"studentCode\": \"{{student_code}}\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\",\n  \"amount\": 5000,\n  \"method\": \"BANK\",\n  \"bankName\": \"Bank of Kigali (BK)\",\n  \"accountNumber\": \"0001234567890\",\n  \"accountHolder\": \"Jean Parent\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const ref = json?.data?.reference ?? json?.reference;",
+                  "if (ref) { pm.environment.set(\"payment_reference\", ref); console.log(\"payment_reference=\" + ref); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Step 4 — Confirm & Receipt",
+      "description": "Poll until COMPLETED, then fetch receipt.",
+      "item": [
+        {
+          "name": "4.1 Payment Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{fees_api_url}}/public/payments/{{payment_reference}}/status",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "payments",
+                "{{payment_reference}}",
+                "status"
+              ]
+            },
+            "description": "Poll until status is COMPLETED. In sandbox, may auto-confirm after demo timeout.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "4.2 Get Receipt",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{fees_api_url}}/public/receipts/{{receipt_number}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "receipts",
+                "{{receipt_number}}"
+              ]
+            },
+            "description": "Public receipt verification by receipt number from status response.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

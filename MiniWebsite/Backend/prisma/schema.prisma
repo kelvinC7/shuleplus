@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum WebsiteStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ApplicantStatus {
+  NEW
+  REVIEWED
+  CONTACTED
+  ACCEPTED
+  REJECTED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  district         String?
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  website SchoolWebsite?
+
+  @@map("tenants")
+}
+
+model SchoolWebsite {
+  id               String         @id @default(uuid())
+  organizationId   String         @unique @map("organization_id")
+  organizationName String         @map("organization_name")
+  slug             String         @unique
+  template         String         @default("vschool") @map("template")
+  templateName     String?        @map("template_name")
+  title            String         @map("title")
+  tagline          String?        @map("tagline")
+  heroTitle        String?        @map("hero_title")
+  heroText         String?        @map("hero_text")
+  heroImageUrl     String?        @map("hero_image_url")
+  logoUrl          String?        @map("logo_url")
+  primaryColor     String         @default("#001121") @map("primary_color")
+  secondaryColor   String         @default("#f59e0b") @map("secondary_color")
+  email            String?        @map("email")
+  phone            String?        @map("phone")
+  address          String?        @map("address")
+  province         String?        @map("province")
+  district         String?        @map("district")
+  sector           String?        @map("sector")
+  cell             String?        @map("cell")
+  village          String?        @map("village")
+  schoolCategory   String?        @map("school_category")
+  schoolProgram    String?        @map("school_program")
+  educationLevels  Json?          @map("education_levels")
+  leaders          Json?          @map("leaders")
+  websiteUrl       String?        @map("website_url")
+  about            String?        @map("about")
+  vision           String?        @map("vision")
+  mission          String?        @map("mission")
+  admissionInfo    String?        @map("admission_info")
+  admissionsEnabled Boolean       @default(false) @map("admissions_enabled")
+  admissionForm    Json?          @map("admission_form")
+  programs         Json?          @map("programs")
+  news             Json?          @map("news")
+  gallery          Json?          @map("gallery")
+  stats            Json?          @map("stats")
+  customCss        String?        @map("custom_css")
+  html             String?        @map("html")
+  status           WebsiteStatus  @default(DRAFT)
+  publishedAt      DateTime?      @map("published_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  tenant    Tenant?       @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+  pages     WebsitePage[]
+  applicants Applicant[]
+
+  @@map("school_websites")
+}
+
+model WebsitePage {
+  id        String         @id @default(uuid())
+  websiteId String         @map("website_id")
+  slug      String
+  title     String
+  content   String         @db.Text
+  sortOrder Int            @default(0) @map("sort_order")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  website SchoolWebsite @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, slug])
+  @@index([websiteId])
+  @@map("website_pages")
+}
+
+model Applicant {
+  id              String          @id @default(uuid())
+  websiteId       String          @map("website_id")
+  fullName        String          @map("full_name")
+  email           String?         @map("email")
+  phone           String          @map("phone")
+  gradeAppliedFor String?         @map("grade_applied_for")
+  birthDate       String?         @map("birth_date")
+  parentName      String?         @map("parent_name")
+  previousSchool  String?         @map("previous_school")
+  message         String?         @map("message")
+  formData        Json?           @map("form_data")
+  status          ApplicantStatus @default(NEW)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  website SchoolWebsite @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([websiteId, status])
+  @@map("applicants")
+}

@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-primary: #fcb038;
+  --color-navy: #000435;
+  --color-navy-light: #1a1f5c;
+  --color-background: #f8fafc;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-navy);
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.input {
+  @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy outline-none transition;
+}
+
+.input:focus {
+  @apply border-primary/50 ring-2 ring-primary/20;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-navy-light disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-slate-50 disabled:opacity-50;
+}
+
+.text-primary { color: var(--color-primary); }
+.text-navy { color: var(--color-navy); }
+.text-muted { color: var(--color-muted); }
+.bg-primary { background-color: var(--color-primary); }
+.border-border { border-color: var(--color-border); }
+.bg-navy { background-color: var(--color-navy); }
+.hover\:bg-navy-light:hover { background-color: var(--color-navy-light); }

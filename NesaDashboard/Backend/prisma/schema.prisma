@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PolicyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum EducationLevel {
+  NURSERY
+  PRIMARY
+  SECONDARY
+  TVET
+}
+
+enum StudentType {
+  DAY
+  BOARDING
+}
+
+model FeePolicy {
+  id              String         @id @default(uuid())
+  academicYear    String
+  term            Int
+  educationLevel  EducationLevel
+  studentType     StudentType
+  /// JSON string array: GOVERNMENT | GOVERNMENT_AIDED
+  ownerships      Json
+  /// JSON string array: ["ALL"] or ["P1","P2",...]
+  applyToClasses  Json
+  maxTuitionRwf   Decimal        @db.Decimal(14, 2)
+  status          PolicyStatus   @default(DRAFT)
+  effectiveDate   DateTime?
+  description     String?
+  version         Int            @default(1)
+  archivedAt      DateTime?
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status, academicYear, term, educationLevel, studentType])
+  @@map("fee_policies")
+}
+
+model GeneralAssemblyPolicy {
+  id                   String       @id @default(uuid())
+  /// JSON: ["ALL"] or ["NURSERY","PRIMARY","SECONDARY","TVET"]
+  levels               Json
+  /// JSON: GOVERNMENT | GOVERNMENT_AIDED
+  ownerships           Json
+  /// JSON: DAY | BOARDING | ALL
+  studentTypes         Json
+  maxAmountRwf         Decimal      @db.Decimal(14, 2)
+  requireApproval      Boolean      @default(true)
+  maxTimesPerTerm      Int          @default(1)
+  allowMultipleCharges Boolean      @default(false)
+  requireAttachment    Boolean      @default(false)
+  /// JSON string array of attachment type labels
+  attachmentTypes      Json         @default("[]")
+  description          String?
+  status               PolicyStatus @default(DRAFT)
+  effectiveDate        DateTime?
+  version              Int          @default(1)
+  archivedAt           DateTime?
+  createdBy            String?
+  updatedBy            String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([status])
+  @@map("general_assembly_policies")
+}
+
+model PolicyAuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String?
+  action     String
+  actorId    String?
+  actorName  String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("policy_audit_logs")
+}

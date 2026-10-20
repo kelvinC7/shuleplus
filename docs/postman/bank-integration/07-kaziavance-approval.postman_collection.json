@@ -1,0 +1,812 @@
+{
+  "info": {
+    "name": "ShulePlus — 7. KaziAvance Approval (Org Admin)",
+    "description": "# KaziAvance — Org Admin Approval Flow\n\nDirect KaziAvance API for school finance / HR admins.\n\n## Scopes\n- `kazi.read` — list requests, employees, policies\n- `kazi.write` — manage employees, policies\n- `kazi.approve` — review, approve, reject, disburse\n\n## Approval actions (PATCH /requests/:id)\n`{ \"action\": \"review\" | \"approve\" | \"reject\" | \"disburse\", \"amount\": 500000, \"comment\": \"...\" }`\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Dashboard & Employees",
+      "description": "",
+      "item": [
+        {
+          "name": "Kazi Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/health",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Org Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/dashboard",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "dashboard"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Sync Staff from Payroll",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/sync-payroll",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "sync-payroll"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Advance Policies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/policies",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "policies"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff Setup for TichaAvance",
+      "description": "Search staff → set salary → enable advance (same as TichaPortal org admin).",
+      "item": [
+        {
+          "name": "1. Sync Staff Directory (HR/Timetable/IAM)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/sync-directory",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "sync-directory"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "2. Lookup Staff by Name / Code / ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/lookup?q={{staff_search}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{staff_search}}"
+                }
+              ]
+            },
+            "description": "Also supports ?id=, ?employeeCode=, ?email=, ?iamUserId=, ?phone="
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const row = json?.data?.[0];",
+                  "if (row?.id) pm.environment.set(\"employee_id\", row.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Set Salary + Enable Advance (one step)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/{{employee_id}}/advance-setup",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "{{employee_id}}",
+                "advance-setup"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grossSalary\": 850000,\n  \"netSalary\": 720000,\n  \"allowances\": 50000,\n  \"deductions\": 180000,\n  \"allowAdvance\": true,\n  \"eligibilityStatus\": \"Eligible\",\n  \"maxSalaryPercent\": 50,\n  \"reason\": \"Salary set via partner API for TichaAvance\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Or — Set Salary Only",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/{{employee_id}}/salary",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "{{employee_id}}",
+                "salary"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grossSalary\": 850000,\n  \"netSalary\": 720000,\n  \"allowances\": 50000,\n  \"deductions\": 180000,\n  \"reason\": \"Manual salary update\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5. Or — Enable Eligibility Only",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/{{employee_id}}/eligibility",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "{{employee_id}}",
+                "eligibility"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"allowAdvance\": true,\n  \"eligibilityStatus\": \"Eligible\",\n  \"maxSalaryPercent\": 50,\n  \"maxActiveAdvances\": 1,\n  \"waitingPeriodDays\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "6. Pull Salary from Payroll Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/employees/{{employee_id}}/fetch-payroll-salary",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "employees",
+                "{{employee_id}}",
+                "fetch-payroll-salary"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Request Queue",
+      "description": "",
+      "item": [
+        {
+          "name": "List Advance Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Requests Workspace",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/workspace",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "workspace"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Request Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/{{advance_request_id}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Approve / Reject / Disburse",
+      "description": "Run in order for a pending request.",
+      "item": [
+        {
+          "name": "1. Mark Under Review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/{{advance_request_id}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"review\",\n  \"comment\": \"Reviewing documentation\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Approve Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/{{advance_request_id}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"amount\": 500000,\n  \"comment\": \"Approved by finance\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Disburse Funds",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/{{advance_request_id}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"disburse\",\n  \"comment\": \"Disbursed to employee account\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reject Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/requests/{{advance_request_id}}",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "requests",
+                "{{advance_request_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\",\n  \"comment\": \"Insufficient eligibility\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Active Advances & Repayments",
+      "description": "",
+      "item": [
+        {
+          "name": "Active Advances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/active-advances",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "active-advances"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Repayments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/repayments",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "repayments"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kazi_api_url}}/api/org-admin/audit-logs",
+              "host": [
+                "{{kazi_api_url}}"
+              ],
+              "path": [
+                "api",
+                "org-admin",
+                "audit-logs"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

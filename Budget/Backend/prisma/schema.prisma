@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum BudgetStatus {
+  draft
+  pending_approval
+  approved
+  rejected
+  closed
+}
+
+model Tenant {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model SchoolBudget {
+  id                    String       @id @default(cuid())
+  organizationId        String       @map("organization_id")
+  budgetCode            String       @map("budget_code")
+  title                 String
+  academicYear          String       @map("academic_year")
+  term                  String
+  budgetType            String       @map("budget_type")
+  startDate             DateTime?    @map("start_date")
+  endDate               DateTime?    @map("end_date")
+  description           String?
+  preparedByName        String?      @map("prepared_by_name")
+  status                BudgetStatus @default(draft)
+  totalExpectedIncomeRwf Float       @default(0) @map("total_expected_income_rwf")
+  totalAllocatedRwf     Float        @default(0) @map("total_allocated_rwf")
+  submittedAt           DateTime?    @map("submitted_at")
+  managerReviewedById   String?      @map("manager_reviewed_by_id")
+  managerReviewedByName String?      @map("manager_reviewed_by_name")
+  managerReviewedAt     DateTime?    @map("manager_reviewed_at")
+  managerNotes          String?      @map("manager_notes")
+  createdById           String?      @map("created_by_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  incomeSources SchoolBudgetIncomeSource[]
+  lines         SchoolBudgetLine[]
+  auditLogs     SchoolBudgetAuditLog[]
+
+  @@unique([organizationId, budgetCode])
+  @@index([organizationId, status])
+  @@index([organizationId, academicYear])
+  @@map("school_budgets")
+}
+
+model SchoolBudgetIncomeSource {
+  id                String   @id @default(cuid())
+  budgetId          String   @map("budget_id")
+  incomeSourceKey   String   @map("income_source_key")
+  expectedAmountRwf Float    @map("expected_amount_rwf")
+  configJson        Json?    @map("config_json")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  budget SchoolBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([budgetId])
+  @@map("school_budget_income_sources")
+}
+
+model SchoolBudgetLine {
+  id               String    @id @default(cuid())
+  budgetId         String    @map("budget_id")
+  lineName         String    @map("line_name")
+  category         String
+  department       String
+  priority         String?
+  plannedAmountRwf Float     @map("planned_amount_rwf")
+  usedAmountRwf    Float     @default(0) @map("used_amount_rwf")
+  startDate        DateTime? @map("start_date")
+  endDate          DateTime? @map("end_date")
+  notes            String?
+  isFrozen         Boolean   @default(false) @map("is_frozen")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  budget SchoolBudget            @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  usages SchoolBudgetLineUsage[]
+
+  @@index([budgetId])
+  @@index([budgetId, department])
+  @@map("school_budget_lines")
+}
+
+model SchoolBudgetLineUsage {
+  id              String   @id @default(cuid())
+  budgetLineId    String   @map("budget_line_id")
+  amountRwf       Float    @map("amount_rwf")
+  usageDate       DateTime @map("usage_date")
+  expenseCategory String?  @map("expense_category")
+  paymentMethod   String?  @map("payment_method")
+  paymentBankName String?  @map("payment_bank_name")
+  paymentPhone    String?  @map("payment_phone")
+  description     String?
+  receiptName     String?  @map("receipt_name")
+  source          String?  @default("manual")
+  createdById     String?  @map("created_by_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  budgetLine SchoolBudgetLine @relation(fields: [budgetLineId], references: [id], onDelete: Cascade)
+
+  @@index([budgetLineId])
+  @@index([usageDate])
+  @@map("school_budget_line_usages")
+}
+
+model SchoolBudgetAuditLog {
+  id        String   @id @default(cuid())
+  organizationId String @map("organization_id")
+  budgetId  String?  @map("budget_id")
+  action    String
+  actorId   String?  @map("actor_id")
+  actorRole String?  @map("actor_role")
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  budget SchoolBudget? @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("school_budget_audit_logs")
+}

@@ -1,0 +1,277 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary: #fcb038;
+  --color-ochre: #c87800;
+  --color-gold: #febf10;
+  --color-navy: #000435;
+  --color-navy-deep: #000521;
+  --color-navy-light: #1a1f5c;
+  --color-background: #f8fafc;
+  --color-surface: #f8fafc;
+  --color-muted: #64748b;
+  --color-muted-foreground: #64748b;
+  --color-border: #e2e8f0;
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-navy);
+}
+
+.input {
+  @apply w-full rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 text-sm text-navy outline-none backdrop-blur-sm transition-all duration-300;
+  box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.01);
+}
+
+.input:focus {
+  @apply border-primary bg-white ring-4 ring-primary/10;
+  box-shadow: 0 4px 12px rgba(252, 176, 56, 0.05);
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-gold px-5 py-3 text-sm font-semibold text-navy transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md hover:shadow-primary/20 hover:translate-y-[-1px] active:translate-y-[0px];
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-navy transition-all duration-300 cursor-pointer hover:border-slate-300 hover:bg-slate-50/70 hover:translate-y-[-1px] active:translate-y-[0px];
+}
+
+.badge {
+  @apply inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-300 transition-all duration-300;
+}
+
+.sidebar-link:hover {
+  @apply bg-white/5 text-white translate-x-1;
+}
+
+.sidebar-link-active {
+  background: linear-gradient(135deg, rgba(252, 176, 56, 0.15) 0%, rgba(254, 191, 16, 0.05) 100%);
+  border: 1px solid rgba(252, 176, 56, 0.25);
+  @apply text-primary shadow-lg shadow-primary/5 translate-x-1 font-extrabold;
+}
+
+.dashboard-bg {
+  background-color: #f4f6fb;
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(252, 176, 56, 0.08), transparent 38%),
+    radial-gradient(circle at 88% 92%, rgba(0, 4, 53, 0.06), transparent 42%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.hr-card {
+  @apply rounded-2xl border border-white bg-white/70 backdrop-blur-md shadow-sm transition-all duration-300;
+  box-shadow: 0 4px 20px -2px rgba(0, 4, 53, 0.03), 0 1px 3px -1px rgba(0, 4, 53, 0.02);
+}
+
+.hr-card-hover {
+  @apply hover:-translate-y-1 hover:border-primary/20 hover:bg-white/85 hover:shadow-md;
+}
+
+.stat-card {
+  @apply border border-slate-100/80;
+}
+
+.platform-sidebar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.hr-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(252, 176, 56, 0.45) transparent;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(252, 176, 56, 0.4);
+  border-radius: 999px;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(252, 176, 56, 0.65);
+}
+
+.page-header {
+  @apply flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-navy/[0.06] bg-white px-5 py-4 shadow-sm sm:px-6;
+  box-shadow: 0 1px 2px rgba(0, 4, 53, 0.04), 0 8px 24px rgba(0, 4, 53, 0.06);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-200/80 hover:bg-slate-300;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #fcb038;
+  --primary-foreground: #000435;
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: #000435;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: #000435;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #fcb038;
+  --sidebar-primary-foreground: #000435;
+  --sidebar-accent: rgba(252, 176, 56, 0.15);
+  --sidebar-accent-foreground: #fcb038;
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-ring: #fcb038;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+.inv-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(252, 176, 56, 0.45) transparent;
+}
+
+.inv-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inv-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inv-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(252, 176, 56, 0.4);
+  border-radius: 999px;
+}
+
+.inv-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(252, 176, 56, 0.65);
+}
+

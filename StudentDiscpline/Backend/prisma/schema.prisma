@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  disciplineSettings Json?      @map("discipline_settings")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  disciplineCases         DisciplineCase[]
+  disciplineMarks         DisciplineMark[]
+  studentDisciplineBalances StudentDisciplineBalance[]
+  permissionRequests      PermissionRequest[]
+  gates                   Gate[]
+  gateOfficers            GateOfficer[]
+  gateLogs                GateLog[]
+
+  @@map("tenants")
+}
+
+model DisciplineMark {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  category       String   @default("General")
+  type           String
+  points         Int
+  status         String   @default("Active")
+  isDefault      Boolean  @default(true) @map("is_default")
+  usageCount     Int      @default(0) @map("usage_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [organizationId], references: [organizationId])
+  cases  DisciplineCase[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+  @@map("discipline_marks")
+}
+
+model StudentDisciplineBalance {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  studentCode    String?  @map("student_code")
+  studentName    String   @map("student_name")
+  className      String?  @map("class_name")
+  classId        String?  @map("class_id")
+  currentScore   Int      @default(100) @map("current_score")
+  maxScore       Int      @default(100) @map("max_score")
+  totalCases     Int      @default(0) @map("total_cases")
+  casesThisTerm  Int      @default(0) @map("cases_this_term")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, studentId])
+  @@index([organizationId, studentCode])
+  @@map("student_discipline_balances")
+}
+
+model DisciplineCase {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  caseNumber     String    @map("case_number")
+  studentId      String?   @map("student_id")
+  studentCode    String?   @map("student_code")
+  studentName    String    @map("student_name")
+  className      String    @map("class_name")
+  classId        String?   @map("class_id")
+  academicYear   String?   @map("academic_year")
+  markId         String?   @map("mark_id")
+  markName       String?   @map("mark_name")
+  customCaseName String?   @map("custom_case_name")
+  category       String    @default("Conduct")
+  severity       String    @default("Medium")
+  status         String    @default("Open")
+  incidentDate   DateTime  @map("incident_date") @db.Date
+  incidentTime   String?   @map("incident_time")
+  location       String?
+  description    String?
+  appliedPoints  Int?      @map("applied_points")
+  defaultPoints  Int?      @map("default_points")
+  scoreBefore    Int?      @map("score_before")
+  scoreAfter     Int?      @map("score_after")
+  actionsTaken   Json?     @map("actions_taken")
+  actionNotes    String?   @map("action_notes")
+  notifyParent   Boolean   @default(false) @map("notify_parent")
+  notifyMethods  Json?     @map("notify_methods")
+  evidence       Json?
+  witnesses      Json?
+  resolvedAt     DateTime? @map("resolved_at")
+  createdBy      String    @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant          @relation(fields: [organizationId], references: [organizationId])
+  mark   DisciplineMark? @relation(fields: [markId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, caseNumber])
+  @@index([organizationId, className])
+  @@index([organizationId, studentCode])
+  @@index([organizationId, studentId])
+  @@index([organizationId, status])
+  @@map("discipline_cases")
+}
+
+model PermissionRequest {
+  id                         String    @id @default(uuid())
+  organizationId             String    @map("organization_id")
+  referenceNumber            String    @map("reference_number")
+  studentId                  String    @map("student_id")
+  studentCode                String?   @map("student_code")
+  studentName                String    @map("student_name")
+  className                  String    @map("class_name")
+  classId                    String?   @map("class_id")
+  academicYear               String?   @map("academic_year")
+  term                       String?
+  permissionType             String    @map("permission_type")
+  customType                 String?   @map("custom_type")
+  reason                     String
+  destination                String    @default("")
+  destinationAddress         String?   @map("destination_address")
+  scanCode                   String    @unique @map("scan_code")
+  departureDate              DateTime  @map("departure_date") @db.Date
+  departureTime              String    @map("departure_time")
+  expectedReturnDate         DateTime  @map("expected_return_date") @db.Date
+  expectedReturnTime         String    @map("expected_return_time")
+  durationMinutes            Int?      @map("duration_minutes")
+  leavingWith                String    @map("leaving_with")
+  guardianName               String?   @map("guardian_name")
+  guardianRelationship       String?   @map("guardian_relationship")
+  guardianPhone              String?   @map("guardian_phone")
+  authorizedPersonName       String?   @map("authorized_person_name")
+  authorizedPersonRelationship String? @map("authorized_person_relationship")
+  authorizedPersonPhone      String?   @map("authorized_person_phone")
+  authorizedPersonId         String?   @map("authorized_person_id")
+  requestedBy                String    @map("requested_by")
+  requestedByName            String?   @map("requested_by_name")
+  approvalChain              Json?     @map("approval_chain")
+  status                     String    @default("Pending")
+  actualDepartureAt          DateTime? @map("actual_departure_at")
+  actualReturnAt             DateTime? @map("actual_return_at")
+  createdBy                  String    @map("created_by")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant            @relation(fields: [organizationId], references: [organizationId])
+  events PermissionEvent[]
+  gateLogs GateLog[]
+
+  @@unique([organizationId, referenceNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, studentId])
+  @@index([organizationId, departureDate])
+  @@map("permission_requests")
+}
+
+model PermissionEvent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  permissionId   String   @map("permission_id")
+  eventType      String   @map("event_type")
+  actorName      String?  @map("actor_name")
+  actorRole      String?  @map("actor_role")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  permission PermissionRequest @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@index([permissionId])
+  @@map("permission_events")
+}
+
+model Gate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  code           String?
+  location       String?
+  status         String   @default("Active")
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant        @relation(fields: [organizationId], references: [organizationId])
+  officers GateOfficer[]
+  logs     GateLog[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+  @@map("gates")
+}
+
+model GateOfficer {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  gateId         String?  @map("gate_id")
+  userId         String?  @map("user_id")
+  fullName       String   @map("full_name")
+  email          String?
+  phone          String?
+  pin            String?
+  role           String   @default("Gate Officer")
+  status         String   @default("Active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant  @relation(fields: [organizationId], references: [organizationId])
+  gate   Gate?   @relation(fields: [gateId], references: [id], onDelete: SetNull)
+  logs   GateLog[]
+
+  @@index([organizationId, status])
+  @@map("gate_officers")
+}
+
+model GateLog {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  gateId          String   @map("gate_id")
+  permissionId    String?  @map("permission_id")
+  studentId       String   @map("student_id")
+  studentCode     String?  @map("student_code")
+  studentName     String   @map("student_name")
+  className       String?  @map("class_name")
+  eventType       String   @map("event_type")
+  method          String
+  officerId       String?  @map("officer_id")
+  officerName     String?  @map("officer_name")
+  expectedTime    String?  @map("expected_time")
+  actualTime      DateTime @map("actual_time")
+  varianceMinutes Int?     @map("variance_minutes")
+  varianceLabel   String?  @map("variance_label")
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant             @relation(fields: [organizationId], references: [organizationId])
+  gate       Gate               @relation(fields: [gateId], references: [id])
+  permission PermissionRequest? @relation(fields: [permissionId], references: [id], onDelete: SetNull)
+  officer    GateOfficer?       @relation(fields: [officerId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, studentId])
+  @@index([organizationId, eventType])
+  @@map("gate_logs")
+}

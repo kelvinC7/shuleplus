@@ -1,0 +1,178 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Package, Loader2, ArrowRight, Tag, Star, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import TeacherOrangeHero from '../components/TeacherOrangeHero';
+import { kaziGetDeals, KAZI_DIRECT_URL } from '../services/kaziApi';
+
+const UPLOADS_BASE = KAZI_DIRECT_URL;
+
+function toAssetUrl(pathLike) {
+  if (!pathLike || typeof pathLike !== 'string') return null;
+  if (pathLike.startsWith('http://') || pathLike.startsWith('https://')) return pathLike;
+  const clean = pathLike.replace(/\\/g, '/');
+  return `${UPLOADS_BASE}${clean.startsWith('/') ? clean : `/${clean}`}`;
+}
+
+function formatMoney(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '-';
+  return `${Math.round(v).toLocaleString()} RWF`;
+}
+
+export default function TichaDeals() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dealProducts, setDealProducts] = useState([]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const products = await kaziGetDeals();
+      setDealProducts(Array.isArray(products) ? products : []);
+    } catch (e) {
+      setError('Could not load deals catalog. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    loadData();
+  }, [loadData]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f0f2f9] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-[#f59e0b]" />
+        <p className="text-[#000435]/60 text-[10px] font-black uppercase tracking-widest animate-pulse">Loading Catalog...</p>
+      </div>
+    );
+  }
+
+  const featuredProduct = dealProducts[0] || null;
+  const popularDeals = dealProducts.slice(1);
+
+  return (
+    <div className="min-h-screen bg-[#f0f2f9] pb-28 font-sans">
+      
+      <TeacherOrangeHero
+        title="Ticha Deals"
+        subtitle="Exclusive products - pay monthly from your payroll."
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/ticha-deals/tracking')}
+          className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-white border border-white/40 px-4 py-2 rounded-xl bg-white/15 hover:bg-white/25 transition-all"
+        >
+          <ArrowRight size={11} /> Track my requests
+        </button>
+      </TeacherOrangeHero>
+
+      <div className="max-w-[1000px] mx-auto px-4 sm:px-6 -mt-8 relative z-20">
+        
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-white p-4 flex items-center gap-3 text-red-600 shadow-lg">
+            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
+               <AlertTriangle size={20} />
+            </div>
+            <p className="font-bold text-xs">{error}</p>
+          </div>
+        )}
+
+        {/* ── Featured Deal ── */}
+        {featuredProduct && (
+          <div
+            onClick={() => navigate(`/ticha-deals/${featuredProduct.id}`)}
+            className="bg-white rounded-[22px] overflow-hidden cursor-pointer shadow-xl hover:shadow-2xl transition-all mb-6 border border-black/5 group active:scale-[0.99]"
+          >
+            <div className="flex flex-col sm:flex-row">
+              <div className="w-full sm:w-[220px] h-[200px] sm:h-[220px] bg-slate-50 flex items-center justify-center relative overflow-hidden shrink-0">
+                <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-[#f59e0b] to-[#ff7b00] text-white text-[10px] font-black px-2.5 py-1 rounded-lg tracking-widest uppercase shadow-md flex items-center gap-1">
+                  <Star size={9} className="fill-white" /> Featured
+                </div>
+                {featuredProduct.image_url ? (
+                  <img src={toAssetUrl(featuredProduct.image_url)} alt={featuredProduct.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-700 p-6" />
+                ) : (
+                  <Package className="h-12 w-12 text-slate-300" />
+                )}
+              </div>
+              <div className="flex-1 p-5 flex flex-col justify-between">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black text-[#000435] mb-2 line-clamp-2 leading-tight">
+                    {featuredProduct.name}
+                  </h2>
+                  <p className="text-[12px] text-slate-500 font-semibold line-clamp-2 leading-relaxed">
+                    {featuredProduct.short_description || featuredProduct.description || 'Premium quality product available for you.'}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-slate-100">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Price</p>
+                    <span className="text-xl font-black text-[#f59e0b]">{formatMoney(featuredProduct.price_rwf)}</span>
+                  </div>
+                  <button className="flex items-center gap-2 px-5 py-3 bg-[#000435] text-white text-[11px] font-black uppercase tracking-widest rounded-xl group-hover:bg-[#0a116b] transition-colors whitespace-nowrap">
+                    Request deal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── All Deals Grid ── */}
+        {popularDeals.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1 mt-8">
+              <h2 className="text-sm font-black text-[#000435] flex items-center gap-2 uppercase tracking-wider">
+                <Tag size={15} className="text-[#f59e0b]" /> All Deals
+              </h2>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{popularDeals.length} products</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {popularDeals.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => navigate(`/ticha-deals/${p.id}`)}
+                  className="bg-white rounded-[18px] overflow-hidden cursor-pointer group shadow-sm hover:shadow-lg transition-all duration-300 border border-black/5 flex flex-col active:scale-[0.97]"
+                >
+                  <div className="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center p-3">
+                    {p.image_url ? (
+                      <img src={toAssetUrl(p.image_url)} alt={p.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500" />
+                    ) : (
+                      <Package className="h-10 w-10 text-slate-200" />
+                    )}
+                  </div>
+                  
+                  <div className="p-3 flex-1 flex flex-col border-t border-slate-50/80">
+                    <h3 className="text-xs font-black text-[#000435] leading-snug mb-2 line-clamp-2">{p.name}</h3>
+                    <div className="mt-auto flex items-center justify-between gap-1">
+                      <span className="text-sm font-black text-[#f59e0b] truncate">{formatMoney(p.price_rwf)}</span>
+                      <span className="inline-flex h-8 items-center rounded-lg bg-[#fcb038] px-2.5 text-[10px] font-black uppercase tracking-wide text-[#000435]">
+                        Request
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!dealProducts.length && !loading && !error && (
+          <div className="rounded-[32px] border-2 border-dashed border-black/5 bg-white p-12 flex flex-col items-center justify-center text-center mt-10 shadow-sm">
+            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+               <Package className="h-10 w-10 text-slate-300" />
+            </div>
+            <h3 className="text-lg font-black text-[#000435] mb-2">No Deals Yet</h3>
+            <p className="text-xs font-bold text-slate-400 max-w-xs">Check back later for exclusive discounts and new product arrivals.</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

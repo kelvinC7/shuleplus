@@ -1,0 +1,14 @@
+{
+  "name": "@shuleplus/session-access-ui",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./session-access-denied-screen.tsx",
+  "types": "./session-access-denied-screen.tsx",
+  "exports": {
+    ".": "./session-access-denied-screen.tsx",
+    "./illustration": "./session-expired-illustration.tsx"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

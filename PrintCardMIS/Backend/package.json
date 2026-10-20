@@ -1,0 +1,48 @@
+{
+  "name": "print-card-service",
+  "version": "1.0.0",
+  "description": "ShulePlus Print Card / Smart Cards microservice",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "node scripts/ensure-database.mjs && prisma migrate deploy && tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "worker:photo-import": "tsx src/workers/photo-import.worker.ts",
+    "worker:photo-import:prod": "node dist/workers/photo-import.worker.js",
+    "setup:env": "node -e \"require('fs').copyFileSync('.env.example','.env')\"",
+    "db:ensure": "node scripts/ensure-database.mjs",
+    "db:reset": "node scripts/reset-database.mjs",
+    "db:setup": "node scripts/reset-database.mjs && prisma migrate deploy && prisma generate",
+    "db:migrate": "prisma migrate deploy && prisma generate",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "resync:staff-cards": "tsx scripts/resync-all-staff-cards.ts"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "adm-zip": "^0.5.16",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "pg": "^8.23.0",
+    "sharp": "^0.34.2",
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^22.15.32",
+    "prisma": "^6.9.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

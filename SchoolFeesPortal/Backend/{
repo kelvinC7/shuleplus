@@ -1,0 +1,1 @@
+import { prisma } from './src/config/database'; (async () = const s = await prisma.feeStructure.findFirst({ where: { status: 'ACTIVE' }, select: { organizationId: true, academicYear: true, term: true, className: true } }); console.log(JSON.stringify(s)); await prisma.\(); })();

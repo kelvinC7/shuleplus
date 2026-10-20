@@ -1,0 +1,54 @@
+/* ShulePlus shared theme — import in each microservice globals.css:
+   @import "@shuleplus/ui/theme";
+*/
+
+:root {
+  --background: #f8fafc;
+  --foreground: #000435;
+  --card: #ffffff;
+  --card-foreground: #000435;
+  --popover: #ffffff;
+  --popover-foreground: #000435;
+  --primary: #fcb038;
+  --primary-foreground: #000435;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #000435;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #fff7ed;
+  --accent-foreground: #000435;
+  --destructive: #ef4444;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #fcb038;
+  --radius: 0.75rem;
+  --sidebar: #000435;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #fcb038;
+  --sidebar-primary-foreground: #000435;
+  --sidebar-accent: #0a0f5c;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #fcb038;
+}
+
+.dark {
+  --background: #000435;
+  --foreground: #f8fafc;
+  --card: #0a0f5c;
+  --card-foreground: #f8fafc;
+  --primary: #fcb038;
+  --primary-foreground: #000435;
+  --secondary: #0a0f5c;
+  --secondary-foreground: #f8fafc;
+  --muted: #0a0f5c;
+  --muted-foreground: #94a3b8;
+  --destructive: #f87171;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #fcb038;
+  --sidebar: #000435;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #fcb038;
+  --sidebar-primary-foreground: #000435;
+}

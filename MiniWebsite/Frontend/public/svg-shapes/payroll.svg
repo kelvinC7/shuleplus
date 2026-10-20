@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/>
+      <stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+<path d="M18 10 H46 C48 10 50 12 50 14 V52 L44 48 L38 52 L32 48 L26 52 L20 48 L14 52 V14 C14 12 16 10 18 10 Z" fill="url(#gN)" opacity="0.92"/>
+  <path d="M20 12 H48 C49.5 12 51 13.5 51 15 V50 L45.5 46.5 L40 50.5 L34 46.5 L28 50.5 L22.5 46.5 L17 50.5 V15 C17 13.5 18.5 12 20 12 Z" fill="url(#gA)" opacity="0.88"/>
+  <path d="M26 24 H42" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 31 H38" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+  <path d="M26 38 H34" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.65"/>
+  <circle cx="42" cy="38" r="5" fill="url(#gT)"/>
+</svg>

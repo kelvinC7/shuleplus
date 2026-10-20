@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  records      Record[]
+  reports      Report[]
+  settings     Setting[]
+  activityLogs ActivityLog[]
+
+  @@map("tenants")
+}
+
+model UserCache {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([organizationId, userId])
+  @@map("users_cache")
+}
+
+model Record {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  description    String?
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("records")
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  summary        String?
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("reports")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, key])
+  @@map("settings")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("activity_logs")
+}

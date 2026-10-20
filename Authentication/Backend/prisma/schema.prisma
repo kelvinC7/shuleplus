@@ -1,0 +1,1279 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  DISABLED
+  ARCHIVED
+}
+
+enum OrganizationType {
+  SCHOOL
+  UNIVERSITY
+  NGO
+  FACTORY
+  HOSPITAL
+  CHURCH
+  BUSINESS
+  TVET
+  SACCO
+  COOPERATIVE
+  GOVERNMENT_INSTITUTION
+  HOTEL
+  OTHER
+}
+
+enum RegistrationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ModuleAssignmentStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  PENDING
+}
+
+enum SubscriptionPeriod {
+  MONTHLY
+  YEARLY
+  LIFETIME
+  TRIAL
+  ENTERPRISE
+  CUSTOM
+}
+
+enum OrgSubscriptionStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+enum DataScope {
+  SELF
+  DEPARTMENT
+  BRANCH
+  ORGANIZATION
+  GLOBAL
+}
+
+/// Per-module access within an organization.
+/// HEAD sees all users' work in that module; USER only sees their own.
+enum ModuleAccessLevel {
+  USER
+  HEAD
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  EMAIL_VERIFIED
+  MFA_ENABLED
+  MFA_DISABLED
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  ROLE_ASSIGNED
+  ROLE_REMOVED
+  PERMISSION_CHANGED
+  SESSION_REVOKED
+  ORGANIZATION_CREATED
+  ORGANIZATION_UPDATED
+  ORGANIZATION_SUSPENDED
+  ORGANIZATION_DISABLED
+  ORGANIZATION_ARCHIVED
+  MODULE_ENABLED
+  MODULE_DISABLED
+  EMERGENCY_CONTROL_UPDATED
+  SUPER_ADMIN_CREATED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum MfaMethod {
+  EMAIL_OTP
+  AUTHENTICATOR_APP
+}
+
+enum AdmissionApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  DOCUMENTS_VERIFICATION
+  ASSESSMENT_INTERVIEW
+  ADMISSION_APPROVED
+  FEE_PAYMENT
+  ENROLLED
+  REJECTED
+}
+
+// ─── Organization ────────────────────────────────────────────────────────────
+
+model Organization {
+  id               String             @id @default(uuid())
+  organizationCode String?            @unique @map("organization_code")
+  name             String
+  slug             String             @unique
+  type             OrganizationType   @default(SCHOOL)
+  category         String?
+  status           OrganizationStatus @default(PENDING)
+  email            String?
+  phone            String?
+  address          String?
+  physicalAddress  String?            @map("physical_address")
+  poBox            String?            @map("po_box")
+  website          String?
+  registrationNumber String?            @map("registration_number")
+  tin              String?
+  description      String?
+  establishedDate  DateTime?          @map("established_date")
+  gpsCoordinates   String?            @map("gps_coordinates")
+  mapUrl           String?            @map("map_url")
+  country          String             @default("Rwanda")
+  provinceId       String?            @map("province_id")
+  districtId       String?            @map("district_id")
+  sectorId         String?            @map("sector_id")
+  cellId           String?            @map("cell_id")
+  villageId        String?            @map("village_id")
+  logoUrl          String?            @map("logo_url")
+  signatureUrl     String?            @map("signature_url")
+  stampUrl         String?            @map("stamp_url")
+  subscriptionTier String?            @map("subscription_tier")
+  modules          Json               @default("[]")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  province         Province?          @relation(fields: [provinceId], references: [id])
+  district         District?          @relation(fields: [districtId], references: [id])
+  sector           Sector?            @relation(fields: [sectorId], references: [id])
+  cell             Cell?              @relation(fields: [cellId], references: [id])
+  village          Village?           @relation(fields: [villageId], references: [id])
+  users            User[]
+  roles            Role[]
+  auditLogs        AuditLog[]
+  schoolProfile    SchoolProfile?
+  hospitalProfile  HospitalProfile?
+  factoryProfile   FactoryProfile?
+  churchProfile    ChurchProfile?
+  companyProfile   CompanyProfile?
+  registration     OrganizationRegistration?
+  assignedModules  OrganizationModule[]
+  subscription     OrganizationSubscription?
+  admissionSettings SchoolAdmissionSettings?
+  admissionApplications AdmissionApplication[]
+  developerPartnerSandbox    DeveloperPartner[] @relation("PartnerSandboxOrg")
+  developerPartnerProduction DeveloperPartner? @relation("PartnerProductionOrg")
+  representativeAssignments SchoolRepresentativeAssignment[]
+  representativeAlerts       RepresentativeAlert[]
+  chiefAccountantAssignments ChiefAccountantAssignment[]
+
+  @@map("organizations")
+}
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id                String     @id @default(uuid())
+  organizationId    String     @map("organization_id")
+  email             String
+  passwordHash      String     @map("password_hash")
+  firstName         String     @map("first_name")
+  lastName          String     @map("last_name")
+  phone             String?
+  avatarUrl         String?    @map("avatar_url")
+  department        String?
+  branch            String?
+  position          String?
+  employeeId        String?    @map("employee_id")
+  supervisorId      String?    @map("supervisor_id")
+  status            UserStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt   DateTime?  @map("email_verified_at")
+  failedLoginCount  Int        @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?  @map("locked_until")
+  lastLoginAt       DateTime?  @map("last_login_at")
+  mfaEnabled        Boolean    @default(false) @map("mfa_enabled")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  activatedAt       DateTime?  @map("activated_at")
+  rfidUid           String?    @map("rfid_uid")
+  fingerprintId     String?    @map("fingerprint_id")
+  identityRemarks   String?    @map("identity_remarks")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supervisor        User?           @relation("UserSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  supervisees       User[]          @relation("UserSupervisor")
+  userRoles         UserRole[]
+  userModules       UserModule[]
+  sessions          Session[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  mfaSecret         MfaSecret?
+  representativeProfile        SchoolRepresentativeProfile?
+  representativeAssignments    SchoolRepresentativeAssignment[] @relation("RepUser")
+  representativeAssignmentsMade SchoolRepresentativeAssignment[] @relation("RepAssignedBy")
+  representativeFollowUps      RepresentativeFollowUp[]
+  chiefAccountantProfile       ChiefAccountantProfile?
+  chiefAccountantAssignments   ChiefAccountantAssignment[] @relation("ChiefAccountantUser")
+  chiefAccountantAssignmentsMade ChiefAccountantAssignment[] @relation("ChiefAccountantAssignedBy")
+  seiOfficerProfile            SeiOfficerProfile?
+  deoOfficerProfile            DeoOfficerProfile?
+
+  @@unique([organizationId, email])
+  @@index([organizationId, department])
+  @@map("users")
+}
+
+// ─── Role & Permission ───────────────────────────────────────────────────────
+
+model Role {
+  id             String   @id @default(uuid())
+  organizationId String?  @map("organization_id")
+  name           String
+  slug           String
+  description    String?
+  hierarchyLevel Int      @default(0) @map("hierarchy_level")
+  isSystem       Boolean  @default(false) @map("is_system")
+  dataScope      DataScope @default(SELF) @map("data_scope")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+  userRoles      UserRole[]
+
+  @@unique([organizationId, slug])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  module      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── Session & Tokens ───────────────────────────────────────────────────────
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  deviceName   String?  @map("device_name")
+  browser      String?
+  os           String?
+  ipAddress    String?  @map("ip_address")
+  location     String?
+  userAgent    String?  @map("user_agent")
+  isActive     Boolean  @default(true) @map("is_active")
+  lastActivity DateTime @default(now()) @map("last_activity")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  sessionId String   @map("session_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── MFA ─────────────────────────────────────────────────────────────────────
+
+model MfaSecret {
+  id        String    @id @default(uuid())
+  userId    String    @unique @map("user_id")
+  method    MfaMethod
+  secret    String
+  isVerified Boolean  @default(false) @map("is_verified")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mfa_secrets")
+}
+
+model MfaSession {
+  id                String   @id @default(uuid())
+  token             String   @unique
+  userId            String   @map("user_id")
+  ipAddress         String?  @map("ip_address")
+  userAgent         String?  @map("user_agent")
+  rememberMe        Boolean  @default(false) @map("remember_me")
+  verificationStep  Int      @default(0) @map("verification_step")
+  expiresAt         DateTime @map("expires_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("mfa_sessions")
+}
+
+model MfaOtp {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("mfa_otps")
+}
+
+// ─── Audit & Notifications ───────────────────────────────────────────────────
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  organizationId String?     @map("organization_id")
+  userId         String?     @map("user_id")
+  action         AuditAction
+  resource       String?
+  resourceId     String?     @map("resource_id")
+  metadata       Json?
+  ipAddress      String?     @map("ip_address")
+  userAgent      String?     @map("user_agent")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String              @map("user_id")
+  channel   NotificationChannel
+  title     String
+  body      String
+  isRead    Boolean             @default(false) @map("is_read")
+  metadata  Json?
+  sentAt    DateTime?           @map("sent_at")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Platform (ROOT_ADMIN) ───────────────────────────────────────────────────
+
+model PlatformSettings {
+  id                      String   @id @default("platform")
+  maintenanceMode         Boolean  @default(false) @map("maintenance_mode")
+  loginsDisabled          Boolean  @default(false) @map("logins_disabled")
+  registrationsDisabled   Boolean  @default(false) @map("registrations_disabled")
+  forceLogoutAll          Boolean  @default(false) @map("force_logout_all")
+  lockedOrganizationId    String?  @map("locked_organization_id")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  updatedById             String?  @map("updated_by_id")
+
+  @@map("platform_settings")
+}
+
+model PlatformModule {
+  id                   String   @id @default(uuid())
+  slug                 String   @unique
+  name                 String
+  shortName            String?  @map("short_name")
+  description          String?
+  category             String?
+  version              String   @default("1.0.0")
+  logoUrl              String?  @map("logo_url")
+  color                String?  @default("#FCB038")
+  icon                 String?
+  frontendUrl          String?  @map("frontend_url")
+  backendUrl           String?  @map("backend_url")
+  docsUrl              String?  @map("docs_url")
+  healthCheckUrl       String?  @map("health_check_url")
+  requiredPermissions  Json     @default("[]") @map("required_permissions")
+  minSubscriptionPlan  String?  @map("min_subscription_plan")
+  isEnabled            Boolean  @default(true) @map("is_enabled")
+  maintenanceMode      Boolean  @default(false) @map("maintenance_mode")
+  isPublic             Boolean  @default(true) @map("is_public")
+  isPremium            Boolean  @default(false) @map("is_premium")
+  isCore               Boolean  @default(false) @map("is_core")
+  allowTrial           Boolean  @default(false) @map("allow_trial")
+  visibleInMarketplace Boolean  @default(true) @map("visible_in_marketplace")
+  licenseType          String?  @map("license_type")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  dependencies         ModuleDependency[] @relation("ModuleDependsOn")
+  requiredBy           ModuleDependency[] @relation("ModuleRequiredBy")
+  organizationModules  OrganizationModule[]
+  userModules          UserModule[]
+
+  @@map("platform_modules")
+}
+
+model ModuleDependency {
+  moduleId          String @map("module_id")
+  dependsOnModuleId String @map("depends_on_module_id")
+
+  module    PlatformModule @relation("ModuleDependsOn", fields: [moduleId], references: [id], onDelete: Cascade)
+  dependsOn PlatformModule @relation("ModuleRequiredBy", fields: [dependsOnModuleId], references: [id], onDelete: Cascade)
+
+  @@id([moduleId, dependsOnModuleId])
+  @@map("module_dependencies")
+}
+
+model OrganizationModule {
+  id                  String                 @id @default(uuid())
+  organizationId      String                 @map("organization_id")
+  moduleId            String                 @map("module_id")
+  status              ModuleAssignmentStatus @default(PENDING)
+  subscriptionPlan    String?                @map("subscription_plan")
+  moduleVersion       String?                @map("module_version")
+  activatedById       String?                @map("activated_by_id")
+  activatedAt         DateTime?              @map("activated_at")
+  expiresAt           DateTime?              @map("expires_at")
+  tenantProvisioned   Boolean                @default(false) @map("tenant_provisioned")
+  tenantProvisionedAt DateTime?              @map("tenant_provisioned_at")
+  /// Hidden from the organization launcher without unassigning.
+  isHidden            Boolean                @default(false) @map("is_hidden")
+  /// Optional per-module limits (seats, records, storage...) as free-form JSON.
+  limits              Json                   @default("{}")
+  provisionLastError  String?                @map("provision_last_error")
+  provisionAttempts   Int                    @default(0) @map("provision_attempts")
+  config              Json                   @default("{}")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  module       PlatformModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleId])
+  @@index([organizationId, status])
+  @@map("organization_modules")
+}
+
+/// History of provisioning / lifecycle actions per org module (View Logs).
+model ModuleProvisionLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  moduleId       String?  @map("module_id")
+  moduleSlug     String?  @map("module_slug")
+  action         String
+  success        Boolean  @default(true)
+  message        String?
+  actorId        String?  @map("actor_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("module_provision_logs")
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id          String             @id @default(uuid())
+  code        String             @unique
+  name        String
+  period      SubscriptionPeriod @default(MONTHLY)
+  amount      Float              @default(0)
+  currency    String             @default("RWF")
+  description String?
+  features    Json               @default("[]")
+  isActive    Boolean            @default(true) @map("is_active")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  subscriptions OrganizationSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model OrganizationSubscription {
+  id             String                @id @default(uuid())
+  organizationId String                @unique @map("organization_id")
+  planId         String                @map("plan_id")
+  status         OrgSubscriptionStatus @default(ACTIVE)
+  startsAt       DateTime              @default(now()) @map("starts_at")
+  endsAt         DateTime?             @map("ends_at")
+  renewedAt      DateTime?             @map("renewed_at")
+  cancelledAt    DateTime?             @map("cancelled_at")
+  notes          String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("organization_subscriptions")
+}
+
+model UserModule {
+  id             String            @id @default(uuid())
+  userId         String            @map("user_id")
+  organizationId String            @map("organization_id")
+  moduleId       String            @map("module_id")
+  /// HEAD can view all users' work in this module; USER only their own.
+  accessLevel    ModuleAccessLevel @default(USER) @map("access_level")
+  /// Effective data scope for this module assignment.
+  dataScope      DataScope         @default(SELF) @map("data_scope")
+  assignedById   String?           @map("assigned_by_id")
+  assignedAt     DateTime          @default(now()) @map("assigned_at")
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module PlatformModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([organizationId])
+  @@index([organizationId, moduleId, accessLevel])
+  @@map("user_modules")
+}
+
+// ─── Rwanda Administrative Locations ─────────────────────────────────────────
+
+model Province {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  code      String?    @unique
+  districts District[]
+  organizations Organization[]
+
+  @@map("provinces")
+}
+
+model District {
+  id         String   @id @default(uuid())
+  provinceId String   @map("province_id")
+  name       String
+  code       String   @unique
+  sectors    Sector[]
+  organizations Organization[]
+  orgCounter DistrictOrgCounter?
+
+  province Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+
+  @@unique([provinceId, name])
+  @@map("districts")
+}
+
+model Sector {
+  id         String @id @default(uuid())
+  districtId String @map("district_id")
+  name       String
+  cells      Cell[]
+  organizations Organization[]
+
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@unique([districtId, name])
+  @@map("sectors")
+}
+
+model Cell {
+  id       String @id @default(uuid())
+  sectorId String @map("sector_id")
+  name     String
+  villages Village[]
+  organizations Organization[]
+
+  sector Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+
+  @@unique([sectorId, name])
+  @@map("cells")
+}
+
+model Village {
+  id     String @id @default(uuid())
+  cellId String @map("cell_id")
+  name   String
+  organizations Organization[]
+
+  cell Cell @relation(fields: [cellId], references: [id], onDelete: Cascade)
+
+  @@unique([cellId, name])
+  @@map("villages")
+}
+
+model DistrictOrgCounter {
+  districtId String @id @map("district_id")
+  lastSerial Int    @default(0) @map("last_serial")
+
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@map("district_org_counters")
+}
+
+// ─── Organization Registration Wizard ──────────────────────────────────────────
+
+model OrganizationRegistration {
+  id               String             @id @default(uuid())
+  organizationCode String?            @unique @map("organization_code")
+  organizationName String             @map("organization_name")
+  organizationType OrganizationType   @map("organization_type")
+  status           RegistrationStatus @default(DRAFT)
+  payload          Json
+  submittedById    String?            @map("submitted_by_id")
+  reviewedById     String?            @map("reviewed_by_id")
+  organizationId   String?            @unique @map("organization_id")
+  reviewNotes      String?            @map("review_notes")
+  submittedAt      DateTime?          @map("submitted_at")
+  reviewedAt       DateTime?          @map("reviewed_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("organization_registrations")
+}
+
+model SchoolProfile {
+  organizationId   String   @id @map("organization_id")
+  schoolCategory   String?  @map("school_category")
+  schoolProgram    String?  @map("school_program")
+  educationLevels  Json     @default("[]") @map("education_levels")
+  aLevelCombinations Json   @default("[]") @map("a_level_combinations")
+  tvetTrades       Json     @default("[]") @map("tvet_trades")
+  curriculum       String?
+  ownership        String?
+  academicYear     String?  @map("academic_year")
+  academicSettings Json?    @map("academic_settings")
+  schoolMotto      String?  @map("school_motto")
+  schoolShift      String?  @map("school_shift")
+  principalName    String?  @map("principal_name")
+  deputyHeadName   String?  @map("deputy_head_name")
+  bursarName       String?  @map("bursar_name")
+  secretaryName    String?  @map("secretary_name")
+  leadershipPhone  String?  @map("leadership_phone")
+  leadershipEmail  String?  @map("leadership_email")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("school_profiles")
+}
+
+model HospitalProfile {
+  organizationId     String  @id @map("organization_id")
+  hospitalType       String? @map("hospital_type")
+  bedsCapacity       Int?    @map("beds_capacity")
+  departments        Json    @default("[]")
+  emergencyServices  Boolean @default(false) @map("emergency_services")
+  laboratory         Boolean @default(false)
+  pharmacy           Boolean @default(false)
+  operatingHours     String? @map("operating_hours")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("hospital_profiles")
+}
+
+model FactoryProfile {
+  organizationId        String @id @map("organization_id")
+  industry              String?
+  productionType        String? @map("production_type")
+  factorySize           String? @map("factory_size")
+  employeeCapacity      Int?    @map("employee_capacity")
+  workingShifts         Json    @default("[]") @map("working_shifts")
+  environmentalLicense  String? @map("environmental_license")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("factory_profiles")
+}
+
+model ChurchProfile {
+  organizationId String  @id @map("organization_id")
+  denomination   String?
+  branch         String?
+  diocese        String?
+  serviceDays    Json    @default("[]") @map("service_days")
+  capacity       Int?
+  youthMinistry  Boolean @default(false) @map("youth_ministry")
+  choir          Boolean @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("church_profiles")
+}
+
+model CompanyProfile {
+  organizationId String @id @map("organization_id")
+  businessSector   String? @map("business_sector")
+  industry         String?
+  businessSize     String? @map("business_size")
+  departments      Json    @default("[]")
+  taxCategory      String? @map("tax_category")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+// ─── School Admissions (babyeyi.rw public applications) ─────────────────────
+
+model SchoolAdmissionSettings {
+  organizationId       String    @id @map("organization_id")
+  enabled              Boolean   @default(false)
+  applicationDeadline  DateTime? @map("application_deadline")
+  estimatedFee         Int?      @map("estimated_fee")
+  /// Per-level available places, e.g. { "Primary": 120, "A-Level": 40 }
+  availablePlaces      Json      @default("{}") @map("available_places")
+  /// Extra document requirements beyond defaults
+  requiredDocuments    Json      @default("[]") @map("required_documents")
+  termsUrl             String?   @map("terms_url")
+  privacyUrl           String?   @map("privacy_url")
+  welcomeMessage       String?   @map("welcome_message")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("school_admission_settings")
+}
+
+model AdmissionApplication {
+  id                  String                     @id @default(uuid())
+  applicationNumber   String                     @unique @map("application_number")
+  organizationId      String                     @map("organization_id")
+  status              AdmissionApplicationStatus @default(SUBMITTED)
+  draftToken          String?                    @unique @map("draft_token")
+
+  admissionLevel      String                     @map("admission_level")
+  classApplying       String                     @map("class_applying")
+  academicYear        String                     @map("academic_year")
+  termOfEntry         String                     @map("term_of_entry")
+  boardingPreference  String                     @map("boarding_preference")
+  studentGender       String                     @map("student_gender")
+  previousSchool      String?                    @map("previous_school")
+  preferredCombination String?                   @map("preferred_combination")
+  admissionType       String                     @map("admission_type")
+
+  studentDetails      Json                       @map("student_details")
+  parentDetails       Json                       @map("parent_details")
+  documents           Json                       @default("[]")
+
+  confirmAccurate     Boolean                    @default(false) @map("confirm_accurate")
+  acceptTerms         Boolean                    @default(false) @map("accept_terms")
+  schoolNotes         String?                    @map("school_notes")
+  interviewAt         DateTime?                  @map("interview_at")
+  submittedAt         DateTime?                  @map("submitted_at")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, submittedAt])
+  @@map("admission_applications")
+}
+
+// ─── Developer Portal ────────────────────────────────────────────────────────
+
+enum DeveloperAccessType {
+  DEVELOPER
+  TECHNICAL_ADMIN
+  API_VIEWER
+}
+
+enum DeveloperUserStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+  LOCKED
+}
+
+enum DeveloperEnvironment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum DeveloperApplicationStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum DeveloperProductionAccessStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DeveloperPartner {
+  id                       String                          @id @default(uuid())
+  name                     String
+  slug                     String                          @unique
+  description              String?
+  status                   String                          @default("ACTIVE")
+  sandboxOrganizationId    String?                         @map("sandbox_organization_id")
+  productionOrganizationId String?                         @unique @map("production_organization_id")
+  productionAccessStatus   DeveloperProductionAccessStatus @default(NONE) @map("production_access_status")
+  assignedModuleSlugs      Json                            @default("[\"student-management\",\"school-fees\",\"babyeyi\",\"authentication\",\"webpage-babyeyi\"]") @map("assigned_module_slugs")
+  sandboxTestData          Json?                           @map("sandbox_test_data")
+  createdAt                DateTime                        @default(now()) @map("created_at")
+  updatedAt                DateTime                        @updatedAt @map("updated_at")
+
+  sandboxOrganization    Organization? @relation("PartnerSandboxOrg", fields: [sandboxOrganizationId], references: [id], onDelete: SetNull)
+  productionOrganization Organization? @relation("PartnerProductionOrg", fields: [productionOrganizationId], references: [id], onDelete: SetNull)
+  users                  DeveloperUser[]
+  applications           DeveloperApplication[]
+  productionRequests     DeveloperProductionAccessRequest[]
+
+  @@map("developer_partners")
+}
+
+/** Super Admin — public IAM API URL for developer gateway (Postman, Test Lab, OpenAPI). */
+model DeveloperPortalSettings {
+  id            String   @id @default("default")
+  publicApiUrl  String?  @map("public_api_url")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by_id")
+
+  @@map("developer_portal_settings")
+}
+
+model DeveloperUser {
+  id                  String              @id @default(uuid())
+  partnerId           String              @map("partner_id")
+  email               String              @unique
+  passwordHash        String?             @map("password_hash")
+  firstName           String              @map("first_name")
+  lastName            String              @map("last_name")
+  accessType          DeveloperAccessType @default(DEVELOPER) @map("access_type")
+  status              DeveloperUserStatus @default(PENDING_ACTIVATION)
+  allowedModules      Json                @default("{}") @map("allowed_modules")
+  allowedEnvironments Json                @default("[\"SANDBOX\"]") @map("allowed_environments")
+  ipRestrictions      Json?               @map("ip_restrictions")
+  mfaEnabled          Boolean             @default(false) @map("mfa_enabled")
+  emailVerifiedAt     DateTime?           @map("email_verified_at")
+  activatedAt         DateTime?           @map("activated_at")
+  lastLoginAt         DateTime?           @map("last_login_at")
+  lastLoginIp         String?             @map("last_login_ip")
+  failedLoginCount    Int                 @default(0) @map("failed_login_count")
+  lockedUntil         DateTime?           @map("locked_until")
+  recoveryCodesHash   Json?               @map("recovery_codes_hash")
+  createdByUserId     String?             @map("created_by_user_id")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  partner          DeveloperPartner           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  mfaSecret        DeveloperMfaSecret?
+  activationTokens DeveloperActivationToken[]
+  sessions         DeveloperSession[]
+  refreshTokens    DeveloperRefreshToken[]
+  auditLogs        DeveloperAuditLog[]
+
+  @@index([partnerId])
+  @@map("developer_users")
+}
+
+model DeveloperActivationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user DeveloperUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("developer_activation_tokens")
+}
+
+model DeveloperMfaSecret {
+  id         String    @id @default(uuid())
+  userId     String    @unique @map("user_id")
+  secret     String
+  isVerified Boolean   @default(false) @map("is_verified")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user DeveloperUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("developer_mfa_secrets")
+}
+
+model DeveloperMfaSession {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String   @map("user_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  rememberMe Boolean  @default(false) @map("remember_me")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("developer_mfa_sessions")
+}
+
+model DeveloperSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  deviceName   String?  @map("device_name")
+  browser      String?
+  os           String?
+  ipAddress    String?  @map("ip_address")
+  location     String?
+  userAgent    String?  @map("user_agent")
+  isActive     Boolean  @default(true) @map("is_active")
+  isTrusted    Boolean  @default(false) @map("is_trusted")
+  lastActivity DateTime @default(now()) @map("last_activity")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user          DeveloperUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens DeveloperRefreshToken[]
+
+  @@map("developer_sessions")
+}
+
+model DeveloperRefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  sessionId String    @map("session_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user    DeveloperUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session DeveloperSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("developer_refresh_tokens")
+}
+
+model DeveloperApplication {
+  id                 String                     @id @default(uuid())
+  partnerId          String                     @map("partner_id")
+  organizationId     String?                    @map("organization_id")
+  name               String
+  description        String?
+  environment        DeveloperEnvironment       @default(SANDBOX)
+  status             DeveloperApplicationStatus @default(ACTIVE)
+  clientId           String                     @unique @map("client_id")
+  clientSecretHash   String                     @map("client_secret_hash")
+  clientSecretPrefix String                     @map("client_secret_prefix")
+  scopes             Json                       @default("[]")
+  rateLimitPerMinute Int                        @default(1000) @map("rate_limit_per_minute")
+  rateLimitPerDay    Int                        @default(100000) @map("rate_limit_per_day")
+  lastUsedAt         DateTime?                  @map("last_used_at")
+  createdByUserId    String?                    @map("created_by_user_id")
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+
+  partner  DeveloperPartner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  webhooks DeveloperWebhook[]
+  apiLogs  DeveloperApiLog[]
+
+  @@index([partnerId])
+  @@index([organizationId])
+  @@map("developer_applications")
+}
+
+model DeveloperProductionAccessRequest {
+  id                    String                          @id @default(uuid())
+  partnerId             String                          @map("partner_id")
+  requestedByUserId     String                          @map("requested_by_user_id")
+  status                DeveloperProductionAccessStatus @default(PENDING)
+  requestedModules      Json                            @default("[]") @map("requested_modules")
+  businessJustification String?                         @map("business_justification")
+  reviewedByUserId      String?                         @map("reviewed_by_user_id")
+  reviewNotes           String?                         @map("review_notes")
+  reviewedAt            DateTime?                       @map("reviewed_at")
+  createdAt             DateTime                        @default(now()) @map("created_at")
+  updatedAt             DateTime                        @updatedAt @map("updated_at")
+
+  partner DeveloperPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, status])
+  @@map("developer_production_access_requests")
+}
+
+model DeveloperWebhook {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  name          String
+  url           String
+  secretHash    String   @map("secret_hash")
+  events        Json     @default("[]")
+  isActive      Boolean  @default(true) @map("is_active")
+  lastDelivery  DateTime? @map("last_delivery")
+  successRate   Float    @default(100) @map("success_rate")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  application DeveloperApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("developer_webhooks")
+}
+
+model DeveloperApiLog {
+  id            String              @id @default(uuid())
+  applicationId String?             @map("application_id")
+  partnerId     String              @map("partner_id")
+  requestId     String              @unique @map("request_id")
+  method        String
+  endpoint      String
+  statusCode    Int                 @map("status_code")
+  responseTime  Int                 @map("response_time")
+  environment   DeveloperEnvironment @default(SANDBOX)
+  ipAddress     String?             @map("ip_address")
+  requestBody   Json?               @map("request_body")
+  responseBody  Json?               @map("response_body")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  application DeveloperApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId, createdAt])
+  @@index([applicationId, createdAt])
+  @@map("developer_api_logs")
+}
+
+model DeveloperAuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  partnerId  String?  @map("partner_id")
+  action     String
+  resource   String?
+  resourceId String?  @map("resource_id")
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user DeveloperUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId, createdAt])
+  @@index([userId, createdAt])
+  @@map("developer_audit_logs")
+}
+
+// ─── School Representative (multi-school oversight) ─────────────────────────
+
+enum RepresentativeAssignmentStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+model SchoolRepresentativeProfile {
+  userId      String   @id @map("user_id")
+  permissions Json     @default("{}")
+  accessMode  String   @default("view_only") @map("access_mode")
+  enforceMfa  Boolean  @default(false) @map("enforce_mfa")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("school_representative_profiles")
+}
+
+model SchoolRepresentativeAssignment {
+  id             String                         @id @default(uuid())
+  userId         String                         @map("user_id")
+  organizationId String                         @map("organization_id")
+  status         RepresentativeAssignmentStatus @default(ACTIVE)
+  permissions    Json                           @default("{}")
+  assignedAt     DateTime                       @default(now()) @map("assigned_at")
+  expiresAt      DateTime?                      @map("expires_at")
+  assignedById   String?                        @map("assigned_by_id")
+  notes          String?
+
+  user         User         @relation("RepUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy   User?        @relation("RepAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, organizationId])
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@map("school_representative_assignments")
+}
+
+model RepresentativeFollowUp {
+  id                   String    @id @default(uuid())
+  representativeUserId String    @map("representative_user_id")
+  organizationId       String    @map("organization_id")
+  title                String
+  description          String?
+  priority             String    @default("MEDIUM")
+  status               String    @default("PENDING")
+  dueDate              DateTime? @map("due_date")
+  resolutionNotes      String?   @map("resolution_notes")
+  resolvedAt           DateTime? @map("resolved_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  representative User @relation(fields: [representativeUserId], references: [id], onDelete: Cascade)
+
+  @@index([representativeUserId, status])
+  @@index([organizationId])
+  @@map("representative_follow_ups")
+}
+
+model RepresentativeAlert {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  type           String
+  title          String
+  message        String
+  severity       String   @default("info")
+  status         String   @default("OPEN")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("representative_alerts")
+}
+
+// ─── Chief Accountant (multi-school finance workspace) ───────────────────────
+
+model ChiefAccountantProfile {
+  userId        String   @id @map("user_id")
+  permissions   Json     @default("{}")
+  accessLevel   String   @default("prepare") @map("access_level")
+  approvalLimit Decimal? @map("approval_limit") @db.Decimal(18, 2)
+  enforceMfa    Boolean  @default(false) @map("enforce_mfa")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chief_accountant_profiles")
+}
+
+model ChiefAccountantAssignment {
+  id             String                         @id @default(uuid())
+  userId         String                         @map("user_id")
+  organizationId String                         @map("organization_id")
+  status         RepresentativeAssignmentStatus @default(ACTIVE)
+  permissions    Json                           @default("{}")
+  assignedAt     DateTime                       @default(now()) @map("assigned_at")
+  expiresAt      DateTime?                      @map("expires_at")
+  assignedById   String?                        @map("assigned_by_id")
+  notes          String?
+
+  user         User         @relation("ChiefAccountantUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedBy   User?        @relation("ChiefAccountantAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, organizationId])
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@map("chief_accountant_assignments")
+}
+
+// ─── SEI (Sector Education Inspector — Sector MIS) ─────────────────────────
+
+model SeiOfficerProfile {
+  userId           String   @id @map("user_id")
+  provinceId       String?  @map("province_id")
+  provinceName     String?  @map("province_name")
+  districtId       String?  @map("district_id")
+  districtName     String?  @map("district_name")
+  sectorId         String?  @map("sector_id")
+  sectorName       String   @map("sector_name")
+  enforceMfa       Boolean  @default(true) @map("enforce_mfa")
+  requireDualOtp   Boolean  @default(true) @map("require_dual_otp")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sei_officer_profiles")
+}
+
+// ─── DEO (District Education Officer — District MIS) ───────────────────────
+
+model DeoOfficerProfile {
+  userId         String   @id @map("user_id")
+  provinceId     String?  @map("province_id")
+  provinceName   String?  @map("province_name")
+  districtId     String?  @map("district_id")
+  districtName   String   @map("district_name")
+  enforceMfa     Boolean  @default(true) @map("enforce_mfa")
+  requireDualOtp Boolean  @default(true) @map("require_dual_otp")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("deo_officer_profiles")
+}

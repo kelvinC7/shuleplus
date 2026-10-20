@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@shuleplus/id-photo-config": ["../../packages/id-photo-config/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "../../packages/id-photo-config/index.ts"],
+  "exclude": ["node_modules", "dist"]
+}

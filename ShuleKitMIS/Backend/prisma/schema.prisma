@@ -1,0 +1,377 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum KitStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CatalogStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum OrderType {
+  STANDARD
+  CUSTOM
+  LEGACY
+}
+
+enum RequestStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+  APPROVED
+  PAID
+}
+
+enum DeliveryMethod {
+  AT_SCHOOL
+  AT_HOME
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+}
+
+enum ParentRelation {
+  FATHER
+  MOTHER
+  GUARDIAN
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  district         String?
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  kits         Kit[]
+  requests     KitRequest[]
+  standardKits StandardKit[]
+
+  @@map("tenants")
+}
+
+model Kit {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  name           String
+  gradeLevel     String    @map("grade_level")
+  description    String?
+  imageUrl       String?   @map("image_url")
+  amount         Decimal   @map("amount")
+  status         KitStatus @default(ACTIVE)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant           @relation(fields: [organizationId], references: [organizationId])
+  requirements KitRequirement[]
+  requests     KitRequest[]
+
+  @@unique([organizationId, gradeLevel])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("kits")
+}
+
+model KitRequirement {
+  id             String   @id @default(uuid())
+  kitId          String   @map("kit_id")
+  organizationId String   @map("organization_id")
+  title          String
+  quantity       Int      @default(1)
+  unitPrice      Decimal  @default(0) @map("unit_price")
+  imageUrl       String?  @map("image_url")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  kit          Kit              @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  requestItems KitRequestItem[]
+
+  @@index([kitId])
+  @@map("kit_requirements")
+}
+
+model ProductCategory {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String?
+  status      CatalogStatus @default(ACTIVE)
+  sortOrder   Int           @default(0) @map("sort_order")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id          String        @id @default(uuid())
+  categoryId  String?       @map("category_id")
+  name        String
+  sku         String        @unique
+  description String?
+  imageUrl    String?       @map("image_url")
+  unitPrice   Decimal       @default(0) @map("unit_price")
+  stockQty    Int           @default(0) @map("stock_qty")
+  vatPercent  Decimal?      @map("vat_percent")
+  status      CatalogStatus @default(ACTIVE)
+  featured    Boolean       @default(false)
+  customEligible Boolean    @default(true) @map("custom_eligible")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  category     ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  pricingRules PricingRule[]
+  kitItems     StandardKitItem[]
+  requestItems KitRequestItem[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+model PricingRule {
+  id            String   @id @default(uuid())
+  productId     String?  @map("product_id")
+  standardKitId String?  @map("standard_kit_id")
+  sellingPrice  Decimal  @map("selling_price")
+  discountPct   Decimal  @default(0) @map("discount_pct")
+  promotionLabel String? @map("promotion_label")
+  available     Boolean  @default(true)
+  featured      Boolean  @default(false)
+  startsAt      DateTime? @map("starts_at")
+  endsAt        DateTime? @map("ends_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  product     Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  standardKit StandardKit? @relation(fields: [standardKitId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([standardKitId])
+  @@map("pricing_rules")
+}
+
+model StandardKit {
+  id               String        @id @default(uuid())
+  organizationId   String?       @map("organization_id")
+  organizationName String?       @map("organization_name")
+  district         String?
+  academicYear     String        @map("academic_year")
+  term             String
+  className        String        @map("class_name")
+  educationLevel   String?       @map("education_level")
+  name             String
+  description      String?
+  imageUrl         String?       @map("image_url")
+  babyeyiCircularId String?      @map("babyeyi_circular_id")
+  totalAmount      Decimal       @default(0) @map("total_amount")
+  status           CatalogStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  tenant       Tenant?           @relation(fields: [organizationId], references: [organizationId], onDelete: SetNull)
+  items        StandardKitItem[]
+  pricingRules PricingRule[]
+  requests     KitRequest[]
+
+  @@unique([babyeyiCircularId])
+  @@index([organizationId, academicYear, term, className])
+  @@index([district])
+  @@index([status])
+  @@map("standard_kits")
+}
+
+model StandardKitItem {
+  id            String   @id @default(uuid())
+  standardKitId String   @map("standard_kit_id")
+  productId     String?  @map("product_id")
+  title         String
+  description   String?
+  quantity      Int      @default(1)
+  unitPrice     Decimal  @default(0) @map("unit_price")
+  imageUrl      String?  @map("image_url")
+  sourceItemKey String?  @map("source_item_key")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  standardKit StandardKit @relation(fields: [standardKitId], references: [id], onDelete: Cascade)
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([standardKitId])
+  @@map("standard_kit_items")
+}
+
+model KitRequest {
+  id               String         @id @default(uuid())
+  organizationId   String         @map("organization_id")
+  organizationName String?        @map("organization_name")
+  district         String?
+  academicYear     String?        @map("academic_year")
+  term             String?
+  requestNumber    String         @unique @map("request_number")
+  orderType        OrderType      @default(LEGACY) @map("order_type")
+  kitId            String?        @map("kit_id")
+  standardKitId    String?        @map("standard_kit_id")
+  studentId        String         @map("student_id")
+  studentName      String         @map("student_name")
+  studentCode      String?        @map("student_code")
+  className        String?        @map("class_name")
+  gradeLevel       String?        @map("grade_level")
+  parentName       String         @map("parent_name")
+  parentPhone      String?        @map("parent_phone")
+  parentRelation   ParentRelation @map("parent_relation")
+  deliveryMethod   DeliveryMethod @map("delivery_method")
+  subtotal         Decimal        @map("subtotal")
+  homeFee          Decimal        @default(0) @map("home_fee")
+  total            Decimal        @map("total")
+  status           RequestStatus  @default(PENDING)
+  notes            String?
+  trackingNumber   String?        @unique @map("tracking_number")
+  recordedBy       String?        @map("recorded_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  tenant      Tenant             @relation(fields: [organizationId], references: [organizationId])
+  kit         Kit?               @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  standardKit StandardKit?       @relation(fields: [standardKitId], references: [id], onDelete: SetNull)
+  payments    KitRequestPayment[]
+  items       KitRequestItem[]
+  delivery    Delivery?
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, studentId])
+  @@index([orderType, status])
+  @@index([district])
+  @@map("kit_requests")
+}
+
+model KitRequestItem {
+  id            String   @id @default(uuid())
+  requestId     String   @map("request_id")
+  requirementId String?  @map("requirement_id")
+  productId     String?  @map("product_id")
+  title         String
+  imageUrl      String?  @map("image_url")
+  unitPrice     Decimal  @default(0) @map("unit_price")
+  quantity      Int      @default(1)
+  lineTotal     Decimal  @default(0) @map("line_total")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  request     KitRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requirement KitRequirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  product     Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([requirementId])
+  @@index([productId])
+  @@map("kit_request_items")
+}
+
+model KitRequestPayment {
+  id             String        @id @default(uuid())
+  requestId      String        @map("request_id")
+  organizationId String        @map("organization_id")
+  paymentNumber  String        @unique @map("payment_number")
+  amount         Decimal       @map("amount")
+  method         PaymentMethod @default(MOBILE_MONEY)
+  status         PaymentStatus @default(COMPLETED)
+  reference      String?       @map("reference")
+  paidBy         String?       @map("paid_by")
+  verifiedAt     DateTime?     @map("verified_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  request KitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([organizationId])
+  @@map("kit_request_payments")
+}
+
+model Delivery {
+  id             String         @id @default(uuid())
+  requestId      String         @unique @map("request_id")
+  method         DeliveryMethod @default(AT_HOME)
+  status         DeliveryStatus @default(PENDING)
+  addressLine    String?        @map("address_line")
+  pickupPoint    String?        @map("pickup_point")
+  district       String?
+  sector         String?
+  fee            Decimal        @default(0)
+  trackingCode   String?        @map("tracking_code")
+  courierName    String?        @map("courier_name")
+  estimatedAt    DateTime?      @map("estimated_at")
+  deliveredAt    DateTime?      @map("delivered_at")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  request KitRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([district])
+  @@map("deliveries")
+}
+
+model PlatformSettings {
+  id                 String   @id @default("platform")
+  homeDeliveryFee    Decimal  @default(2500) @map("home_delivery_fee")
+  schoolPickupFee    Decimal  @default(0) @map("school_pickup_fee")
+  lowStockThreshold  Int      @default(10) @map("low_stock_threshold")
+  customKitsEnabled  Boolean  @default(true) @map("custom_kits_enabled")
+  standardKitsEnabled Boolean @default(true) @map("standard_kits_enabled")
+  supportPhone       String?  @map("support_phone")
+  supportEmail       String?  @map("support_email")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}

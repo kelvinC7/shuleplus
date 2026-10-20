@@ -1,0 +1,35 @@
+{
+  "name": "device-module-service",
+  "version": "1.0.0",
+  "description": "ShulePlus RFID Device microservice",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "prisma generate --schema prisma/schema.prisma && tsx watch src/server.ts",
+    "build": "prisma generate --schema prisma/schema.prisma && tsc",
+    "start": "node dist/server.js",
+    "setup:env": "node -e \"require('fs').copyFileSync('.env.example','.env')\"",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:push": "prisma db push --schema prisma/schema.prisma",
+    "prisma:studio": "prisma studio"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.15.2",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.32",
+    "prisma": "^6.9.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

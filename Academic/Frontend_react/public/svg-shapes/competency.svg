@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="cpA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/><stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="cpN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/><stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="cpT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/><stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="30" r="18" fill="url(#cpN)" opacity="0.92"/>
+  <path d="M32 16 L35.5 25.5 H46 L37.5 31.5 L41 41 L32 35 L23 41 L26.5 31.5 L18 25.5 H28.5 Z" fill="url(#cpA)"/>
+  <rect x="20" y="46" width="24" height="8" rx="4" fill="url(#cpT)"/>
+</svg>

@@ -1,0 +1,1145 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Core Enums ────────────────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  TRANSFERRED
+  WITHDRAWN
+}
+
+enum ParentRole {
+  FATHER
+  MOTHER
+  GUARDIAN
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  GRADUATED
+  TRANSFERRED
+  WITHDRAWN
+}
+
+// ─── Assessment Enums ──────────────────────────────────
+
+enum AssessmentLevel {
+  NURSERY
+  PRIMARY
+  SECONDARY
+  TVET
+  O_LEVEL
+  A_LEVEL
+  UNIVERSITY
+}
+
+enum AssessmentTemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+  REJECTED
+}
+
+enum CalculationMethod {
+  WEIGHTED_AVERAGE
+  SIMPLE_AVERAGE
+  BEST_SCORE
+  SUM_OF_SCORES
+}
+
+enum AssessmentLifecycle {
+  DRAFT
+  OPEN
+  MARK_ENTRY
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  LOCKED
+}
+
+enum TemplateAssignmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ResultStatus {
+  DRAFT
+  FINALIZED
+  PUBLISHED
+}
+
+enum MarkStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+  EXEMPT
+  MISSING
+}
+
+// ─── Legacy Enums (kept for backward compat) ───────────
+
+enum ExamType {
+  MIDTERM
+  FINAL
+  ASSIGNMENT
+  QUIZ
+  CAT
+  HOMEWORK
+  PRACTICAL
+}
+
+enum ExamStatus {
+  DRAFT
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Core Models ───────────────────────────────────────
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  district         String?
+  schoolCode       String?      @map("school_code")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  classes             Class[]
+  grades              Grade[]
+  combinations        Combination[]
+  subjects            Subject[]
+  students            Student[]
+  enrollments         Enrollment[]
+  parents             Parent[]
+  exams               Exam[]
+  markEntries         MarkEntry[]
+  assessmentTemplates AssessmentTemplate[]
+  assessments         Assessment[]
+  assessmentMarks     AssessmentMark[]
+  componentMarks      ComponentMark[]
+  studentResults      StudentResult[]
+  templateAssignments TemplateAssignment[]
+  gradingScales       GradingScale[]
+  competencyTemplates CompetencyTemplate[]
+  studentCompetencies StudentCompetency[]
+  correctionRequests  MarkCorrectionRequest[]
+  assessmentEvidences AssessmentEvidence[]
+  examSessions          ExamSession[]
+  examSchedules         ExamSchedule[]
+  examSeats             ExamSeat[]
+  examAttendances       ExamAttendance[]
+  examConflicts         ExamConflict[]
+  examInvigilatorDuties ExamInvigilatorDuty[]
+  examInvigilatorStaff  ExamInvigilatorStaff[]
+  examAuditLogs         ExamAuditLog[]
+  reportCardComments      ReportCardComment[]
+  courseDefaultMarks      CourseDefaultMarks[]
+  reportCardPublications  ReportCardPublication[]
+
+  @@map("tenants")
+}
+
+model ReportCardPublication {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  classId        String   @map("class_id")
+  className      String?  @map("class_name")
+  studentName    String?  @map("student_name")
+  studentCode    String?  @map("student_code")
+  academicYear   String   @map("academic_year")
+  term           String
+  publishedAt    DateTime @default(now()) @map("published_at")
+  publishedBy    String?  @map("published_by")
+  publishedByName String? @map("published_by_name")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, studentId, classId, academicYear, term])
+  @@index([organizationId, classId, academicYear, term])
+  @@index([organizationId, academicYear, term, publishedAt])
+  @@map("report_card_publications")
+}
+
+model ReportCardComment {
+  id                  String   @id @default(uuid())
+  organizationId      String   @map("organization_id")
+  studentId           String   @map("student_id")
+  classId             String   @map("class_id")
+  academicYear        String   @map("academic_year")
+  term                String   @default("All")
+  classTeacherComment String?  @map("class_teacher_comment") @db.Text
+  headTeacherComment  String?  @map("head_teacher_comment") @db.Text
+  updatedBy           String?  @map("updated_by")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, studentId, classId, academicYear, term])
+  @@index([organizationId, classId, academicYear, term])
+  @@map("report_card_comments")
+}
+
+model Combination {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  displayName    String?  @map("display_name")
+  subjects       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant              Tenant               @relation(fields: [organizationId], references: [organizationId])
+  classes             Class[]
+  combinationSubjects CombinationSubject[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("combinations")
+}
+
+model Subject {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  code           String?
+  category       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant              Tenant               @relation(fields: [organizationId], references: [organizationId])
+  combinationSubjects CombinationSubject[]
+  markEntries         MarkEntry[]
+  componentMarks      ComponentMark[]
+  studentResults      StudentResult[]
+  assessments         Assessment[]
+  courseDefaultMarks  CourseDefaultMarks[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, category])
+  @@map("subjects")
+}
+
+model CourseDefaultMarks {
+  id                 String   @id @default(uuid())
+  organizationId     String   @map("organization_id")
+  classId            String   @map("class_id")
+  subjectId          String   @map("subject_id")
+  academicYear       String   @map("academic_year")
+  term               String
+  defaultCourseMarks Decimal  @map("default_course_marks")
+  updatedBy          String?  @map("updated_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [organizationId], references: [organizationId])
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, classId, subjectId, academicYear, term])
+  @@index([organizationId, classId, academicYear, term])
+  @@map("course_default_marks")
+}
+
+model CombinationSubject {
+  id            String   @id @default(uuid())
+  combinationId String   @map("combination_id")
+  subjectId     String   @map("subject_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  combination Combination @relation(fields: [combinationId], references: [id], onDelete: Cascade)
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([combinationId, subjectId])
+  @@map("combination_subjects")
+}
+
+model Grade {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  category       String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [organizationId], references: [organizationId])
+  classes Class[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("grades")
+}
+
+model Class {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  stream         String?
+  category       String?
+  gradeId        String?  @map("grade_id")
+  combinationId  String?  @map("combination_id")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant              Tenant               @relation(fields: [organizationId], references: [organizationId])
+  grade               Grade?               @relation(fields: [gradeId], references: [id])
+  combination         Combination?         @relation(fields: [combinationId], references: [id])
+  enrollments         Enrollment[]         @relation("ClassEnrollments")
+  promotedEnrollments Enrollment[]         @relation("PromotedEnrollments")
+  markEntries         MarkEntry[]
+  templateAssignments TemplateAssignment[]
+  studentResults      StudentResult[]
+  assessments         Assessment[]
+  courseDefaultMarks  CourseDefaultMarks[]
+
+  @@unique([organizationId, name, combinationId, stream])
+  @@index([organizationId])
+  @@map("classes")
+}
+
+model Student {
+  id              String        @id @default(uuid())
+  organizationId  String        @map("organization_id")
+  studentUid      String        @map("student_uid")
+  firstName       String        @map("first_name")
+  lastName        String        @map("last_name")
+  gender          Gender?
+  dateOfBirth     DateTime?     @map("date_of_birth")
+  nationality     String?
+  province        String?
+  district        String?
+  sector          String?
+  cell            String?
+  village         String?
+  studentCode     String?       @map("student_code")
+  sdmCode         String?       @map("sdm_code")
+  studentPhoto    String?       @map("student_photo")
+  rfidUid         String?       @map("rfid_uid")
+  fingerprintId   String?       @map("fingerprint_id")
+  bloodGroup      String?       @map("blood_group")
+  allergies       String?
+  formerSchool    String?       @map("former_school")
+  leavingReason   String?       @map("leaving_reason")
+  identityRemarks String?       @map("identity_remarks")
+  disciplineMarks Decimal?      @map("discipline_marks")
+  status          StudentStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  enrollments         Enrollment[]
+  studentParents      StudentParent[]
+  markEntries         MarkEntry[]
+  componentMarks      ComponentMark[]
+  studentResults      StudentResult[]
+  assessmentMarks     AssessmentMark[]
+  correctionRequests  MarkCorrectionRequest[]
+  studentCompetencies StudentCompetency[]
+
+  @@unique([organizationId, studentUid])
+  @@index([organizationId])
+  @@index([organizationId, rfidUid])
+  @@index([organizationId, fingerprintId])
+  @@map("students")
+}
+
+model Enrollment {
+  id                String           @id @default(uuid())
+  organizationId    String           @map("organization_id")
+  studentId         String           @map("student_id")
+  classId           String           @map("class_id")
+  academicYear      String           @map("academic_year")
+  status            EnrollmentStatus @default(ACTIVE)
+  isCurrent         Boolean          @default(true) @map("is_current")
+  promotedToClassId String?          @map("promoted_to_class_id")
+  promotedToYear    String?          @map("promoted_to_year")
+  term              String?
+  joiningDate       DateTime?        @map("joining_date")
+  recordedBy        String?          @map("recorded_by")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  tenant          Tenant  @relation(fields: [organizationId], references: [organizationId])
+  student         Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class           Class   @relation("ClassEnrollments", fields: [classId], references: [id])
+  promotedToClass Class?  @relation("PromotedEnrollments", fields: [promotedToClassId], references: [id])
+
+  @@unique([organizationId, studentId, academicYear])
+  @@index([organizationId])
+  @@index([organizationId, classId, academicYear])
+  @@index([organizationId, isCurrent])
+  @@map("enrollments")
+}
+
+model Parent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  phone          String?
+  email          String?
+  nationalId     String?  @map("national_id")
+  occupation     String?
+  address        String?
+  passwordHash   String?  @map("password_hash")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant          @relation(fields: [organizationId], references: [organizationId])
+  studentParents StudentParent[]
+
+  @@index([organizationId])
+  @@index([organizationId, phone])
+  @@index([organizationId, nationalId])
+  @@map("parents")
+}
+
+model StudentParent {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  studentId      String     @map("student_id")
+  parentId       String     @map("parent_id")
+  role           ParentRole
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent  Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, studentId, parentId])
+  @@index([organizationId])
+  @@index([organizationId, studentId])
+  @@index([organizationId, parentId])
+  @@map("student_parents")
+}
+
+// ─── Legacy Exam System (kept for backward compat) ─────
+
+model Exam {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  name           String
+  type           ExamType
+  academicYear   String     @map("academic_year")
+  term           String?
+  startDate      DateTime?  @map("start_date")
+  endDate        DateTime?  @map("end_date")
+  status         ExamStatus @default(DRAFT)
+  description    String?
+  totalMarks     Int?       @map("total_marks")
+  passingMarks   Int?       @map("passing_marks")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  markEntries MarkEntry[]
+
+  @@index([organizationId])
+  @@index([organizationId, academicYear])
+  @@index([organizationId, status])
+  @@map("exams")
+}
+
+model MarkEntry {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  examId         String   @map("exam_id")
+  studentId      String   @map("student_id")
+  subjectId      String   @map("subject_id")
+  classId        String   @map("class_id")
+  score          Decimal
+  remarks        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [organizationId], references: [organizationId])
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId, subjectId])
+  @@index([organizationId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([classId])
+  @@index([examId, classId, subjectId])
+  @@map("mark_entries")
+}
+
+// ─── Assessment Framework (New System) ─────────────────
+
+model AssessmentTemplate {
+  id                String                   @id @default(uuid())
+  organizationId    String                   @map("organization_id")
+  name              String
+  description       String?
+  academicLevel     AssessmentLevel          @map("academic_level")
+  academicYear      String                   @map("academic_year")
+  term              String
+  calculationMethod CalculationMethod        @default(WEIGHTED_AVERAGE) @map("calculation_method")
+  defaultCourseMarks Decimal?               @default(100) @map("default_course_marks")
+  applicableClasses Json?                    @map("applicable_classes")
+  version           Int                      @default(1)
+  status            AssessmentTemplateStatus @default(DRAFT)
+  createdBy         String?                  @map("created_by")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  tenant      Tenant                @relation(fields: [organizationId], references: [organizationId])
+  components  AssessmentComponent[]
+  assignments TemplateAssignment[]
+  assessments Assessment[]
+
+  @@unique([organizationId, name, academicYear, term, version])
+  @@index([organizationId])
+  @@index([organizationId, academicLevel])
+  @@index([organizationId, status])
+  @@index([organizationId, academicYear, term])
+  @@map("assessment_templates")
+}
+
+model AssessmentComponent {
+  id               String   @id @default(uuid())
+  templateId       String   @map("template_id")
+  name             String
+  code             String
+  description      String?
+  maxMark          Decimal? @default(0) @map("max_mark")
+  weightPercentage Decimal? @map("weight_percentage")
+  isRequired       Boolean  @default(true) @map("is_required")
+  sortOrder        Int      @default(0) @map("sort_order")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  template    AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  marks       ComponentMark[]
+  assessments Assessment[]
+
+  @@unique([templateId, code])
+  @@index([templateId])
+  @@map("assessment_components")
+}
+
+model TemplateAssignment {
+  id             String                   @id @default(uuid())
+  organizationId String                   @map("organization_id")
+  templateId     String                   @map("template_id")
+  classId        String                   @map("class_id")
+  academicYear   String                   @map("academic_year")
+  term           String
+  status         TemplateAssignmentStatus @default(ACTIVE)
+  assignedBy     String?                  @map("assigned_by")
+  assignedAt     DateTime                 @default(now()) @map("assigned_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  class    Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  marks    ComponentMark[]
+  results  StudentResult[]
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([templateId, classId])
+  @@index([organizationId])
+  @@index([templateId])
+  @@index([classId])
+  @@index([organizationId, academicYear, term])
+  @@index([classId, academicYear, term])
+  @@map("template_assignments")
+}
+
+model ComponentMark {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  assignmentId   String     @map("assignment_id")
+  componentId    String     @map("component_id")
+  studentId      String     @map("student_id")
+  subjectId      String     @map("subject_id")
+  score          Decimal
+  maxMark        Decimal?   @default(0) @map("max_mark")
+  markStatus     MarkStatus @default(PRESENT) @map("mark_status")
+  remarks        String?
+  enteredBy      String?    @map("entered_by")
+  enteredAt      DateTime   @default(now()) @map("entered_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  assignment TemplateAssignment  @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  component  AssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject    Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([assignmentId, componentId, studentId, subjectId])
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([componentId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([assignmentId, studentId, subjectId])
+  @@map("component_marks")
+}
+
+model StudentResult {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
+  assignmentId    String       @map("assignment_id")
+  studentId       String       @map("student_id")
+  classId         String       @map("class_id")
+  subjectId       String       @map("subject_id")
+  academicYear    String       @map("academic_year")
+  term            String
+  componentScores Json         @map("component_scores")
+  categoryScores  Json?        @map("category_scores")
+  totalScore      Decimal      @map("total_score")
+  averageScore    Decimal?     @map("average_score")
+  percentage      Decimal?     @map("percentage")
+  grade           String?
+  rank            Int?
+  classSize       Int?         @map("class_size")
+  remarks         String?
+  status          ResultStatus @default(DRAFT)
+  calculatedAt    DateTime     @default(now()) @map("calculated_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  assignment TemplateAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class      Class              @relation(fields: [classId], references: [id])
+  subject    Subject            @relation(fields: [subjectId], references: [id])
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([assignmentId, studentId, subjectId])
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([organizationId, academicYear, term])
+  @@index([classId, academicYear, term])
+  @@index([studentId, academicYear, term])
+  @@map("student_results")
+}
+
+model GradingScale {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  name           String
+  academicLevel  AssessmentLevel @map("academic_level")
+  minPercentage  Decimal         @map("min_percentage")
+  maxPercentage  Decimal         @map("max_percentage")
+  grade          String
+  description    String?
+  remarks        String?
+  sortOrder      Int             @default(0) @map("sort_order")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, name, grade])
+  @@index([organizationId])
+  @@index([organizationId, academicLevel])
+  @@map("grading_scales")
+}
+
+// ─── Actual Assessments (Teacher Creates) ──────────────
+
+model Assessment {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  templateId     String?             @map("template_id")
+  componentId    String?             @map("component_id")
+  subjectId      String              @map("subject_id")
+  classId        String              @map("class_id")
+  title          String
+  assessmentCode String?             @map("assessment_code")
+  description    String?
+  academicYear   String              @map("academic_year")
+  term           String
+  assessmentDate DateTime?           @map("assessment_date")
+  maxMark        Decimal             @map("max_mark")
+  duration       String?
+  status         AssessmentLifecycle @default(DRAFT)
+  createdBy      String?             @map("created_by")
+  publishedBy    String?             @map("published_by")
+  publishedAt    DateTime?           @map("published_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  tenant      Tenant                  @relation(fields: [organizationId], references: [organizationId])
+  template    AssessmentTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  component   AssessmentComponent?    @relation(fields: [componentId], references: [id], onDelete: SetNull)
+  subject     Subject                 @relation(fields: [subjectId], references: [id])
+  class       Class                   @relation(fields: [classId], references: [id])
+  marks       AssessmentMark[]
+  evidences   AssessmentEvidence[]
+  corrections MarkCorrectionRequest[]
+
+  @@index([organizationId])
+  @@index([templateId])
+  @@index([componentId])
+  @@index([subjectId])
+  @@index([classId])
+  @@index([status])
+  @@index([organizationId, academicYear, term])
+  @@index([classId, academicYear, term])
+  @@map("assessments")
+}
+
+model AssessmentMark {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  assessmentId   String     @map("assessment_id")
+  studentId      String     @map("student_id")
+  score          Decimal?
+  maxMark        Decimal?   @map("max_mark")
+  markStatus     MarkStatus @default(PRESENT) @map("mark_status")
+  remarks        String?
+  competencies   Json?
+  enteredBy      String?    @map("entered_by")
+  enteredAt      DateTime?  @map("entered_at")
+  lastModifiedBy String?    @map("last_modified_by")
+  lastModifiedAt DateTime?  @map("last_modified_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([assessmentId, studentId])
+  @@index([organizationId])
+  @@index([assessmentId])
+  @@index([studentId])
+  @@map("assessment_marks")
+}
+
+model AssessmentEvidence {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  assessmentId   String   @map("assessment_id")
+  studentId      String?  @map("student_id")
+  fileName       String   @map("file_name")
+  fileUrl        String   @map("file_url")
+  fileSize       Int?     @map("file_size")
+  mimeType       String?  @map("mime_type")
+  description    String?
+  uploadedBy     String?  @map("uploaded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([assessmentId])
+  @@map("assessment_evidences")
+}
+
+model MarkCorrectionRequest {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  assessmentId   String    @map("assessment_id")
+  studentId      String    @map("student_id")
+  currentScore   Decimal   @map("current_score")
+  requestedScore Decimal   @map("requested_score")
+  reason         String
+  status         String    @default("PENDING")
+  requestedBy    String?   @map("requested_by")
+  reviewedBy     String?   @map("reviewed_by")
+  reviewedAt     DateTime? @map("reviewed_at")
+  reviewNotes    String?   @map("review_notes")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([assessmentId])
+  @@index([status])
+  @@map("mark_correction_requests")
+}
+
+// ─── Competency-Based Assessment ──────────────────────
+
+model CompetencyTemplate {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  name           String
+  academicLevel  AssessmentLevel @map("academic_level")
+  competencies   Json
+  description    String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tenant  Tenant              @relation(fields: [organizationId], references: [organizationId])
+  records StudentCompetency[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("competency_templates")
+}
+
+model StudentCompetency {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  templateId     String   @map("template_id")
+  assessmentId   String?  @map("assessment_id")
+  studentId      String   @map("student_id")
+  subjectId      String?  @map("subject_id")
+  competencies   Json
+  academicYear   String   @map("academic_year")
+  term           String
+  recordedBy     String?  @map("recorded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  template CompetencyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  student  Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([templateId])
+  @@index([studentId])
+  @@index([assessmentId])
+  @@map("student_competencies")
+}
+
+// ─── Exam Planning (smart timetable, seating, invigilators, live attendance) ───
+
+enum ExamSessionLifecycle {
+  DRAFT
+  REVIEWED
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExamSlotStatus {
+  SCHEDULED
+  READY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum ExamAttendanceState {
+  NOT_ARRIVED
+  PRESENT
+  LATE
+  ABSENT
+  IN_PROGRESS
+  SUBMITTED
+  EXITED
+}
+
+enum ExamConflictType {
+  STUDENT
+  ROOM
+  INVIGILATOR
+  CAPACITY
+  DURATION
+  MAJOR_SPACING
+  DAILY_LOAD
+  SEATING
+}
+
+enum ExamConflictSeverity {
+  ERROR
+  WARNING
+}
+
+enum ExamDutyMode {
+  AUTO
+  MANUAL
+  LOCKED
+}
+
+enum ExamCheckMethod {
+  MANUAL
+  QR
+  RFID
+}
+
+model ExamSession {
+  id                     String               @id @default(uuid())
+  organizationId         String               @map("organization_id")
+  name                   String
+  academicYear           String               @map("academic_year")
+  term                   String
+  examType               String               @map("exam_type")
+  startDate              DateTime             @map("start_date")
+  endDate                DateTime             @map("end_date")
+  generateAutomatically  Boolean              @default(true) @map("generate_automatically")
+  status                 ExamSessionLifecycle @default(DRAFT)
+  maxExamsPerDay         Int                  @default(2) @map("max_exams_per_day")
+  majorGapSessions       Int                  @default(1) @map("major_gap_sessions")
+  rooms                  Json
+  timeSlots              Json                 @map("time_slots")
+  days                   Json
+  invigilatorSettings    Json                 @map("invigilator_settings")
+  readinessScore         Int                  @default(0) @map("readiness_score")
+  createdBy              String?              @map("created_by")
+  publishedAt            DateTime?            @map("published_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  tenant        Tenant                @relation(fields: [organizationId], references: [organizationId])
+  classes       ExamSessionClass[]
+  courses       ExamSessionCourse[]
+  schedules     ExamSchedule[]
+  seats         ExamSeat[]
+  attendances   ExamAttendance[]
+  conflicts     ExamConflict[]
+  duties        ExamInvigilatorDuty[]
+  auditLogs     ExamAuditLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, academicYear, term])
+  @@index([organizationId, status])
+  @@map("exam_sessions")
+}
+
+model ExamSessionClass {
+  id           String  @id @default(uuid())
+  sessionId    String  @map("session_id")
+  classId      String  @map("class_id")
+  className    String  @map("class_name")
+  studentCount Int     @default(0) @map("student_count")
+  selected     Boolean @default(true)
+
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, classId])
+  @@index([sessionId])
+  @@map("exam_session_classes")
+}
+
+model ExamSessionCourse {
+  id              String  @id @default(uuid())
+  sessionId       String  @map("session_id")
+  classId         String  @map("class_id")
+  subjectName     String  @map("subject_name")
+  durationMinutes Int     @default(120) @map("duration_minutes")
+  selected        Boolean @default(true)
+  isMajor         Boolean @default(false) @map("is_major")
+
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, classId, subjectName])
+  @@index([sessionId])
+  @@map("exam_session_courses")
+}
+
+model ExamSchedule {
+  id          String         @id @default(uuid())
+  organizationId String      @map("organization_id")
+  sessionId   String         @map("session_id")
+  classId     String         @map("class_id")
+  className   String         @map("class_name")
+  subjectName String         @map("subject_name")
+  examDate    DateTime       @map("exam_date")
+  slotCode    String         @map("slot_code")
+  startTime   String         @map("start_time")
+  endTime     String         @map("end_time")
+  status      ExamSlotStatus @default(SCHEDULED)
+  rooms       Json
+  studentCount Int           @default(0) @map("student_count")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  tenant       Tenant                @relation(fields: [organizationId], references: [organizationId])
+  session      ExamSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  seats        ExamSeat[]
+  attendances  ExamAttendance[]
+  duties       ExamInvigilatorDuty[]
+
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([sessionId, examDate, slotCode])
+  @@map("exam_schedules")
+}
+
+model ExamSeat {
+  id             String  @id @default(uuid())
+  organizationId String  @map("organization_id")
+  sessionId      String  @map("session_id")
+  scheduleId     String  @map("schedule_id")
+  studentId      String  @map("student_id")
+  studentCode    String  @map("student_code")
+  fullName       String  @map("full_name")
+  className      String  @map("class_name")
+  roomName       String  @map("room_name")
+  seatCode       String  @map("seat_code")
+  rowLabel       String  @map("row_label")
+  colIndex       Int     @map("col_index")
+
+  tenant   Tenant       @relation(fields: [organizationId], references: [organizationId])
+  session  ExamSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  schedule ExamSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, studentId])
+  @@unique([scheduleId, roomName, seatCode])
+  @@index([sessionId])
+  @@index([scheduleId])
+  @@map("exam_seats")
+}
+
+model ExamAttendance {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  sessionId      String              @map("session_id")
+  scheduleId     String              @map("schedule_id")
+  studentId      String              @map("student_id")
+  studentCode    String              @map("student_code")
+  fullName       String              @map("full_name")
+  className      String              @map("class_name")
+  roomName       String              @map("room_name")
+  seatCode       String?             @map("seat_code")
+  status         ExamAttendanceState @default(NOT_ARRIVED)
+  checkInAt      DateTime?           @map("check_in_at")
+  submitAt       DateTime?           @map("submit_at")
+  exitAt         DateTime?           @map("exit_at")
+  method         ExamCheckMethod?    
+  lateMinutes    Int                 @default(0) @map("late_minutes")
+  earlyReason    String?             @map("early_reason")
+  actorId        String?             @map("actor_id")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  tenant   Tenant       @relation(fields: [organizationId], references: [organizationId])
+  session  ExamSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  schedule ExamSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, studentId])
+  @@index([sessionId])
+  @@index([scheduleId])
+  @@map("exam_attendances")
+}
+
+model ExamConflict {
+  id             String               @id @default(uuid())
+  organizationId String               @map("organization_id")
+  sessionId      String               @map("session_id")
+  type           ExamConflictType
+  severity       ExamConflictSeverity
+  message        String
+  details        Json?
+  resolved       Boolean              @default(false)
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  tenant  Tenant      @relation(fields: [organizationId], references: [organizationId])
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("exam_conflicts")
+}
+
+model ExamInvigilatorDuty {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
+  sessionId       String       @map("session_id")
+  scheduleId      String?      @map("schedule_id")
+  examDate        DateTime     @map("exam_date")
+  slotCode        String       @map("slot_code")
+  roomName        String       @map("room_name")
+  invigilatorId   String       @map("invigilator_id")
+  invigilatorName String       @map("invigilator_name")
+  userId          String?      @map("user_id")
+  email           String?
+  mode            ExamDutyMode @default(AUTO)
+  locked          Boolean      @default(false)
+  checkedInAt     DateTime?    @map("checked_in_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  tenant   Tenant        @relation(fields: [organizationId], references: [organizationId])
+  session  ExamSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  schedule ExamSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([examDate, slotCode])
+  @@index([organizationId, userId])
+  @@map("exam_invigilator_duties")
+}
+
+model ExamInvigilatorStaff {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  name           String
+  email          String?
+  phone          String?
+  source         String   @default("STAFF")
+  hasAccount     Boolean  @default(false) @map("has_account")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([organizationId, userId])
+  @@index([organizationId, email])
+  @@map("exam_invigilator_staff")
+}
+
+model ExamAuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  sessionId      String   @map("session_id")
+  actorId        String?  @map("actor_id")
+  action         String
+  message        String
+  payload        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant      @relation(fields: [organizationId], references: [organizationId])
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("exam_audit_logs")
+}

@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "gender" TEXT;
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "date_of_birth" TIMESTAMP(3);
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "hire_date" TIMESTAMP(3);
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'ACTIVE';
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "hr_profile" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "is_protected" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "payroll_staff" ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3);

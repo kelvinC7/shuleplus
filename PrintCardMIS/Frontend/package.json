@@ -1,0 +1,35 @@
+{
+  "name": "print-card-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3092",
+    "build": "next build",
+    "start": "next start -p 3092",
+    "lint": "next lint",
+    "setup:env": "node -e \"require('fs').copyFileSync('.env.example','.env')\""
+  },
+  "dependencies": {
+    "@shuleplus/id-photo-config": "file:../../packages/id-photo-config",
+    "@shuleplus/id-photo-browser": "file:../../packages/id-photo-browser",
+    "axios": "^1.10.0",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.525.0",
+    "next": "^15.3.4",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.10",
+    "@types/node": "^22.15.32",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.4",
+    "tailwindcss": "^4.1.10",
+    "typescript": "^5.8.3"
+  }
+}

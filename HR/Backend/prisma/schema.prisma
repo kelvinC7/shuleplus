@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  PROBATION
+  SUSPENDED
+  ON_LEAVE
+  TERMINATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractType {
+  PERMANENT
+  CONTRACT
+  TEMPORARY
+  PROBATION
+  INTERNSHIP
+  PART_TIME
+  CONSULTANCY
+}
+
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+enum DepartmentStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+model Department {
+  id                 String           @id @default(uuid())
+  organizationId     String           @map("organization_id")
+  name               String
+  code               String?
+  headName           String?          @map("head_name")
+  budget             Decimal?         @db.Decimal(14, 2)
+  status             DepartmentStatus @default(ACTIVE)
+  departmentType     String?          @map("department_type")
+  branch             String?
+  parentDepartmentId String?          @map("parent_department_id")
+  departmentProfile  Json?            @default("{}") @map("department_profile")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  parentDepartment Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id], onDelete: SetNull)
+  childDepartments Department[] @relation("DepartmentHierarchy")
+  employees        Employee[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([parentDepartmentId])
+  @@map("departments")
+}
+
+model EmploymentCategory {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  employees Employee[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("employment_categories")
+}
+
+model Employee {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  employeeNumber String         @map("employee_number")
+  firstName      String         @map("first_name")
+  middleName     String?        @map("middle_name")
+  lastName       String         @map("last_name")
+  gender         Gender
+  dateOfBirth    DateTime       @map("date_of_birth")
+  email          String?
+  phone          String
+  address        String?
+  nationalId     String?        @map("national_id")
+  photoUrl       String?        @map("photo_url")
+  departmentId   String?        @map("department_id")
+  categoryId     String?        @map("category_id")
+  position       String
+  contractType   ContractType   @default(PERMANENT) @map("contract_type")
+  status         EmployeeStatus @default(ACTIVE)
+  hireDate       DateTime       @map("hire_date")
+  contractEnd    DateTime?      @map("contract_end")
+  ongoingContract Boolean       @default(false) @map("ongoing_contract")
+  basicSalary    Decimal?       @db.Decimal(14, 2) @map("basic_salary")
+  netSalary      Decimal?       @db.Decimal(14, 2) @map("net_salary")
+  isProtected    Boolean        @default(false) @map("is_protected")
+  payrollStaffId String?        @map("payroll_staff_id")
+  rfidUid          String?       @map("rfid_uid")
+  fingerprintId    String?       @map("fingerprint_id")
+  identityRemarks  String?       @map("identity_remarks")
+  hrProfile      Json           @default("{}") @map("hr_profile")
+  deletedAt      DateTime?      @map("deleted_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  department     Department?          @relation(fields: [departmentId], references: [id])
+  category       EmploymentCategory?  @relation(fields: [categoryId], references: [id])
+  leaveRequests  LeaveRequest[]
+  documents      EmployeeDocument[]
+  qualifications Qualification[]
+
+  @@unique([organizationId, employeeNumber])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("employees")
+}
+
+model Qualification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  employeeId     String   @map("employee_id")
+  level          String
+  field          String?
+  institution    String?
+  year           Int?
+  grade          String?
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("qualifications")
+}
+
+model EmployeeDocument {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  employeeId     String   @map("employee_id")
+  category       String
+  filename       String
+  filePath       String?  @map("file_path")
+  mimeType       String?  @map("mime_type")
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([employeeId])
+  @@map("employee_documents")
+}
+
+model LeavePolicy {
+  id                  String   @id @default(uuid())
+  organizationId      String   @map("organization_id")
+  leaveType           String   @map("leave_type")
+  category            String
+  paid                Boolean  @default(true)
+  maxDays             Int      @default(0) @map("max_days")
+  carryForward        Boolean  @default(false) @map("carry_forward")
+  genderRestriction   String   @default("ANY") @map("gender_restriction")
+  eligibleDepartments String[] @default([]) @map("eligible_departments")
+  minYearsOfService   Int      @default(0) @map("min_years_of_service")
+  approvalWorkflow    String[] @default([]) @map("approval_workflow")
+  requiredDocuments   String[] @default([]) @map("required_documents")
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, leaveType])
+  @@index([organizationId])
+  @@map("leave_policies")
+}
+
+model LeaveRequest {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  employeeId     String      @map("employee_id")
+  leaveType      String      @map("leave_type")
+  startDate      DateTime    @map("start_date")
+  endDate        DateTime    @map("end_date")
+  totalDays      Int         @map("total_days")
+  reason         String?
+  status         LeaveStatus @default(PENDING)
+  appliedOn      DateTime    @default(now()) @map("applied_on")
+  approvedBy     String?     @map("approved_by")
+  metadata       Json        @default("{}")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([employeeId])
+  @@index([organizationId, status])
+  @@map("leave_requests")
+}

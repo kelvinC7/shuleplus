@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TimePreference {
+  ANY
+  MORNING
+  AFTERNOON
+  CUSTOM
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model TeacherAssignment {
+  id              String           @id @default(uuid())
+  organizationId  String           @map("organization_id")
+  teacherUserId   String           @map("teacher_user_id")
+  teacherName     String           @map("teacher_name")
+  className       String           @map("class_name")
+  subjectName     String           @map("subject_name")
+  periodsPerWeek  Int              @default(1) @map("periods_per_week")
+  defaultCourseMarks Decimal?      @map("default_course_marks")
+  room            String?
+  schedulingOverrides Json @default("{}") @map("scheduling_overrides")
+  term            String
+  academicYear    String           @map("academic_year")
+  status          AssignmentStatus @default(ACTIVE)
+  supersededById  String?          @map("superseded_by_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@index([organizationId, term, academicYear])
+  @@index([organizationId, className])
+  @@map("teacher_assignments")
+}
+
+model TimetableSchoolSchedule {
+  id                    String   @id @default(uuid())
+  organizationId        String   @map("organization_id")
+  dayStart              String   @default("07:30") @map("day_start")
+  dayEnd                String   @default("16:30") @map("day_end")
+  periodDurationMinutes Int      @default(40) @map("period_duration_minutes")
+  periodCount           Int      @default(8) @map("period_count")
+  transitionMinutes     Int      @default(5) @map("transition_minutes")
+  durationMode          String   @default("UNIFORM") @map("duration_mode")
+  periodSlots           Json     @default("[]") @map("period_slots")
+  activeDays            Json     @default("[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]") @map("active_days")
+  breaks                Json     @default("[]")
+  term                  String
+  academicYear          String   @map("academic_year")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, term, academicYear])
+  @@map("timetable_school_schedule")
+}
+
+model TimetableTeacherProfile {
+  id                 String   @id @default(uuid())
+  organizationId     String   @map("organization_id")
+  teacherUserId      String   @map("teacher_user_id")
+  teacherName        String   @map("teacher_name")
+  position           String?  @default("Teacher") @map("position")
+  employeeNumber     String?  @map("employee_number")
+  maxPeriodsPerDay   Int      @default(6) @map("max_periods_per_day")
+  availableDays      Json     @default("[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\"]") @map("available_days")
+  preferredSlots     Json     @default("[]") @map("preferred_slots")
+  unavailableSlots   Json     @default("[]") @map("unavailable_slots")
+  portalEnabled      Boolean  @default(false) @map("portal_enabled")
+  loginMethod        String   @default("email") @map("login_method")
+  loginEmail         String?  @map("login_email")
+  loginPhone         String?  @map("login_phone")
+  rfidUid            String?  @map("rfid_uid")
+  fingerprintId      String?  @map("fingerprint_id")
+  identityRemarks      String?  @map("identity_remarks")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, teacherUserId])
+  @@map("timetable_teacher_profiles")
+}
+
+model TimetableCourseConfig {
+  id                  String         @id @default(uuid())
+  organizationId      String         @map("organization_id")
+  subjectName         String         @map("subject_name")
+  courseCode          String?        @map("course_code")
+  codeMode            String         @default("AUTOMATIC") @map("code_mode")
+  color               String?        @map("color")
+  priority            Int            @default(5)
+  periodsPerWeek      Int            @default(1) @map("periods_per_week")
+  requiresLab         Boolean        @default(false) @map("requires_lab")
+  prefersDoublePeriod Boolean        @default(false) @map("prefers_double_period")
+  timePreference      TimePreference @default(ANY) @map("time_preference")
+  customWindowStart   String?        @map("custom_window_start")
+  customWindowEnd     String?        @map("custom_window_end")
+  schedulingRules     Json           @default("{}") @map("scheduling_rules")
+  isCore              Boolean        @default(true) @map("is_core")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  @@unique([organizationId, courseCode])
+  @@index([organizationId, subjectName])
+  @@map("timetable_course_config")
+}
+
+model TimetableExtraActivity {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  className      String?  @map("class_name")
+  dayOfWeek      String   @map("day_of_week")
+  startTime      String   @map("start_time")
+  endTime        String   @map("end_time")
+  capacity       Int      @default(1)
+  term           String
+  academicYear   String   @map("academic_year")
+  synced         Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  timetableRows AcademicTimetable[]
+
+  @@index([organizationId, term, academicYear])
+  @@map("timetable_extra_activities")
+}
+
+model ClassTimetablePublish {
+  id                String   @id @default(uuid())
+  organizationId    String   @map("organization_id")
+  className         String   @map("class_name")
+  term              String
+  academicYear      String   @map("academic_year")
+  lessonCount       Int      @default(0) @map("lesson_count")
+  confirmedAt       DateTime @default(now()) @map("confirmed_at")
+  confirmedByUserId String?  @map("confirmed_by_user_id")
+
+  @@unique([organizationId, className, term, academicYear])
+  @@index([organizationId, term, academicYear])
+  @@map("class_timetable_publishes")
+}
+
+model AcademicTimetable {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  className        String   @map("class_name")
+  subjectName      String   @map("subject_name")
+  teacherUserId    String   @map("teacher_user_id")
+  teacherName      String   @map("teacher_name")
+  dayOfWeek        String   @map("day_of_week")
+  startTime        String   @map("start_time")
+  endTime          String   @map("end_time")
+  room             String?
+  term             String
+  academicYear     String   @map("academic_year")
+  extraActivityId  String?  @map("extra_activity_id")
+  isExtraActivity  Boolean  @default(false) @map("is_extra_activity")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  extraActivity TimetableExtraActivity? @relation(fields: [extraActivityId], references: [id], onDelete: SetNull)
+  lessonSessions LessonSession[]
+
+  @@index([organizationId, term, academicYear])
+  @@index([organizationId, className])
+  @@index([organizationId, teacherUserId])
+  @@map("academic_timetables")
+}
+
+enum LessonSessionStatus {
+  SCHEDULED
+  WAITING
+  RUNNING
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum PunctualityStatus {
+  EARLY
+  ON_TIME
+  LATE
+  VERY_LATE
+  WRONG_CLASSROOM
+  MISSED
+  NOT_STARTED
+}
+
+enum StudentAttendanceMark {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  SICK
+  SCHOOL_ACTIVITY
+}
+
+model Classroom {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  building       String?
+  floor          String?
+  roomNumber     String   @map("room_number")
+  qrCode         String   @unique @map("qr_code")
+  sourceClassId  String?  @map("source_class_id")
+  classLabel     String?  @map("class_label")
+  capacity       Int?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sessions LessonSession[]
+
+  @@unique([organizationId, roomNumber])
+  @@unique([organizationId, sourceClassId])
+  @@index([organizationId])
+  @@map("classrooms")
+}
+
+model SmartTimetableSettings {
+  id                       String   @id @default(uuid())
+  organizationId           String   @unique @map("organization_id")
+  graceMinutesOnTime       Int      @default(5) @map("grace_minutes_on_time")
+  lateThresholdMinutes     Int      @default(10) @map("late_threshold_minutes")
+  veryLateThresholdMinutes Int      @default(20) @map("very_late_threshold_minutes")
+  qrRequired               Boolean  @default(true) @map("qr_required")
+  gpsRequired              Boolean  @default(false) @map("gps_required")
+  autoCloseAfterEnd        Boolean  @default(true) @map("auto_close_after_end")
+  reminderEnabled          Boolean  @default(true) @map("reminder_enabled")
+  liveRefreshSeconds       Int      @default(8) @map("live_refresh_seconds")
+  notifyHeadOfStudies      Boolean  @default(true) @map("notify_head_of_studies")
+  notifyDeputyHead         Boolean  @default(false) @map("notify_deputy_head")
+  notifyDepartmentHead     Boolean  @default(false) @map("notify_department_head")
+  alertLateEnabled         Boolean  @default(true) @map("alert_late_enabled")
+  alertMissingCheckInEnabled Boolean @default(true) @map("alert_missing_check_in_enabled")
+  alertMissingCheckOutEnabled Boolean @default(true) @map("alert_missing_check_out_enabled")
+  alertEarlyDepartureEnabled Boolean @default(true) @map("alert_early_departure_enabled")
+  missingCheckInAfterMinutes Int    @default(10) @map("missing_check_in_after_minutes")
+  attendanceEarlyOpenMinutes Int    @default(5) @map("attendance_early_open_minutes")
+  attendanceEditAfterMinutes Int    @default(30) @map("attendance_edit_after_minutes")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("smart_timetable_settings")
+}
+
+model LessonSession {
+  id                String              @id @default(uuid())
+  organizationId    String              @map("organization_id")
+  timetableId       String              @map("timetable_id")
+  classroomId       String?             @map("classroom_id")
+  lessonDate        DateTime            @map("lesson_date") @db.Date
+  status            LessonSessionStatus @default(SCHEDULED)
+  punctuality       PunctualityStatus   @default(NOT_STARTED)
+  scheduledStart    String              @map("scheduled_start")
+  scheduledEnd      String              @map("scheduled_end")
+  scannedAt         DateTime?           @map("scanned_at")
+  startedAt         DateTime?           @map("started_at")
+  completedAt       DateTime?           @map("completed_at")
+  scanDevice        String?             @map("scan_device")
+  scanLocation      String?             @map("scan_location")
+  qrVerified        Boolean             @default(false) @map("qr_verified")
+  attendanceDone    Boolean             @default(false) @map("attendance_done")
+  attendanceSubmittedAt DateTime?       @map("attendance_submitted_at")
+  attendanceReference   String?           @map("attendance_reference")
+  periodLabel       String?             @map("period_label")
+  teacherUserId     String              @map("teacher_user_id")
+  teacherName       String              @map("teacher_name")
+  className         String              @map("class_name")
+  subjectName       String              @map("subject_name")
+  room              String?
+  topic             String?
+  objectives        String?
+  notes             String?
+  homework          String?
+  resourcesUsed     String?             @map("resources_used")
+  nextLessonPlan    String?             @map("next_lesson_plan")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  timetable  AcademicTimetable     @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  classroom  Classroom?            @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  attendance LessonAttendanceRow[]
+
+  @@unique([timetableId, lessonDate])
+  @@index([organizationId, lessonDate])
+  @@index([organizationId, teacherUserId, lessonDate])
+  @@index([organizationId, status])
+  @@map("lesson_sessions")
+}
+
+model LessonAttendanceRow {
+  id             String                @id @default(uuid())
+  organizationId String                @map("organization_id")
+  sessionId      String                @map("session_id")
+  studentCode    String                @map("student_code")
+  fullName       String                @map("full_name")
+  gender         String?
+  className      String                @map("class_name")
+  stream         String?
+  rollNumber     String?               @map("roll_number")
+  photoUrl       String?               @map("photo_url")
+  status         StudentAttendanceMark @default(PRESENT)
+  reason         String?
+  arrivalTime    String?               @map("arrival_time")
+  minutesLate    Int?                  @map("minutes_late")
+  notes          String?
+  markedAt       DateTime?             @map("marked_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  session LessonSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentCode])
+  @@index([organizationId, sessionId])
+  @@map("lesson_attendance_rows")
+}
+
+model SmartNotification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  audience       String
+  title          String
+  message        String
+  relatedType    String?  @map("related_type")
+  relatedId      String?  @map("related_id")
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("smart_notifications")
+}

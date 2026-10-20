@@ -1,0 +1,54 @@
+import { PrismaClient } from '@prisma/client';
+export declare const SAINT_THEO_ORG_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+export declare const SAINT_THEO_ORG_SLUG = "saint-theo-school";
+export declare function seedPlatform(prisma: PrismaClient): Promise<{
+    platformOrg: {
+        name: string;
+        email: string | null;
+        id: string;
+        organizationCode: string | null;
+        slug: string;
+        type: import("@prisma/client").$Enums.OrganizationType;
+        category: string | null;
+        status: import("@prisma/client").$Enums.OrganizationStatus;
+        phone: string | null;
+        address: string | null;
+        physicalAddress: string | null;
+        poBox: string | null;
+        website: string | null;
+        registrationNumber: string | null;
+        tin: string | null;
+        description: string | null;
+        establishedDate: Date | null;
+        gpsCoordinates: string | null;
+        mapUrl: string | null;
+        country: string;
+        provinceId: string | null;
+        districtId: string | null;
+        sectorId: string | null;
+        cellId: string | null;
+        villageId: string | null;
+        logoUrl: string | null;
+        signatureUrl: string | null;
+        stampUrl: string | null;
+        subscriptionTier: string | null;
+        modules: import("@prisma/client/runtime/library").JsonValue;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+    rootAdminRole: {
+        name: string;
+        id: string;
+        slug: string;
+        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        organizationId: string | null;
+        hierarchyLevel: number;
+        isSystem: boolean;
+        dataScope: import("@prisma/client").$Enums.DataScope;
+    };
+}>;
+export declare function ensureRootAdmin(prisma: PrismaClient): Promise<void>;
+export declare function seedSchool(prisma: PrismaClient): Promise<void>;
+//# sourceMappingURL=seed.d.ts.map

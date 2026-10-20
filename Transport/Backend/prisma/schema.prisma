@@ -1,0 +1,725 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum CardStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  LOST
+  BLOCKED
+  EXPIRED
+  TEMPORARY
+  REPLACED
+  DAMAGED
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  MAINTENANCE
+  DISABLED
+}
+
+enum BusStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RouteStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TripStatus {
+  SCHEDULED
+  BOARDING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TripDirection {
+  TO_SCHOOL
+  TO_HOME
+}
+
+enum BoardingType {
+  BOARDING
+  EXIT
+}
+
+enum StudentTransportState {
+  ON_BUS
+  AT_SCHOOL
+  EXPECTED
+  MISSING
+  RETURNED_HOME
+  WRONG_BUS
+  SUSPENDED
+}
+
+enum PassengerMark {
+  EXPECTED
+  BOARDED
+  EXITED
+  ABSENT
+  MANUAL
+  CHANGED_BUS
+  MISSING
+}
+
+enum AlertType {
+  WRONG_BUS
+  UNKNOWN_CARD
+  DUPLICATE_TAP
+  MISSING_STUDENT
+  EMERGENCY
+  UNAUTHORIZED
+  LATE_BOARDING
+  MAINTENANCE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum EmergencyType {
+  ACCIDENT
+  MEDICAL
+  MECHANICAL
+  SECURITY
+  OTHER
+}
+
+enum EmergencyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  APP
+  WHATSAPP
+  PUSH
+}
+
+enum FeeStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum MaintenanceKind {
+  OIL
+  TIRES
+  BRAKES
+  ENGINE
+  INSURANCE
+  INSPECTION
+  SERVICE
+  OTHER
+}
+
+enum DocumentKind {
+  INSURANCE
+  INSPECTION
+  REGISTRATION
+  PHOTO
+  OTHER
+}
+
+model Tenant {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model TransportSettings {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique @map("organization_id")
+  enableParentNotify    Boolean  @default(true) @map("enable_parent_notify")
+  enableSms             Boolean  @default(false) @map("enable_sms")
+  enableEmail           Boolean  @default(true) @map("enable_email")
+  enableWhatsapp        Boolean  @default(false) @map("enable_whatsapp")
+  enablePush            Boolean  @default(true) @map("enable_push")
+  requireReconciliation Boolean  @default(true) @map("require_reconciliation")
+  allowWrongBus         Boolean  @default(false) @map("allow_wrong_bus")
+  duplicateTapSeconds   Int      @default(30) @map("duplicate_tap_seconds")
+  morningStart          String   @default("05:30") @map("morning_start")
+  schoolArrival         String   @default("07:30") @map("school_arrival")
+  afternoonStart        String   @default("15:30") @map("afternoon_start")
+  homeArrival           String   @default("17:30") @map("home_arrival")
+  academicYear          String   @default("2026-2027") @map("academic_year")
+  term                  String   @default("Term 1")
+  schoolName            String?  @map("school_name")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("transport_settings")
+}
+
+model Driver {
+  id             String      @id @default(cuid())
+  organizationId String      @map("organization_id")
+  name           String
+  phone          String?
+  licenseNumber  String?     @map("license_number")
+  licenseExpiry  DateTime?   @map("license_expiry")
+  status         StaffStatus @default(ACTIVE)
+  notes          String?
+  deletedAt      DateTime?   @map("deleted_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  buses Bus[]
+  trips Trip[]
+
+  @@index([organizationId, status])
+  @@map("drivers")
+}
+
+model Attendant {
+  id             String      @id @default(cuid())
+  organizationId String      @map("organization_id")
+  name           String
+  phone          String?
+  status         StaffStatus @default(ACTIVE)
+  notes          String?
+  deletedAt      DateTime?   @map("deleted_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  buses Bus[]
+  trips Trip[]
+
+  @@index([organizationId, status])
+  @@map("attendants")
+}
+
+model Route {
+  id             String      @id @default(cuid())
+  organizationId String      @map("organization_id")
+  name           String
+  code           String
+  direction      String      @default("Kicukiro → School")
+  distanceKm     Float?      @map("distance_km")
+  etaMinutes     Int?        @map("eta_minutes")
+  status         RouteStatus @default(ACTIVE)
+  notes          String?
+  deletedAt      DateTime?   @map("deleted_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  stops       Stop[]
+  buses       Bus[]
+  assignments StudentAssignment[]
+  trips       Trip[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@map("routes")
+}
+
+model Stop {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  routeId        String   @map("route_id")
+  name           String
+  sequence       Int
+  etaMinutes     Int?     @map("eta_minutes")
+  latitude       Float?
+  longitude      Float?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  route              Route               @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  pickupAssignments  StudentAssignment[] @relation("PickupStop")
+  dropoffAssignments StudentAssignment[] @relation("DropoffStop")
+  boardingEvents     BoardingEvent[]
+
+  @@index([organizationId, routeId])
+  @@map("stops")
+}
+
+model Bus {
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  code             String
+  plateNumber      String    @map("plate_number")
+  busType          String    @default("School Bus") @map("bus_type")
+  capacity         Int       @default(40)
+  status           BusStatus @default(ACTIVE)
+  gpsDevice        String?   @map("gps_device")
+  lastLocation     String?   @map("last_location")
+  lastLat          Float?    @map("last_lat")
+  lastLng          Float?    @map("last_lng")
+  speedKmh         Float?    @map("speed_kmh")
+  mileageKm        Int       @default(0) @map("mileage_km")
+  nextServiceKm    Int?      @map("next_service_km")
+  insuranceValidTo DateTime? @map("insurance_valid_to")
+  inspectionValidTo DateTime? @map("inspection_valid_to")
+  notes            String?
+  deletedAt        DateTime? @map("deleted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  driverId    String? @map("driver_id")
+  attendantId String? @map("attendant_id")
+  routeId     String? @map("route_id")
+
+  driver    Driver?    @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  attendant Attendant? @relation(fields: [attendantId], references: [id], onDelete: SetNull)
+  route     Route?     @relation(fields: [routeId], references: [id], onDelete: SetNull)
+
+  devices          RfidDevice[]
+  morningStudents  StudentAssignment[] @relation("MorningBus")
+  afternoonStudents StudentAssignment[] @relation("AfternoonBus")
+  trips            Trip[]
+  maintenance      MaintenanceRecord[]
+  fuel             FuelRecord[]
+  documents        BusDocument[]
+  emergencies      Emergency[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@map("buses")
+}
+
+model StudentAssignment {
+  id                 String                @id @default(cuid())
+  organizationId     String                @map("organization_id")
+  studentId          String?               @map("student_id")
+  studentCode        String                @map("student_code")
+  studentName        String                @map("student_name")
+  className          String?               @map("class_name")
+  level              String?
+  pickupStopId       String?               @map("pickup_stop_id")
+  dropoffStopId      String?               @map("dropoff_stop_id")
+  morningBusId       String?               @map("morning_bus_id")
+  afternoonBusId     String?               @map("afternoon_bus_id")
+  routeId            String?               @map("route_id")
+  guardianName       String?               @map("guardian_name")
+  guardianPhone      String?               @map("guardian_phone")
+  liveState          StudentTransportState @default(EXPECTED) @map("live_state")
+  transportSuspended Boolean               @default(false) @map("transport_suspended")
+  academicYear       String?               @map("academic_year")
+  term               String?
+  deletedAt          DateTime?             @map("deleted_at")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  pickupStop   Stop?  @relation("PickupStop", fields: [pickupStopId], references: [id], onDelete: SetNull)
+  dropoffStop  Stop?  @relation("DropoffStop", fields: [dropoffStopId], references: [id], onDelete: SetNull)
+  morningBus   Bus?   @relation("MorningBus", fields: [morningBusId], references: [id], onDelete: SetNull)
+  afternoonBus Bus?   @relation("AfternoonBus", fields: [afternoonBusId], references: [id], onDelete: SetNull)
+  route        Route? @relation(fields: [routeId], references: [id], onDelete: SetNull)
+
+  cards     RfidCard[]
+  parents   ParentContact[]
+  fees      TransportFee[]
+  passengers TripPassenger[]
+
+  @@unique([organizationId, studentCode])
+  @@index([organizationId, liveState])
+  @@map("student_assignments")
+}
+
+model RfidCard {
+  id             String     @id @default(cuid())
+  organizationId String     @map("organization_id")
+  cardNumber     String     @map("card_number")
+  uid            String?
+  qrPayload      String?    @map("qr_payload")
+  status         CardStatus @default(PENDING)
+  assignmentId   String?    @map("assignment_id")
+  studentCode    String?    @map("student_code")
+  studentName    String?    @map("student_name")
+  className      String?    @map("class_name")
+  issuedAt       DateTime?  @map("issued_at")
+  activatedAt    DateTime?  @map("activated_at")
+  blockedAt      DateTime?  @map("blocked_at")
+  blockedReason  String?    @map("blocked_reason")
+  lostAt         DateTime?  @map("lost_at")
+  notes          String?
+  usageCount     Int        @default(0) @map("usage_count")
+  lastUsedAt     DateTime?  @map("last_used_at")
+  deletedAt      DateTime?  @map("deleted_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  assignment StudentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  history    CardHistory[]
+  events     BoardingEvent[]
+
+  @@unique([organizationId, cardNumber])
+  @@index([organizationId, status])
+  @@map("rfid_cards")
+}
+
+model CardHistory {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  cardId         String   @map("card_id")
+  action         String
+  detail         String?
+  actorUserId    String?  @map("actor_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  card RfidCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, cardId])
+  @@map("card_history")
+}
+
+model RfidDevice {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  deviceCode     String       @map("device_code")
+  name           String
+  busId          String?      @map("bus_id")
+  status         DeviceStatus @default(OFFLINE)
+  batteryPercent Int?         @map("battery_percent")
+  signalQuality  String?      @map("signal_quality")
+  firmwareVersion String?     @map("firmware_version")
+  lastSeenAt     DateTime?    @map("last_seen_at")
+  notes          String?
+  deletedAt      DateTime?    @map("deleted_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  bus    Bus?            @relation(fields: [busId], references: [id], onDelete: SetNull)
+  events BoardingEvent[]
+
+  @@unique([organizationId, deviceCode])
+  @@index([organizationId, status])
+  @@map("rfid_devices")
+}
+
+model Trip {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  busId          String        @map("bus_id")
+  routeId        String?       @map("route_id")
+  driverId       String?       @map("driver_id")
+  attendantId    String?       @map("attendant_id")
+  direction      TripDirection
+  status         TripStatus    @default(SCHEDULED)
+  tripDate       DateTime      @map("trip_date") @db.Date
+  startedAt      DateTime?     @map("started_at")
+  endedAt        DateTime?     @map("ended_at")
+  lastLocation   String?       @map("last_location")
+  lastLat        Float?        @map("last_lat")
+  lastLng        Float?        @map("last_lng")
+  speedKmh       Float?        @map("speed_kmh")
+  etaAt          DateTime?     @map("eta_at")
+  lastRfidAt     DateTime?     @map("last_rfid_at")
+  lastRfidName   String?       @map("last_rfid_name")
+  expectedCount  Int           @default(0) @map("expected_count")
+  boardedCount   Int           @default(0) @map("boarded_count")
+  exitedCount    Int           @default(0) @map("exited_count")
+  missingCount   Int           @default(0) @map("missing_count")
+  reconciled     Boolean       @default(false)
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  bus       Bus        @relation(fields: [busId], references: [id], onDelete: Cascade)
+  route     Route?     @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  driver    Driver?    @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  attendant Attendant? @relation(fields: [attendantId], references: [id], onDelete: SetNull)
+
+  passengers  TripPassenger[]
+  events      BoardingEvent[]
+  gpsPings    GpsPing[]
+  emergencies Emergency[]
+
+  @@index([organizationId, tripDate, status])
+  @@index([organizationId, busId, tripDate])
+  @@map("trips")
+}
+
+model TripPassenger {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  tripId         String        @map("trip_id")
+  assignmentId   String?       @map("assignment_id")
+  studentCode    String        @map("student_code")
+  studentName    String        @map("student_name")
+  className      String?       @map("class_name")
+  mark           PassengerMark @default(EXPECTED)
+  boardedAt      DateTime?     @map("boarded_at")
+  exitedAt       DateTime?     @map("exited_at")
+  note           String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  trip       Trip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  assignment StudentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@unique([tripId, studentCode])
+  @@index([organizationId, tripId])
+  @@map("trip_passengers")
+}
+
+model BoardingEvent {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  tripId         String?      @map("trip_id")
+  cardId         String?      @map("card_id")
+  deviceId       String?      @map("device_id")
+  stopId         String?      @map("stop_id")
+  studentCode    String?
+  studentName    String
+  className      String?
+  cardNumber     String?      @map("card_number")
+  busCode        String?      @map("bus_code")
+  routeName      String?      @map("route_name")
+  stopName       String?      @map("stop_name")
+  driverName     String?      @map("driver_name")
+  deviceCode     String?      @map("device_code")
+  type           BoardingType
+  outcome        String       @default("OK")
+  academicYear   String?      @map("academic_year")
+  term           String?
+  scannedAt      DateTime     @default(now()) @map("scanned_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  trip   Trip?       @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  card   RfidCard?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  device RfidDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  stop   Stop?       @relation(fields: [stopId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, scannedAt])
+  @@index([organizationId, studentCode, scannedAt])
+  @@map("boarding_events")
+}
+
+model GpsPing {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  tripId         String   @map("trip_id")
+  location       String?
+  latitude       Float?
+  longitude      Float?
+  speedKmh       Float?   @map("speed_kmh")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, tripId, createdAt])
+  @@map("gps_pings")
+}
+
+model ParentContact {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  assignmentId   String?   @map("assignment_id")
+  studentCode    String?   @map("student_code")
+  studentName    String
+  parentName     String    @map("parent_name")
+  relationship   String    @default("GUARDIAN")
+  phone          String?
+  email          String?
+  notifySms      Boolean   @default(true) @map("notify_sms")
+  notifyEmail    Boolean   @default(true) @map("notify_email")
+  notifyWhatsapp Boolean   @default(false) @map("notify_whatsapp")
+  notifyPush     Boolean   @default(true) @map("notify_push")
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  assignment    StudentAssignment?  @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  notifications ParentNotification[]
+
+  @@index([organizationId, studentCode])
+  @@map("parent_contacts")
+}
+
+model ParentNotification {
+  id             String              @id @default(cuid())
+  organizationId String              @map("organization_id")
+  parentId       String?             @map("parent_id")
+  studentName    String              @map("student_name")
+  channel        NotificationChannel @default(APP)
+  title          String
+  message        String
+  sentAt         DateTime?           @map("sent_at")
+  status         String              @default("QUEUED")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  parent ParentContact? @relation(fields: [parentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("parent_notifications")
+}
+
+model SafetyAlert {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  type           AlertType
+  severity       AlertSeverity @default(WARNING)
+  title          String
+  message        String
+  relatedType    String?       @map("related_type")
+  relatedId      String?       @map("related_id")
+  resolved       Boolean       @default(false)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([organizationId, resolved, createdAt])
+  @@map("safety_alerts")
+}
+
+model Emergency {
+  id             String          @id @default(cuid())
+  organizationId String          @map("organization_id")
+  busId          String?         @map("bus_id")
+  tripId         String?         @map("trip_id")
+  type           EmergencyType
+  status         EmergencyStatus @default(OPEN)
+  location       String?
+  studentCount   Int?            @map("student_count")
+  driverName     String?         @map("driver_name")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  bus  Bus?  @relation(fields: [busId], references: [id], onDelete: SetNull)
+  trip Trip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@map("emergencies")
+}
+
+model Incident {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  title          String
+  detail         String?
+  busCode        String?  @map("bus_code")
+  driverName     String?  @map("driver_name")
+  severity       String   @default("WARNING")
+  resolved       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("incidents")
+}
+
+model MaintenanceRecord {
+  id             String          @id @default(cuid())
+  organizationId String          @map("organization_id")
+  busId          String          @map("bus_id")
+  kind           MaintenanceKind
+  title          String
+  dueAt          DateTime?       @map("due_at")
+  completedAt    DateTime?       @map("completed_at")
+  costRwf        Int?            @map("cost_rwf")
+  mileageKm      Int?            @map("mileage_km")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  bus Bus @relation(fields: [busId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, busId])
+  @@map("maintenance_records")
+}
+
+model FuelRecord {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  busId          String   @map("bus_id")
+  litres         Float
+  costRwf        Int      @map("cost_rwf")
+  mileageKm      Int?     @map("mileage_km")
+  driverName     String?  @map("driver_name")
+  purchasedAt    DateTime @default(now()) @map("purchased_at")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  bus Bus @relation(fields: [busId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, busId])
+  @@map("fuel_records")
+}
+
+model TransportFee {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  assignmentId   String?   @map("assignment_id")
+  studentName    String    @map("student_name")
+  studentCode    String?   @map("student_code")
+  academicYear   String    @map("academic_year")
+  term           String
+  routeName      String?   @map("route_name")
+  amountRwf      Int       @map("amount_rwf")
+  paidRwf        Int       @default(0) @map("paid_rwf")
+  status         FeeStatus @default(PENDING)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  assignment StudentAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, academicYear, term])
+  @@map("transport_fees")
+}
+
+model BusDocument {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  busId          String       @map("bus_id")
+  kind           DocumentKind
+  title          String
+  validTo        DateTime?    @map("valid_to")
+  notes          String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  bus Bus @relation(fields: [busId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, busId])
+  @@map("bus_documents")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  actorUserId    String?  @map("actor_user_id")
+  action         String
+  entityType     String?  @map("entity_type")
+  entityId       String?  @map("entity_id")
+  detail         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}

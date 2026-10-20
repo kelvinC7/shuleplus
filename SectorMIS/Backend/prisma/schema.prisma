@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum FollowUpStatus {
+  OPEN
+  UNDER_REVIEW
+  ACTION_REQUIRED
+  RESOLVED
+  CLOSED
+}
+
+enum FollowUpPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  district         String?
+  sector           String?
+  status           TenantStatus @default(ACTIVE)
+  settings         Json?        @map("settings")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  followUpCases FollowUpCase[]
+  schoolVisits  SchoolVisit[]
+
+  @@map("tenants")
+}
+
+model FollowUpCase {
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  caseNumber     String           @map("case_number")
+  schoolId       String           @map("school_id")
+  schoolName     String           @map("school_name")
+  issue          String
+  priority       FollowUpPriority @default(MEDIUM)
+  status         FollowUpStatus   @default(OPEN)
+  assignedTo     String?          @map("assigned_to")
+  followUpDate   DateTime?        @map("follow_up_date")
+  comments       Json?            @default("[]")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, caseNumber])
+  @@map("follow_up_cases")
+}
+
+model SchoolVisit {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  schoolId    String   @map("school_id")
+  schoolName  String   @map("school_name")
+  startedAt   DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  observations Json?   @default("{}")
+  report      Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("school_visits")
+}

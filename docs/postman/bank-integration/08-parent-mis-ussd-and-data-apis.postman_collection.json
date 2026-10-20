@@ -1,0 +1,370 @@
+{
+  "info": {
+    "name": "ShulePlus — 8. ParentMIS PIN (USSD) + Students, Parents, Fees",
+    "description": "# ParentMIS & USSD\n\nParent login uses a **5-digit PIN** (not a text password). USSD menus should call the same Student Management public auth endpoints with `{ \"phone\", \"pin\" }`.\n\n## Bases\n| Variable | Module |\n|----------|--------|\n| `{{students_api_url}}` | Student Management — parent PIN auth, students, parents |\n| `{{babyeyi_bff_url}}` | WebpageBabyeyi — public pay fees on babyeyi.rw |\n| `{{fees_api_url}}` | School Fees Portal — collections & bursar payments |\n\nImport environment: `ShulePlus-Bank-Sandbox.postman_environment.json`\n\nAlso see collections **02**, **03**, and **04** in this folder for full detail.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Parent PIN auth (USSD + ParentMIS web)",
+      "description": "No Bearer token required. PIN is stored hashed in Student Management (`passwordHash` on parent rows).",
+      "item": [
+        {
+          "name": "Auth status by phone",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/status?phone={{parent_phone}}",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "status"],
+              "query": [{ "key": "phone", "value": "{{parent_phone}}" }]
+            },
+            "description": "Returns linked students, `hasPin` / `hasPassword`, display name."
+          }
+        },
+        {
+          "name": "Set PIN (first time)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.token) pm.environment.set('parent_token', d.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{parent_phone}}\",\n  \"pin\": \"{{parent_pin}}\",\n  \"confirmPin\": \"{{parent_pin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/set-password",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "set-password"]
+            },
+            "description": "USSD: after phone lookup, collect PIN twice then POST here. Body field `pin` (alias `password` still accepted)."
+          }
+        },
+        {
+          "name": "Login with PIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.token) pm.environment.set('parent_token', d.token);",
+                  "const students = d?.students ?? [];",
+                  "if (students[0]?.id) pm.environment.set('student_id', students[0].id);",
+                  "if (students[0]?.studentCode) pm.environment.set('student_code', students[0].studentCode);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{parent_phone}}\",\n  \"pin\": \"{{parent_pin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/login",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Parent session (linked students)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{parent_token}}" }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/public/parents/auth/me",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "parents", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Students & parents (school API)",
+      "description": "School staff / integration token from IAM (`00-iam-authentication`). Parent PIN token only works on `/public/parents/auth/*`.",
+      "item": [
+        {
+          "name": "Public — lookup student by ShuleCode",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const d = json?.data ?? json;",
+                  "if (d?.id) pm.environment.set('student_id', d.id);",
+                  "if (d?.studentCode) pm.environment.set('student_code', d.studentCode);",
+                  "if (d?.organizationId) pm.environment.set('organization_id', d.organizationId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{students_api_url}}/public/students/lookup?code={{student_code}}",
+              "host": ["{{students_api_url}}"],
+              "path": ["public", "students", "lookup"],
+              "query": [{ "key": "code", "value": "{{student_code}}" }]
+            }
+          }
+        },
+        {
+          "name": "List students (authenticated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/students?page=1&limit=20&academicYear={{academic_year}}",
+              "host": ["{{students_api_url}}"],
+              "path": ["students"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "academicYear", "value": "{{academic_year}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List parents (authenticated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{students_api_url}}/parents",
+              "host": ["{{students_api_url}}"],
+              "path": ["parents"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebpageBabyeyi — school fees payments",
+      "description": "Public BFF used by babyeyi.rw pay-fees flow.",
+      "item": [
+        {
+          "name": "Student lookup",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/students/lookup?code={{student_code}}",
+              "host": ["{{babyeyi_bff_url}}"],
+              "path": ["students", "lookup"],
+              "query": [{ "key": "code", "value": "{{student_code}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get student fees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/student-fees?organizationId={{organization_id}}&studentCode={{student_code}}&academicYear={{academic_year}}&term={{term}}",
+              "host": ["{{babyeyi_bff_url}}"],
+              "path": ["fees", "student-fees"],
+              "query": [
+                { "key": "organizationId", "value": "{{organization_id}}" },
+                { "key": "studentCode", "value": "{{student_code}}" },
+                { "key": "academicYear", "value": "{{academic_year}}" },
+                { "key": "term", "value": "{{term}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Initiate MoMo / card payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const ref = json?.data?.reference ?? json?.reference;",
+                  "if (ref) pm.environment.set('payment_reference', ref);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organization_id}}\",\n  \"studentCode\": \"{{student_code}}\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\",\n  \"amount\": 5000,\n  \"method\": \"MOMO\",\n  \"phone\": \"{{parent_phone}}\"\n}"
+            },
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/payments/initiate",
+              "host": ["{{babyeyi_bff_url}}"],
+              "path": ["fees", "payments", "initiate"]
+            }
+          }
+        },
+        {
+          "name": "Payment status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{babyeyi_bff_url}}/fees/payments/{{payment_reference}}/status",
+              "host": ["{{babyeyi_bff_url}}"],
+              "path": ["fees", "payments", "{{payment_reference}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "School Fees Portal — collections",
+      "description": "Bursar / bank integration. Requires IAM `access_token` with fees scopes.",
+      "item": [
+        {
+          "name": "Collection overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection",
+              "host": ["{{fees_api_url}}"],
+              "path": ["collections", "fee-collection"]
+            }
+          }
+        },
+        {
+          "name": "Lookup student for collection",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/lookup?search={{student_code}}",
+              "host": ["{{fees_api_url}}"],
+              "path": ["collections", "fee-collection", "lookup"],
+              "query": [{ "key": "search", "value": "{{student_code}}" }]
+            }
+          }
+        },
+        {
+          "name": "Student fee account",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/student-account?studentId={{student_id}}",
+              "host": ["{{fees_api_url}}"],
+              "path": ["collections", "fee-collection", "student-account"],
+              "query": [{ "key": "studentId", "value": "{{student_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Record collection payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-developer-environment", "value": "{{developer_environment}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"billId\": \"{{bill_id}}\",\n  \"amount\": 50000,\n  \"method\": \"BANK_TRANSFER\",\n  \"reference\": \"BK-TXN-TEST-001\",\n  \"payerName\": \"Parent via bank\",\n  \"notes\": \"Collection desk test\"\n}"
+            },
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/payments",
+              "host": ["{{fees_api_url}}"],
+              "path": ["collections", "fee-collection", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Public — get student fees (direct fees API)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{fees_api_url}}/public/student-fees?organizationId={{organization_id}}&studentCode={{student_code}}&academicYear={{academic_year}}&term={{term}}",
+              "host": ["{{fees_api_url}}"],
+              "path": ["public", "student-fees"],
+              "query": [
+                { "key": "organizationId", "value": "{{organization_id}}" },
+                { "key": "studentCode", "value": "{{student_code}}" },
+                { "key": "academicYear", "value": "{{academic_year}}" },
+                { "key": "term", "value": "{{term}}" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

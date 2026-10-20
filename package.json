@@ -1,0 +1,24 @@
+{
+  "name": "shuleplus",
+  "private": true,
+  "scripts": {
+    "db:setup": "node scripts/setup-module-databases.mjs",
+    "db:setup:academic": "node scripts/setup-module-databases.mjs --only=Academic",
+    "subdomains:apply": "node scripts/apply-module-subdomains.mjs",
+    "subdomains:preview": "node scripts/apply-module-subdomains.mjs --dry-run",
+    "subdomains:doc": "node scripts/generate-subdomains-doc.mjs",
+    "ports:check": "node scripts/check-module-ports.mjs"
+  },
+  "workspaces": [
+    "packages/*",
+    "Authentication/Frontend",
+    "HR/Frontend",
+    "Payroll/Frontend",
+    "TeacherPortal/Frontend",
+    "SampleModule/Frontend",
+    "StudentDiscpline/Frontend"
+  ],
+  "devDependencies": {
+    "docx": "^9.7.1"
+  }
+}

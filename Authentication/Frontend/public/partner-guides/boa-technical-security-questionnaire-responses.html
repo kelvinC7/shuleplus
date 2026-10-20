@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShulePlus | BOA Technical &amp; Security Questionnaire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #000435;
+      --gold: #fcb038;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+      --sidebar-w: 260px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Montserrat", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--navy); font-weight: 600; }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(120deg, #000435 0%, #0d1b4a 45%, #1a3268 100%);
+      border-bottom: 2px solid var(--gold);
+      box-shadow: 0 8px 32px rgba(0, 4, 53, 0.35);
+    }
+    .topbar-inner {
+      max-width: 1200px; margin: 0 auto; padding: 18px 28px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .topbar-logo-wrap {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(252,176,56,0.35);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topbar-logo-wrap svg { width: 44px; height: 44px; border-radius: 10px; }
+    .topbar-eyebrow { margin: 0 0 4px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+    .topbar h1 { margin: 0; font-size: 1.1rem; font-weight: 800; color: #fff; line-height: 1.25; }
+    .topbar h1 .title-accent { color: var(--gold); font-weight: 700; }
+    .topbar-sub { margin: 6px 0 0; font-size: 0.76rem; font-weight: 500; color: #94a3b8; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.12);
+      padding: 8px 14px; border-radius: 999px; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+
+    .layout { display: flex; max-width: 1200px; margin: 0 auto; }
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0; position: sticky; top: 76px;
+      height: calc(100vh - 76px); overflow-y: auto; padding: 20px 14px 48px;
+      border-right: 1px solid var(--border); background: var(--surface);
+    }
+    .sidebar .nav-section { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 16px 0 6px 10px; }
+    .sidebar nav a { display: block; padding: 6px 10px; border-radius: 8px; text-decoration: none; font-size: 0.8rem; color: var(--muted); margin-bottom: 2px; }
+    .sidebar nav a:hover { background: var(--bg); color: var(--navy); }
+
+    main { flex: 1; min-width: 0; padding: 28px 36px 64px; }
+    @media (max-width: 900px) { .sidebar { display: none; } main { padding: 20px 18px 48px; } }
+    @media print { .sidebar, .topbar { position: static; } .sidebar { display: none; } }
+
+    .hero {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 28px; margin-bottom: 28px; box-shadow: 0 1px 3px rgba(15,23,42,0.08);
+    }
+    .hero h2 { margin: 0 0 10px; font-size: 1.5rem; color: var(--navy); font-weight: 800; }
+    .hero .lead { color: var(--muted); margin: 0 0 16px; max-width: 720px; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; font-size: 0.82rem; }
+    .meta-grid dt { font-weight: 700; color: var(--navy); margin: 0; }
+    .meta-grid dd { margin: 4px 0 0; color: var(--muted); }
+
+    section { margin-bottom: 40px; scroll-margin-top: 88px; }
+    section > h2 {
+      font-size: 1.2rem; color: var(--navy); font-weight: 800; margin: 0 0 20px;
+      padding-bottom: 8px; border-bottom: 2px solid var(--gold); display: inline-block;
+    }
+
+    .qa {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 22px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+    }
+    .qa-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+    .qa-num {
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; background: var(--navy); color: var(--gold);
+      font-size: 0.75rem; font-weight: 800; display: flex; align-items: center; justify-content: center;
+    }
+    .qa-q { margin: 0; font-size: 0.92rem; font-weight: 700; color: var(--navy); line-height: 1.4; }
+    .qa-a { color: var(--text); font-size: 0.88rem; }
+    .qa-a p { margin: 0 0 10px; }
+    .qa-a p:last-child { margin-bottom: 0; }
+    .qa-a ul { margin: 8px 0; padding-left: 20px; }
+    .qa-a li { margin-bottom: 6px; }
+
+    .honest {
+      background: var(--amber-bg); border: 1px solid var(--amber-border); border-radius: 10px;
+      padding: 12px 14px; margin-top: 12px; font-size: 0.82rem; color: #78350f;
+    }
+    .honest strong { color: #92400e; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 10px 0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--bg); color: var(--navy); font-weight: 700; }
+    code { font-family: Consolas, monospace; font-size: 0.8rem; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+
+    .sign-block {
+      margin-top: 32px; padding: 24px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface);
+    }
+    .sign-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+    .sign-line { flex: 1; min-width: 200px; border-bottom: 1px solid var(--text); height: 28px; margin-top: 4px; }
+    .footer-note { margin-top: 24px; font-size: 0.8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <div class="topbar-logo-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" aria-label="ShulePlus">
+          <rect width="48" height="48" rx="12" fill="#FCB038"/>
+          <path d="M14 32V16h6.5c3.2 0 5.5 1.8 5.5 4.8 0 2.2-1.2 3.7-3 4.4l3.8 6.8h-3.4l-3.3-6.2H17.2V32H14zm3.2-9h3.1c1.6 0 2.5-.8 2.5-2.1s-.9-2.1-2.5-2.1h-3.1v4.2z" fill="#000435"/>
+          <path d="M28.5 32l5.2-16h3.3l5.2 16h-3.3l-1.1-3.6h-5l-1.1 3.6h-3.2zm4.4-6.2h3.5l-1.7-5.5-1.8 5.5z" fill="#000435"/>
+        </svg>
+      </div>
+      <div>
+        <p class="topbar-eyebrow">Bank of Africa Rwanda · Vendor response</p>
+        <h1>Technical &amp; Security <span class="title-accent">Due Diligence</span></h1>
+        <p class="topbar-sub">ShulePlus school fees API integration · Honest disclosure · March 2026</p>
+      </div>
+    </div>
+    <span class="badge"><span class="badge-dot"></span> Confidential v1.0</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <div class="nav-section">Cover</div>
+      <a href="#cover">Summary</a>
+      <div class="nav-section">Section A</div>
+      <a href="#a1">A1 Documentation</a>
+      <a href="#a2">A2 Versioning</a>
+      <a href="#a3">A3 Authentication</a>
+      <a href="#a4">A4 Credentials</a>
+      <a href="#a5">A5 Sandbox</a>
+      <a href="#a6">A6 Uptime</a>
+      <a href="#a7">A7 Throughput</a>
+      <a href="#a8">A8 Retries</a>
+      <a href="#a9">A9 Idempotency</a>
+      <a href="#a10">A10 TLS</a>
+      <a href="#a11">A11 At rest</a>
+      <a href="#a12">A12 Hosting</a>
+      <a href="#a13">A13 Cloud</a>
+      <div class="nav-section">Section B</div>
+      <a href="#b1">B1 Pen test</a>
+      <a href="#b2">B2 External test</a>
+      <a href="#b3">B3 Incidents</a>
+      <a href="#b4">B4 Breaches</a>
+      <a href="#b5">B5 Patching</a>
+      <a href="#b6">B6 Disclosure</a>
+      <a href="#b7">B7 Certifications</a>
+      <a href="#b8">B8 Staff access</a>
+      <a href="#b9">B9 Audits</a>
+      <a href="#b10">B10 Segregation</a>
+      <a href="#sign">Declaration</a>
+    </nav>
+  </aside>
+
+  <main>
+
+    <div class="hero" id="cover">
+      <h2>Vendor response to BOA questionnaire</h2>
+      <p class="lead">
+        This document answers Bank of Africa Rwanda’s technical and security due diligence questionnaire for
+        ShulePlus school fees payment integration. We state clearly what is <strong>in production today</strong>,
+        what is <strong>in progress</strong>, and what we <strong>do not yet have</strong>, so your review is based on facts.
+      </p>
+      <dl class="meta-grid">
+        <div><dt>Vendor</dt><dd>Theoneste IT Ltd / ShulePlus</dd></div>
+        <div><dt>Scope</dt><dd>Student lookup, fees, payment initiate, status, receipt</dd></div>
+        <div><dt>Primary contact</dt><dd>[Name, title, email, phone]</dd></div>
+        <div><dt>Technical contact</dt><dd>[Name, email]</dd></div>
+      </dl>
+      <p style="margin-top:16px;font-size:0.85rem;color:var(--muted);">
+        <strong>Enclosures:</strong> School Fees API Guide v1.1 · Postman pack · Sandbox credentials (separate secure channel)
+      </p>
+      <p style="font-size:0.8rem;color:var(--muted);">Print this page to PDF: browser menu → Print → Save as PDF.</p>
+    </div>
+
+    <section id="section-a">
+      <h2>Section A: Technical Readiness</h2>
+
+      <article class="qa" id="a1">
+        <div class="qa-head"><span class="qa-num">1</span><p class="qa-q">Complete API documentation (endpoints, request/response formats, error codes)</p></div>
+        <div class="qa-a">
+          <p><strong>Yes.</strong> We provide:</p>
+          <ul>
+            <li>HTML guide: <a href="https://shuleplus.rw/partner-guides/school-fees-payment-api-guide.html">shuleplus.rw/partner-guides/school-fees-payment-api-guide.html</a></li>
+            <li>Postman collections 0–7 with sample requests and test scripts</li>
+            <li>Developer Portal OpenAPI (for partners with portal access)</li>
+          </ul>
+          <p>Production paths for the bank journey:</p>
+          <table>
+            <tr><th>Step</th><th>Method &amp; URL</th></tr>
+            <tr><td>Student lookup</td><td><code>GET https://students-api.shuleplus.rw/api/public/students/lookup?code=…</code></td></tr>
+            <tr><td>Fees</td><td><code>GET https://fees.shuleplus.rw/api/public/student-fees?…</code></td></tr>
+            <tr><td>Initiate pay</td><td><code>POST https://fees.shuleplus.rw/api/public/payments/initiate</code></td></tr>
+            <tr><td>Status</td><td><code>GET https://fees.shuleplus.rw/api/public/payments/{reference}/status</code></td></tr>
+            <tr><td>Receipt</td><td><code>GET https://fees.shuleplus.rw/api/public/receipts/{receiptNumber}</code></td></tr>
+          </table>
+          <p>Success: <code>{ "success": true, "data": { … } }</code>. Error: <code>{ "success": false, "message": "…" }</code> with HTTP 400, 404, 409, etc.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a2">
+        <div class="qa-head"><span class="qa-num">2</span><p class="qa-q">Is documentation versioned? Deprecation of older versions?</p></div>
+        <div class="qa-a">
+          <p><strong>Yes, at integration-pack level.</strong> Current API guide is <strong>v1.1</strong> (March 2026). Postman pack is tied to Git commits on the main branch.</p>
+          <p>We do <strong>not</strong> yet have a signed contractual SLA document only for API deprecation. Our operational commitment: we notify registered partners before breaking changes to production endpoints and allow a reasonable migration window (we propose <strong>90 days</strong> in the partnership agreement).</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a3">
+        <div class="qa-head"><span class="qa-num">3</span><p class="qa-q">Authentication method (OAuth2, mTLS, API keys)?</p></div>
+        <div class="qa-a">
+          <table>
+            <tr><th>API</th><th>Authentication today</th></tr>
+            <tr><td>Public school fees APIs (bank pay flow)</td><td><strong>HTTPS only</strong> — no Bearer token, same as public parent portal</td></tr>
+            <tr><td>Developer Portal / OAuth apps</td><td><strong>OAuth 2.0 client credentials</strong>, Bearer token, 15 min TTL</td></tr>
+            <tr><td>School admin APIs</td><td>JWT from ShulePlus IAM</td></tr>
+          </table>
+          <p><strong>Not in production today:</strong> mTLS on public fees APIs; bank core debit/settlement APIs (BOA CBS side) — to be defined with BOA during design.</p>
+          <div class="honest"><strong>Transparency:</strong> Public fees endpoints are intentionally open like the website flow. For production, we can discuss IP allowlisting, WAF rules, or API keys if BOA requires additional controls beyond TLS.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="a4">
+        <div class="qa-head"><span class="qa-num">4</span><p class="qa-q">How credentials are issued, rotated, and revoked</p></div>
+        <div class="qa-a">
+          <p><strong>OAuth (Developer Portal):</strong> ShulePlus creates partner + sandbox school → bank user activates account (MFA) → creates application → receives <code>client_id</code> and one-time <code>client_secret</code>. Rotation via <strong>Rotate Secret</strong> (old secret invalid immediately). Revocation via suspend/delete application or developer user.</p>
+          <p>Secrets stored hashed; plaintext never kept after display. Server/database credentials: small ops team, environment files, not in Git.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a5">
+        <div class="qa-head"><span class="qa-num">5</span><p class="qa-q">Dedicated sandbox/UAT separate from production?</p></div>
+        <div class="qa-a">
+          <p><strong>Logical separation: yes.</strong> Separate OAuth apps (SANDBOX vs PRODUCTION), dedicated sandbox <code>organization_id</code>, test students, Developer Portal MFA.</p>
+          <div class="honest"><strong>Transparency:</strong> Sandbox currently uses the <strong>same public hostnames</strong> as production (e.g. <code>fees.shuleplus.rw</code>) with <strong>test school data</strong>, not a separate physical UAT datacenter. Payment behaviour in sandbox stays PENDING until confirmed (optional auto-confirm only if enabled for demos).</div>
+        </div>
+      </article>
+
+      <article class="qa" id="a6">
+        <div class="qa-head"><span class="qa-num">6</span><p class="qa-q">Uptime over last 12 months (evidence)</p></div>
+        <div class="qa-a">
+          <p>Production runs on a dedicated server with PM2, Nginx, PostgreSQL, and module <code>/health</code> endpoints. Deployments are controlled via GitHub and self-hosted runner.</p>
+          <div class="honest"><strong>Honest answer:</strong> We do <strong>not</strong> yet have an audited 12-month uptime percentage or a public status page to attach to this response. We can share operational incident notes and health-check logs on request during UAT. We are working toward a published SLA and monitoring dashboard for partners.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="a7">
+        <div class="qa-head"><span class="qa-num">7</span><p class="qa-q">Maximum throughput (RPS/RPM)</p></div>
+        <div class="qa-a">
+          <p>Architecture is standard HTTP + PostgreSQL; capacity depends on server size and DB connections.</p>
+          <div class="honest"><strong>Honest answer:</strong> We have <strong>not</strong> run a formal load test with a certified RPS/RPM number for external partners. We propose joint UAT load testing with BOA before go-live and will share results and scaling plan if limits are reached.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="a8">
+        <div class="qa-head"><span class="qa-num">8</span><p class="qa-q">Failed requests, timeouts, retries</p></div>
+        <div class="qa-a">
+          <ul>
+            <li><strong>GET</strong> (lookup, fees, status, receipt): retry on 5xx/network with backoff (max ~5 attempts).</li>
+            <li><strong>POST initiate:</strong> do not blind retry; use bank idempotency mapping (Q9).</li>
+            <li><strong>4xx:</strong> fix payload; do not retry.</li>
+          </ul>
+          <p>Payments stay <strong>PENDING</strong> until bank confirmation/callback is implemented in production integration.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a9">
+        <div class="qa-head"><span class="qa-num">9</span><p class="qa-q">Idempotency</p></div>
+        <div class="qa-a">
+          <p><code>POST …/payments/initiate</code> supports header <code>Idempotency-Key</code> (per <code>organizationId</code>). Same key and same JSON body replays the original <strong>201</strong> (same <code>reference</code>). Same key with a different body returns <strong>409</strong> — investigate; do not auto-retry.</p>
+          <p>GET calls are idempotent. BOA should still store its own channel idempotency key mapped to ShulePlus <code>reference</code> for reconciliation.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a10">
+        <div class="qa-head"><span class="qa-num">10</span><p class="qa-q">Encryption in transit (TLS)</p></div>
+        <div class="qa-a">
+          <p><strong>Yes.</strong> Partner APIs are served only over HTTPS. TLS terminates at Nginx on <code>*.shuleplus.rw</code>. We configure <strong>TLS 1.2+</strong> (TLS 1.3 where supported). Certificates renewed via our standard Let’s Encrypt / server process.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a11">
+        <div class="qa-head"><span class="qa-num">11</span><p class="qa-q">Encryption at rest</p></div>
+        <div class="qa-a">
+          <table>
+            <tr><th>Data</th><th>Protection</th></tr>
+            <tr><td>Passwords</td><td>Bcrypt hashing</td></tr>
+            <tr><td>OAuth secrets</td><td>Hashed, not stored in plain text</td></tr>
+            <tr><td>Card PAN/CVV</td><td><strong>Not stored</strong> — last 4 digits only in code design</td></tr>
+            <tr><td>Bank account</td><td>Masked (last 4) in payment notes</td></tr>
+          </table>
+          <div class="honest"><strong>Honest answer:</strong> PostgreSQL runs on our production server. We will provide BOA a short infrastructure note confirming disk/backup encryption practices for that host. We do not claim FIPS-140 or vendor-certified “encryption at rest” audit unless the hosting contract provides it.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="a12">
+        <div class="qa-head"><span class="qa-num">12</span><p class="qa-q">Physical hosting (country, data center)</p></div>
+        <div class="qa-a">
+          <p>Primary production for Rwandan schools and this integration is hosted on infrastructure <strong>in Rwanda</strong>, operated by ShulePlus / Theoneste IT.</p>
+          <p><strong>To complete on cover sheet:</strong> [Hosting provider name, city, contract reference]</p>
+        </div>
+      </article>
+
+      <article class="qa" id="a13">
+        <div class="qa-head"><span class="qa-num">13</span><p class="qa-q">Third-party cloud (AWS/Azure/GCP) and shared responsibility</p></div>
+        <div class="qa-a">
+          <p><strong>Core student and fee databases:</strong> self-managed server in Rwanda — not AWS/Azure/GCP multi-tenant SaaS for application data.</p>
+          <p><strong>Third parties used:</strong> GitHub (source code; deploy runner on our server), email/SMS providers for notifications. These do not hold the full production database.</p>
+          <p><strong>Responsibility:</strong> ShulePlus — application security, patching, tenant isolation. Host provider — physical/network per contract. BOA — bank channel and CBS security.</p>
+        </div>
+      </article>
+    </section>
+
+    <section id="section-b">
+      <h2>Section B: Security Specifics</h2>
+
+      <article class="qa" id="b1">
+        <div class="qa-head"><span class="qa-num">1</span><p class="qa-q">Third-party penetration test in last 6–12 months?</p></div>
+        <div class="qa-a">
+          <div class="honest"><strong>Honest answer:</strong> We do <strong>not</strong> have an independent third-party penetration test report from the last 12 months to attach today. External penetration testing on IAM + public fees APIs + Developer Portal is <strong>planned</strong> as part of bank go-live readiness. We will share an executive summary under NDA when completed.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="b2">
+        <div class="qa-head"><span class="qa-num">2</span><p class="qa-q">Pen test by external party or internal?</p></div>
+        <div class="qa-a">
+          <p>Our target is an <strong>independent external</strong> tester for partner-facing scope. Today we rely on internal review, dependency checks, and secure deployment practices until the external test is done.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="b3">
+        <div class="qa-head"><span class="qa-num">3</span><p class="qa-q">Incident response and client notification</p></div>
+        <div class="qa-a">
+          <p>Process: detect → contain → assess → notify partners → recover → post-incident review. Developer/partner actions logged in IAM audit logs.</p>
+          <p>We will notify BOA within <strong>72 hours</strong> of a confirmed incident affecting partner credentials, API confidentiality, or sustained outage, via the integration contact on file.</p>
+          <div class="honest"><strong>Honest answer:</strong> We follow an internal incident procedure; a BOA-specific escalation matrix (names, phones) will be signed with the integration agreement.</div>
+        </div>
+      </article>
+
+      <article class="qa" id="b4">
+        <div class="qa-head"><span class="qa-num">4</span><p class="qa-q">Security breaches in the last 3 years?</p></div>
+        <div class="qa-a">
+          <p>To the best of our knowledge, ShulePlus has <strong>not</strong> had a reportable breach involving bulk exposure of student/financial records or partner OAuth secrets to unrelated third parties in the <strong>last three years</strong>.</p>
+          <p><em>(Management to confirm before signing.)</em></p>
+        </div>
+      </article>
+
+      <article class="qa" id="b5">
+        <div class="qa-head"><span class="qa-num">5</span><p class="qa-q">Patching vulnerabilities — process and timeline</p></div>
+        <div class="qa-a">
+          <table>
+            <tr><th>Severity</th><th>Target</th></tr>
+            <tr><td>Critical</td><td>72 hours (emergency change)</td></tr>
+            <tr><td>High</td><td>7 days</td></tr>
+            <tr><td>Medium</td><td>30 days</td></tr>
+            <tr><td>Low</td><td>90 days / next maintenance</td></tr>
+          </table>
+          <p>Patches via Git, tested deploy scripts, PM2 restart. OS updates on production server as needed (typically monthly or faster if critical).</p>
+        </div>
+      </article>
+
+      <article class="qa" id="b6">
+        <div class="qa-head"><span class="qa-num">6</span><p class="qa-q">Vulnerability disclosure / bug bounty?</p></div>
+        <div class="qa-a">
+          <p>Responsible disclosure: partners may report to <strong>[security@shuleplus.rw — create if not live]</strong>. We acknowledge within 5 business days.</p>
+          <p><strong>No public bug bounty program</strong> today.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="b7">
+        <div class="qa-head"><span class="qa-num">7</span><p class="qa-q">Certifications (ISO 27001, PCI-DSS, SOC 2)</p></div>
+        <div class="qa-a">
+          <table>
+            <tr><th>Standard</th><th>Status (honest)</th></tr>
+            <tr><td>ISO 27001</td><td><strong>Not certified</strong></td></tr>
+            <tr><td>SOC 2</td><td><strong>Not certified</strong></td></tr>
+            <tr><td>PCI-DSS (ShulePlus entity)</td><td><strong>Not certified</strong> — we do not store full card data; production card flow should use BOA/PCI-certified rails</td></tr>
+          </table>
+          <p>We can provide a written controls summary for due diligence; formal certification is on our roadmap as partner volume grows.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="b8">
+        <div class="qa-head"><span class="qa-num">8</span><p class="qa-q">Staff access control to systems handling BOA-related data</p></div>
+        <div class="qa-a">
+          <ul>
+            <li>RBAC: Super Admin, org admin, Developer Portal roles with module scopes</li>
+            <li>MFA for Developer Portal after activation</li>
+            <li>Production SSH: limited named administrators, key-based access</li>
+            <li>Developers do not receive production DB credentials by default</li>
+          </ul>
+          <p>Formal quarterly access review: <strong>target practice</strong>; we document privileged users before bank go-live.</p>
+        </div>
+      </article>
+
+      <article class="qa" id="b9">
+        <div class="qa-head"><span class="qa-num">9</span><p class="qa-q">Regular security audits — frequency</p></div>
+        <div class="qa-a">
+          <table>
+            <tr><th>Activity</th><th>Frequency</th></tr>
+            <tr><td>Dependency / npm audit before deploy</td><td>Each release (informal)</td></tr>
+            <tr><td>Internal security checklist</td><td>Target: semi-annual</td></tr>
+            <tr><td>External penetration test</td><td>Target: annual (first test pending)</td></tr>
+            <tr><td>Git change control</td><td>All production code changes</td></tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="qa" id="b10">
+        <div class="qa-head"><span class="qa-num">10</span><p class="qa-q">Segregation of sensitive data between clients</p></div>
+        <div class="qa-a">
+          <p>Multi-tenant by <code>organizationId</code> (school). Student, fee, bill, and payment rows belong to one organization. BOA sandbox is a dedicated partner + test school. API responses require correct org/student identifiers; cross-tenant leakage is prevented in application logic and DB queries.</p>
+        </div>
+      </article>
+    </section>
+
+    <div class="sign-block" id="sign">
+      <p style="margin:0;font-weight:700;color:var(--navy);">Declaration</p>
+      <p style="margin:8px 0 0;font-size:0.88rem;color:var(--muted);">
+        We confirm this information is accurate to the best of our knowledge as of March 2026, including limitations stated in transparency notes. We will update Bank of Africa if material facts change.
+      </p>
+      <div class="sign-row">
+        <div style="flex:1;min-width:200px;"><span style="font-size:0.75rem;font-weight:600;">Name</span><div class="sign-line"></div></div>
+        <div style="flex:1;min-width:200px;"><span style="font-size:0.75rem;font-weight:600;">Title</span><div class="sign-line"></div></div>
+      </div>
+      <div class="sign-row">
+        <div style="flex:1;min-width:200px;"><span style="font-size:0.75rem;font-weight:600;">Organization (Theoneste IT Ltd / ShulePlus)</span><div class="sign-line"></div></div>
+        <div style="flex:1;min-width:200px;"><span style="font-size:0.75rem;font-weight:600;">Date</span><div class="sign-line"></div></div>
+      </div>
+      <div style="margin-top:20px;"><span style="font-size:0.75rem;font-weight:600;">Signature</span><div class="sign-line" style="max-width:320px;"></div></div>
+    </div>
+
+    <p class="footer-note">ShulePlus Integration Team · <a href="https://shuleplus.rw">shuleplus.rw</a></p>
+
+  </main>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,581 @@
+{
+  "info": {
+    "name": "ShulePlus — 5. Payroll API",
+    "description": "# Payroll Module\n\nStaff payroll, runs, bank disbursement export, and KaziAvance deduction sync.\n\n## Scopes\n- `payroll.read` — dashboard, staff, runs, disbursement\n- `payroll.process` — trigger runs, mark paid, apply deductions\n\n## Gateway\n`{{iam_base_url}}/developers/gateway/payroll/...`\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "staff_id",
+      "value": ""
+    },
+    {
+      "key": "payroll_run_id",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health & Dashboard",
+      "description": "",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/health",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Payroll Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/dashboard",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "dashboard"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Payroll Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/settings",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "description": "",
+      "item": [
+        {
+          "name": "Staff Directory",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/staff/directory",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "staff",
+                "directory"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "List Staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/staff",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "staff"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Staff by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/staff/{{staff_id}}",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "staff",
+                "{{staff_id}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Advance Check for Staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/advance-check/{{staff_id}}",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "advance-check",
+                "{{staff_id}}"
+              ]
+            },
+            "description": "Active KaziAvance advances linked to payroll deductions."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payroll Runs",
+      "description": "",
+      "item": [
+        {
+          "name": "List Runs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/runs",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "runs"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Preview Run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/runs/preview",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "runs",
+                "preview"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"periodLabel\": \"March 2026\",\n  \"payDate\": \"2026-03-31\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Trigger Run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/runs/trigger",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "runs",
+                "trigger"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"periodLabel\": \"March 2026\",\n  \"payDate\": \"2026-03-31\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Run Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/runs/{{payroll_run_id}}",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "runs",
+                "{{payroll_run_id}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Mark Run Paid",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/runs/{{payroll_run_id}}/mark-paid",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "runs",
+                "{{payroll_run_id}}",
+                "mark-paid"
+              ]
+            },
+            "description": "Marks run paid and pushes advance deductions to KaziAvance."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bank Disbursement",
+      "description": "",
+      "item": [
+        {
+          "name": "Disbursement Rules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/disbursement/rules",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "disbursement",
+                "rules"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Disbursement Payments (Bank Export)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/disbursement/payments?runId={{payroll_run_id}}",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "disbursement",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "runId",
+                  "value": "{{payroll_run_id}}"
+                }
+              ]
+            },
+            "description": "Returns payment rows grouped by bank for export."
+          }
+        },
+        {
+          "name": "Apply Scheduled Deductions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/disbursement/apply-deductions",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "disbursement",
+                "apply-deductions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runId\": \"{{payroll_run_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Disbursement Audit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{payroll_api_url}}/disbursement/audit?runId={{payroll_run_id}}",
+              "host": [
+                "{{payroll_api_url}}"
+              ],
+              "path": [
+                "disbursement",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "runId",
+                  "value": "{{payroll_run_id}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

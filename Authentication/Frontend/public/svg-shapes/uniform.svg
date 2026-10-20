@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="uA" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="uN" x1="12" y1="56" x2="52" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+  </defs>
+  <!-- shirt body -->
+  <path
+    d="M20 18 L32 12 L44 18 L50 22 V28 L44 26 V50 C44 52 42.5 54 40 54 H24 C21.5 54 20 52 20 50 V26 L14 28 V22 Z"
+    fill="url(#uN)"
+  />
+  <!-- collar -->
+  <path d="M26 18 L32 24 L38 18 L32 14 Z" fill="url(#uA)"/>
+  <!-- left sleeve tip -->
+  <path d="M14 22 L20 18 V26 L14 28 Z" fill="url(#uA)" opacity="0.95"/>
+  <!-- right sleeve tip -->
+  <path d="M50 22 L44 18 V26 L50 28 Z" fill="url(#uA)" opacity="0.95"/>
+  <!-- placket -->
+  <rect x="30.5" y="26" width="3" height="22" rx="1.5" fill="#FCB038" opacity="0.85"/>
+  <!-- buttons -->
+  <circle cx="32" cy="30" r="1.4" fill="#FFFFFF"/>
+  <circle cx="32" cy="36" r="1.4" fill="#FFFFFF"/>
+  <circle cx="32" cy="42" r="1.4" fill="#FFFFFF"/>
+</svg>

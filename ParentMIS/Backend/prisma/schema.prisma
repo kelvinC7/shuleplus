@@ -1,0 +1,754 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum FeeStatus {
+  PAID
+  PARTIAL
+  UNPAID
+  OVERDUE
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum Priority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum DocumentCategory {
+  REPORT_CARD
+  CERTIFICATE
+  TRANSCRIPT
+  LETTER
+  OTHER
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  parents       ParentAccount[]
+  students      Student[]
+  terms         Term[]
+  subjects      Subject[]
+  announcements Announcement[]
+  teacherContacts TeacherContact[]
+  events        SchoolEvent[]
+  activityLogs  ActivityLog[]
+
+  @@map("tenants")
+}
+
+model ParentAccount {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  phone          String
+  email          String?
+  passwordHash   String?   @map("password_hash")
+  hasPassword    Boolean   @default(false) @map("has_password")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant      Tenant               @relation(fields: [organizationId], references: [organizationId])
+  students    ParentStudentLink[]
+  messages    Message[]
+  orders      StoreOrder[]
+  notifications Notification[]
+  communicationPreference ParentCommunicationPreference?
+
+  @@unique([organizationId, phone])
+  @@index([organizationId])
+  @@map("parents")
+}
+
+model Student {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  dateOfBirth     DateTime? @map("date_of_birth")
+  gender          String?
+  nationality     String?
+  nationalId      String?  @map("national_id")
+  religion        String?
+  shuleCode       String   @unique @map("shule_code")
+  cardNumber      String?  @map("card_number")
+  className       String   @map("class_name")
+  stream          String?
+  academicYear    String?  @map("academic_year")
+  classTeacher    String?  @map("class_teacher")
+  house           String?
+  admissionDate   DateTime? @map("admission_date")
+  isBoarding      Boolean  @default(false) @map("is_boarding")
+  avatarUrl       String?  @map("avatar_url")
+
+  // Logistics
+  transportRoute  String?  @map("transport_route")
+  busNumber       String?  @map("bus_number")
+  driverName      String?  @map("driver_name")
+  driverPhone     String?  @map("driver_phone")
+  pickupTime      String?  @map("pickup_time")
+  boardingStatus  String?  @map("boarding_status")
+  dormitoryName   String?  @map("dormitory_name")
+  roomNumber      String?  @map("room_number")
+  dormitoryPatron String?  @map("dormitory_patron")
+  patronPhone     String?  @map("patron_phone")
+
+  // Medical
+  bloodGroup       String? @map("blood_group")
+  genotype         String?
+  allergies        String[] @default([])
+  chronicConditions String? @map("chronic_conditions")
+
+  // Parents & emergency
+  fatherName        String? @map("father_name")
+  fatherPhone       String? @map("father_phone")
+  fatherEmail       String? @map("father_email")
+  fatherAddress     String? @map("father_address")
+  motherName        String? @map("mother_name")
+  motherPhone       String? @map("mother_phone")
+  motherEmail       String? @map("mother_email")
+  motherAddress     String? @map("mother_address")
+  emergencyName     String? @map("emergency_name")
+  emergencyRelation String? @map("emergency_relation")
+  emergencyPhone    String? @map("emergency_phone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant                @relation(fields: [organizationId], references: [organizationId])
+  parents     ParentStudentLink[]
+  attendance  AttendanceRecord[]
+  grades      Grade[]
+  exams       Exam[]
+  feeStatements FeeStatement[]
+  feePayments FeePayment[]
+  wallet      Wallet?
+  discipline  DisciplineRecord[]
+  documents   StudentDocument[]
+  health      HealthRecord[]
+  homeworks   Homework[]
+  leaveRequests LeaveRequest[]
+  orders      StoreOrder[]
+  timetable   TimetableSlot[]
+
+  @@index([organizationId])
+  @@map("students")
+}
+
+model ParentStudentLink {
+  id           String   @id @default(uuid())
+  parentId     String   @map("parent_id")
+  studentId    String   @map("student_id")
+  relationship String   @default("GUARDIAN")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  parent  ParentAccount  @relation(fields: [parentId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([parentId, studentId])
+  @@index([studentId])
+  @@map("parent_student_links")
+}
+
+model Term {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  academicYear   String?  @map("academic_year")
+  isCurrent      Boolean  @default(false) @map("is_current")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant  @relation(fields: [organizationId], references: [organizationId])
+  grades Grade[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("terms")
+}
+
+model Subject {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  shortName      String?  @map("short_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  grades Grade[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("subjects")
+}
+
+model Grade {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  termId         String   @map("term_id")
+  subjectId      String   @map("subject_id")
+  subjectName    String   @map("subject_name")
+  ca             Float    @default(0)
+  exam           Float    @default(0)
+  total          Float    @default(0)
+  grade          String?
+  rank           Int?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@index([studentId, termId])
+  @@index([organizationId])
+  @@map("grades")
+}
+
+model Exam {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  subject        String
+  date           DateTime
+  type           String   @default("End of Term")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@map("exams")
+}
+
+model AttendanceRecord {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  studentId      String           @map("student_id")
+  date           DateTime
+  checkInTime    String?          @map("check_in_time")
+  checkOutTime   String?          @map("check_out_time")
+  status         AttendanceStatus @default(PRESENT)
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, date])
+  @@index([organizationId])
+  @@map("attendance_records")
+}
+
+model FeeStatement {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  term           String
+  description    String
+  amount         Float    @default(0)
+  paid           Float    @default(0)
+  balance        Float    @default(0)
+  status         FeeStatus @default(UNPAID)
+  dueDate        DateTime
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("fee_statements")
+}
+
+model FeePayment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  date           DateTime
+  description    String
+  amount         Float    @default(0)
+  method         String   @default("Mobile Money")
+  reference      String?
+  receiptUrl     String?  @map("receipt_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("fee_payments")
+}
+
+model Wallet {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @unique @map("student_id")
+  cardNumber     String?  @map("card_number")
+  balance        Float    @default(0)
+  currency       String   @default("RWF")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  student      Student             @relation(fields: [studentId], references: [id])
+  transactions WalletTransaction[]
+
+  @@index([organizationId])
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  walletId       String          @map("wallet_id")
+  date           DateTime
+  description    String
+  amount         Float           @default(0)
+  type           TransactionType @default(CREDIT)
+  balanceAfter   Float           @default(0) @map("balance_after")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@index([organizationId])
+  @@map("wallet_transactions")
+}
+
+model Announcement {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  body           String
+  date           DateTime
+  priority       Priority @default(NORMAL)
+  author         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("announcements")
+}
+
+model Message {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  parentId       String?          @map("parent_id")
+  studentId      String?          @map("student_id")
+  fromName       String           @map("from_name")
+  fromRole       String           @map("from_role")
+  subject        String
+  body           String
+  date           DateTime
+  isRead         Boolean          @default(false) @map("is_read")
+  direction      MessageDirection @default(INBOUND)
+  attachments    String[]         @default([])
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  parent ParentAccount? @relation(fields: [parentId], references: [id])
+
+  @@index([parentId])
+  @@index([organizationId])
+  @@map("messages")
+}
+
+model TeacherContact {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  subject        String?
+  role           String?
+  phone          String?
+  email          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("teacher_contacts")
+}
+
+model DisciplineRecord {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  date           DateTime
+  type           String
+  description    String?
+  points         Int      @default(0)
+  status         String   @default("RECORDED")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("discipline_records")
+}
+
+model StudentDocument {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  studentId      String           @map("student_id")
+  title          String
+  category       DocumentCategory @default(OTHER)
+  description    String?
+  url            String?
+  date           DateTime
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("student_documents")
+}
+
+model SchoolEvent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  date           DateTime
+  time           String?
+  location       String?
+  description    String?
+  category       String   @default("School")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("school_events")
+}
+
+model HealthRecord {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  date           DateTime
+  type           String
+  description    String?
+  treatment      String?
+  status         String   @default("RESOLVED")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("health_records")
+}
+
+model Homework {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  subject        String
+  title          String
+  description    String?
+  teacher        String?
+  assignedDate   DateTime @map("assigned_date")
+  dueDate        DateTime @map("due_date")
+  status         String   @default("PENDING")
+  assignmentId   String?  @map("assignment_id")
+  homeworkType   String   @default("TEXT") @map("homework_type")
+  className      String?  @map("class_name")
+  maxScore       Float?   @map("max_score")
+  estimatedMinutes Int?   @map("estimated_minutes")
+  questionCount  Int?     @map("question_count")
+  questionsJson  Json?    @map("questions_json")
+  attachmentUrl  String?  @map("attachment_url")
+  attachmentName String?  @map("attachment_name")
+  resourceUrl    String?  @map("resource_url")
+  submissionMode String?  @map("submission_mode")
+  answersJson    Json?    @map("answers_json")
+  score          Float?
+  feedback       String?
+  submittedAt    DateTime? @map("submitted_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@map("homework")
+}
+
+model LeaveRequest {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  studentId      String      @map("student_id")
+  date           DateTime
+  type           String      @default("Permission")
+  reason         String?
+  status         LeaveStatus @default(PENDING)
+  submittedAt    DateTime    @default(now()) @map("submitted_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("leave_requests")
+}
+
+model StoreProduct {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  category       String   @default("General")
+  price          Float    @default(0)
+  stock          Int      @default(0)
+  imageUrl       String?  @map("image_url")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  orderItems StoreOrderItem[]
+
+  @@index([organizationId])
+  @@map("store_products")
+}
+
+model StoreOrder {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  parentId       String      @map("parent_id")
+  studentId      String      @map("student_id")
+  date           DateTime
+  total          Float       @default(0)
+  status         OrderStatus @default(PENDING)
+  items          StoreOrderItem[]
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  parent  ParentAccount  @relation(fields: [parentId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([parentId])
+  @@index([organizationId])
+  @@map("store_orders")
+}
+
+model StoreOrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  quantity  Int     @default(1)
+  price     Float   @default(0)
+
+  order   StoreOrder   @relation(fields: [orderId], references: [id])
+  product StoreProduct @relation(fields: [productId], references: [id])
+
+  @@map("store_order_items")
+}
+
+model TimetableSlot {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  day            Int      @map("day_of_week")
+  period         Int
+  startTime      String   @map("start_time")
+  endTime        String   @map("end_time")
+  subject        String
+  teacher        String?
+  room           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("timetable_slots")
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  parentId       String   @map("parent_id")
+  studentId      String   @map("student_id")
+  studentCode    String?  @map("student_code")
+  title          String
+  body           String
+  type           String   @default("DISCIPLINE")
+  sourceModule   String   @default("student-discipline") @map("source_module")
+  priority       String   @default("NORMAL")
+  link           String?
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  parent ParentAccount @relation(fields: [parentId], references: [id])
+
+  @@index([parentId, isRead])
+  @@index([studentId])
+  @@index([organizationId])
+  @@map("notifications")
+}
+
+model ParentCommunicationPreference {
+  id                       String   @id @default(uuid())
+  organizationId           String   @map("organization_id")
+  parentId                 String   @unique @map("parent_id")
+  paymentReminders         Json     @default("{\"sms\":true,\"email\":true,\"push\":true,\"inApp\":true}") @map("payment_reminders")
+  receiptNotifications     Json     @default("{\"sms\":false,\"email\":true,\"push\":true,\"inApp\":true}") @map("receipt_notifications")
+  scholarshipNotifications Json     @default("{\"sms\":false,\"email\":true,\"push\":true,\"inApp\":true}") @map("scholarship_notifications")
+  pushEnabled              Boolean  @default(true) @map("push_enabled")
+  webPushToken             String?  @map("web_push_token")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  parent ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("parent_communication_preferences")
+}
+
+model UserCache {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([organizationId, userId])
+  @@map("users_cache")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("activity_logs")
+}
+
+model Record {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  description    String?
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@map("records")
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  summary        String?
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@map("reports")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, key])
+  @@map("settings")
+}
+
+enum TeacherChatSender {
+  PARENT
+  TEACHER
+}
+
+model TeacherChatThread {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  parentId       String   @map("parent_id")
+  studentId      String   @map("student_id")
+  studentName    String   @map("student_name")
+  className      String   @map("class_name")
+  teacherUserId  String   @map("teacher_user_id")
+  teacherName    String   @map("teacher_name")
+  teacherPhone   String?  @map("teacher_phone")
+  teacherEmail   String?  @map("teacher_email")
+  subjects       String[] @default([])
+  lastMessageAt  DateTime @default(now()) @map("last_message_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  messages TeacherChatMessage[]
+
+  @@unique([organizationId, parentId, studentId, teacherUserId])
+  @@index([organizationId, teacherUserId])
+  @@index([parentId])
+  @@map("teacher_chat_threads")
+}
+
+model TeacherChatMessage {
+  id         String            @id @default(uuid())
+  threadId   String            @map("thread_id")
+  senderRole TeacherChatSender @map("sender_role")
+  senderName String            @map("sender_name")
+  body       String
+  isRead     Boolean           @default(false) @map("is_read")
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  thread TeacherChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("teacher_chat_messages")
+}

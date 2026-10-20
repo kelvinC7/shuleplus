@@ -1,0 +1,74 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-primary: #febf10;
+  --color-navy: #000435;
+  --color-navy-light: #0a0f4a;
+  --color-background: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-navy);
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+}
+
+.input {
+  @apply w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm outline-none focus:border-primary;
+}
+
+.btn-primary {
+  @apply rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-navy transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply rounded-xl border border-border bg-white px-5 py-2.5 text-sm font-semibold text-navy transition hover:bg-navy/5;
+}
+
+.dashboard-bg {
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(254, 191, 16, 0.08), transparent 38%),
+    radial-gradient(circle at 88% 92%, rgba(0, 4, 53, 0.06), transparent 42%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.auth-bg {
+  background-color: #f8fafc;
+  background-image: url('/my_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: repeat;
+}
+
+.platform-sidebar {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.hr-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(254, 191, 16, 0.45) transparent;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(254, 191, 16, 0.4);
+  border-radius: 999px;
+}
+
+.hr-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(254, 191, 16, 0.65);
+}

@@ -1,0 +1,310 @@
+{
+  "users": [],
+  "timetable": [],
+  "homeworkAssignments": [
+    {
+      "id": "93607b7f-5fb7-4dde-a89e-ba20f1b971b1",
+      "organizationId": "b4e8c3c3-b510-44e1-9f92-696e2a1506f3",
+      "teacherUserId": "8e888834-13df-4eab-8928-6c22bfe1c077",
+      "teacherName": "benteacher",
+      "status": "PUBLISHED",
+      "submissions": {},
+      "studentCount": 408,
+      "createdAt": "2026-09-26T20:28:32.675Z",
+      "title": "Algebra Homework1",
+      "description": "",
+      "academicYear": "2025-2026",
+      "term": "Term 1",
+      "classId": "09fd15fc-fe21-4160-86ec-44a759676acc",
+      "className": "P6 A",
+      "courseName": "English",
+      "homeworkType": "FILE",
+      "startDate": "2026-09-26T00:00:00.000Z",
+      "dueDate": "2026-09-27T15:00:00.000Z",
+      "estimatedMinutes": 30,
+      "maxScore": 20,
+      "questions": [],
+      "attachment": {
+        "storageKey": "46272a3c-f67a-4e29-88cf-8122ffe9a99a.pdf",
+        "fileName": "Official Welcome Statement .pdf",
+        "mimeType": "application/pdf",
+        "fileSize": 238236,
+        "fileUrl": "/uploads/homework/46272a3c-f67a-4e29-88cf-8122ffe9a99a.pdf"
+      },
+      "resourceUrl": null,
+      "submissionMode": "BOTH",
+      "updatedAt": "2026-09-26T20:37:01.191Z",
+      "publishedAt": "2026-09-26T20:37:01.191Z"
+    }
+  ],
+  "permissions": [
+    {
+      "id": "perm-1790580462319",
+      "organizationId": "b4e8c3c3-b510-44e1-9f92-696e2a1506f3",
+      "teacherUserId": "cd9c40a3-d348-4f89-a5d7-b3b3b47c7bde",
+      "teacher_name": "simon",
+      "permission_type": "SICK_LEAVE",
+      "permission_type_other": "",
+      "start_date": "2026-09-28",
+      "end_date": "2026-09-28",
+      "reason": "I am sick · Emergency: 0788676576",
+      "emergency_phone": "",
+      "alt_contact": "",
+      "term": "Term 1",
+      "academicYear": "2025-2026",
+      "status": "approved",
+      "created_at": "2026-09-28T07:27:42.319Z",
+      "reviewed_at": "2026-09-28T07:39:45.019Z",
+      "reviewed_by": "sttheoschool@gmail.com",
+      "review_notes": ""
+    }
+  ],
+  "rollCall": [
+    {
+      "id": "roll-1790579540017",
+      "organizationId": "b4e8c3c3-b510-44e1-9f92-696e2a1506f3",
+      "teacherUserId": "cd9c40a3-d348-4f89-a5d7-b3b3b47c7bde",
+      "teacher_name": "simon",
+      "class_name": "N1",
+      "date": "2026-09-28",
+      "roll_label": "Morning prep",
+      "roster": [
+        {
+          "id": "25a460e3-9aa7-43f3-a75d-7d11fd886f37",
+          "name": "NEZA ABBY GRUETTY",
+          "student_code": "04001860526",
+          "student_name": "NEZA ABBY GRUETTY",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "1a6e9cbd-c842-42b9-b6a2-528b1e6dbc43",
+          "name": "KIZA ALEX HENRY",
+          "student_code": "04001860326",
+          "student_name": "KIZA ALEX HENRY",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "efcd2d25-8b1d-44d0-b5ae-89eda3adae43",
+          "name": "UBWISANZURE AMARIS",
+          "student_code": "04001861226",
+          "student_name": "UBWISANZURE AMARIS",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "bbd3bf2e-ed5a-4a24-835c-e0a34042c96a",
+          "name": "AMIZERO AMILA REILA",
+          "student_code": "04001858626",
+          "student_name": "AMIZERO AMILA REILA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "8620e9f0-6666-499e-a3ba-cd5695386242",
+          "name": "AHIRWE AURA GABRIELLA",
+          "student_code": "04001858526",
+          "student_name": "AHIRWE AURA GABRIELLA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "1009cdc5-b322-46ee-85f8-8fddbada5306",
+          "name": "DUSHIME AURA RAVINIA",
+          "student_code": "04001859126",
+          "student_name": "DUSHIME AURA RAVINIA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "2430f8b1-5fbf-484c-935b-9aaea5c971be",
+          "name": "ATETE AYAN ELLA",
+          "student_code": "04001858826",
+          "student_name": "ATETE AYAN ELLA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "412ef182-a4f9-486c-8868-4973ffdb8458",
+          "name": "HAKIZIMANA BENI LOUNGE",
+          "student_code": "04001860426",
+          "student_name": "HAKIZIMANA BENI LOUNGE",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "b34e713b-aa3f-4153-82a1-26a1aa225835",
+          "name": "NSANZIMANA BRIELLA",
+          "student_code": "04001860726",
+          "student_name": "NSANZIMANA BRIELLA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "87ce0492-e277-41e0-96f4-e8a30a8fc223",
+          "name": "SHIMWA ELIO LUCK",
+          "student_code": "04001861026",
+          "student_name": "SHIMWA ELIO LUCK",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "5765df61-b40a-4401-bfff-c8c10da007de",
+          "name": "BARAKA GENTIL",
+          "student_code": "04001858926",
+          "student_name": "BARAKA GENTIL",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "642c15ae-8c75-456a-bb75-6c436e986eba",
+          "name": "NIYOBYOSE GIFT REEDMAR IVAN",
+          "student_code": "04001860626",
+          "student_name": "NIYOBYOSE GIFT REEDMAR IVAN",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "ab5b3077-c52b-41ca-9379-5cfbbd3680ac",
+          "name": "BYIRINGIRO ISIMBI BRAVO OLGA",
+          "student_code": "04001859026",
+          "student_name": "BYIRINGIRO ISIMBI BRAVO OLGA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "212cbf2f-7ca4-4cf4-aa00-e17dcc862ce2",
+          "name": "ISHIMWE IZERE JOSPIN",
+          "student_code": "04001860226",
+          "student_name": "ISHIMWE IZERE JOSPIN",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "bf71fe5d-c063-4f91-8c96-47a42458bf19",
+          "name": "INEZA JEANINE DOSSIE",
+          "student_code": "04001859626",
+          "student_name": "INEZA JEANINE DOSSIE",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "b35e3560-4ced-43f7-9650-fe97adbb900d",
+          "name": "SHIMWA JIDEDIA KABAYITA",
+          "student_code": "04001861126",
+          "student_name": "SHIMWA JIDEDIA KABAYITA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "e48c5f42-8e98-469e-bdce-49dea668fcf7",
+          "name": "NZIZA KIRENGA LEO DIVIN",
+          "student_code": "04001860926",
+          "student_name": "NZIZA KIRENGA LEO DIVIN",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "21b93033-6def-4542-bffa-a2cdc078acdf",
+          "name": "NUWAYO LANAH ORNELLA",
+          "student_code": "04001860826",
+          "student_name": "NUWAYO LANAH ORNELLA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "1f98fc6a-1e96-4319-983a-7ab3172ccfc5",
+          "name": "GANZA LEON FIDELE",
+          "student_code": "04001859226",
+          "student_name": "GANZA LEON FIDELE",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "2dbe5647-6ae4-464a-afe2-0cbe19fcdf67",
+          "name": "INEZA LUCKY",
+          "student_code": "04001859726",
+          "student_name": "INEZA LUCKY",
+          "status": "excused",
+          "remarks": ""
+        },
+        {
+          "id": "e1982ceb-b6a0-4f63-ad00-5a9805cc66a9",
+          "name": "ASHIMWE MBARAGA BRAYAN",
+          "student_code": "04001858726",
+          "student_name": "ASHIMWE MBARAGA BRAYAN",
+          "status": "absent",
+          "remarks": ""
+        },
+        {
+          "id": "bd57621f-b200-4856-b380-1ff588cd4805",
+          "name": "INEZA MUKUNDWA WIVINE",
+          "student_code": "04001859826",
+          "student_name": "INEZA MUKUNDWA WIVINE",
+          "status": "absent",
+          "remarks": ""
+        },
+        {
+          "id": "fd0c73a6-8e8b-47f0-81c4-d93b7a3e5801",
+          "name": "IRAKIZA NEMA FIDELLLA",
+          "student_code": "04001859926",
+          "student_name": "IRAKIZA NEMA FIDELLLA",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "55caae2c-06b1-43f4-8504-6d06da130b62",
+          "name": "INEZA Peter",
+          "student_code": "04001858426",
+          "student_name": "INEZA Peter",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "7c03513f-f99d-474a-b2c1-df489799b5fa",
+          "name": "ISHEMA RUGIRA MAXIME",
+          "student_code": "04001860126",
+          "student_name": "ISHEMA RUGIRA MAXIME",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "a64b3773-7c6e-43d8-8e9d-b72134620629",
+          "name": "IRERA SABATO ESPERANCE",
+          "student_code": "04001860026",
+          "student_name": "IRERA SABATO ESPERANCE",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "2768266f-2b0d-46e3-a772-b954bd342f6f",
+          "name": "GANZA SHAMI ELVIN",
+          "student_code": "04001859326",
+          "student_name": "GANZA SHAMI ELVIN",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "b947d5d5-f328-4317-843f-d03a5b22171a",
+          "name": "GASARO UWASE AROHIE",
+          "student_code": "04001859426",
+          "student_name": "GASARO UWASE AROHIE",
+          "status": "present",
+          "remarks": ""
+        },
+        {
+          "id": "64fd1bdb-e221-44fd-8db6-3f1fa0f2b359",
+          "name": "GWIZA VINCENT LEVI",
+          "student_code": "04001859526",
+          "student_name": "GWIZA VINCENT LEVI",
+          "status": "present",
+          "remarks": ""
+        }
+      ],
+      "createdAt": "2026-09-28T07:12:20.017Z",
+      "updatedAt": "2026-09-28T07:21:47.941Z"
+    }
+  ],
+  "calendarEvents": []
+}

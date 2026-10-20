@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "ShulePlus — 0. IAM Authentication",
+    "description": "# ShulePlus IAM — Authentication for Bank Integrations\n\nUse this collection **first** to obtain tokens used by all other collections.\n\n## Two authentication modes\n\n| Mode | Use case | Token endpoint |\n|------|----------|----------------|\n| **OAuth client credentials** | Server-to-server (recommended for banks) | `POST /developers/oauth/token` |\n| **Developer portal login** | Human testers with portal account | `POST /developers/auth/login` |\n\n## Required variables (environment)\n- `iam_base_url` — e.g. `https://shuleplus.rw/api/v1`\n- `organization_id` — sandbox school UUID (provided by ShulePlus)\n- `client_id` / `client_secret` — from Developer Portal → Applications\n- `developer_environment` — `SANDBOX` or `PRODUCTION`\n\n## Module API bases (direct backend)\n| Variable | Service |\n|----------|---------|\n| `students_api_url` | Student Management |\n| `fees_api_url` | School Fees Portal |\n| `babyeyi_bff_url` | WebpageBabyeyi BFF (babyeyi.rw) |\n\nOAuth is required for **school-authenticated** routes. **Public pay-fees** routes (`/public/...`) do not require a token.\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "iam_base_url",
+      "value": "https://shuleplus.rw/api/v1"
+    },
+    {
+      "key": "organization_id",
+      "value": "b4e8c3c3-b510-44e1-9f92-696c2a1506f3"
+    },
+    {
+      "key": "developer_environment",
+      "value": "SANDBOX"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Setup & Health",
+      "description": "Verify IAM is reachable before authenticating.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{iam_base_url}}/health",
+            "description": "Returns IAM service status. No authentication required.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "OAuth — Bank Integration (recommended)",
+      "description": "Client credentials flow for server-to-server API access.",
+      "item": [
+        {
+          "name": "1. Get OAuth Access Token",
+          "request": {
+            "method": "POST",
+            "url": "{{iam_base_url}}/developers/oauth/token",
+            "description": "**Run first.** Exchanges client_id + client_secret for a Bearer token (15 min TTL).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"{{client_id}}\",\n  \"client_secret\": \"{{client_secret}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.access_token) {",
+                  "  pm.environment.set(\"access_token\", json.access_token);",
+                  "  pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "  console.log(\"access_token saved\");",
+                  "}",
+                  "if (json && json.data && json.data.accessToken) {",
+                  "  pm.environment.set(\"access_token\", json.data.accessToken);",
+                  "  pm.collectionVariables.set(\"access_token\", json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Verify — Student Management Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{students_api_url}}/health",
+              "host": [
+                "{{students_api_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Confirms Student Management API is reachable.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "3. Verify — School Fees Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{fees_api_url}}/health",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Confirms School Fees Portal API is reachable.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Developer Portal Login (optional)",
+      "description": "For human testers with a developer portal account.",
+      "item": [
+        {
+          "name": "Login (email + password)",
+          "request": {
+            "method": "POST",
+            "url": "{{iam_base_url}}/developers/auth/login",
+            "description": "If MFA is enabled, complete MFA verify before using the token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{developer_email}}\",\n  \"password\": \"{{developer_password}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Complete MFA",
+          "request": {
+            "method": "POST",
+            "url": "{{iam_base_url}}/developers/auth/mfa/verify",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfaSessionToken\": \"{{mfa_session_token}}\",\n  \"code\": \"{{mfa_code}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.access_token) {",
+                  "  pm.environment.set(\"access_token\", json.access_token);",
+                  "  pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "  console.log(\"access_token saved\");",
+                  "}",
+                  "if (json && json.data && json.data.accessToken) {",
+                  "  pm.environment.set(\"access_token\", json.data.accessToken);",
+                  "  pm.collectionVariables.set(\"access_token\", json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{iam_base_url}}/developers/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.access_token) {",
+                  "  pm.environment.set(\"access_token\", json.access_token);",
+                  "  pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "  console.log(\"access_token saved\");",
+                  "}",
+                  "if (json && json.data && json.data.accessToken) {",
+                  "  pm.environment.set(\"access_token\", json.data.accessToken);",
+                  "  pm.collectionVariables.set(\"access_token\", json.data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Organization Context",
+      "description": "Sandbox school details for all API calls.",
+      "item": [
+        {
+          "name": "Sandbox Organization Reference",
+          "request": {
+            "method": "GET",
+            "url": "{{iam_base_url}}/health",
+            "description": "Your sandbox **organization_id** is provided by ShulePlus when your partner account is created.\n\nDefault sandbox (ST THEO SCHOOL):\n- organization_id: `b4e8c3c3-b510-44e1-9f92-696c2a1506f3`\n- organization_code: `04001`\n\nSet `organization_id` in your Postman environment before running fee or student APIs.",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

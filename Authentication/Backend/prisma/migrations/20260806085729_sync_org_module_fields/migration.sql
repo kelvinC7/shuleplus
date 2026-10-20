@@ -1,0 +1,3 @@
+-- No-op migration.
+-- Identical SQL was already applied in `20260730071048_add_is_hidden_organization_module`.
+-- Duplicate folder broke `prisma migrate dev` shadow DB replay (SubscriptionPeriod already exists).

@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  PROCESSING
+  PROCESSED
+  PAID
+}
+
+enum TerminationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model PayrollStaff {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  employeeNumber String    @map("employee_number")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  gender         String?
+  dateOfBirth    DateTime? @map("date_of_birth")
+  hireDate       DateTime? @map("hire_date")
+  status         String    @default("ACTIVE")
+  department     String?
+  position       String?
+  nationalId     String?   @map("national_id")
+  rssbNumber     String?   @map("rssb_number")
+  email          String?
+  phone          String?
+  bankName       String?   @map("bank_name")
+  bankAccount    String?   @map("bank_account")
+  hrProfile      Json      @default("{}") @map("hr_profile")
+  hrEmployeeId   String?   @map("hr_employee_id")
+  isProtected    Boolean   @default(false) @map("is_protected")
+  isActive       Boolean   @default(true) @map("is_active")
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  profile      StaffPayrollProfile?
+  deductions   EmployeeDeduction[]
+  runLines     PayrollRunLine[]
+  terminations TerminationBenefit[]
+
+  @@unique([organizationId, employeeNumber])
+  @@index([organizationId])
+  @@map("payroll_staff")
+}
+
+model StaffPayrollProfile {
+  id                String   @id @default(uuid())
+  organizationId    String   @map("organization_id")
+  staffId           String   @unique @map("staff_id")
+  basicSalary       Decimal  @default(0) @db.Decimal(14, 2) @map("basic_salary")
+  transportAllowance Decimal @default(0) @db.Decimal(14, 2) @map("transport_allowance")
+  housingAllowance  Decimal  @default(0) @db.Decimal(14, 2) @map("housing_allowance")
+  othersAllowance   Decimal  @default(0) @db.Decimal(14, 2) @map("others_allowance")
+  mealAllowance     Decimal  @default(0) @db.Decimal(14, 2) @map("meal_allowance")
+  otherAllowances   Json     @default("[]") @map("other_allowances")
+  useNetToGross       Boolean  @default(false) @map("use_net_to_gross")
+  desiredNet          Decimal? @db.Decimal(14, 2) @map("desired_net")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  staff PayrollStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("staff_payroll_profiles")
+}
+
+model PayrollTemplate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String   @default("Default Template")
+  isActive       Boolean  @default(true) @map("is_active")
+  version        Int      @default(1)
+  statutoryRates Json     @default("{}") @map("statutory_rates")
+  payeRates      Json     @default("[]") @map("paye_rates")
+  allowanceRules Json     @default("{}") @map("allowance_rules")
+  allowances     Json     @default("[]")
+  deductions     Json     @default("[]")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId, isActive])
+  @@map("payroll_templates")
+}
+
+model EmployeeDeduction {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  staffId        String   @map("staff_id")
+  name           String
+  amount         Decimal  @db.Decimal(14, 2)
+  amountType     String   @default("fixed") @map("amount_type")
+  channel        String   @default("tax")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  staff PayrollStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, staffId])
+  @@map("employee_deductions")
+}
+
+model PayrollRun {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  runNumber      String           @map("run_number")
+  academicYear   String           @map("academic_year")
+  month          Int
+  year           Int
+  term           String?
+  status         PayrollRunStatus @default(DRAFT)
+  registerJson   Json             @default("[]") @map("register_json")
+  totalsJson     Json             @default("{}") @map("totals_json")
+  paymentDate    DateTime?        @map("payment_date")
+  paymentRef     String?          @map("payment_ref")
+  runOverridesJson Json           @default("{}") @map("run_overrides_json")
+  createdBy      String?          @map("created_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  lines PayrollRunLine[]
+
+  @@unique([organizationId, runNumber])
+  @@index([organizationId, year, month])
+  @@map("payroll_runs")
+}
+
+model PayrollRunLine {
+  id             String  @id @default(uuid())
+  organizationId String  @map("organization_id")
+  runId          String  @map("run_id")
+  staffId        String  @map("staff_id")
+  lineJson       Json    @map("line_json")
+  paymentStatus  String  @default("pending") @map("payment_status")
+
+  run   PayrollRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  staff PayrollStaff @relation(fields: [staffId], references: [id])
+
+  @@index([runId])
+  @@map("payroll_run_lines")
+}
+
+model DisbursementRule {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  deductionType  String   @map("deduction_type")
+  applyTo        String   @default("all") @map("apply_to")
+  amount         Decimal  @db.Decimal(14, 2)
+  amountType     String   @default("fixed") @map("amount_type")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@map("disbursement_rules")
+}
+
+model TerminationBenefit {
+  id                  String            @id @default(uuid())
+  organizationId      String            @map("organization_id")
+  staffId             String            @map("staff_id")
+  terminationDate     DateTime          @map("termination_date")
+  reason              String?
+  notes               String?
+  yearsWorked         Decimal           @db.Decimal(5, 2) @map("years_worked")
+  severanceAmount     Decimal           @db.Decimal(14, 2) @map("severance_amount")
+  outstandingDeductions Decimal         @default(0) @db.Decimal(14, 2) @map("outstanding_deductions")
+  totalPayable        Decimal           @db.Decimal(14, 2) @map("total_payable")
+  status              TerminationStatus @default(DRAFT)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  staff PayrollStaff @relation(fields: [staffId], references: [id])
+
+  @@index([organizationId, status])
+  @@map("termination_benefits")
+}
+
+model PayslipBranding {
+  id             String   @id @default(uuid())
+  organizationId String   @unique @map("organization_id")
+  schoolName     String?  @map("school_name")
+  logoUrl        String?  @map("logo_url")
+  stampUrl       String?  @map("stamp_url")
+  signatureUrl   String?  @map("signature_url")
+  footerText     String?  @map("footer_text")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("payslip_branding")
+}
+
+model PayrollSettings {
+  id                  String   @id @default(uuid())
+  organizationId      String   @unique @map("organization_id")
+  currentAcademicYear String   @map("current_academic_year")
+  currentTerm         String   @default("Term 1") @map("current_term")
+  termsJson           Json     @default("[]") @map("terms_json")
+  calendarJson        Json     @default("{}") @map("calendar_json")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("payroll_settings")
+}
+
+model PayrollTemplateVersion {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  templateId     String   @map("template_id")
+  version        Int
+  snapshotJson   Json     @map("snapshot_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, templateId])
+  @@map("payroll_template_versions")
+}
+
+model PayrollAuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  runId          String?  @map("run_id")
+  action         String
+  detailJson     Json     @default("{}") @map("detail_json")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, runId])
+  @@map("payroll_audit_logs")
+}
+
+model ShuleAvanceRequest {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  staffId          String   @map("staff_id")
+  amount           Decimal  @db.Decimal(14, 2)
+  monthlyPayment   Decimal  @db.Decimal(14, 2) @map("monthly_payment")
+  remainingBalance Decimal  @db.Decimal(14, 2) @map("remaining_balance")
+  repaymentMonths  Int      @map("repayment_months")
+  status           String   @default("APPROVED")
+  approvedAt       DateTime @default(now()) @map("approved_at")
+
+  @@index([organizationId, staffId, status])
+  @@map("shule_avance_requests")
+}

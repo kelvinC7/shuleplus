@@ -1,0 +1,624 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum MealType {
+  BREAKFAST
+  MORNING_TEA
+  LUNCH
+  AFTERNOON_SNACK
+  DINNER
+}
+
+enum PlanType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  EVENT
+  HOLIDAY
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ISSUED
+  RECEIVED
+}
+
+enum StaffRole {
+  CHEF
+  KITCHEN_ASSISTANT
+  STOREKEEPER
+  CLEANER
+  SUPERVISOR
+}
+
+enum RosterStatus {
+  SCHEDULED
+  ON_DUTY
+  COMPLETED
+  ABSENT
+}
+
+enum HygieneCheckType {
+  KITCHEN_CLEANING
+  EQUIPMENT_CLEANING
+  FOOD_TEMPERATURE
+  WATER_QUALITY
+  HEALTH_INSPECTION
+  SANITATION
+}
+
+enum HygieneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum DeliveryStatus {
+  SCHEDULED
+  IN_TRANSIT
+  DELIVERED
+  REJECTED
+}
+
+enum QualityStatus {
+  ACCEPTED
+  REJECTED
+  PARTIAL
+}
+
+enum WasteType {
+  SPOILED
+  LEFTOVERS
+  EXPIRED
+  COOKING_WASTE
+  OVERPRODUCED
+}
+
+enum SeverityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  menuItems         MenuItem[]
+  recipes           Recipe[]
+  mealPlans         MealPlan[]
+  mealProductions   MealProduction[]
+  foodWaste         FoodWaste[]
+  kitchenRequests   KitchenRequest[]
+  kitchenStaff      KitchenStaff[]
+  dutyRosters       DutyRoster[]
+  hygieneChecklists HygieneChecklist[]
+  coldStorageLogs   ColdStorageLog[]
+  supplierDeliveries SupplierDelivery[]
+  nutritionProfiles NutritionProfile[]
+  allergyProfiles   AllergyProfile[]
+  mealBudgets       MealBudget[]
+  attachments       Attachment[]
+  notifications     CafeteriaNotification[]
+  settings          Setting[]
+  activityLogs      ActivityLog[]
+
+  @@map("cafeteria_tenants")
+}
+
+model UserCache {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([organizationId, userId])
+  @@map("cafeteria_users_cache")
+}
+
+model MenuItem {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  category       String
+  mealType       MealType @map("meal_type")
+  description    String?
+  isVegetarian   Boolean  @default(false) @map("is_vegetarian")
+  isVegan        Boolean  @default(false) @map("is_vegan")
+  isHalal        Boolean  @default(false) @map("is_halal")
+  isGlutenFree   Boolean  @default(false) @map("is_gluten_free")
+  imageUrl       String?  @map("image_url")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  recipe        Recipe?
+  mealPlanItems MealPlanItem[]
+  tenant        Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([mealType])
+  @@map("cafeteria_menu_items")
+}
+
+model Recipe {
+  id                String   @id @default(uuid())
+  menuItemId        String   @unique @map("menu_item_id")
+  organizationId    String   @map("organization_id")
+  name              String
+  description       String?
+  instructions      String?
+  prepTimeMinutes   Int?     @map("prep_time_minutes")
+  cookTimeMinutes   Int?     @map("cook_time_minutes")
+  servings          Int?
+  calories          Int?
+  protein           Int?
+  carbohydrates     Int?
+  fat               Int?
+  vitamins          String?
+  allergens         String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  menuItem          MenuItem            @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredients       RecipeIngredient[]
+  tenant            Tenant              @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("cafeteria_recipes")
+}
+
+model RecipeIngredient {
+  id             String   @id @default(uuid())
+  recipeId       String   @map("recipe_id")
+  productId      String   @map("product_id")
+  quantity       Decimal  @db.Decimal(10, 2)
+  unit           String
+  notes          String?
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@index([productId])
+  @@map("cafeteria_recipe_ingredients")
+}
+
+model MealPlan {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  planDate       DateTime   @map("plan_date")
+  mealType       MealType   @map("meal_type")
+  planType       PlanType   @map("plan_type")
+  status         PlanStatus @default(DRAFT)
+  createdBy      String     @map("created_by")
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  items        MealPlanItem[]
+  productions  MealProduction[]
+  tenant       Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([planDate])
+  @@index([mealType])
+  @@index([status])
+  @@map("cafeteria_meal_plans")
+}
+
+model MealPlanItem {
+  id              String   @id @default(uuid())
+  mealPlanId      String   @map("meal_plan_id")
+  menuItemId      String   @map("menu_item_id")
+  servingsPlanned Int      @map("servings_planned")
+
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@index([mealPlanId])
+  @@map("cafeteria_meal_plan_items")
+}
+
+model MealProduction {
+  id               String          @id @default(uuid())
+  organizationId   String          @map("organization_id")
+  mealPlanId       String?         @map("meal_plan_id")
+  productionDate   DateTime        @map("production_date")
+  mealType         MealType        @map("meal_type")
+  plannedServings  Int             @map("planned_servings")
+  actualServings   Int             @default(0) @map("actual_servings")
+  status           ProductionStatus @default(PLANNED)
+  preparedBy       String          @map("prepared_by")
+  notes            String?
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  items     MealProductionItem[]
+  servings  MealServing[]
+  waste     FoodWaste[]
+  mealPlan  MealPlan?             @relation(fields: [mealPlanId], references: [id])
+  tenant    Tenant                @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([productionDate])
+  @@index([mealType])
+  @@index([status])
+  @@map("cafeteria_meal_productions")
+}
+
+model MealProductionItem {
+  id               String  @id @default(uuid())
+  productionId     String  @map("production_id")
+  menuItemId       String  @map("menu_item_id")
+  recipeId         String? @map("recipe_id")
+  plannedQuantity  Decimal @default(0) @map("planned_quantity") @db.Decimal(10, 2)
+  actualQuantity   Decimal @default(0) @map("actual_quantity") @db.Decimal(10, 2)
+
+  production MealProduction @relation(fields: [productionId], references: [id], onDelete: Cascade)
+
+  @@index([productionId])
+  @@map("cafeteria_meal_production_items")
+}
+
+model MealServing {
+  id              String   @id @default(uuid())
+  productionId    String   @map("production_id")
+  beneficiaryType String   @map("beneficiary_type")
+  beneficiaryId   String?  @map("beneficiary_id")
+  beneficiaryName String   @map("beneficiary_name")
+  quantity        Int      @default(1)
+  servedAt        DateTime @default(now()) @map("served_at")
+  notes           String?
+
+  production MealProduction @relation(fields: [productionId], references: [id], onDelete: Cascade)
+
+  @@index([productionId])
+  @@index([beneficiaryType])
+  @@map("cafeteria_meal_servings")
+}
+
+model FoodWaste {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  productionId   String?    @map("production_id")
+  wasteDate      DateTime   @map("waste_date")
+  wasteType      WasteType  @map("waste_type")
+  itemName       String     @map("item_name")
+  quantity       Decimal    @db.Decimal(10, 2)
+  unit           String
+  cost           Decimal?   @db.Decimal(10, 2)
+  reason         String?
+  reportedBy     String     @map("reported_by")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  production MealProduction? @relation(fields: [productionId], references: [id])
+  tenant     Tenant          @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([wasteDate])
+  @@index([wasteType])
+  @@map("cafeteria_food_waste")
+}
+
+model KitchenRequest {
+  id                 String        @id @default(uuid())
+  organizationId     String        @map("organization_id")
+  requestNumber      String        @map("request_number")
+  requestedBy        String        @map("requested_by")
+  status             RequestStatus @default(PENDING)
+  stockRequestId     String?       @map("stock_request_id")
+  inventoryStatus    String?       @map("inventory_status")
+  storekeeperApproval String?      @map("storekeeper_approval")
+  approvedBy         String?       @map("approved_by")
+  issuedBy           String?       @map("issued_by")
+  receivedBy         String?       @map("received_by")
+  notes              String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  items  KitchenRequestItem[]
+  tenant Tenant               @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, requestNumber])
+  @@index([organizationId])
+  @@index([status])
+  @@index([stockRequestId])
+  @@map("cafeteria_kitchen_requests")
+}
+
+model KitchenRequestItem {
+  id                String   @id @default(uuid())
+  requestId         String   @map("request_id")
+  productId         String   @map("product_id")
+  quantityRequested Decimal  @map("quantity_requested") @db.Decimal(10, 2)
+  quantityApproved  Decimal? @map("quantity_approved") @db.Decimal(10, 2)
+  quantityIssued    Decimal? @map("quantity_issued") @db.Decimal(10, 2)
+  notes             String?
+
+  request KitchenRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([productId])
+  @@map("cafeteria_kitchen_request_items")
+}
+
+model KitchenStaff {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  name           String
+  role           StaffRole
+  phone          String?
+  email          String?
+  qualification  String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  dutyRosters DutyRoster[]
+  tenant      Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("cafeteria_kitchen_staff")
+}
+
+model DutyRoster {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  staffId        String        @map("staff_id")
+  rosterDate     DateTime      @map("roster_date")
+  shift          String
+  duty           String
+  status         RosterStatus  @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  staff KitchenStaff @relation(fields: [staffId], references: [id])
+  tenant Tenant      @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([rosterDate])
+  @@index([staffId])
+  @@map("cafeteria_duty_rosters")
+}
+
+model HygieneChecklist {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  checkDate      DateTime        @map("check_date")
+  checkType      HygieneCheckType @map("check_type")
+  status         HygieneStatus   @default(PENDING)
+  checkedBy      String          @map("checked_by")
+  score          Int?
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  items HygieneChecklistItem[]
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([checkDate])
+  @@map("cafeteria_hygiene_checklists")
+}
+
+model HygieneChecklistItem {
+  id          String  @id @default(uuid())
+  checklistId String  @map("checklist_id")
+  item        String
+  status      String
+  notes       String?
+
+  checklist HygieneChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+  @@map("cafeteria_hygiene_checklist_items")
+}
+
+model ColdStorageLog {
+  id                      String   @id @default(uuid())
+  organizationId          String   @map("organization_id")
+  logDate                 DateTime @map("log_date")
+  freezerTemperature      Decimal  @map("freezer_temperature") @db.Decimal(5, 2)
+  refrigeratorTemperature Decimal  @map("refrigerator_temperature") @db.Decimal(5, 2)
+  storageConditions       String?  @map("storage_conditions")
+  alertsTriggered         Boolean  @default(false) @map("alerts_triggered")
+  loggedBy                String   @map("logged_by")
+  notes                   String?
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([logDate])
+  @@map("cafeteria_cold_storage_logs")
+}
+
+model SupplierDelivery {
+  id                 String         @id @default(uuid())
+  organizationId     String         @map("organization_id")
+  supplierId         String         @map("supplier_id")
+  deliveryDate       DateTime       @map("delivery_date")
+  status             DeliveryStatus @default(SCHEDULED)
+  qualityRating      Int?
+  inspectionNotes    String?        @map("inspection_notes")
+  receivedBy         String         @map("received_by")
+  invoiceNumber      String?        @map("invoice_number")
+  deliveryNoteNumber String?        @map("delivery_note_number")
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  items  SupplierDeliveryItem[]
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([deliveryDate])
+  @@map("cafeteria_supplier_deliveries")
+}
+
+model SupplierDeliveryItem {
+  id            String        @id @default(uuid())
+  deliveryId    String        @map("delivery_id")
+  productId     String        @map("product_id")
+  quantity      Decimal       @db.Decimal(10, 2)
+  unitCost      Decimal?      @map("unit_cost") @db.Decimal(10, 2)
+  qualityStatus QualityStatus @map("quality_status")
+  notes         String?
+
+  delivery SupplierDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
+  @@map("cafeteria_supplier_delivery_items")
+}
+
+model NutritionProfile {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  mealPlanId     String   @map("meal_plan_id")
+  calories       Int?
+  protein        Int?
+  carbohydrates  Int?
+  fat            Int?
+  vitamins       String?
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("cafeteria_nutrition_profiles")
+}
+
+model AllergyProfile {
+  id              String        @id @default(uuid())
+  organizationId  String        @map("organization_id")
+  beneficiaryType String        @map("beneficiary_type")
+  beneficiaryId   String?       @map("beneficiary_id")
+  beneficiaryName String        @map("beneficiary_name")
+  allergyType     String        @map("allergy_type")
+  severity        SeverityLevel
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([beneficiaryType])
+  @@map("cafeteria_allergy_profiles")
+}
+
+model MealBudget {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  month           Int
+  year            Int
+  allocatedAmount Decimal  @map("allocated_amount") @db.Decimal(12, 2)
+  spentAmount     Decimal  @default(0) @map("spent_amount") @db.Decimal(12, 2)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, month, year])
+  @@index([organizationId])
+  @@map("cafeteria_meal_budgets")
+}
+
+model Attachment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  referenceType  String   @map("reference_type")
+  referenceId    String   @map("reference_id")
+  fileName       String   @map("file_name")
+  fileUrl        String   @map("file_url")
+  fileType       String?  @map("file_type")
+  fileSize       Int?     @map("file_size")
+  uploadedBy     String   @map("uploaded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([referenceType, referenceId])
+  @@map("cafeteria_attachments")
+}
+
+model CafeteriaNotification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  message        String
+  type           String
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([isRead])
+  @@map("cafeteria_notifications")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, key])
+  @@map("cafeteria_settings")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("cafeteria_activity_logs")
+}

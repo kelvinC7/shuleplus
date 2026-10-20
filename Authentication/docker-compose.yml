@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shuleplus-iam-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shuleplus_iam
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-module-databases.sql:/docker-entrypoint-initdb.d/02-module-databases.sql:ro
+
+  # Optional: create notification DB on first connect via Prisma migrate in Notification-Service
+  # DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shuleplus_notifications
+
+  # NOTE: Redis is intentionally not defined here.
+  # This machine already runs a shared `redis` container on localhost:6379,
+  # which the backend uses via REDIS_URL. Re-add a service block here only if
+  # you need a dedicated, isolated Redis (use a different host port, e.g. 6380:6379).
+
+volumes:
+  postgres_data:

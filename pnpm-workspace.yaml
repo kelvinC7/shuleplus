@@ -1,0 +1,18 @@
+packages:
+  - "packages/*"
+  - "**/Frontend"
+  - "**/Frontend_react"
+  - "**/Backend"
+  - "!SchoolFeesPortal/Backend"
+  - "!InternalChat/Backend"
+  - "!BabyeyiWizard/Backend"
+  - "**/Notification-Service"
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': true
+  core-js: true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true

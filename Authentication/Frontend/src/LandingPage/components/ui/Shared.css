@@ -1,0 +1,105 @@
+/**
+ * Shared.css
+ * Shule+ design system — colors, gradients, shadows, motion.
+ * Brand colors: #FCB038 (amber) · #000435 (navy)
+ *
+ * WHERE TO PUT THIS FILE:
+ *   src/styles/Shared.css   (create the "styles" folder if it doesn't exist)
+ *
+ * HOW TO USE IT:
+ *   At the top of Hero.tsx and Navbar.tsx, add ONE line:
+ *     import "@/styles/Shared.css";
+ *   (or, if your project doesn't use the "@/" alias, use a relative path
+ *    like "../styles/Shared.css" — count the "../" to match your folder depth)
+ *
+ * This file does NOT touch tailwind.config.ts or globals.css.
+ * It works on its own, everywhere you import it.
+ */
+
+ :root {
+    /* Navy — derived from #000435 */
+    --navy-50: #edeef7;
+    --navy-100: #d1d4ea;
+    --navy-200: #a3a8d5;
+    --navy-300: #6e76b8;
+    --navy-400: #3c4593;
+    --navy-500: #1a2166;
+    --navy-600: #0f1550;
+    --navy-700: #080b3f;
+    --navy-800: #03063a;
+    --navy-900: #000435; /* brand base */
+    --navy-950: #00021d;
+  
+    /* Amber — derived from #FCB038 */
+    --amber-50: #fff8ec;
+    --amber-100: #ffefd1;
+    --amber-200: #fedda3;
+    --amber-300: #fdc873;
+    --amber-400: #fdbc53;
+    --amber-500: #fcb038; /* brand base */
+    --amber-600: #e89a1e;
+    --amber-700: #c17e14;
+    --amber-800: #8f5e0f;
+    --amber-900: #5c3d0a;
+    --amber-950: #331f04;
+  
+    /* Neutral background used behind cards/sections */
+    --mist-50: #f7f8fb;
+    --mist-100: #eef0f6;
+  
+    /* Secondary accents — muted so they support navy/amber, not compete */
+    --violet-accent: #6d5fd1;
+    --blue-accent: #3e7bd6;
+    --indigo-accent: #4c56c4;
+    --emerald-accent: #149e6b;
+    --rose-accent: #d65a7a;
+    --cyan-accent: #1e9fae;
+  }
+  
+  /* ---------- Reusable classes (match what's already used in your components) ---------- */
+  
+  .text-gradient-amber {
+    background-image: linear-gradient(135deg, var(--amber-500) 0%, var(--amber-600) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  
+  .shadow-soft {
+    box-shadow: 0 2px 10px -2px rgba(0, 4, 53, 0.08);
+  }
+  
+  .shadow-lift {
+    box-shadow: 0 20px 45px -18px rgba(0, 4, 53, 0.28);
+  }
+  
+  .shadow-glow-amber {
+    box-shadow: 0 8px 24px -6px rgba(252, 176, 56, 0.45);
+  }
+  
+  @keyframes float-med {
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  
+  .animate-float-med {
+    animation: float-med 5s ease-in-out infinite;
+  }
+  
+  /* ---------- Base feel ---------- */
+  
+  .brand-body {
+    color: var(--navy-900);
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  :focus-visible {
+    outline: 2px solid var(--amber-500);
+    outline-offset: 2px;
+  }

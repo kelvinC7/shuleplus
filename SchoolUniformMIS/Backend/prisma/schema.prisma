@@ -1,0 +1,739 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum SupplyMethod {
+  READY_MADE
+  FABRIC_TAILORING
+}
+
+enum GenderTarget {
+  MALE
+  FEMALE
+  UNISEX
+}
+
+enum EducationLevel {
+  NURSERY
+  PRIMARY
+  SECONDARY
+  TVET
+  ALL
+}
+
+enum SleeveType {
+  SHORT
+  LONG
+  NA
+}
+
+enum ProductionStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DistributionStatus {
+  PAID
+  PENDING
+  FREE
+}
+
+enum ReturnStatus {
+  COMPLETED
+  REFUNDED
+  PARTIAL
+}
+
+enum ReturnCondition {
+  NEW
+  GOOD
+  DAMAGED
+  WORN
+  DEFECTIVE
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  MOBILE_MONEY
+  CARD
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+  RESERVE
+  RELEASE
+  DAMAGE
+  SALE
+  DISTRIBUTION
+}
+
+enum CustomerType {
+  STUDENT
+  PARENT
+  WALK_IN
+}
+
+enum ReservationStatus {
+  PENDING
+  AWAITING_PAYMENT
+  FULFILLED
+  CANCELLED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  settings         SchoolUniformSettings?
+  categories       UniformCategory[]
+  products         UniformProduct[]
+  packages         UniformPackage[]
+  suppliers        Supplier[]
+  fabrics          Fabric[]
+  fabricPurchases  FabricPurchase[]
+  fabricIssues     FabricIssue[]
+  tailors          Tailor[]
+  productionOrders ProductionOrder[]
+  students         UniformStudent[]
+  sales            UniformSale[]
+  distributionReceipts DistributionReceipt[]
+  uniformReturns   UniformReturn[]
+  activityLogs     ActivityLog[]
+
+  @@map("tenants")
+}
+
+model SchoolUniformSettings {
+  id             String  @id @default(uuid())
+  organizationId String  @unique @map("organization_id")
+
+  enableFabricManagement     Boolean @default(true) @map("enable_fabric_management")
+  enableTailoring            Boolean @default(false) @map("enable_tailoring")
+  enableBarcode              Boolean @default(true) @map("enable_barcode")
+  enableQrCodes              Boolean @default(false) @map("enable_qr_codes")
+  enableAutoStockAlerts      Boolean @default(true) @map("enable_auto_stock_alerts")
+  enableInstallments         Boolean @default(false) @map("enable_installments")
+  enableDiscounts            Boolean @default(true) @map("enable_discounts")
+  enableParentNotifications  Boolean @default(false) @map("enable_parent_notifications")
+  enableTrackOwnership       Boolean @default(true) @map("enable_track_ownership")
+  enableMissingAlerts        Boolean @default(true) @map("enable_missing_alerts")
+  enableSizeRecommendations  Boolean @default(false) @map("enable_size_recommendations")
+
+  receiptSignatureUrl String? @map("receipt_signature_url")
+  receiptStampUrl     String? @map("receipt_stamp_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@map("school_uniform_settings")
+}
+
+model UniformCategory {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [organizationId], references: [organizationId])
+  products UniformProduct[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("uniform_categories")
+}
+
+model UniformProduct {
+  id                  String         @id @default(uuid())
+  organizationId      String         @map("organization_id")
+  name                String
+  sku                 String?
+  barcode             String?
+  categoryId          String?        @map("category_id")
+  gender              GenderTarget
+  educationLevel      EducationLevel @map("education_level")
+  color               String?
+  material            String?
+  description         String?
+  images              Json           @default("[]")
+  metadata            Json           @default("{}")
+  sellingPrice        Decimal        @db.Decimal(14, 2) @map("selling_price")
+  costPrice           Decimal        @db.Decimal(14, 2) @map("cost_price")
+  supplyMethod        SupplyMethod   @map("supply_method")
+  fabricMetersPerItem Decimal?       @db.Decimal(12, 2) @map("fabric_meters_per_item")
+  isActive            Boolean        @default(true) @map("is_active")
+  deletedAt           DateTime?      @map("deleted_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  tenant           Tenant               @relation(fields: [organizationId], references: [organizationId])
+  category         UniformCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  variants         UniformVariant[]
+  packageLines     UniformPackageLine[]
+  studentItems     StudentUniformItem[]
+  productionOrders ProductionOrder[]
+
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+  @@map("uniform_products")
+}
+
+model UniformVariant {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  productId      String      @map("product_id")
+  size           String
+  color          String?
+  sleeve         SleeveType  @default(NA)
+  sku            String
+  barcode        String?
+  sellingPrice   Decimal?    @db.Decimal(14, 2) @map("selling_price")
+  costPrice      Decimal?    @db.Decimal(14, 2) @map("cost_price")
+  isActive       Boolean     @default(true) @map("is_active")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  product          UniformProduct       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockBalance     StockBalance?
+  stockMovements   StockMovement[]
+  distributions    UniformDistribution[]
+  reservations     UniformReservation[]
+  saleLines        SaleLine[]
+  studentItems     StudentUniformItem[]
+  returnLines      UniformReturnLine[] @relation("ReturnLineVariant")
+  exchangeLines    UniformReturnLine[] @relation("ReturnExchangeVariant")
+
+  @@unique([organizationId, sku])
+  @@index([organizationId])
+  @@index([productId])
+  @@map("uniform_variants")
+}
+
+model UniformPackage {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant               @relation(fields: [organizationId], references: [organizationId])
+  lines  UniformPackageLine[]
+
+  @@index([organizationId])
+  @@map("uniform_packages")
+}
+
+model UniformPackageLine {
+  id             String @id @default(uuid())
+  organizationId String @map("organization_id")
+  packageId      String @map("package_id")
+  productId      String @map("product_id")
+  quantity       Int    @default(1)
+
+  package UniformPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  product UniformProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([packageId])
+  @@index([organizationId])
+  @@map("uniform_package_lines")
+}
+
+model Supplier {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant           @relation(fields: [organizationId], references: [organizationId])
+  fabrics         Fabric[]
+  fabricPurchases FabricPurchase[]
+
+  @@index([organizationId])
+  @@map("suppliers")
+}
+
+model Fabric {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  name            String
+  supplierId      String?   @map("supplier_id")
+  rollNumber      String?   @map("roll_number")
+  metersTotal     Decimal   @db.Decimal(12, 2) @map("meters_total")
+  metersRemaining Decimal   @db.Decimal(12, 2) @map("meters_remaining")
+  cost            Decimal   @db.Decimal(14, 2)
+  color           String?
+  quality         String?
+  warehouse       String?
+  academicYear    String?   @map("academic_year")
+  purchaseDate    DateTime? @map("purchase_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant           Tenant            @relation(fields: [organizationId], references: [organizationId])
+  supplier         Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchases        FabricPurchase[]
+  issues           FabricIssue[]
+  productionOrders ProductionOrder[]
+
+  @@index([organizationId])
+  @@map("fabrics")
+}
+
+model FabricPurchase {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  fabricId       String?  @map("fabric_id")
+  name           String
+  supplierId     String?  @map("supplier_id")
+  meters         Decimal  @db.Decimal(12, 2)
+  cost           Decimal  @db.Decimal(14, 2)
+  purchaseDate   DateTime @default(now()) @map("purchase_date")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [organizationId], references: [organizationId])
+  fabric   Fabric?   @relation(fields: [fabricId], references: [id], onDelete: SetNull)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("fabric_purchases")
+}
+
+model FabricIssue {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  fabricId       String   @map("fabric_id")
+  tailorId       String?  @map("tailor_id")
+  meters         Decimal  @db.Decimal(12, 2)
+  expectedPieces Int?     @map("expected_pieces")
+  issuedAt       DateTime @default(now()) @map("issued_at")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant  @relation(fields: [organizationId], references: [organizationId])
+  fabric Fabric  @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+  tailor Tailor? @relation(fields: [tailorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@map("fabric_issues")
+}
+
+model Tailor {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  company        String?
+  phone          String?
+  email          String?
+  address        String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant           Tenant            @relation(fields: [organizationId], references: [organizationId])
+  fabricIssues     FabricIssue[]
+  productionOrders ProductionOrder[]
+
+  @@index([organizationId])
+  @@map("tailors")
+}
+
+model ProductionOrder {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  tailorId       String            @map("tailor_id")
+  fabricId       String?           @map("fabric_id")
+  metersIssued   Decimal           @db.Decimal(12, 2) @map("meters_issued")
+  expectedOutput Int               @map("expected_output")
+  deliveryDate   DateTime?         @map("delivery_date")
+  tailoringCost  Decimal           @db.Decimal(14, 2) @map("tailoring_cost")
+  status         ProductionStatus  @default(WAITING)
+  productId      String?           @map("product_id")
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [organizationId], references: [organizationId])
+  tailor   Tailor               @relation(fields: [tailorId], references: [id])
+  fabric   Fabric?              @relation(fields: [fabricId], references: [id], onDelete: SetNull)
+  product  UniformProduct?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  receipts ProductionReceipt[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("production_orders")
+}
+
+model ProductionReceipt {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  orderId        String   @map("order_id")
+  receivedQty    Int      @default(0) @map("received_qty")
+  damagedQty     Int      @default(0) @map("damaged_qty")
+  unfinishedQty  Int      @default(0) @map("unfinished_qty")
+  receivedAt     DateTime @default(now()) @map("received_at")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  order ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([organizationId])
+  @@map("production_receipts")
+}
+
+model StockBalance {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  variantId      String   @unique @map("variant_id")
+  available      Int      @default(0)
+  reserved       Int      @default(0)
+  sold           Int      @default(0)
+  damaged        Int      @default(0)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  variant UniformVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("stock_balances")
+}
+
+model StockMovement {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  variantId      String            @map("variant_id")
+  type           StockMovementType
+  quantity       Int
+  reference      String?
+  notes          String?
+  createdBy      String?           @map("created_by")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  variant UniformVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([variantId])
+  @@map("stock_movements")
+}
+
+model UniformStudent {
+  id                 String   @id @default(uuid())
+  organizationId     String   @map("organization_id")
+  firstName          String   @map("first_name")
+  lastName           String   @map("last_name")
+  className          String?  @map("class_name")
+  academicYear       String?  @map("academic_year")
+  academicStudentId  String?  @map("academic_student_id")
+  gender             String?
+  phone              String?
+  notes              String?
+  profileMeta        Json     @default("{}") @map("profile_meta")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  tenant        Tenant                @relation(fields: [organizationId], references: [organizationId])
+  measurement   StudentMeasurement?
+  items         StudentUniformItem[]
+  distributions UniformDistribution[]
+  reservations  UniformReservation[]
+  sales         UniformSale[]
+  receipts      DistributionReceipt[]
+  returns       UniformReturn[]
+
+  @@index([organizationId])
+  @@index([organizationId, className])
+  @@map("uniform_students")
+}
+
+model StudentMeasurement {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @unique @map("student_id")
+  height         Decimal? @db.Decimal(6, 2)
+  weight         Decimal? @db.Decimal(6, 2)
+  chest          Decimal? @db.Decimal(6, 2)
+  waist          Decimal? @db.Decimal(6, 2)
+  hip            Decimal? @db.Decimal(6, 2)
+  shoulder       Decimal? @db.Decimal(6, 2)
+  leg            Decimal? @db.Decimal(6, 2)
+  sleeve         Decimal? @db.Decimal(6, 2)
+  shirtSize      String?  @map("shirt_size")
+  trouserSize    String?  @map("trouser_size")
+  skirtSize      String?  @map("skirt_size")
+  dressSize      String?  @map("dress_size")
+  sweaterSize    String?  @map("sweater_size")
+  shoeSize       String?  @map("shoe_size")
+  sportSize      String?  @map("sport_size")
+  hatSize        String?  @map("hat_size")
+  beltSize       String?  @map("belt_size")
+  sizes          Json     @default("[]")
+  history        Json     @default("[]")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  student UniformStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("student_measurements")
+}
+
+model StudentUniformItem {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  studentId      String   @map("student_id")
+  productId      String   @map("product_id")
+  variantId      String?  @map("variant_id")
+  owned          Boolean  @default(false)
+  quantity       Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  student UniformStudent  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  product UniformProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant UniformVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@map("student_uniform_items")
+}
+
+model UniformDistribution {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  receiptId      String?             @map("receipt_id")
+  studentId      String              @map("student_id")
+  variantId      String              @map("variant_id")
+  quantity       Int
+  unitPrice      Decimal             @default(0) @map("unit_price") @db.Decimal(14, 2)
+  academicYear   String?             @map("academic_year")
+  issuedBy       String?             @map("issued_by")
+  issuedAt       DateTime            @default(now()) @map("issued_at")
+  status         DistributionStatus  @default(PENDING)
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  receipt DistributionReceipt? @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+  student UniformStudent       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  variant UniformVariant       @relation(fields: [variantId], references: [id])
+  returnLines UniformReturnLine[]
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([receiptId])
+  @@map("uniform_distributions")
+}
+
+model DistributionReceipt {
+  id             String             @id @default(uuid())
+  organizationId String             @map("organization_id")
+  receiptNumber  String             @map("receipt_number")
+  studentId      String             @map("student_id")
+  saleId         String?            @unique @map("sale_id")
+  academicYear   String?            @map("academic_year")
+  term           String?
+  status         DistributionStatus @default(PENDING)
+  itemCount      Int                @default(0) @map("item_count")
+  totalQty       Int                @default(0) @map("total_qty")
+  subtotal       Decimal            @default(0) @db.Decimal(14, 2)
+  discount       Decimal            @default(0) @db.Decimal(14, 2)
+  total          Decimal            @default(0) @db.Decimal(14, 2)
+  paid           Decimal            @default(0) @db.Decimal(14, 2)
+  balance        Decimal            @default(0) @db.Decimal(14, 2)
+  notes          String?
+  issuedBy       String?            @map("issued_by")
+  issuedAt       DateTime           @default(now()) @map("issued_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  tenant  Tenant               @relation(fields: [organizationId], references: [organizationId])
+  student UniformStudent       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sale    UniformSale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  lines   UniformDistribution[]
+  returns UniformReturn[]
+
+  @@unique([organizationId, receiptNumber])
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([issuedAt])
+  @@map("distribution_receipts")
+}
+
+model UniformReturn {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  returnNumber   String         @map("return_number")
+  receiptId      String         @map("receipt_id")
+  studentId      String         @map("student_id")
+  reason         String?
+  condition      ReturnCondition @default(GOOD)
+  status         ReturnStatus   @default(COMPLETED)
+  refundAmount   Decimal        @default(0) @map("refund_amount") @db.Decimal(14, 2)
+  restock        Boolean        @default(true)
+  replaceItem    Boolean        @default(false) @map("replace_item")
+  exchange       Boolean        @default(false)
+  notes          String?
+  processedBy    String?        @map("processed_by")
+  processedAt    DateTime       @default(now()) @map("processed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  tenant  Tenant               @relation(fields: [organizationId], references: [organizationId])
+  receipt DistributionReceipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  student UniformStudent       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lines   UniformReturnLine[]
+
+  @@unique([organizationId, returnNumber])
+  @@index([organizationId])
+  @@index([receiptId])
+  @@index([studentId])
+  @@map("uniform_returns")
+}
+
+model UniformReturnLine {
+  id               String  @id @default(uuid())
+  organizationId   String  @map("organization_id")
+  returnId         String  @map("return_id")
+  distributionId   String? @map("distribution_id")
+  variantId        String  @map("variant_id")
+  quantity         Int
+  reason           String?
+  exchangeVariantId String? @map("exchange_variant_id")
+
+  return         UniformReturn       @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  distribution   UniformDistribution? @relation(fields: [distributionId], references: [id], onDelete: SetNull)
+  variant        UniformVariant      @relation("ReturnLineVariant", fields: [variantId], references: [id])
+  exchangeVariant UniformVariant?    @relation("ReturnExchangeVariant", fields: [exchangeVariantId], references: [id])
+
+  @@index([returnId])
+  @@index([organizationId])
+  @@map("uniform_return_lines")
+}
+
+model UniformReservation {
+  id             String             @id @default(uuid())
+  organizationId String             @map("organization_id")
+  studentId      String             @map("student_id")
+  variantId      String             @map("variant_id")
+  quantity       Int
+  status         ReservationStatus  @default(PENDING)
+  reservedAt     DateTime           @default(now()) @map("reserved_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  student UniformStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  variant UniformVariant @relation(fields: [variantId], references: [id])
+
+  @@index([organizationId])
+  @@index([studentId])
+  @@map("uniform_reservations")
+}
+
+model UniformSale {
+  id              String        @id @default(uuid())
+  organizationId  String        @map("organization_id")
+  invoiceNumber   String        @map("invoice_number")
+  customerType    CustomerType  @map("customer_type")
+  studentId       String?       @map("student_id")
+  customerName    String?       @map("customer_name")
+  discount        Decimal       @default(0) @db.Decimal(14, 2)
+  tax             Decimal       @default(0) @db.Decimal(14, 2)
+  total           Decimal       @db.Decimal(14, 2)
+  paymentStatus   PaymentStatus @default(PENDING) @map("payment_status")
+  notes           String?
+  createdBy       String?       @map("created_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  tenant   Tenant           @relation(fields: [organizationId], references: [organizationId])
+  student  UniformStudent?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  lines    SaleLine[]
+  payments Payment[]
+  distributionReceipt DistributionReceipt?
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@map("uniform_sales")
+}
+
+model SaleLine {
+  id             String  @id @default(uuid())
+  organizationId String  @map("organization_id")
+  saleId         String  @map("sale_id")
+  variantId      String  @map("variant_id")
+  quantity       Int
+  unitPrice      Decimal @db.Decimal(14, 2) @map("unit_price")
+  lineTotal      Decimal @db.Decimal(14, 2) @map("line_total")
+
+  sale    UniformSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  variant UniformVariant @relation(fields: [variantId], references: [id])
+
+  @@index([saleId])
+  @@index([organizationId])
+  @@map("sale_lines")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  saleId         String        @map("sale_id")
+  amount         Decimal       @db.Decimal(14, 2)
+  method         PaymentMethod
+  status         PaymentStatus @default(PAID)
+  paidAt         DateTime?     @map("paid_at")
+  notes          String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  sale UniformSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([organizationId])
+  @@map("payments")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("activity_logs")
+}

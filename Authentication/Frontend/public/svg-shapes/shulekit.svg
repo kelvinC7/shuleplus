@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/>
+      <stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 28 C18 20 24 14 32 14 C40 14 46 20 46 28 V48 C46 50 44 52 42 52 H22 C20 52 18 50 18 48 Z" fill="url(#gN)" opacity="0.92"/>
+  <path d="M22 30 C22 24 26 20 32 20 C38 20 42 24 42 30 V46 H22 Z" fill="url(#gA)" opacity="0.9"/>
+  <rect x="28" y="10" width="8" height="6" rx="2" fill="url(#gT)"/>
+  <circle cx="32" cy="36" r="5" fill="#FFFFFF" opacity="0.9"/>
+  <path d="M29 36 H35 M32 33 V39" stroke="url(#gN)" stroke-width="2" stroke-linecap="round"/>
+</svg>

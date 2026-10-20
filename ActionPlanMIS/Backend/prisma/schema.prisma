@@ -1,0 +1,804 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PlanStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum DependencyType {
+  FINISH_TO_START
+  START_TO_START
+  FINISH_TO_FINISH
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RecurrenceType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum PeriodType {
+  ANNUAL
+  QUARTERLY
+  MONTHLY
+  WEEKLY
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentType {
+  INDIVIDUAL
+  MULTIPLE
+  DEPARTMENT
+  EXTERNAL
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}
+
+model Category {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  color          String?  @default("#fcb038")
+  icon           String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actionPlans ActionPlan[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("categories")
+}
+
+model StrategicPlan {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  title            String
+  description      String?
+  startYear        Int      @map("start_year")
+  endYear          Int      @map("end_year")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdBy        String?  @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  strategicGoals StrategicGoal[]
+
+  @@unique([organizationId, title])
+  @@index([organizationId])
+  @@map("strategic_plans")
+}
+
+model StrategicGoal {
+  id               String   @id @default(uuid())
+  organizationId   String   @map("organization_id")
+  strategicPlanId  String   @map("strategic_plan_id")
+  title            String
+  description      String?
+  targetValue      Decimal? @db.Decimal(14, 2) @map("target_value")
+  progress         Decimal? @default(0) @db.Decimal(5, 2)
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdBy        String?  @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  strategicPlan  StrategicPlan @relation(fields: [strategicPlanId], references: [id], onDelete: Cascade)
+  objectives     Objective[]
+
+  @@index([organizationId])
+  @@index([strategicPlanId])
+  @@map("strategic_goals")
+}
+
+model Objective {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  strategicGoalId String   @map("strategic_goal_id")
+  title           String
+  description     String?
+  targetDate      DateTime? @map("target_date")
+  progress        Decimal? @default(0) @db.Decimal(5, 2)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  strategicGoal StrategicGoal @relation(fields: [strategicGoalId], references: [id], onDelete: Cascade)
+  actionPlans   ActionPlan[] @relation("ObjectiveActionPlans")
+
+  @@index([organizationId])
+  @@index([strategicGoalId])
+  @@map("objectives")
+}
+
+model ActionPlan {
+  id                String    @id @default(uuid())
+  organizationId    String    @map("organization_id")
+  title             String
+  description       String?
+  strategicGoalId   String?   @map("strategic_goal_id")
+  objectiveId       String?   @map("objective_id")
+  categoryId        String?   @map("category_id")
+  department        String?
+  priority          Priority  @default(MEDIUM)
+  responsiblePerson String?   @map("responsible_person")
+  teamMembers       Json      @default("[]") @map("team_members")
+  startDate         DateTime  @map("start_date")
+  dueDate           DateTime  @map("due_date")
+  budget            Decimal?  @default(0) @db.Decimal(14, 2)
+  actualCost        Decimal?  @default(0) @db.Decimal(14, 2)
+  expectedOutcome   String?   @map("expected_outcome")
+  progress          Decimal?  @default(0) @db.Decimal(5, 2)
+  status            PlanStatus @default(DRAFT)
+  version           Int       @default(1)
+  parentId          String?   @map("parent_id")
+  periodType        PeriodType? @map("period_type")
+  periodYear        Int?      @map("period_year")
+  periodQuarter     Int?      @map("period_quarter")
+  periodMonth       Int?      @map("period_month")
+  periodWeek        Int?      @map("period_week")
+  qrCode            String?   @map("qr_code")
+  isTemplate        Boolean   @default(false) @map("is_template")
+  templateType      String?   @map("template_type")
+  createdBy         String?   @map("created_by")
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  objective     Objective?     @relation("ObjectiveActionPlans", fields: [objectiveId], references: [id])
+  tasks         ActionPlanTask[]
+  comments      ActionPlanComment[]
+  attachments   ActionPlanAttachment[]
+  statusHistory ActionPlanStatusHistory[]
+  approvals     ActionPlanApproval[]
+  milestones    Milestone[]
+  budgets       Budget[]
+  expenses      Expense[]
+  risks         Risk[]
+  issues        Issue[]
+  kpis          Kpi[]
+  assignments   ActionPlanAssignment[]
+  versions      ActionPlanVersion[]
+  resourceAllocations ResourceAllocation[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([categoryId])
+  @@index([parentId])
+  @@map("action_plans")
+}
+
+model ActionPlanTask {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  actionPlanId   String     @map("action_plan_id")
+  parentId       String?    @map("parent_id")
+  title          String
+  description    String?
+  owner          String?
+  startDate      DateTime?  @map("start_date")
+  dueDate        DateTime?  @map("due_date")
+  progress       Decimal?   @default(0) @db.Decimal(5, 2)
+  status         TaskStatus @default(TODO)
+  sortOrder      Int        @default(0) @map("sort_order")
+  estimatedHours Decimal?   @db.Decimal(8, 2) @map("estimated_hours")
+  actualHours    Decimal?   @db.Decimal(8, 2) @map("actual_hours")
+  createdBy      String?    @map("created_by")
+  deletedAt      DateTime?  @map("deleted_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  actionPlan    ActionPlan       @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  parent        ActionPlanTask?  @relation("TaskSubtasks", fields: [parentId], references: [id])
+  subtasks      ActionPlanTask[] @relation("TaskSubtasks")
+  dependencies  TaskDependency[] @relation("TaskDependencyFrom")
+  dependents    TaskDependency[] @relation("TaskDependencyTo")
+  comments      TaskComment[]
+  assignments   ActionPlanAssignment[]
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([parentId])
+  @@map("action_plan_tasks")
+}
+
+model TaskDependency {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  taskId         String         @map("task_id")
+  dependsOnId    String         @map("depends_on_id")
+  type           DependencyType @default(FINISH_TO_START)
+  lagDays        Int            @default(0) @map("lag_days")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  task      ActionPlanTask @relation("TaskDependencyFrom", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn ActionPlanTask @relation("TaskDependencyTo", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([organizationId])
+  @@index([taskId])
+  @@index([dependsOnId])
+  @@map("task_dependencies")
+}
+
+model TaskComment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  taskId         String   @map("task_id")
+  content        String
+  author         String?
+  mentions       Json     @default("[]")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  task ActionPlanTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+model ActionPlanAssignment {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  actionPlanId   String?        @map("action_plan_id")
+  taskId         String?        @map("task_id")
+  assigneeId     String         @map("assignee_id")
+  assigneeName   String?        @map("assignee_name")
+  assignmentType AssignmentType @default(INDIVIDUAL) @map("assignment_type")
+  assignedBy     String?        @map("assigned_by")
+  acceptedAt     DateTime?      @map("accepted_at")
+  startedAt      DateTime?      @map("started_at")
+  completedAt    DateTime?      @map("completed_at")
+  progress       Decimal?       @default(0) @db.Decimal(5, 2)
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan?     @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  task       ActionPlanTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([taskId])
+  @@index([assigneeId])
+  @@map("action_plan_assignments")
+}
+
+model ActionPlanComment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actionPlanId   String   @map("action_plan_id")
+  parentId       String?  @map("parent_id")
+  content        String
+  author         String?
+  mentions       Json     @default("[]")
+  reactions      Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan          @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  parent     ActionPlanComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    ActionPlanComment[] @relation("CommentReplies")
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("action_plan_comments")
+}
+
+model ActionPlanAttachment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actionPlanId   String   @map("action_plan_id")
+  taskId         String?  @map("task_id")
+  filename       String
+  originalName   String?  @map("original_name")
+  filePath       String?  @map("file_path")
+  mimeType       String?  @map("mime_type")
+  fileSize       Int?     @map("file_size")
+  category       String?  @default("other")
+  uploadedBy     String?  @map("uploaded_by")
+  verifiedBy     String?  @map("verified_by")
+  verifiedAt     DateTime? @map("verified_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([taskId])
+  @@map("action_plan_attachments")
+}
+
+model ActionPlanStatusHistory {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  actionPlanId   String    @map("action_plan_id")
+  fromStatus     PlanStatus? @map("from_status")
+  toStatus       PlanStatus @map("to_status")
+  changedBy      String?   @map("changed_by")
+  reason         String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("action_plan_status_history")
+}
+
+model ActionPlanApproval {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  actionPlanId   String         @map("action_plan_id")
+  level          Int            @default(1)
+  approverId     String?        @map("approver_id")
+  approverName   String?        @map("approver_name")
+  role           String?
+  status         ApprovalStatus @default(PENDING)
+  comments       String?
+  digitalSignature String?      @map("digital_signature")
+  signedAt       DateTime?      @map("signed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([approverId])
+  @@map("action_plan_approvals")
+}
+
+model Milestone {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  actionPlanId    String   @map("action_plan_id")
+  title           String
+  description     String?
+  targetDate      DateTime @map("target_date")
+  completedDate   DateTime? @map("completed_date")
+  responsiblePerson String? @map("responsible_person")
+  evidence        String?
+  progress        Decimal? @default(0) @db.Decimal(5, 2)
+  isCompleted     Boolean  @default(false) @map("is_completed")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("milestones")
+}
+
+model Budget {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actionPlanId   String   @map("action_plan_id")
+  category       String   @default("general")
+  allocated      Decimal  @default(0) @db.Decimal(14, 2)
+  spent          Decimal  @default(0) @db.Decimal(14, 2)
+  committed      Decimal  @default(0) @db.Decimal(14, 2)
+  currency       String   @default("RWF")
+  fiscalYear     Int?     @map("fiscal_year")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("budgets")
+}
+
+model Expense {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  actionPlanId   String      @map("action_plan_id")
+  category       String      @default("other")
+  description    String?
+  amount         Decimal     @db.Decimal(14, 2)
+  expenseDate    DateTime    @map("expense_date")
+  paidTo         String?     @map("paid_to")
+  receiptUrl     String?     @map("receipt_url")
+  receiptNumber  String?     @map("receipt_number")
+  fundingSource  String?     @map("funding_source")
+  budgetLineId   String?     @map("budget_line_id")
+  budgetLineLabel String?    @map("budget_line_label")
+  approvedBy     String?     @map("approved_by")
+  status         String      @default("PENDING")
+  createdBy      String?     @map("created_by")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([category])
+  @@map("expenses")
+}
+
+model Risk {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  actionPlanId   String    @map("action_plan_id")
+  title          String
+  description    String?
+  category       String?
+  impact         RiskLevel @default(MEDIUM)
+  probability    RiskLevel @default(MEDIUM)
+  mitigation     String?
+  contingency    String?
+  owner          String?
+  status         String    @default("OPEN")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("risks")
+}
+
+model Issue {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  actionPlanId   String       @map("action_plan_id")
+  title          String
+  description    String?
+  severity       IssueSeverity @default(MEDIUM)
+  priority       Priority     @default(MEDIUM)
+  assignedTo     String?      @map("assigned_to")
+  resolution     String?
+  status         String       @default("OPEN")
+  resolvedAt     DateTime?    @map("resolved_at")
+  createdBy      String?      @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("issues")
+}
+
+model Kpi {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actionPlanId   String   @map("action_plan_id")
+  name           String
+  description    String?
+  target         Decimal  @db.Decimal(14, 2)
+  currentValue   Decimal  @default(0) @db.Decimal(14, 2) @map("current_value")
+  unit           String?  @default("%")
+  trend          String?  @default("stable")
+  measurementDate DateTime? @map("measurement_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("kpis")
+}
+
+model PerformanceMetric {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  value          Decimal  @db.Decimal(14, 2)
+  target         Decimal? @db.Decimal(14, 2)
+  category       String?
+  period         String?
+  measuredAt     DateTime @default(now()) @map("measured_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@index([category])
+  @@map("performance_metrics")
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  title          String
+  message        String?
+  type           String   @default("info")
+  referenceType  String?  @map("reference_type")
+  referenceId    String?  @map("reference_id")
+  isRead         Boolean  @default(false) @map("is_read")
+  readAt         DateTime? @map("read_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model Reminder {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  actionPlanId   String?        @map("action_plan_id")
+  taskId         String?        @map("task_id")
+  title          String
+  message        String?
+  remindAt       DateTime       @map("remind_at")
+  isSent         Boolean        @default(false) @map("is_sent")
+  recurrenceType RecurrenceType? @map("recurrence_type")
+  recurrenceInterval Int?       @map("recurrence_interval")
+  sentAt         DateTime?      @map("sent_at")
+  createdBy      String?        @map("created_by")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([remindAt])
+  @@map("reminders")
+}
+
+model Meeting {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  actionPlanId   String?       @map("action_plan_id")
+  title          String
+  description    String?
+  agenda         Json          @default("[]")
+  location       String?
+  meetingDate    DateTime      @map("meeting_date")
+  startTime      String?       @map("start_time")
+  endTime        String?       @map("end_time")
+  participants   Json          @default("[]")
+  status         MeetingStatus @default(SCHEDULED)
+  createdBy      String?       @map("created_by")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  minutes MeetingMinute[]
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("meetings")
+}
+
+model MeetingMinute {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  meetingId      String   @map("meeting_id")
+  content        String
+  author         String?
+  decision       Boolean  @default(false)
+  actionItem     String?
+  assignedTo     String?  @map("assigned_to")
+  dueDate        DateTime? @map("due_date")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([meetingId])
+  @@map("meeting_minutes")
+}
+
+model RecurringPlan {
+  id               String         @id @default(uuid())
+  organizationId   String         @map("organization_id")
+  title            String
+  description      String?
+  recurrenceType   RecurrenceType @map("recurrence_type")
+  interval         Int            @default(1)
+  startDate        DateTime       @map("start_date")
+  endDate          DateTime?      @map("end_date")
+  nextGeneration   DateTime?      @map("next_generation")
+  templateId       String?        @map("template_id")
+  department       String?
+  responsiblePerson String?       @map("responsible_person")
+  priority         Priority       @default(MEDIUM)
+  budget           Decimal?       @default(0) @db.Decimal(14, 2)
+  isActive         Boolean        @default(true) @map("is_active")
+  lastGeneratedAt  DateTime?      @map("last_generated_at")
+  createdBy        String?        @map("created_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@map("recurring_plans")
+}
+
+model ResourceAllocation {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  actionPlanId   String   @map("action_plan_id")
+  resourceType   String   @map("resource_type")
+  resourceName   String   @map("resource_name")
+  quantity       Int      @default(1)
+  allocatedFrom  DateTime @map("allocated_from")
+  allocatedTo    DateTime? @map("allocated_to")
+  cost           Decimal? @default(0) @db.Decimal(14, 2)
+  status         String   @default("ALLOCATED")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@index([resourceType])
+  @@map("resource_allocations")
+}
+
+model ActionPlanVersion {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  actionPlanId   String    @map("action_plan_id")
+  version        Int
+  data           Json
+  changedBy      String?   @map("changed_by")
+  changeSummary  String?   @map("change_summary")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([actionPlanId, version])
+  @@index([organizationId])
+  @@index([actionPlanId])
+  @@map("action_plan_versions")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  entityType     String?  @map("entity_type")
+  entityId       String?  @map("entity_id")
+  changes        Json     @default("{}")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  browser        String?
+  device         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model ActionPlanTemplate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  type           String   @default("general")
+  categoryId     String?  @map("category_id")
+  ownership      String   @default("school")
+  templateData   Json     @default("{}")
+  isDefault      Boolean  @default(false) @map("is_default")
+  isOfficial     Boolean  @default(false) @map("is_official")
+  officialSlug   String?  @map("official_slug")
+  sourcePlanId   String?  @map("source_plan_id")
+  schoolType     String?  @map("school_type")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, officialSlug])
+  @@index([organizationId])
+  @@index([organizationId, categoryId])
+  @@index([organizationId, ownership])
+  @@map("action_plan_templates")
+}
+
+model PeriodReview {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  reviewType     String    @map("review_type")
+  periodYear     Int       @map("period_year")
+  periodMonth    Int?      @map("period_month")
+  periodQuarter  Int?      @map("period_quarter")
+  planned        String?
+  completed      String?
+  delayed        String?
+  reason         String?
+  corrective     String?
+  newDeadline    DateTime? @map("new_deadline")
+  responsible    String?
+  createdBy      String?   @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([organizationId])
+  @@index([reviewType, periodYear])
+  @@map("period_reviews")
+}

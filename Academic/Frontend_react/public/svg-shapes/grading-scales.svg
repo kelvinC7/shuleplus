@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gsA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/><stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gsN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/><stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gsT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/><stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="36" width="8" height="16" rx="2" fill="url(#gsN)" opacity="0.55"/>
+  <rect x="24" y="28" width="8" height="24" rx="2" fill="url(#gsT)"/>
+  <rect x="36" y="18" width="8" height="34" rx="2" fill="url(#gsA)"/>
+  <circle cx="46" cy="18" r="10" fill="url(#gsN)"/>
+  <path d="M46 12 L47.8 16.2 H52.4 L48.8 18.8 L50.4 23 L46 20.4 L41.6 23 L43.2 18.8 L39.6 16.2 H44.2 Z" fill="#FFFFFF"/>
+</svg>

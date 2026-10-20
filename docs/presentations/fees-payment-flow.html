@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShulePlus — School Fees Payment Flow</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --accent2: #34d399;
+      --warn: #fbbf24;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    .deck { height: 100vh; position: relative; }
+    .slide {
+      display: none; height: 100vh; padding: 48px 64px 80px;
+      flex-direction: column; justify-content: center;
+    }
+    .slide.active { display: flex; }
+    h1 { font-size: 2.6rem; font-weight: 700; margin-bottom: 12px; }
+    h2 { font-size: 1.75rem; color: var(--accent); margin-bottom: 28px; font-weight: 600; }
+    h3 { font-size: 1.1rem; color: var(--accent2); margin: 20px 0 10px; }
+    p, li { font-size: 1.15rem; line-height: 1.65; color: var(--muted); }
+    .subtitle { font-size: 1.35rem; color: var(--muted); margin-bottom: 8px; }
+    .tag { display: inline-block; background: var(--card); border: 1px solid var(--border); padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; color: var(--accent); margin-right: 8px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 24px;
+    }
+    .card h4 { color: var(--text); font-size: 1rem; margin-bottom: 8px; }
+    .card p, .card li { font-size: 0.95rem; }
+    .steps { counter-reset: step; list-style: none; }
+    .steps li {
+      counter-increment: step; position: relative; padding: 14px 14px 14px 56px;
+      margin-bottom: 10px; background: var(--card); border-radius: 10px; border: 1px solid var(--border);
+      font-size: 1rem; color: var(--text);
+    }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      width: 28px; height: 28px; background: var(--accent); color: var(--bg); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem;
+    }
+    .steps li span { display: block; font-size: 0.88rem; color: var(--muted); margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    th { color: var(--accent); font-weight: 600; }
+    td code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 0.82rem; color: var(--accent2); }
+    .status-done { color: var(--accent2); font-weight: 600; }
+    .status-todo { color: var(--warn); font-weight: 600; }
+    .arch {
+      font-family: 'Consolas', monospace; font-size: 0.78rem; line-height: 1.5;
+      background: #0c1222; border: 1px solid var(--border); border-radius: 12px;
+      padding: 24px; white-space: pre; overflow-x: auto; color: #cbd5e1;
+    }
+    .arch .hl { color: var(--accent); }
+    .arch .hl2 { color: var(--accent2); }
+    .arch .hl3 { color: var(--warn); }
+    .nav {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 12px; align-items: center; z-index: 10;
+    }
+    .nav button {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+    }
+    .nav button:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .counter { color: var(--muted); font-size: 0.9rem; min-width: 60px; text-align: center; }
+    .logo { font-size: 0.9rem; color: var(--muted); margin-bottom: 24px; letter-spacing: 0.05em; text-transform: uppercase; }
+    ul.bullets { list-style: none; }
+    ul.bullets li { padding: 6px 0 6px 20px; position: relative; }
+    ul.bullets li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); }
+    .highlight-box { border-left: 4px solid var(--warn); padding-left: 16px; margin-top: 16px; }
+    .highlight-box p { color: var(--text); }
+    @media (max-width: 900px) {
+      .slide { padding: 32px 24px 72px; }
+      h1 { font-size: 1.8rem; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <!-- SLIDE 1: Title -->
+    <section class="slide active">
+      <div class="logo">ShulePlus Platform</div>
+      <h1>School Fees Payment Flow</h1>
+      <p class="subtitle">Architecture · Process · APIs · Bank Integration Roadmap</p>
+      <p style="margin-top: 32px;">
+        <span class="tag">WebpageBabyeyi</span>
+        <span class="tag">BabyeyiWizard</span>
+        <span class="tag">SchoolFeesPortal</span>
+        <span class="tag">Authentication</span>
+        <span class="tag">ParentMIS</span>
+      </p>
+      <p style="margin-top: 48px; font-size: 0.95rem;">Press → or Space to advance · ← to go back · F11 for fullscreen</p>
+    </section>
+
+    <!-- SLIDE 2: Architecture -->
+    <section class="slide">
+      <h2>System Architecture</h2>
+      <div class="arch"><span class="hl">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="hl">│  PARENT / PUBLIC USER  (babyeyi.rw)                             │</span>
+<span class="hl">└───────────────────────────────┬─────────────────────────────────┘</span>
+                                │
+                                ▼
+<span class="hl2">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="hl2">│  WebpageBabyeyi Frontend          Authentication Landing        │</span>
+<span class="hl2">│  Pay Fees Wizard (7 steps)        Same wizard on shuleplus.rw   │</span>
+<span class="hl2">└───────────────────────────────┬─────────────────────────────────┘</span>
+                                │
+                                ▼
+<span class="hl2">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="hl2">│  WebpageBabyeyi Backend (BFF — port 3099)                       │</span>
+<span class="hl2">│  Proxies public API calls to microservices                      │</span>
+<span class="hl2">└───────┬─────────────────┬──────────────────┬────────────────────┘</span>
+        │                 │                  │
+        ▼                 ▼                  ▼
+<span class="hl"> StudentManagement   BabyeyiWizard    SchoolFeesPortal</span>
+  (student lookup)    (fee circular)    (payments & bills)
+        │                 │                  │
+        │                 │                  ▼
+        │                 │           <span class="hl3"> PostgreSQL</span>
+        │                 │           payments · bills · receipts
+        │                 │                  │
+        └─────────────────┴──────────────────┤
+                                             ▼
+                              <span class="hl2"> ParentMIS · SMS · Email · Push</span>
+
+<span class="hl3">  ┌──────────────────────────────────────────┐</span>
+<span class="hl3">  │  BANK / MoMo / CARD APIs  ← NOT YET      │</span>
+<span class="hl3">  │  (BK, MTN, Airtel, PSP)                  │</span>
+<span class="hl3">  └──────────────────────────────────────────┘</span></div>
+    </section>
+
+    <!-- SLIDE 3: Module roles -->
+    <section class="slide">
+      <h2>What Each Module Does</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h4>BabyeyiWizard</h4>
+          <ul class="bullets">
+            <li>School creates fee circular (Babyeyi document)</li>
+            <li>Defines payment line items & amounts</li>
+            <li>Captures school bank accounts (display on PDF)</li>
+            <li>NESA fee limit validation</li>
+            <li><strong>Does NOT process payments</strong></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>SchoolFeesPortal</h4>
+          <ul class="bullets">
+            <li>Fee structures & student bills</li>
+            <li>Payment recording & receipts</li>
+            <li>Balance updates & notifications</li>
+            <li>Staff fee collection (authenticated)</li>
+            <li><strong>Core payment engine</strong></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>WebpageBabyeyi</h4>
+          <ul class="bullets">
+            <li>Public school directory (babyeyi.rw)</li>
+            <li>Parent-facing Pay Fees wizard</li>
+            <li>BFF proxy to backend services</li>
+            <li>Get Babyeyi · Request Loan flows</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Authentication + ParentMIS</h4>
+          <ul class="bullets">
+            <li>IAM: JWT, MFA, module licensing</li>
+            <li>Developer API gateway (OAuth scopes)</li>
+            <li>ParentMIS: transaction history & webhooks</li>
+            <li>Service-to-service keys</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Payment steps -->
+    <section class="slide">
+      <h2>Parent Payment Flow — 7 Steps</h2>
+      <ol class="steps">
+        <li><strong>Find school</strong> <span>Parent selects school on babyeyi.rw</span></li>
+        <li><strong>Student lookup</strong> <span>Enter ShuleCode / SDMS code → StudentManagement API</span></li>
+        <li><strong>Load fees</strong> <span>SchoolFeesPortal fee structure OR Babyeyi circular fallback</span></li>
+        <li><strong>Choose amount</strong> <span>Full balance, partial, or custom amount</span></li>
+        <li><strong>Select method</strong> <span>Mobile Money (MTN/Airtel) · Card · Bank transfer</span></li>
+        <li><strong>Initiate payment</strong> <span>POST /fees/payments/initiate → status PENDING</span></li>
+        <li><strong>Confirm & receipt</strong> <span>Poll status → COMPLETED → bill updated → receipt + notify parents</span></li>
+      </ol>
+    </section>
+
+    <!-- SLIDE 5: Backend process -->
+    <section class="slide">
+      <h2>What Happens on the Backend</h2>
+      <div class="grid-2">
+        <div>
+          <h3>On Initiate</h3>
+          <ul class="bullets">
+            <li>Validate student, amount, method</li>
+            <li>Resolve or create student bill</li>
+            <li>Create payment record (PENDING)</li>
+            <li>Store masked details (card last4, bank ****last4)</li>
+            <li>Return payment reference</li>
+          </ul>
+          <h3>On Complete</h3>
+          <ul class="bullets">
+            <li>Update bill paid amount & balance</li>
+            <li>Generate receipt with QR code</li>
+            <li>Notify ParentMIS webhook</li>
+            <li>Send SMS / email / push to parents</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Payment Methods Today</h4>
+          <table>
+            <tr><th>Method</th><th>UI</th><th>Real API?</th></tr>
+            <tr><td>MoMo</td><td>MTN / Airtel phone</td><td class="status-todo">No — record only</td></tr>
+            <tr><td>Card</td><td>PAN + CVV form</td><td class="status-todo">No — record only</td></tr>
+            <tr><td>Bank</td><td>Bank + account form</td><td class="status-todo">No — record only</td></tr>
+          </table>
+          <div class="highlight-box">
+            <p><strong>Today:</strong> Payment saved as PENDING in database. Demo mode can auto-confirm on poll. <strong>No money moves through a bank yet.</strong></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: APIs we have -->
+    <section class="slide">
+      <h2>APIs We Have Today</h2>
+      <h3>Public APIs (parents — no login)</h3>
+      <table>
+        <tr><th>Service</th><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>GET</td><td><code>/api/students/lookup</code></td><td>Find student</td></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>GET</td><td><code>/api/fees/student-fees</code></td><td>Fee structure & balance</td></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>GET</td><td><code>/api/circulars</code></td><td>Babyeyi fee circular</td></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>POST</td><td><code>/api/fees/payments/initiate</code></td><td>Start payment</td></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>GET</td><td><code>/api/fees/payments/:ref/status</code></td><td>Check payment status</td></tr>
+        <tr><td>WebpageBabyeyi BFF</td><td>GET</td><td><code>/api/fees/receipts/:number</code></td><td>Get receipt</td></tr>
+        <tr><td>SchoolFeesPortal</td><td>POST</td><td><code>/public/payments/initiate</code></td><td>Core payment engine</td></tr>
+        <tr><td>SchoolFeesPortal</td><td>GET</td><td><code>/public/payments/:ref/status</code></td><td>Status polling</td></tr>
+        <tr><td>BabyeyiWizard</td><td>GET</td><td><code>/public/circulars</code></td><td>Fee items + bank accounts</td></tr>
+      </table>
+    </section>
+
+    <!-- SLIDE 7: Internal APIs -->
+    <section class="slide">
+      <h2>APIs We Have — Staff & Integrations</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h4>Authenticated (school staff — JWT)</h4>
+          <ul class="bullets">
+            <li><code>GET /payments</code> — list payments</li>
+            <li><code>POST /payments</code> — record cash/bank payment</li>
+            <li><code>GET /bills</code> — student bills</li>
+            <li><code>GET /structures</code> — fee structures</li>
+            <li><code>POST /collections/fee-collection/payments</code></li>
+            <li>Installments, scholarships, reminders, reports</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Service-to-service (x-service-key)</h4>
+          <ul class="bullets">
+            <li><code>GET /service/parent-fees-summary</code></li>
+            <li><code>GET /service/parent-fees-transactions</code></li>
+            <li><code>POST /webhooks/fees</code> (ParentMIS)</li>
+          </ul>
+          <h4 style="margin-top:16px">Developer Gateway (OAuth scopes)</h4>
+          <ul class="bullets">
+            <li><code>payment.create</code> — initiate payments</li>
+            <li><code>payment.read</code> — status & receipts</li>
+            <li><code>fees.read</code> / <code>fees.write</code></li>
+            <li><code>payment.refund</code> — void receipts</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Bank APIs remaining -->
+    <section class="slide">
+      <h2>Bank / Payment APIs — Still To Build</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h4>Mobile Money</h4>
+          <ul class="bullets">
+            <li class="status-todo">MTN MoMo Request-to-Pay / STK</li>
+            <li class="status-todo">Airtel Money API</li>
+            <li class="status-todo">MoMo webhook callback</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Bank Transfer</h4>
+          <ul class="bullets">
+            <li class="status-todo">Bank of Kigali API</li>
+            <li class="status-todo">I&M / Equity / BPR APIs</li>
+            <li class="status-todo">Virtual account / bill pay ref</li>
+            <li class="status-todo">Statement reconciliation</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Card Payments</h4>
+          <ul class="bullets">
+            <li class="status-todo">PSP integration (Flutterwave, etc.)</li>
+            <li class="status-todo">Hosted payment page (PCI safe)</li>
+            <li class="status-todo">3DS / card webhook</li>
+          </ul>
+        </div>
+      </div>
+      <h3 style="margin-top:24px">New endpoints needed in SchoolFeesPortal</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Purpose</th><th>Status</th></tr>
+        <tr><td><code>POST /webhooks/payments/{provider}</code></td><td>Bank confirms payment (signed)</td><td class="status-todo">Not built</td></tr>
+        <tr><td><code>PaymentGatewayAdapter</code></td><td>Call BK / MTN / PSP on initiate</td><td class="status-todo">Not built</td></tr>
+        <tr><td><code>Payment intent token</code></td><td>Secure session after student lookup</td><td class="status-todo">Not built</td></tr>
+        <tr><td><code>Idempotency-Key</code></td><td>Prevent duplicate charges</td><td class="status-todo">Not built</td></tr>
+        <tr><td><code>Reconciliation job</code></td><td>Match bank statements to PENDING</td><td class="status-todo">Not built</td></tr>
+      </table>
+    </section>
+
+    <!-- SLIDE 9: Target architecture -->
+    <section class="slide">
+      <h2>Target Architecture (With Bank API)</h2>
+      <div class="arch"><span class="hl">Parent clicks Pay</span>
+        │
+        ▼
+<span class="hl2">SchoolFeesPortal.initiate()</span>
+        │
+        ├──► <span class="hl">PaymentGatewayAdapter</span>  (NEW)
+        │         │
+        │    ┌────┴────┬──────────┬─────────┐
+        │    ▼         ▼          ▼         ▼
+        │  <span class="hl3">BK API</span>  <span class="hl3">MTN MoMo</span>  <span class="hl3">Airtel</span>  <span class="hl3">Card PSP</span>
+        │    │         │          │         │
+        │    └────┬────┴──────────┴─────────┘
+        │         │
+        │    Parent approves on phone / bank / card page
+        │         │
+        ◄─────────┘  <span class="hl">POST /webhooks/payments/{provider}</span>  (signed)
+        │
+        ▼
+<span class="hl2">confirm()</span> → update bill → receipt → ParentMIS notify
+
+<span class="hl3">Security rules:</span>
+  • No raw card data on our servers (hosted PSP page)
+  • Only webhook marks payment COMPLETED
+  • Short-lived token after student lookup
+  • Rate limits + idempotency keys</div>
+    </section>
+
+    <!-- SLIDE 10: Roadmap -->
+    <section class="slide">
+      <h2>Roadmap & Summary</h2>
+      <div class="grid-2">
+        <div>
+          <h3 class="status-done">✓ Already built</h3>
+          <ul class="bullets">
+            <li>Full parent payment UI (MoMo, card, bank)</li>
+            <li>Fee structures, bills, receipts, QR</li>
+            <li>Babyeyi circular + school bank display</li>
+            <li>Parent notifications (SMS, email, push)</li>
+            <li>Staff collection & developer API scopes</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="status-todo">→ Next for bank integration</h3>
+          <ol class="steps" style="margin-top:0">
+            <li style="padding-left:56px"><strong>Gateway adapter</strong> <span>One interface, multiple providers</span></li>
+            <li style="padding-left:56px"><strong>Signed webhooks</strong> <span>Only path to COMPLETED</span></li>
+            <li style="padding-left:56px"><strong>Replace card forms</strong> <span>PSP hosted page</span></li>
+            <li style="padding-left:56px"><strong>MoMo STK push</strong> <span>Real phone prompt</span></li>
+            <li style="padding-left:56px"><strong>Reconciliation</strong> <span>Finance dashboard</span></li>
+          </ol>
+        </div>
+      </div>
+      <p style="margin-top:32px; font-size:1.2rem; color:var(--text); text-align:center;">
+        <strong>Bottom line:</strong> UX & backend structure are ready. Bank API layer is the missing piece to go live with real money.
+      </p>
+    </section>
+
+    <!-- SLIDE 11: Q&A -->
+    <section class="slide">
+      <div class="logo">ShulePlus</div>
+      <h1>Questions?</h1>
+      <p class="subtitle" style="margin-top:24px">School Fees Payment · babyeyi.rw · Bank Integration</p>
+      <div class="grid-3" style="margin-top:48px">
+        <div class="card"><h4>Platform</h4><p>ShulePlus multi-module SaaS for Rwandan schools</p></div>
+        <div class="card"><h4>Public site</h4><p>babyeyi.rw — school directory & parent services</p></div>
+        <div class="card"><h4>Payment core</h4><p>SchoolFeesPortal — bills, payments, receipts</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="nav">
+    <button id="prev" aria-label="Previous">← Prev</button>
+    <span class="counter" id="counter">1 / 11</span>
+    <button id="next" aria-label="Next">Next →</button>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    let i = 0;
+    function show(n) {
+      slides[i].classList.remove('active');
+      i = (n + slides.length) % slides.length;
+      slides[i].classList.add('active');
+      document.getElementById('counter').textContent = `${i + 1} / ${slides.length}`;
+    }
+    document.getElementById('next').onclick = () => show(i + 1);
+    document.getElementById('prev').onclick = () => show(i - 1);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); show(i + 1); }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(i - 1); }
+      if (e.key === 'Home') show(0);
+      if (e.key === 'End') show(slides.length - 1);
+    });
+  </script>
+</body>
+</html>

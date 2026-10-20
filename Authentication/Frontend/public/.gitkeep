@@ -1,0 +1,3 @@
+# Place your auth background image here as auth-background.jpg
+# Recommended: 1920x1080, subtle pattern or school-themed imagery
+# The login page references /auth-background.jpg in globals.css

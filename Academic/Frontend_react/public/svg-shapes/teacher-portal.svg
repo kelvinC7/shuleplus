@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="tpA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/><stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="tpN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/><stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="tpT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/><stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="18" width="48" height="28" rx="4" fill="url(#tpN)" opacity="0.9"/>
+  <rect x="12" y="22" width="40" height="20" rx="2" fill="#FFFFFF"/>
+  <rect x="16" y="26" width="18" height="3" rx="1.5" fill="url(#tpA)"/>
+  <rect x="16" y="32" width="12" height="3" rx="1.5" fill="url(#tpT)"/>
+  <circle cx="42" cy="32" r="6" fill="url(#tpA)"/>
+  <path d="M22 46 H42 L48 54 H16 Z" fill="url(#tpN)"/>
+  <circle cx="32" cy="14" r="7" fill="url(#tpT)"/>
+</svg>

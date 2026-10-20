@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/>
+      <stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="10" width="40" height="44" rx="4" fill="url(#gN)" opacity="0.9"/>
+  <rect x="16" y="14" width="32" height="36" rx="2" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M22 22 H42" stroke="url(#gA)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M22 30 H38" stroke="url(#gT)" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 38 H34" stroke="url(#gN)" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="44" cy="46" r="10" fill="url(#gA)" opacity="0.95"/>
+  <path d="M44 41 V51 M39 46 H49" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

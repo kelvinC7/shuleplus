@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id               String   @id @default(cuid())
+  organizationId   String   @unique
+  organizationCode String?
+  organizationName String
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model OrgPolicy {
+  id                     String   @id @default(cuid())
+  organizationId         String   @unique
+  maxAdvancePercent      Int      @default(50)
+  defaultRepaymentPeriod Int      @default(3)
+  minEmploymentMonths    Int      @default(6)
+  waitingPeriodDays      Int      @default(30)
+  maxActiveAdvances      Int      @default(1)
+  autoApprove            Boolean  @default(false)
+  requireManagerApproval Boolean  @default(true)
+  requireFinanceApproval Boolean  @default(true)
+  requireDocuments       Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Employee {
+  id                    String             @id @default(cuid())
+  iamUserId             String?            @unique
+  organizationId        String?
+  employeeCode          String             @unique
+  email                 String             @unique
+  passwordHash          String?
+  fullName              String
+  department            String
+  position              String
+  phone                 String?
+  companyName           String
+  employmentStatus      String
+  yearsOfService        Int
+  photoUrl              String?
+  verificationStatus    String             @default("Pending")
+  profileCompletion     Int                @default(0)
+  creditScore           Int                @default(650)
+  riskLevel             String             @default("Medium")
+  netSalary             Int                @default(0)
+  grossSalary           Int                @default(0)
+  taxAmount             Int                @default(0)
+  eligibilityStatus     String             @default("Eligible")
+  allowAdvance          Boolean            @default(true)
+  maxAdvanceAmount      Int?
+  maxSalaryPercent      Int                @default(50)
+  maxActiveAdvances     Int                @default(1)
+  repaymentPeriodMonths Int                @default(3)
+  waitingPeriodDays     Int                @default(30)
+  requireDocuments      Boolean            @default(false)
+  directorySources      String             @default("")
+  salarySource          String             @default("missing")
+  salaryUpdatedAt       DateTime?
+  salaryUpdateReason    String?
+  allowances            Int                @default(0)
+  deductions            Int                @default(0)
+  hireDate              DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  lastLoginAt           DateTime?
+  documents             EmployeeDocument[]
+  advances              AdvanceRequest[]
+  payrollRecords        PayrollRecord[]
+  repayments            AdvanceRepayment[]
+}
+
+model PayrollRecord {
+  id          String   @id @default(cuid())
+  employeeId  String
+  monthLabel  String
+  grossSalary Int
+  taxAmount   Int
+  deductions  Int
+  netSalary   Int
+  allowances  Int      @default(0)
+  payrollDate DateTime
+  source      String   @default("payroll-service")
+  status      String   @default("Approved")
+  reason      String?
+  createdAt   DateTime @default(now())
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model EmployeeDocument {
+  id           String   @id @default(cuid())
+  employeeId   String
+  category     String
+  originalName String
+  filePath     String
+  mimeType     String
+  sizeBytes    Int
+  uploadedAt   DateTime @default(now())
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model AdvanceRequest {
+  id                String             @id @default(cuid())
+  requestNumber     String             @unique
+  employeeId        String
+  amount            Int
+  repaymentMonths   Int
+  purpose           String
+  description       String?
+  signature         String?
+  signatureFile     String?
+  signatureMimeType String?
+  status            String             @default("Pending")
+  remainingBalance  Int?
+  monthlyDeduction  Int?
+  approvedAt        DateTime?
+  disbursedAt       DateTime?
+  rejectedAt        DateTime?
+  reviewComment     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  employee          Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  repayments        AdvanceRepayment[]
+}
+
+model AdvanceRepayment {
+  id                String         @id @default(cuid())
+  advanceRequestId  String
+  employeeId        String
+  installmentNumber Int
+  amount            Int
+  dueDate           DateTime
+  paidAmount        Int            @default(0)
+  paidAt            DateTime?
+  status            String         @default("Pending")
+  advanceRequest    AdvanceRequest @relation(fields: [advanceRequestId], references: [id], onDelete: Cascade)
+  employee          Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userEmail      String
+  action         String
+  target         String
+  createdAt      DateTime @default(now())
+}

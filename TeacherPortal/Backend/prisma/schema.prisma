@@ -1,0 +1,368 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ShuleAvanceCatalogType {
+  cashout
+  service
+}
+
+enum ShuleAvanceRequestType {
+  cashout
+  service
+}
+
+enum ShuleAvanceRequestStatus {
+  pending_accountant
+  sent_to_manager
+  approved
+  rejected_by_accountant
+  rejected_by_manager
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  shuleAvanceMaxPercent Int     @default(25) @map("shule_avance_max_percent")
+  payrollModuleEnabled Boolean  @default(false) @map("payroll_module_enabled")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  catalogItems     ShuleAvanceCatalogItem[]
+  advanceRequests  ShuleAvanceRequest[]
+  payrollSnapshots StaffPayrollSnapshot[]
+  avanceApprovers  ShuleAvanceApprover[]
+  activityLogs     ActivityLog[]
+
+  @@map("tenants")
+}
+
+model UserCache {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([organizationId, userId])
+  @@map("users_cache")
+}
+
+model ShuleAvanceCatalogItem {
+  id             String                 @id @default(uuid())
+  organizationId String                 @map("organization_id")
+  slug           String
+  name           String
+  type           ShuleAvanceCatalogType
+  description    String?
+  icon           String?
+  interestRateBps Int?                  @map("interest_rate_bps")
+  isActive       Boolean                @default(true) @map("is_active")
+  sortOrder      Int                    @default(0) @map("sort_order")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("shule_avance_catalog")
+}
+
+model ShuleAvanceRequest {
+  id                       String                   @id @default(uuid())
+  organizationId           String                   @map("organization_id")
+  userId                   String                   @map("user_id")
+  requestType              ShuleAvanceRequestType   @map("request_type")
+  serviceCategory          String?                  @map("service_category")
+  status                   ShuleAvanceRequestStatus @default(sent_to_manager)
+  amountRwf                Int                      @map("amount_rwf")
+  repaymentTermMonths      Int                      @map("repayment_term_months")
+  reason                   String?
+  autoApproved             Boolean                  @default(false) @map("auto_approved")
+  netSalaryBaselineRwf     Int?                     @map("net_salary_baseline_rwf")
+  monthlyRequestedTotalRwf Int?                     @map("monthly_requested_total_rwf")
+  servicePayload           Json                     @default("{}") @map("service_payload")
+  metadata                 Json                     @default("{}")
+  managerNote              String?                  @map("manager_note")
+  createdAt                DateTime                 @default(now()) @map("created_at")
+  updatedAt                DateTime                 @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId, userId])
+  @@index([organizationId, status])
+  @@map("shule_avance_requests")
+}
+
+model StaffPayrollSnapshot {
+  id                   String   @id @default(uuid())
+  organizationId       String   @map("organization_id")
+  userId               String   @map("user_id")
+  employeeNumber       String?  @map("employee_number")
+  displayName          String?  @map("display_name")
+  netSalaryRwf         Int      @map("net_salary_rwf")
+  tichaAvanceEligible  Boolean  @default(false) @map("ticha_avance_eligible")
+  syncSource           String?  @map("sync_source")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, userId])
+  @@map("staff_payroll_snapshots")
+}
+
+model ShuleAvanceApprover {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  role           String
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, userId, role])
+  @@index([organizationId, role])
+  @@map("shule_avance_approvers")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  action         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@map("activity_logs")
+}
+
+enum RollCallStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum RollCallRepeatRule {
+  ONCE
+  EVERY_SCHOOL_DAY
+  EVERY_MONDAY
+  EVERY_WEEK
+  CUSTOM
+}
+
+model RollCallSession {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  teacherUserId  String           @map("teacher_user_id")
+  teacherName    String           @map("teacher_name")
+  name           String
+  classId        String?          @map("class_id")
+  className      String           @map("class_name")
+  classLabel     String?          @map("class_label")
+  sessionDate    DateTime         @map("session_date") @db.Date
+  startTime      String?          @map("start_time")
+  attendanceType String           @default("general") @map("attendance_type")
+  academicYear   String?          @map("academic_year")
+  term           String?          @map("term")
+  status         RollCallStatus   @default(DRAFT)
+  sessionNotes   String?          @map("session_notes")
+  completedAt    DateTime?        @map("completed_at")
+  reference      String?
+  repeatRule     RollCallRepeatRule @default(ONCE) @map("repeat_rule")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  rows RollCallAttendanceRow[]
+
+  @@index([organizationId, sessionDate])
+  @@index([organizationId, teacherUserId])
+  @@index([organizationId, status])
+  @@map("roll_call_sessions")
+}
+
+model RollCallAttendanceRow {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  sessionId      String    @map("session_id")
+  studentCode    String    @map("student_code")
+  fullName       String    @map("full_name")
+  rollNumber     String?   @map("roll_number")
+  photoUrl       String?   @map("photo_url")
+  gender         String?
+  status         String    @default("UNMARKED")
+  reason         String?
+  arrivalTime    String?   @map("arrival_time")
+  notes          String?
+  markedAt       DateTime? @map("marked_at")
+
+  session RollCallSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentCode])
+  @@index([organizationId, sessionId])
+  @@map("roll_call_attendance_rows")
+}
+
+model RollCallTemplate {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  defaultTime    String?  @map("default_time")
+  attendanceType String   @default("general") @map("attendance_type")
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("roll_call_templates")
+}
+
+enum TeacherPermissionStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TeacherPermissionRequest {
+  id             String                  @id @default(uuid())
+  organizationId String                  @map("organization_id")
+  userId         String                  @map("user_id")
+  reference      String
+  permissionType String                  @map("permission_type")
+  startDate      DateTime                @map("start_date") @db.Date
+  endDate        DateTime                @map("end_date") @db.Date
+  startTime      String?                 @map("start_time")
+  endTime        String?                 @map("end_time")
+  reason         String
+  details        String?
+  attachmentName String?                 @map("attachment_name")
+  status         TeacherPermissionStatus @default(PENDING)
+  timeline       Json                    @default("[]")
+  rejectReason   String?                 @map("reject_reason")
+  academicYear   String?                 @map("academic_year")
+  term           String?                 @map("term")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  @@index([organizationId, userId])
+  @@index([organizationId, status])
+  @@map("teacher_permission_requests")
+}
+
+model TeacherAttendanceCorrection {
+  id              String                   @id @default(uuid())
+  organizationId  String                   @map("organization_id")
+  userId          String                   @map("user_id")
+  attendanceDate  DateTime                 @map("attendance_date") @db.Date
+  correctionType  String                   @map("correction_type")
+  expectedTime    String?                  @map("expected_time")
+  reason          String
+  status          AttendanceCorrectionStatus @default(PENDING)
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+
+  @@index([organizationId, userId])
+  @@map("teacher_attendance_corrections")
+}
+
+model SchoolCalendarEvent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  title          String
+  eventType      String   @map("event_type")
+  startDate      DateTime @map("start_date") @db.Date
+  endDate        DateTime @map("end_date") @db.Date
+  startTime      String?  @map("start_time")
+  endTime        String?  @map("end_time")
+  location       String?
+  description    String?
+  organizer      String?
+  participants   String?
+  academicYear   String?  @map("academic_year")
+  term           String?  @map("term")
+  allDay         Boolean  @default(false) @map("all_day")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId, startDate])
+  @@map("school_calendar_events")
+}
+
+enum ClassAttendanceStatus {
+  DRAFT
+  COMPLETED
+}
+
+model ClassAttendanceSession {
+  id             String                @id @default(uuid())
+  organizationId String                @map("organization_id")
+  teacherUserId  String                @map("teacher_user_id")
+  teacherName    String                @map("teacher_name")
+  classId        String                @map("class_id")
+  className      String                @map("class_name")
+  classLabel     String?               @map("class_label")
+  sessionDate    DateTime              @map("session_date") @db.Date
+  academicYear   String                @map("academic_year")
+  term           String                @map("term")
+  status         ClassAttendanceStatus @default(DRAFT)
+  sessionNotes   String?               @map("session_notes")
+  completedAt    DateTime?             @map("completed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  rows ClassAttendanceRow[]
+
+  @@unique([organizationId, classId, sessionDate, term, academicYear])
+  @@index([organizationId, teacherUserId])
+  @@index([organizationId, classId])
+  @@map("class_attendance_sessions")
+}
+
+model ClassAttendanceRow {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  sessionId      String    @map("session_id")
+  studentId      String?   @map("student_id")
+  studentCode    String    @map("student_code")
+  fullName       String    @map("full_name")
+  rollNumber     String?   @map("roll_number")
+  status         String    @default("UNMARKED")
+  notes          String?
+  markedAt       DateTime? @map("marked_at")
+
+  session ClassAttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentCode])
+  @@index([organizationId, sessionId])
+  @@map("class_attendance_rows")
+}

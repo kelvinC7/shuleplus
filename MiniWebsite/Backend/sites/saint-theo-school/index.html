@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Saint Theo School | Official School Website</title>
+<meta name="description" content="Saint Theo School is a private school in Gasabo, Kigali, offering Nursery, Primary and Secondary education with a strong focus on academic excellence and character formation." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --p: #001121;
+  --a: #FBBF24;
+  --a2: #F59E0B;
+  --ink: #1F2937;
+  --ink2: #111827;
+  --cream: #F8F7F4;
+  --muted: #6B7280;
+  --line: #E8E4DC;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Montserrat', sans-serif; color: var(--ink); background: #fff; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; }
+button { font-family: inherit; cursor: pointer; }
+a { text-decoration: none; color: inherit; }
+svg { display: inline-block; flex-shrink: 0; }
+.container { width: min(1280px, 100%); margin: 0 auto; padding: 0 1.25rem; }
+@media (min-width: 640px) { .container { padding: 0 2rem; } }
+
+/* ── NAVBAR ─────────────────────────────────────────── */
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; background: var(--p); box-shadow: 0 2px 16px rgba(0,0,0,0.15); }
+.nav-inner { max-width: 1280px; margin: 0 auto; padding: 0.55rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; }
+.nav-logo { width: 44px; height: 44px; border-radius: 0.75rem; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); border: 2px solid rgba(251,191,36,0.35); text-decoration: none; }
+.nav-logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+.nav-logo span { font-weight: 900; font-size: 0.95rem; color: #fff; }
+.nav-links { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.nav-link { color: rgba(255,255,255,0.88); font-size: 0.7rem; font-weight: 700; padding: 0.45rem 0.75rem; border-radius: 0.6rem; transition: all 0.2s; }
+.nav-link:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.nav-link.active { background: var(--a); color: var(--ink); }
+.nav-apply { display: inline-flex; align-items: center; gap: 0.35rem; background: var(--a); color: var(--ink); font-weight: 900; font-size: 0.72rem; padding: 0.55rem 0.9rem; border-radius: 0.6rem; transition: transform 0.15s; white-space: nowrap; }
+.nav-apply:hover { transform: scale(1.04); }
+.nav-burger { display: none; width: 40px; height: 40px; border-radius: 0.75rem; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); color: #fff; border: 0; }
+.nav-spacer { height: 62px; }
+
+/* ── MOBILE DRAWER ──────────────────────────────────── */
+.drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 280px; z-index: 400; background: var(--ink); transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; }
+.drawer.open { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.4); }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 1.3rem 1.2rem 1rem; border-bottom: 1px solid rgba(251,191,36,0.15); }
+.drawer-name { color: #fff; font-weight: 800; font-size: 0.95rem; }
+.drawer-close { width: 38px; height: 38px; border-radius: 0.75rem; background: rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; border: 0; }
+.drawer-nav { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.drawer-link { display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem 1rem; border-radius: 0.9rem; font-size: 0.9rem; font-weight: 700; color: rgba(255,255,255,0.75); transition: all 0.2s; }
+.drawer-link svg { color: var(--a); }
+.drawer-link:hover, .drawer-link.active { background: var(--a); color: var(--ink); }
+.drawer-link:hover svg, .drawer-link.active svg { color: var(--ink); }
+.drawer-cta { padding: 1rem; border-top: 1px solid rgba(251,191,36,0.12); }
+.drawer-overlay { position: fixed; inset: 0; z-index: 350; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+/* ── HERO ───────────────────────────────────────────── */
+.hero { position: relative; min-height: min(92vh, 780px); display: flex; align-items: flex-end; overflow: hidden; }
+.hero-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero-grad { position: absolute; inset: 0; background: linear-gradient(135deg, #111827 0%, var(--p) 100%); }
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(15,20,30,0.95) 0%, rgba(15,20,30,0.8) 20%, rgba(15,20,30,0.55) 42%, rgba(15,20,30,0.25) 70%, rgba(15,20,30,0.06) 90%, transparent 100%); }
+.hero-overlay-bottom { position: absolute; inset: 0; background: linear-gradient(to top, rgba(15,20,30,0.9) 25%, rgba(15,20,30,0.3) 60%, rgba(0,0,0,0.05) 100%); }
+.hero-amber-line { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, transparent, var(--a), transparent); }
+.hero-inner { position: relative; z-index: 5; width: min(1280px, 100%); margin: 0 auto; padding: 5rem 1.25rem 5rem; }
+@media (min-width: 640px) { .hero-inner { padding: 6rem 2rem 5.5rem; } }
+.hero-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.95rem; border-radius: 999px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--a); background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); margin-bottom: 0.9rem; }
+.hero-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--a); animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+.hand-kicker { font-family: 'Caveat','Kalam','Patrick Hand',cursive; font-style: italic; font-weight: 700; font-size: clamp(1.9rem, 3.2vw, 2.6rem); color: var(--a); letter-spacing: -0.03em; text-shadow: 0 2px 14px rgba(0,0,0,0.35); display: inline-block; margin-bottom: 0.35rem; }
+.kicker-underline { display: block; width: 135px; height: 14px; }
+.hero-title-row { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.1rem; }
+.hero-logo { width: clamp(72px, 9vw, 100px); height: clamp(72px, 9vw, 100px); border-radius: 1rem; background: #fff; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); border: 4px solid rgba(255,255,255,0.35); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.hero-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.hero-name { font-size: clamp(1.7rem, 4vw, 3rem); font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -0.02em; }
+.hero-sub { color: rgba(255,255,255,0.85); font-size: 1rem; line-height: 1.65; max-width: 42rem; margin-bottom: 1.2rem; }
+.hero-pills { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-bottom: 1.5rem; }
+.pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); color: rgba(255,255,255,0.85); }
+.pill svg { color: var(--a); }
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.85rem 1.4rem; border-radius: 1rem; font-weight: 900; font-size: 0.82rem; transition: all 0.2s; }
+.btn-amber { background: var(--a); color: var(--ink); box-shadow: 0 8px 30px rgba(251,191,36,0.4); }
+.btn-amber:hover { transform: scale(1.04); }
+.btn-ghost { border: 2px solid rgba(255,255,255,0.3); color: #fff; }
+.btn-ghost:hover { background: rgba(255,255,255,0.1); }
+.hero-scroll { position: absolute; bottom: 1.4rem; left: 50%; transform: translateX(-50%); color: #fff; opacity: 0.5; animation: bounce 2s infinite; }
+@keyframes bounce { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,8px); } }
+
+/* ── STATS ──────────────────────────────────────────── */
+.stats { background: var(--ink); padding: 2.2rem 0; }
+.stats-inner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.4rem; }
+.stat { text-align: center; }
+.stat-value { font-weight: 900; font-size: clamp(1.6rem, 3vw, 2.2rem); color: var(--a); }
+.stat-label { font-size: 0.72rem; color: rgba(255,255,255,0.55); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.25rem; }
+
+/* ── SECTIONS ───────────────────────────────────────── */
+section { scroll-margin-top: 70px; }
+.section { padding: 5rem 0; }
+.sec-white { background: #fff; }
+.sec-cream { background: var(--cream); }
+.sec-head { text-align: center; margin-bottom: 3rem; }
+.eyebrow { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: var(--a); margin-bottom: 0.9rem; }
+.eyebrow::before, .eyebrow::after { content: ''; width: 24px; height: 1px; background: var(--a); }
+.sec-title { font-size: clamp(1.7rem, 3.4vw, 2.6rem); font-weight: 900; color: var(--ink); line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 0.6rem; }
+.sec-sub { color: var(--muted); font-size: 0.95rem; max-width: 36rem; margin: 0 auto; line-height: 1.6; }
+
+/* ── ABOUT ──────────────────────────────────────────── */
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+.about-eyebrow { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: var(--a); margin-bottom: 1.1rem; }
+.about-eyebrow::before { content: ''; width: 24px; height: 1px; background: var(--a); }
+.about-title { font-size: clamp(1.8rem, 3.6vw, 2.8rem); font-weight: 900; color: var(--ink); line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 1.2rem; }
+.hand-accent { font-family: 'Caveat','Kalam','Patrick Hand',cursive; font-style: italic; font-weight: 700; color: var(--a); letter-spacing: -0.03em; text-shadow: 0 2px 14px rgba(0,0,0,0.18); position: relative; white-space: nowrap; }
+.hand-accent svg { position: absolute; left: 0; bottom: -8px; width: 100%; height: 14px; }
+.about-text { color: var(--muted); font-size: 0.95rem; line-height: 1.7; margin-bottom: 1.4rem; white-space: pre-line; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
+.tag { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 700; background: rgba(251,191,36,0.1); color: var(--ink); border: 1px solid rgba(251,191,36,0.25); }
+.tag svg { color: var(--a); }
+.about-media { position: relative; }
+.about-media > img { width: 100%; height: 380px; object-fit: cover; border-radius: 1.5rem; box-shadow: 0 24px 60px rgba(0,0,0,0.2); position: relative; z-index: 1; }
+.about-block-amber { position: absolute; bottom: -1rem; right: -1rem; width: 6rem; height: 6rem; border-radius: 1.5rem; background: rgba(251,191,36,0.25); }
+.about-block-navy { position: absolute; top: -1rem; left: -1rem; width: 4rem; height: 4rem; border-radius: 1rem; background: var(--ink); opacity: 0.15; }
+.about-fallback { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.af-tile { border-radius: 1.5rem; padding: 2.2rem 1.5rem; display: flex; flex-direction: column; align-items: center; text-align: center; transition: transform 0.25s; }
+.af-tile:hover { transform: scale(1.04); }
+.af-tile span { font-size: 0.75rem; font-weight: 900; margin-top: 0.9rem; }
+.af-tile:nth-child(odd) { background: var(--ink); }
+.af-tile:nth-child(odd) svg { color: var(--a); }
+.af-tile:nth-child(odd) span { color: #fff; }
+.af-tile:nth-child(even) { background: rgba(251,191,36,0.08); margin-top: 2rem; }
+.af-tile:nth-child(even) svg { color: var(--ink); }
+.af-tile:nth-child(even) span { color: var(--ink); }
+
+/* ── MISSION & VISION ───────────────────────────────── */
+.mission-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+.m-card { border-radius: 1.5rem; padding: 2.2rem; position: relative; overflow: hidden; }
+.m-card-dark { background: var(--ink); }
+.m-card-dark h3 { color: #fff; }
+.m-card-dark .m-text { color: rgba(255,255,255,0.6); }
+.m-card-light { background: #fff; border: 2px solid rgba(251,191,36,0.3); }
+.m-card-light h3 { color: var(--ink); }
+.m-card-light .m-text { color: var(--muted); }
+.m-icon { width: 52px; height: 52px; border-radius: 1rem; display: flex; align-items: center; justify-content: center; background: rgba(251,191,36,0.15); color: var(--a); margin-bottom: 1.1rem; }
+.m-title { font-size: 1.5rem; font-weight: 900; margin-bottom: 0.8rem; }
+.m-text { font-size: 0.95rem; line-height: 1.7; position: relative; z-index: 1; }
+.m-orb { position: absolute; top: 0; right: 0; width: 12rem; height: 12rem; border-radius: 50%; opacity: 0.06; transform: translate(50%, -50%); }
+.m-orb-dark { background: var(--a); }
+.m-orb-navy { background: var(--ink); }
+
+/* ── PROGRAMS ───────────────────────────────────────── */
+.programs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+.program-card { border-radius: 1.5rem; padding: 1.8rem 1.5rem; text-align: center; border: 2px solid transparent; transition: all 0.25s; }
+.program-card:hover { transform: scale(1.04); box-shadow: 0 18px 40px rgba(0,0,0,0.08); }
+.pc-dark { background: var(--ink); }
+.pc-dark h3 { color: #fff; }
+.pc-dark p { color: rgba(255,255,255,0.5); }
+.pc-amber { background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.25); }
+.pc-amber h3 { color: var(--ink); }
+.pc-amber p { color: var(--muted); }
+.pc-light { background: var(--cream); }
+.pc-light h3 { color: var(--ink); }
+.pc-light p { color: var(--muted); }
+.pc-icon { width: 52px; height: 52px; border-radius: 1rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-weight: 900; font-size: 1.15rem; }
+.program-card h3 { font-size: 1rem; font-weight: 900; margin-bottom: 0.5rem; }
+.program-card p { font-size: 0.82rem; line-height: 1.6; }
+
+/* ── NEWS ───────────────────────────────────────────── */
+.news-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+.news-card { text-align: left; width: 100%; background: #FDFCFA; border: 1px solid var(--line); border-radius: 1rem; padding: 1.4rem; transition: all 0.3s; }
+.news-card:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.08); border-color: rgba(251,191,36,0.5); transform: translateY(-2px); }
+.news-date { display: flex; align-items: center; gap: 0.45rem; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--a); margin-bottom: 0.6rem; }
+.news-card h3 { font-size: 0.95rem; font-weight: 900; color: var(--ink); line-height: 1.35; margin-bottom: 0.5rem; }
+.news-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.6; }
+.news-more { display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.7rem; font-size: 0.75rem; font-weight: 900; color: var(--p); }
+.news-more svg { color: var(--p); }
+
+/* ── MODAL ──────────────────────────────────────────── */
+.modal { position: fixed; inset: 0; z-index: 300; display: none; align-items: center; justify-content: center; padding: 1.25rem; }
+.modal.open { display: flex; }
+.modal-back { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+.modal-box { position: relative; z-index: 2; width: min(560px, 100%); max-height: 90vh; display: flex; flex-direction: column; border-radius: 1.5rem; overflow: hidden; background: linear-gradient(165deg, #1F2937 0%, #111827 100%); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.modal-date { font-size: 0.68rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--a); margin-bottom: 0.3rem; }
+.modal-title { font-size: 1.05rem; font-weight: 900; color: #fff; line-height: 1.3; }
+.modal-close { background: rgba(255,255,255,0.08); border: 0; border-radius: 0.7rem; padding: 0.5rem; color: #fff; display: flex; flex-shrink: 0; }
+.modal-close:hover { background: rgba(255,255,255,0.16); }
+.modal-body { overflow-y: auto; padding: 1.2rem 1.2rem; color: rgba(255,255,255,0.85); font-size: 0.9rem; line-height: 1.7; white-space: pre-wrap; }
+.modal-foot { padding: 1rem 1.2rem; border-top: 1px solid rgba(255,255,255,0.1); }
+.modal-foot .btn-amber { width: 100%; justify-content: center; }
+
+/* ── GALLERY ────────────────────────────────────────── */
+.gallery-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.9rem; }
+.gallery-item { aspect-ratio: 1; border: 0; padding: 0; border-radius: 1rem; overflow: hidden; background-size: cover; background-position: center; cursor: zoom-in; transition: transform 0.25s; }
+.gallery-item:hover { transform: scale(1.02); box-shadow: 0 18px 40px rgba(0,0,0,0.12); }
+.lightbox { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.96); display: none; flex-direction: column; }
+.lightbox.open { display: flex; }
+.lb-top { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.2rem; }
+.lb-count { color: rgba(255,255,255,0.4); font-size: 0.75rem; font-family: monospace; }
+.lb-close { width: 40px; height: 40px; border-radius: 0.75rem; background: rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; border: 0; }
+.lb-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1rem; position: relative; min-height: 0; }
+.lb-stage img { max-height: 72vh; max-width: 100%; object-fit: contain; border-radius: 1rem; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 1rem; background: rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; border: 0; }
+.lb-nav:hover { background: rgba(255,255,255,0.16); }
+.lb-prev { left: 0.75rem; }
+.lb-next { right: 0.75rem; }
+.lb-thumbs { display: flex; gap: 0.5rem; justify-content: center; padding: 0 1rem 1rem; flex-wrap: wrap; }
+.lb-thumb { width: 48px; height: 48px; border-radius: 0.7rem; overflow: hidden; border: 2px solid transparent; opacity: 0.4; background-size: cover; background-position: center; transition: all 0.2s; }
+.lb-thumb.active { border-color: var(--a); opacity: 1; transform: scale(1.08); }
+
+/* ── ADMISSIONS ─────────────────────────────────────── */
+.adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+.adm-note { background: var(--cream); border: 2px solid rgba(251,191,36,0.25); border-radius: 1.5rem; padding: 1.6rem; color: var(--muted); font-size: 0.9rem; line-height: 1.7; }
+.adm-note p { margin-bottom: 0.8rem; }
+.adm-steps { list-style: none; margin-top: 1.1rem; }
+.adm-steps li { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.8rem; font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.adm-step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--a); color: var(--ink); font-weight: 900; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.form-card { background: #fff; border-radius: 1.5rem; overflow: hidden; box-shadow: 0 24px 60px rgba(17,24,39,0.1); border: 1px solid #f1f1f1; }
+.form-head { background: var(--ink); padding: 1.2rem 1.4rem; display: flex; align-items: center; gap: 0.8rem; }
+.form-head-icon { width: 42px; height: 42px; border-radius: 1rem; background: rgba(251,191,36,0.2); color: var(--a); display: flex; align-items: center; justify-content: center; }
+.form-head h3 { color: #fff; font-size: 1rem; font-weight: 900; }
+.form-body { padding: 1.5rem; display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+.form-body .full { grid-column: 1 / -1; }
+.f-label { display: block; font-size: 0.68rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #92620a; margin-bottom: 0.4rem; }
+.f-input { width: 100%; padding: 0.7rem 0.9rem; border-radius: 0.8rem; border: 2px solid #E5E0D0; background: #F9F8F5; font-size: 0.85rem; font-family: inherit; font-weight: 500; color: var(--ink); outline: none; transition: all 0.2s; }
+.f-input:focus { border-color: var(--a); box-shadow: 0 0 0 3px rgba(251,191,36,0.15); }
+select.f-input { appearance: none; }
+textarea.f-input { resize: vertical; min-height: 80px; }
+.form-submit { grid-column: 1 / -1; justify-content: center; width: 100%; border: 0; }
+.form-message { grid-column: 1 / -1; font-size: 0.85rem; font-weight: 600; min-height: 1.2em; }
+
+/* ── CONTACT ────────────────────────────────────────── */
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.contact-list { display: flex; flex-direction: column; gap: 0.8rem; }
+.contact-item { display: flex; gap: 1rem; padding: 1.2rem; border-radius: 1rem; background: #fff; border: 1px solid #F0ECE0; transition: all 0.2s; }
+.contact-item:hover { box-shadow: 0 10px 30px rgba(0,0,0,0.06); border-color: rgba(251,191,36,0.4); }
+.contact-ic { width: 44px; height: 44px; border-radius: 1rem; background: rgba(251,191,36,0.1); color: var(--a); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.contact-label { font-size: 0.68rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; color: #9CA3AF; margin-bottom: 0.2rem; }
+.contact-val { font-size: 0.9rem; font-weight: 600; color: var(--ink); word-break: break-word; }
+.map-card { border-radius: 1.5rem; border: 1px solid #E5E7EB; background: var(--cream); min-height: 280px; display: flex; align-items: center; justify-content: center; }
+.map-inner { text-align: center; padding: 2rem; }
+.map-icon { width: 80px; height: 80px; border-radius: 1.5rem; background: var(--ink); color: var(--a); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; box-shadow: 0 14px 40px rgba(0,0,0,0.2); }
+.map-title { font-weight: 900; color: var(--ink); font-size: 1.1rem; }
+.map-sub { color: #9CA3AF; font-size: 0.85rem; margin-top: 0.25rem; }
+
+/* ── FOOTER ─────────────────────────────────────────── */
+.footer { background: var(--ink); color: rgba(255,255,255,0.6); padding: 2.6rem 0 1.4rem; }
+.footer-top { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.6rem; }
+.footer-brand { display: flex; align-items: center; gap: 0.9rem; }
+.footer-logo { width: 48px; height: 48px; border-radius: 1rem; border: 2px solid rgba(251,191,36,0.3); background: rgba(251,191,36,0.15); color: var(--a); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; overflow: hidden; flex-shrink: 0; }
+.footer-logo img { width: 100%; height: 100%; object-fit: cover; }
+.footer-name { color: #fff; font-weight: 900; font-size: 1.05rem; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 1.1rem; }
+.footer-links a { color: rgba(255,255,255,0.55); font-size: 0.8rem; }
+.footer-links a:hover { color: var(--a); }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.1rem; text-align: center; font-size: 0.75rem; color: rgba(255,255,255,0.35); }
+.powered { color: var(--a); font-weight: 800; }
+
+/* ── CUSTOM PAGES ───────────────────────────────────── */
+.site-page { background: #fff; }
+.page-card { background: var(--cream); border: 1px solid #EDE8DC; border-radius: 1.5rem; padding: 2rem; color: var(--muted); line-height: 1.7; font-size: 0.9rem; }
+.page-card img { border-radius: 1rem; margin: 1rem 0; max-width: 100%; }
+.page-card h2, .page-card h3, .page-card h4 { color: var(--ink); margin: 1.2rem 0 0.5rem; }
+
+/* ── CIRCULARS ─────────────────────────────────────── */
+.circ-launch-section { padding: 2.5rem 0; }
+.circ-launch-card { display: grid; grid-template-columns: auto 1fr auto; gap: 1.25rem 1.5rem; align-items: center; background: linear-gradient(135deg, #fff 0%, #faf7f0 55%, #fff8eb 100%); border: 1px solid #EDE8DC; border-radius: 1.35rem; padding: 1.75rem 2rem; box-shadow: 0 20px 50px rgba(15,23,42,0.07); }
+.circ-launch-icon { width: 64px; height: 64px; border-radius: 1rem; display: flex; align-items: center; justify-content: center; background: var(--p); color: var(--a); box-shadow: 0 10px 24px rgba(0,17,33,0.18); }
+.circ-launch-tag { display: inline-block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--a); margin-bottom: 0.35rem; }
+.circ-launch-title { margin: 0; font-size: clamp(1.25rem, 2.5vw, 1.55rem); font-weight: 900; color: var(--ink); line-height: 1.2; }
+.circ-launch-desc { margin: 0.45rem 0 0; font-size: 0.88rem; color: var(--muted); line-height: 1.55; max-width: 42rem; }
+.circ-launch-btn { min-width: 200px; justify-content: center; font-size: 0.88rem; padding: 0.9rem 1.35rem; box-shadow: 0 10px 24px rgba(251,191,36,0.35); white-space: nowrap; }
+@media (max-width: 768px) {
+  .circ-launch-card { grid-template-columns: 1fr; text-align: center; }
+  .circ-launch-icon { margin: 0 auto; }
+  .circ-launch-btn { width: 100%; }
+}
+.circ-doc-modal { position: fixed; inset: 0; z-index: 450; display: none; align-items: center; justify-content: center; padding: 1rem; }
+.circ-doc-modal.open { display: flex; }
+.circ-doc-panel { position: relative; z-index: 2; width: min(920px, 100%); height: min(90vh, 820px); display: flex; flex-direction: column; background: #fff; border-radius: 1.25rem; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.12); }
+.circ-doc-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; padding: 1rem 1.25rem; border-bottom: 1px solid #EDE8DC; background: linear-gradient(180deg, #faf7f0 0%, #fff 100%); }
+.circ-doc-actions { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+.circ-doc-frame-wrap { flex: 1; min-height: 0; background: #f8fafc; }
+.circ-doc-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.circ-modal { position: fixed; inset: 0; z-index: 400; display: none; align-items: center; justify-content: center; padding: 1rem; }
+.circ-modal.open { display: flex; }
+.circ-modal-back { position: absolute; inset: 0; background: rgba(15,23,42,0.72); backdrop-filter: blur(6px); }
+.circ-modal-panel { position: relative; z-index: 2; width: min(980px, 100%); max-height: min(88vh, 900px); display: flex; flex-direction: column; background: #fff; border-radius: 1.25rem; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.12); }
+.circ-modal-head { display: flex; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #EDE8DC; background: linear-gradient(180deg, #faf7f0 0%, #fff 100%); }
+.circ-modal-kicker { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--a); margin: 0 0 0.25rem; }
+.circ-modal-title { margin: 0; font-size: 1.35rem; font-weight: 900; color: var(--ink); }
+.circ-modal-sub { margin: 0.35rem 0 0; font-size: 0.82rem; color: var(--muted); }
+.circ-modal-close { width: 40px; height: 40px; border: 1px solid #EDE8DC; border-radius: 0.75rem; background: #fff; color: var(--ink); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; }
+.circ-modal-close:hover { background: #f8fafc; }
+.circ-modal-toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.circ-modal-body { flex: 1; overflow: auto; padding: 1.25rem 1.5rem 1.5rem; }
+.circ-toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; justify-content: space-between; margin-bottom: 1.5rem; }
+.circ-filters { display: flex; flex-wrap: wrap; gap: 1rem; }
+.circ-filter { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.circ-select { min-width: 160px; padding: 0.55rem 0.75rem; border: 1px solid #EDE8DC; border-radius: 0.65rem; background: #fff; font: inherit; color: var(--ink); }
+.circ-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.circ-card { background: #fff; border: 1px solid #e8edf5; border-radius: 1rem; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.65rem; box-shadow: 0 10px 30px rgba(15,23,42,0.05); transition: transform .15s, box-shadow .15s, border-color .15s; }
+.circ-card:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(15,23,42,0.1); border-color: rgba(251,191,36,0.45); }
+.circ-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--p); background: rgba(0,17,33,0.06); padding: 0.25rem 0.55rem; border-radius: 999px; width: fit-content; }
+.circ-title { font-size: 1rem; font-weight: 800; color: var(--ink); margin: 0; }
+.circ-meta { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+.circ-actions { display: flex; gap: 0.5rem; margin-top: auto; }
+.circ-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.55rem 0.75rem; border-radius: 0.55rem; font-size: 0.75rem; font-weight: 700; border: 1px solid #EDE8DC; background: #fff; color: var(--p); cursor: pointer; text-decoration: none; }
+.circ-btn.primary { background: var(--a); border-color: var(--a); color: var(--p); }
+.circ-loading, .circ-empty { grid-column: 1 / -1; text-align: center; padding: 2.5rem 1rem; color: var(--muted); font-size: 0.9rem; }
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-burger { display: flex; }
+  .about-grid, .mission-grid, .adm-grid, .contact-grid { grid-template-columns: 1fr; }
+  .programs-grid { grid-template-columns: 1fr 1fr; }
+  .news-grid { grid-template-columns: 1fr 1fr; }
+  .gallery-grid { grid-template-columns: 1fr 1fr; }
+  .stats-inner { grid-template-columns: 1fr 1fr; }
+  .hero-inner { padding-top: 4rem; }
+}
+@media (max-width: 560px) {
+  .programs-grid, .news-grid { grid-template-columns: 1fr; }
+  .form-body { grid-template-columns: 1fr; }
+  .hero-title-row { flex-direction: column; align-items: flex-start; }
+}
+
+</style>
+</head>
+<body>
+  <!-- ── NAVBAR ── -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="nav-logo" href="#hero" aria-label="Saint Theo School home"><span>S</span></a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a class="nav-link" href="#about">About</a><a class="nav-link" href="#programs">Programs</a><a class="nav-link" href="#news">News</a><a class="nav-link circ-open-link" href="#" data-circ-open="1">Circular</a><a class="nav-link" href="#contact">Contact</a><a class="nav-link" href="#page-why-choose-us">Why Choose Us</a>
+      </nav>
+      
+      <button class="nav-burger" id="navBurger" type="button" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/></svg></button>
+    </div>
+  </header>
+  <div class="nav-spacer" aria-hidden="true"></div>
+
+  <!-- ── HERO ── -->
+  <section id="hero" class="hero">
+    <div class="hero-grad"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-overlay-bottom"></div>
+    <div class="hero-amber-line"></div>
+    <div class="hero-inner">
+      
+      <div class="hand-kicker">Welcome to <svg viewBox="0 0 120 10" preserveAspectRatio="none" aria-hidden="true"><path d="M2 6 Q30 1 60 6 Q90 11 118 5" fill="none" stroke="#FBBF24" stroke-width="3.2" stroke-linecap="round"/></svg></div>
+      <div class="hero-title-row">
+        
+        <h1 class="hero-name">Saint Theo School</h1>
+      </div>
+      <p class="hero-sub">Shaping Bright Futures, One Learner at a Time</p>
+      
+      <div class="hero-ctas">
+        
+        <a class="btn btn-ghost" href="#contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Contact School</a>
+      </div>
+    </div>
+    <div class="hero-scroll" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+  </section>
+
+  <!-- ── STATS ── -->
+  <section class="stats" aria-label="School statistics">
+    <div class="container">
+      <div class="stats-inner">
+      <div class="stat">
+        <div class="stat-value">20+</div>
+        <div class="stat-label">Years of Excellence</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">950+</div>
+        <div class="stat-label">Happy Learners</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">65+</div>
+        <div class="stat-label">Qualified Staff</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">18</div>
+        <div class="stat-label">Subject Offerings</div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ── ABOUT ── -->
+  <section id="about" class="section sec-white">
+    <div class="container">
+      <div class="about-grid">
+        <div>
+          <div class="about-eyebrow">Who We Are</div>
+          <h2 class="about-title">Shaping Rwanda's <span class="hand-accent">Future Leaders<svg viewBox="0 0 120 10" preserveAspectRatio="none" aria-hidden="true"><path d="M2 6 Q30 1 60 6 Q90 11 118 5" fill="none" stroke="#FBBF24" stroke-width="3.2" stroke-linecap="round"/></svg></span></h2>
+          <div class="about-text">Founded with a commitment to holistic education, Saint Theo School blends a rigorous academic programme with co-curricular excellence, discipline and care for every learner.
+
+Our qualified teachers, modern classrooms and safe campus make us a home away from home for your child.</div>
+          
+          <div class="tags">
+            <span class="tag"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Nursery</span><span class="tag"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Primary</span><span class="tag"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>O-Level</span>
+          </div>
+          <div>
+            <a class="btn btn-amber" href="#contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Contact Us</a>
+          </div>
+        </div>
+        <div class="about-media">
+          <div class="about-fallback">
+                 <div class="af-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span>Academic Excellence</span></div>
+                 <div class="af-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Student Community</span></div>
+                 <div class="af-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg><span>Quality Learning</span></div>
+                 <div class="af-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg><span>Achievements</span></div>
+               </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MISSION & VISION ── -->
+  <section id="mission" class="section sec-cream">
+    <div class="container">
+      <div class="sec-head">
+        <div class="eyebrow">Our Purpose</div>
+        <h2 class="sec-title">Mission &amp; Vision</h2>
+      </div>
+      <div class="mission-grid">
+        <div class="m-card m-card-dark">
+          <div class="m-orb m-orb-dark"></div>
+          <div class="m-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <h3 class="m-title">Our Mission</h3>
+          <p class="m-text">Founded with a commitment to holistic education, Saint Theo School blends a rigorous academic programme with co-curricular excellence, discipline and care for every learner.
+
+Our qualified teachers, modern classrooms and safe campus make us a home away from home for your child.</p>
+        </div>
+        <div class="m-card m-card-light">
+          <div class="m-orb m-orb-navy"></div>
+          <div class="m-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg></div>
+          <h3 class="m-title">Our Vision</h3>
+          <p class="m-text">Nursery · Primary · Secondary</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PROGRAMS ── -->
+  <section id="programs" class="section sec-white">
+    <div class="container">
+      <div class="sec-head">
+        <div class="eyebrow">Academics</div>
+        <h2 class="sec-title">Our Programs</h2>
+        <p class="sec-sub">Comprehensive education pathways for every learner</p>
+      </div>
+      <div class="programs-grid">
+      <div class="program-card pc-dark">
+        <div class="pc-icon" style="background:rgba(251,191,36,0.15);color:#FBBF24">A</div>
+        <h3>Nursery</h3>
+        <p>Play-based early learning for children aged 3–6 (N1–N3).</p>
+      </div>
+      <div class="program-card pc-amber">
+        <div class="pc-icon" style="background:rgba(251,191,36,0.2);color:#1F2937">B</div>
+        <h3>Primary</h3>
+        <p>Strong foundations across P1–P6 with modern teaching methods.</p>
+      </div>
+      <div class="program-card pc-light">
+        <div class="pc-icon" style="background:rgba(31,41,55,0.07);color:#1F2937">C</div>
+        <h3>O-Level</h3>
+        <p>Ordinary Level studies (S1–S3) with a wide subject choice.</p>
+      </div>
+      <div class="program-card pc-dark">
+        <div class="pc-icon" style="background:rgba(251,191,36,0.15);color:#FBBF24">D</div>
+        <h3>A-Level</h3>
+        <p>Advanced Level combinations (S4–S6) preparing for university.</p>
+      </div></div>
+    </div>
+  </section>
+
+  
+  <!-- ── NEWS ── -->
+  <section id="news" class="section sec-cream">
+    <div class="container">
+      <div class="sec-head">
+        <div class="eyebrow">Updates</div>
+        <h2 class="sec-title">News &amp; Announcements</h2>
+        <p class="sec-sub">Stay informed about events and stories from our school community</p>
+      </div>
+      <div class="news-grid">
+      <button type="button" class="news-card" data-title="2026–2027 Admissions Now Open" data-date="August 2026" data-body="Applications are open for Nursery to A-Level. Secure your place today.">
+        <div class="news-date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>August 2026</div>
+        <h3>2026–2027 Admissions Now Open</h3>
+        <p>Applications are open for Nursery to A-Level. Secure your place today.</p>
+        <span class="news-more">Read more <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+      <button type="button" class="news-card" data-title="Science Week 2026" data-date="June 2026" data-body="Our learners showcased incredible projects during the annual Science Week.">
+        <div class="news-date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>June 2026</div>
+        <h3>Science Week 2026</h3>
+        <p>Our learners showcased incredible projects during the annual Science Week.</p>
+        <span class="news-more">Read more <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+      <button type="button" class="news-card" data-title="Graduation Ceremony" data-date="May 2026" data-body="Celebrating our P6, S3 and S6 graduates with their families and staff.">
+        <div class="news-date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>May 2026</div>
+        <h3>Graduation Ceremony</h3>
+        <p>Celebrating our P6, S3 and S6 graduates with their families and staff.</p>
+        <span class="news-more">Read more <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button></div>
+    </div>
+  </section>
+
+  
+
+  
+  <section class="site-page" id="page-why-choose-us">
+    <div class="container">
+      <div class="sec-head">
+        <div class="eyebrow">Overview</div>
+        <h2 class="sec-title">Why Choose Us</h2>
+      </div>
+      <div class="page-card"><h3>Academic Excellence</h3><p>We consistently achieve strong national examination results and our learners are prepared for top secondary schools and universities.</p><h3>Holistic Development</h3><p>Sports, arts, clubs and leadership opportunities are part of daily life at Saint Theo.</p><h3>Safe &amp; Caring Environment</h3><p>Our campus is secure, well-maintained and staffed by caring professionals who know every learner by name.</p></div>
+    </div>
+  </section>
+
+  
+  <!-- ── CIRCULARS LAUNCH (button only — list opens in modal) ── -->
+  <section id="circulars" class="section sec-cream circ-launch-section">
+    <div class="container">
+      <div class="circ-launch-card">
+        <div class="circ-launch-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg></div>
+        <div class="circ-launch-copy">
+          <span class="circ-launch-tag">Babyeyi · School documents</span>
+          <h2 class="circ-launch-title">Fee &amp; requirement circulars</h2>
+          <p class="circ-launch-desc">Browse official Babyeyi documents by academic year and term — view or print from one place.</p>
+        </div>
+        <button type="button" class="btn btn-amber circ-open-link circ-launch-btn" data-circ-open="1">
+          Browse circulars <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CIRCULARS LIST MODAL ── -->
+  <div class="circ-modal" id="circ-modal" aria-hidden="true">
+    <div class="circ-modal-back" data-circ-close="1"></div>
+    <div class="circ-modal-panel" role="dialog" aria-modal="true" aria-labelledby="circ-modal-title">
+      <div class="circ-modal-head">
+        <div>
+          <p class="circ-modal-kicker">Babyeyi · School circulars</p>
+          <h2 id="circ-modal-title" class="circ-modal-title">Select a document</h2>
+          <p class="circ-modal-sub">Filter by year and term, then open a circular to view or print.</p>
+        </div>
+        <button type="button" class="circ-modal-close" data-circ-close="1" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="circ-modal-toolbar">
+        <div class="circ-filters">
+          <label class="circ-filter">
+            <span>Academic year</span>
+            <select id="circ-year" class="circ-select"></select>
+          </label>
+          <label class="circ-filter">
+            <span>Term</span>
+            <select id="circ-term" class="circ-select"></select>
+          </label>
+        </div>
+        <button type="button" class="btn btn-amber circ-refresh" id="circ-refresh"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>Refresh</button>
+      </div>
+      <div class="circ-modal-body">
+        <div class="circ-grid" id="circ-grid">
+          <div class="circ-loading">Loading circulars…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CIRCULAR DOCUMENT PREVIEW MODAL ── -->
+  <div class="circ-doc-modal" id="circ-doc-modal" aria-hidden="true">
+    <div class="circ-modal-back" data-circ-doc-close="1"></div>
+    <div class="circ-doc-panel" role="dialog" aria-modal="true" aria-labelledby="circ-doc-title">
+      <div class="circ-doc-head">
+        <div>
+          <p class="circ-modal-kicker">Document preview</p>
+          <h2 id="circ-doc-title" class="circ-modal-title">School circular</h2>
+        </div>
+        <div class="circ-doc-actions">
+          <button type="button" class="circ-btn primary" id="circ-doc-print"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Print</button>
+          <button type="button" class="circ-modal-close" data-circ-doc-close="1" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+      </div>
+      <div class="circ-doc-frame-wrap">
+        <iframe id="circ-doc-frame" class="circ-doc-frame" title="Circular document preview"></iframe>
+      </div>
+    </div>
+  </div>
+
+  
+
+  <!-- ── CONTACT ── -->
+  <section id="contact" class="section sec-cream">
+    <div class="container">
+      <div class="sec-head">
+        <div class="eyebrow">Get In Touch</div>
+        <h2 class="sec-title">Contact Us</h2>
+        <p class="sec-sub">We'd love to hear from you</p>
+      </div>
+      <div class="contact-grid">
+        <div class="contact-list">
+          
+          
+          
+        </div>
+        <div class="map-card">
+          <div class="map-inner">
+            <div class="map-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>
+            <div class="map-title">Saint Theo School</div>
+            <div class="map-sub"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <span>S</span>
+          </div>
+          <div>
+            <div class="footer-name">Saint Theo School</div>
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.4)">Nursery · Primary · Secondary</div>
+          </div>
+        </div>
+        <div class="footer-links">
+          <a href="#about">About</a>
+          <a href="#programs">Programs</a>
+          
+          <a href="#circulars" class="circ-open-link" data-circ-open="1">Circular</a>
+          <a href="#contact">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; 2026 Saint Theo School. All rights reserved.
+        <span style="display:block;margin-top:0.25rem">Powered by <span class="powered">ShulePlus</span></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ── NEWS MODAL ── -->
+  <div class="modal" id="newsModal" role="dialog" aria-modal="true">
+    <button type="button" class="modal-back" id="newsModalBack" aria-label="Close"></button>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="min-w-0">
+          <div class="modal-date" id="newsModalDate"></div>
+          <h4 class="modal-title" id="newsModalTitle"></h4>
+        </div>
+        <button type="button" class="modal-close" id="newsModalClose" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="modal-body" id="newsModalBody"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-amber" id="newsModalCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LIGHTBOX ── -->
+  <div class="lightbox" id="lightbox">
+    <div class="lb-top">
+      <span class="lb-count" id="lbCount"></span>
+      <button type="button" class="lb-close" id="lbClose" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="lb-stage" id="lbBack">
+      <button type="button" class="lb-nav lb-prev" id="lbPrev" aria-label="Previous"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+      <img id="lbStageImg" alt="" />
+      <button type="button" class="lb-nav lb-next" id="lbNext" aria-label="Next"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+    <div class="lb-thumbs" id="lbThumbs"></div>
+  </div>
+
+  <!-- ── MOBILE DRAWER ── -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head">
+      <div class="drawer-name">Saint Theo School</div>
+      <button type="button" class="drawer-close" id="drawerClose" aria-label="Close menu"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <nav class="drawer-nav" aria-label="Mobile navigation">
+      <a class="drawer-link" href="#about"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>About</a><a class="drawer-link" href="#programs"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>Programs</a><a class="drawer-link" href="#news"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>News</a><a class="drawer-link circ-open-link" href="#" data-circ-open="1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>Circular</a><a class="drawer-link" href="#contact"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>Contact</a><a class="drawer-link" href="#page-why-choose-us"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>Why Choose Us</a>
+    </nav>
+    
+  </aside>
+
+<script>
+(function () {
+  var GALLERY = [];
+  function qs(s, r) { return (r || document).querySelector(s); }
+  function qsa(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  var body = document.body;
+
+  /* ── Drawer ── */
+  var drawer = qs('#drawer');
+  var overlay = qs('#drawerOverlay');
+  function openDrawer() { if (drawer) drawer.classList.add('open'); if (overlay) overlay.classList.add('open'); body.style.overflow = 'hidden'; }
+  function closeDrawer() { if (drawer) drawer.classList.remove('open'); if (overlay) overlay.classList.remove('open'); body.style.overflow = ''; }
+  var burger = qs('#navBurger');
+  if (burger) burger.addEventListener('click', openDrawer);
+  if (overlay) overlay.addEventListener('click', closeDrawer);
+  var drawerClose = qs('#drawerClose');
+  if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
+  qsa('.drawer-link').forEach(function (l) { l.addEventListener('click', closeDrawer); });
+
+  /* ── Scrollspy ── */
+  var sections = qsa('section[id]');
+  function setActive(id) {
+    if (!id) return;
+    qsa('.nav-link').forEach(function (l) { l.classList.toggle('active', l.getAttribute('href') === '#' + id); });
+    qsa('.drawer-link').forEach(function (l) { l.classList.toggle('active', l.getAttribute('href') === '#' + id); });
+  }
+  if ('IntersectionObserver' in window && sections.length) {
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) setActive(e.target.id); });
+    }, { threshold: 0.25 });
+    sections.forEach(function (sec) { spy.observe(sec); });
+  } else {
+    var ids = sections.map(function (s) { return s.id; });
+    function onScroll() {
+      var pos = window.scrollY + 130;
+      var current = ids[0];
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el && el.offsetTop <= pos) current = ids[i];
+      }
+      setActive(current);
+    }
+    window.addEventListener('scroll', onScroll);
+    onScroll();
+  }
+
+  /* ── News modal ── */
+  var newsModal = qs('#newsModal');
+  function openNews(card) {
+    if (!newsModal) return;
+    qs('#newsModalTitle').textContent = card.getAttribute('data-title') || '';
+    qs('#newsModalDate').textContent = card.getAttribute('data-date') || '';
+    qs('#newsModalBody').textContent = card.getAttribute('data-body') || '';
+    newsModal.classList.add('open');
+    body.style.overflow = 'hidden';
+  }
+  function closeNews() {
+    if (!newsModal) return;
+    newsModal.classList.remove('open');
+    body.style.overflow = '';
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.closest('.news-card')) { openNews(t.closest('.news-card')); return; }
+    if (t.closest('#newsModalClose') || t.closest('#newsModalCloseBtn') || t.closest('#newsModalBack')) closeNews();
+  });
+
+  /* ── Lightbox ── */
+  var lightbox = qs('#lightbox');
+  var lbIndex = 0;
+  function renderLightbox() {
+    if (!lightbox || !GALLERY.length) return;
+    var idx = ((lbIndex % GALLERY.length) + GALLERY.length) % GALLERY.length;
+    qs('#lbCount').textContent = (idx + 1) + ' / ' + GALLERY.length;
+    qs('#lbStageImg').src = GALLERY[idx];
+    var thumbs = qs('#lbThumbs');
+    thumbs.innerHTML = '';
+    GALLERY.forEach(function (src, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lb-thumb' + (i === idx ? ' active' : '');
+      b.style.backgroundImage = "url('" + src.replace(/'/g, "\\'") + "')";
+      b.setAttribute('aria-label', 'Image ' + (i + 1));
+      b.addEventListener('click', function () { lbIndex = i; renderLightbox(); });
+      thumbs.appendChild(b);
+    });
+  }
+  window.openLightbox = function (i) {
+    if (!lightbox || !GALLERY.length) return;
+    lbIndex = i;
+    renderLightbox();
+    lightbox.classList.add('open');
+    body.style.overflow = 'hidden';
+  };
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.classList.remove('open');
+    body.style.overflow = '';
+  }
+  if (lightbox) {
+    qs('#lbClose').addEventListener('click', closeLightbox);
+    qs('#lbBack').addEventListener('click', function (e) { if (e.target.id === 'lbBack') closeLightbox(); });
+    qs('#lbPrev').addEventListener('click', function () { lbIndex -= 1; renderLightbox(); });
+    qs('#lbNext').addEventListener('click', function () { lbIndex += 1; renderLightbox(); });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeNews(); closeLightbox(); closeCircModal(); }
+    if (e.key === 'ArrowLeft' && lightbox && lightbox.classList.contains('open')) { lbIndex -= 1; renderLightbox(); }
+    if (e.key === 'ArrowRight' && lightbox && lightbox.classList.contains('open')) { lbIndex += 1; renderLightbox(); }
+  });
+
+  /* ── Circulars (Babyeyi modal) ── */
+  var circModal = qs('#circ-modal');
+  var circGrid = qs('#circ-grid');
+  var circYear = qs('#circ-year');
+  var circTerm = qs('#circ-term');
+  var circRefresh = qs('#circ-refresh');
+  var circApi = 'http://localhost:3055/api/public/saint-theo-school/circulars';
+  var circDefaults = { year: '', term: '' };
+  var circDocModal = qs('#circ-doc-modal');
+  var circDocFrame = qs('#circ-doc-frame');
+  var circDocTitle = qs('#circ-doc-title');
+  var circDocPrint = qs('#circ-doc-print');
+  var circDocUrl = '';
+
+  function escHtml(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fillSelect(el, values, allLabel, preferred) {
+    if (!el) return;
+    el.innerHTML = '';
+    if (allLabel) {
+      var all = document.createElement('option');
+      all.value = '';
+      all.textContent = allLabel;
+      el.appendChild(all);
+    }
+    (values || []).forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      el.appendChild(o);
+    });
+    if (preferred && values && values.indexOf(preferred) >= 0) el.value = preferred;
+  }
+
+  function renderCircularCards(items) {
+    if (!circGrid) return;
+    if (!items || !items.length) {
+      circGrid.innerHTML = '<div class="circ-empty">No Babyeyi circulars found for the selected academic year and term.</div>';
+      return;
+    }
+    circGrid.innerHTML = items.map(function (c) {
+      var fee = c.totalFee != null && c.totalFee !== '' ? Number(c.totalFee).toLocaleString() + ' RWF' : '—';
+      var printBase = circApi + '/' + encodeURIComponent(c.id) + '/print';
+      var title = escHtml(c.className || 'School circular');
+      return '<article class="circ-card">' +
+        '<span class="circ-badge">' + escHtml(c.status || 'PUBLISHED') + '</span>' +
+        '<h3 class="circ-title">' + title + '</h3>' +
+        '<div class="circ-meta">' + escHtml(c.academicYear) + ' · ' + escHtml(c.term) + '<br/>Total fee: ' + fee + '</div>' +
+        '<div class="circ-actions">' +
+          '<button type="button" class="circ-btn" data-circ-view="' + printBase + '" data-circ-title="' + title + '">View</button>' +
+          '<button type="button" class="circ-btn primary" data-circ-print="' + printBase + '?autoprint=1" data-circ-title="' + title + '">Print</button>' +
+        '</div></article>';
+    }).join('');
+  }
+
+  function openCircDocModal(url, title, autoprint) {
+    if (!circDocModal || !circDocFrame) return;
+    circDocUrl = url;
+    if (circDocTitle) circDocTitle.textContent = title || 'School circular';
+    circDocFrame.src = url;
+    circDocModal.classList.add('open');
+    circDocModal.setAttribute('aria-hidden', 'false');
+    if (autoprint) {
+      circDocFrame.onload = function () {
+        try { circDocFrame.contentWindow && circDocFrame.contentWindow.print(); } catch (e) {}
+      };
+    } else {
+      circDocFrame.onload = null;
+    }
+  }
+
+  function closeCircDocModal() {
+    if (!circDocModal || !circDocFrame) return;
+    circDocModal.classList.remove('open');
+    circDocModal.setAttribute('aria-hidden', 'true');
+    circDocFrame.src = 'about:blank';
+    circDocUrl = '';
+  }
+
+  function loadCircularOptions() {
+    return fetch(circApi + '/options')
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.success || !res.data) return;
+        circDefaults.year = res.data.currentAcademicYear || '';
+        circDefaults.term = res.data.currentTerm || '';
+        fillSelect(circYear, res.data.academicYears || [], '', circDefaults.year);
+        fillSelect(circTerm, res.data.terms || [], 'All terms', circDefaults.term);
+      })
+      .catch(function () {});
+  }
+
+  function loadCirculars() {
+    if (!circGrid) return;
+    circGrid.innerHTML = '<div class="circ-loading">Loading circulars…</div>';
+    var params = [];
+    if (circYear && circYear.value) params.push('academicYear=' + encodeURIComponent(circYear.value));
+    if (circTerm && circTerm.value) params.push('term=' + encodeURIComponent(circTerm.value));
+    var url = circApi + (params.length ? '?' + params.join('&') : '');
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (res) { renderCircularCards(res.success ? res.data : []); })
+      .catch(function () {
+        circGrid.innerHTML = '<div class="circ-empty">Could not load circulars. Please try again.</div>';
+      });
+  }
+
+  function openCircModal() {
+    if (!circModal) return;
+    circModal.classList.add('open');
+    circModal.setAttribute('aria-hidden', 'false');
+    body.style.overflow = 'hidden';
+    loadCircularOptions().then(loadCirculars);
+  }
+
+  function closeCircModal() {
+    if (!circModal) return;
+    circModal.classList.remove('open');
+    circModal.setAttribute('aria-hidden', 'true');
+    body.style.overflow = '';
+  }
+
+  qsa('.circ-open-link').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      openCircModal();
+    });
+  });
+  qsa('[data-circ-close]').forEach(function (el) {
+    el.addEventListener('click', closeCircModal);
+  });
+  if (circYear) circYear.addEventListener('change', loadCirculars);
+  if (circTerm) circTerm.addEventListener('change', loadCirculars);
+  if (circRefresh) circRefresh.addEventListener('click', function () { loadCircularOptions().then(loadCirculars); });
+
+  if (circGrid) {
+    circGrid.addEventListener('click', function (e) {
+      var viewBtn = e.target.closest('[data-circ-view]');
+      if (viewBtn) {
+        openCircDocModal(viewBtn.getAttribute('data-circ-view'), viewBtn.getAttribute('data-circ-title'), false);
+        return;
+      }
+      var printBtn = e.target.closest('[data-circ-print]');
+      if (printBtn) {
+        openCircDocModal(printBtn.getAttribute('data-circ-print'), printBtn.getAttribute('data-circ-title'), true);
+      }
+    });
+  }
+  qsa('[data-circ-doc-close]').forEach(function (el) {
+    el.addEventListener('click', closeCircDocModal);
+  });
+  if (circDocPrint) {
+    circDocPrint.addEventListener('click', function () {
+      if (!circDocUrl) return;
+      try { circDocFrame.contentWindow && circDocFrame.contentWindow.print(); } catch (e) {
+        openCircDocModal(circDocUrl + (circDocUrl.indexOf('?') >= 0 ? '&' : '?') + 'autoprint=1', circDocTitle ? circDocTitle.textContent : 'School circular', true);
+      }
+    });
+  }
+
+  /* ── Apply form ── */
+  var form = qs('#apply-form');
+  var msg = qs('#form-message');
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = { formData: {} };
+      Array.prototype.forEach.call(form.elements, function (el) {
+        if (!el.name || el.type === 'submit' || el.type === 'button') return;
+        if (el.type === 'file') return;
+        payload.formData[el.name] = el.value;
+      });
+
+      var fileInputs = form.querySelectorAll('input[data-file-field]');
+      var readers = [];
+      Array.prototype.forEach.call(fileInputs, function (input) {
+        if (!input.files || !input.files[0]) return;
+        readers.push(new Promise(function (resolve) {
+          var file = input.files[0];
+          var reader = new FileReader();
+          reader.onload = function () {
+            payload.formData[input.name] = {
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              contentBase64: String(reader.result || '')
+            };
+            resolve();
+          };
+          reader.onerror = function () { resolve(); };
+          reader.readAsDataURL(file);
+        }));
+      });
+
+      Promise.all(readers).then(function () {
+        if (!payload.formData.fullName || !payload.formData.phone) {
+          msg.textContent = 'Please fill in required fields (name and phone).';
+          msg.style.color = '#dc2626';
+          return;
+        }
+        msg.textContent = 'Submitting…';
+        msg.style.color = 'var(--p)';
+        fetch('http://localhost:3055/api/public/saint-theo-school/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.success) {
+              msg.textContent = 'Thank you! Your application has been received. We will contact you soon.';
+              msg.style.color = '#059669';
+              form.reset();
+            } else {
+              msg.textContent = res.message || 'Something went wrong. Please try again.';
+              msg.style.color = '#dc2626';
+            }
+          })
+          .catch(function () {
+            msg.textContent = 'Network error. Please try again later.';
+            msg.style.color = '#dc2626';
+          });
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>

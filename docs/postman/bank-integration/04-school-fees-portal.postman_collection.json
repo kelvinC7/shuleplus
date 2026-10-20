@@ -1,0 +1,641 @@
+{
+  "info": {
+    "name": "ShulePlus — 4. School Fees Portal API",
+    "description": "# School Fees Portal — Collections, Structures & Payments\n\nCore financial module for schools. Used by school bursars and bank integrations.\n\n## Scopes\n| Scope | Purpose |\n|-------|---------|\n| `fees.read` | Structures, bills, dashboard, collection lookup |\n| `fees.write` | Create/update fee structures |\n| `payment.create` | Record payments, initiate public pay |\n| `payment.read` | Status, receipts |\n\nDirect API base: `{{fees_api_url}}` (e.g. `https://fees.shuleplus.rw/api`)\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Public — Parent Payments",
+      "description": "Unauthenticated parent payment APIs.",
+      "item": [
+        {
+          "name": "Get Student Fees",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{fees_api_url}}/public/student-fees?organizationId={{organization_id}}&studentCode={{student_code}}&academicYear={{academic_year}}&term={{term}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "student-fees"
+              ],
+              "query": [
+                {
+                  "key": "organizationId",
+                  "value": "{{organization_id}}"
+                },
+                {
+                  "key": "studentCode",
+                  "value": "{{student_code}}"
+                },
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                }
+              ]
+            },
+            "description": "",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Initiate Public Payment",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{fees_api_url}}/public/payments/initiate",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "payments",
+                "initiate"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentCode\": \"{{student_code}}\",\n  \"amount\": 5000,\n  \"method\": \"MOMO\",\n  \"phone\": \"0788123456\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const ref = json?.data?.reference ?? json?.reference;",
+                  "if (ref) { pm.environment.set(\"payment_reference\", ref); console.log(\"payment_reference=\" + ref); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/public/payments/{{payment_reference}}/status",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "payments",
+                "{{payment_reference}}",
+                "status"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Verify Receipt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/public/receipts/{{receipt_number}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "public",
+                "receipts",
+                "{{receipt_number}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fee Structures",
+      "description": "Create and manage term fee structures.",
+      "item": [
+        {
+          "name": "List Fee Structures",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/structures",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "structures"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Fee Structure by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/structures/{{structure_id}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "structures",
+                "{{structure_id}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Academic Context (years/terms)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/structures/academic-context",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "structures",
+                "academic-context"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Fee Structure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/structures",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "structures"
+              ]
+            },
+            "description": "Requires fees.write scope. Creates active structure with line items.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Term 1 Fees 2025-2026\",\n  \"code\": \"FS-2025-T1\",\n  \"academicYear\": \"{{academic_year}}\",\n  \"term\": \"{{term}}\",\n  \"className\": \"P5 A\",\n  \"status\": \"ACTIVE\",\n  \"items\": [\n    {\n      \"name\": \"Tuition\",\n      \"amount\": 150000,\n      \"itemType\": \"MANDATORY\",\n      \"paymentType\": \"SCHOOL_ACCOUNT\"\n    },\n    {\n      \"name\": \"Activity Fee\",\n      \"amount\": 10000,\n      \"itemType\": \"MANDATORY\",\n      \"paymentType\": \"SCHOOL_ACCOUNT\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Import Babyeyi Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/structures/babyeyi-items?academicYear={{academic_year}}&term={{term}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "structures",
+                "babyeyi-items"
+              ],
+              "query": [
+                {
+                  "key": "academicYear",
+                  "value": "{{academic_year}}"
+                },
+                {
+                  "key": "term",
+                  "value": "{{term}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fee Collection (School Bursar)",
+      "description": "In-school payment recording.",
+      "item": [
+        {
+          "name": "Collection Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "collections",
+                "fee-collection"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Lookup Student for Collection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/lookup?search={{student_code}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "collections",
+                "fee-collection",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{student_code}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Student Fee Account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/student-account?studentId={{student_id}}",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "collections",
+                "fee-collection",
+                "student-account"
+              ],
+              "query": [
+                {
+                  "key": "studentId",
+                  "value": "{{student_id}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Record Collection Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/collections/fee-collection/payments",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "collections",
+                "fee-collection",
+                "payments"
+              ]
+            },
+            "description": "Staff-recorded cash/bank payment at school. Requires payment.create.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"billId\": \"{{bill_id}}\",\n  \"amount\": 50000,\n  \"method\": \"BANK_TRANSFER\",\n  \"reference\": \"BK-TXN-20260308-001\",\n  \"payerName\": \"Jean Parent\",\n  \"notes\": \"Bank deposit — partner integration test\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bills, Payments & Outstanding",
+      "description": "Financial reporting endpoints.",
+      "item": [
+        {
+          "name": "List Bills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/bills",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "bills"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "List Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/payments",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Outstanding Balances",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/outstanding",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "outstanding"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Fees Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "x-developer-environment",
+                "value": "{{developer_environment}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{fees_api_url}}/dashboard",
+              "host": [
+                "{{fees_api_url}}"
+              ],
+              "path": [
+                "dashboard"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

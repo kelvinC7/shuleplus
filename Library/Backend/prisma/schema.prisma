@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ResourceType {
+  TEXTBOOK
+  REFERENCE
+  NOVEL
+  STORY_BOOK
+  DICTIONARY
+  ENCYCLOPEDIA
+  TEACHER_GUIDE
+  REVISION_MATERIAL
+  PAST_PAPER
+  MAGAZINE
+  NEWSPAPER
+  EBOOK
+  AUDIO_BOOK
+  EDUCATIONAL_VIDEO
+  RESEARCH_MATERIAL
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  BORROWED
+  OVERDUE
+  DAMAGED
+  UNDER_REPAIR
+  LOST
+  MISSING
+  RESERVED
+  ARCHIVED
+  DISPOSED
+}
+
+enum BorrowerType {
+  STUDENT
+  TEACHER
+}
+
+enum LoanStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+  LOST
+}
+
+enum ReservationStatus {
+  PENDING
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum FineStatus {
+  PENDING
+  PAID
+  WAIVED
+}
+
+enum FineReason {
+  OVERDUE
+  DAMAGED
+  LOST
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PURCHASED
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  IN_TRANSIT
+  COMPLETED
+  REJECTED
+}
+
+enum DigitalFileType {
+  PDF
+  EBOOK
+  AUDIO
+  VIDEO
+  DOCUMENT
+  SPREADSHEET
+}
+
+enum LostBookPolicy {
+  REPLACEMENT_COST
+  FIXED_FINE
+  WARNING_ONLY
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  bookResources        BookResource[]
+  resourceCategories   ResourceCategory[]
+  subjects             Subject[]
+  shelfLocations       ShelfLocation[]
+  bookCopies           BookCopy[]
+  loans                Loan[]
+  reservations         Reservation[]
+  fines                Fine[]
+  libraryVisits        LibraryVisit[]
+  digitalResources     DigitalResource[]
+  bookRequests         BookRequest[]
+  bookTransfers        BookTransfer[] @relation("TransferFrom")
+  bookTransfersTo      BookTransfer[] @relation("TransferTo")
+  librarySettings      LibrarySettings?
+
+  @@map("tenants")
+}
+
+model ResourceCategory {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  description    String?
+  type           ResourceType
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  books  BookResource[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("resource_categories")
+}
+
+model Subject {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  code           String?
+  category       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  books  BookResource[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("library_subjects")
+}
+
+model ShelfLocation {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  building       String   @default("Main")
+  room           String?
+  section        String
+  shelf          String
+  row            String?
+  position       String?
+  capacity       Int?     @default(50)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant    @relation(fields: [organizationId], references: [organizationId])
+  books  BookResource[]
+
+  @@unique([organizationId, building, section, shelf])
+  @@index([organizationId])
+  @@map("shelf_locations")
+}
+
+model BookResource {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  title          String
+  isbn           String?
+  bookCode       String?      @map("book_code")
+  author         String?
+  publisher      String?
+  edition        String?
+  publicationYear Int?        @map("publication_year")
+  subjectId      String?      @map("subject_id")
+  categoryId     String?      @map("category_id")
+  language       String?      @default("English")
+  classLevel     String?      @map("class_level")
+  academicYear   String?      @map("academic_year")
+  description    String?
+  coverUrl       String?      @map("cover_url")
+  totalCopies    Int          @default(1) @map("total_copies")
+  availableCopies Int         @default(1) @map("available_copies")
+  shelfLocationId String?     @map("shelf_location_id")
+  status         ResourceStatus @default(AVAILABLE)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  tenant     Tenant          @relation(fields: [organizationId], references: [organizationId])
+  category   ResourceCategory? @relation(fields: [categoryId], references: [id])
+  subject    Subject?         @relation(fields: [subjectId], references: [id])
+  shelf      ShelfLocation?   @relation(fields: [shelfLocationId], references: [id])
+  copies     BookCopy[]
+  reservations Reservation[]
+
+  @@unique([organizationId, isbn])
+  @@index([organizationId])
+  @@index([organizationId, title])
+  @@index([organizationId, isbn])
+  @@index([organizationId, status])
+  @@map("book_resources")
+}
+
+model BookCopy {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  resourceId     String         @map("resource_id")
+  barcode        String         @unique
+  qrCode         String?        @map("qr_code")
+  libraryId      String         @unique @map("library_id")
+  status         ResourceStatus @default(AVAILABLE)
+  condition      String?        @default("Good")
+  purchasePrice  Decimal?       @db.Decimal(10, 2) @map("purchase_price")
+  source         String?        @default("Purchase")
+  acquiredDate   DateTime?      @map("acquired_date")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [organizationId], references: [organizationId])
+  resource    BookResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  loan        Loan[]
+  reservation Reservation[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([resourceId])
+  @@map("book_copies")
+}
+
+model Loan {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  copyId         String      @map("copy_id")
+  borrowerType   BorrowerType @map("borrower_type")
+  borrowerId     String      @map("borrower_id")
+  borrowerName   String      @map("borrower_name")
+  borrowerClass  String?     @map("borrower_class")
+  loanDate       DateTime    @default(now()) @map("loan_date")
+  dueDate        DateTime    @map("due_date")
+  returnDate     DateTime?   @map("return_date")
+  renewedCount   Int         @default(0) @map("renewed_count")
+  status         LoanStatus  @default(ACTIVE)
+  issuedBy       String?     @map("issued_by")
+  notes          String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [organizationId], references: [organizationId])
+  copy     BookCopy @relation(fields: [copyId], references: [id])
+  fine     Fine[]
+  reservations Reservation[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([copyId])
+  @@index([borrowerId])
+  @@map("loans")
+}
+
+model Reservation {
+  id             String            @id @default(uuid())
+  organizationId String            @map("organization_id")
+  resourceId     String            @map("resource_id")
+  copyId         String?           @map("copy_id")
+  borrowerType   BorrowerType      @map("borrower_type")
+  borrowerId     String            @map("borrower_id")
+  borrowerName   String            @map("borrower_name")
+  borrowerClass  String?           @map("borrower_class")
+  reservationDate DateTime         @default(now()) @map("reservation_date")
+  expiryDate     DateTime?         @map("expiry_date")
+  status         ReservationStatus @default(PENDING)
+  position       Int?
+  fulfilledLoanId String?          @map("fulfilled_loan_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [organizationId], references: [organizationId])
+  resource BookResource @relation(fields: [resourceId], references: [id])
+  copy     BookCopy? @relation(fields: [copyId], references: [id])
+  fulfilledLoan Loan? @relation(fields: [fulfilledLoanId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([resourceId])
+  @@index([borrowerId])
+  @@map("reservations")
+}
+
+model Fine {
+  id             String     @id @default(uuid())
+  organizationId String     @map("organization_id")
+  loanId         String     @map("loan_id")
+  borrowerType   BorrowerType @map("borrower_type")
+  borrowerId     String     @map("borrower_id")
+  amount         Decimal    @db.Decimal(10, 2)
+  reason         FineReason
+  status         FineStatus @default(PENDING)
+  paidAt         DateTime?  @map("paid_at")
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  loan   Loan   @relation(fields: [loanId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([loanId])
+  @@map("fines")
+}
+
+model LibraryVisit {
+  id             String      @id @default(uuid())
+  organizationId String      @map("organization_id")
+  borrowerType   BorrowerType @map("borrower_type")
+  borrowerId     String      @map("borrower_id")
+  borrowerName   String      @map("borrower_name")
+  borrowerClass  String?     @map("borrower_class")
+  checkIn        DateTime    @default(now()) @map("check_in")
+  checkOut       DateTime?   @map("check_out")
+  reason         String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([organizationId, checkIn])
+  @@index([borrowerId])
+  @@map("library_visits")
+}
+
+model DigitalResource {
+  id             String          @id @default(uuid())
+  organizationId String          @map("organization_id")
+  title          String
+  description    String?
+  fileType       DigitalFileType @map("file_type")
+  fileUrl        String          @map("file_url")
+  fileName       String          @map("file_name")
+  fileSize       Int?            @map("file_size")
+  uploadedBy     String?         @map("uploaded_by")
+  accessRoles    String[]        @default([]) @map("access_roles")
+  subjectId      String?         @map("subject_id")
+  classLevel     String?         @map("class_level")
+  downloadCount  Int             @default(0) @map("download_count")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tenant   Tenant       @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([organizationId, fileType])
+  @@map("digital_resources")
+}
+
+model BookRequest {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  requesterType  BorrowerType  @map("requester_type")
+  requesterId    String        @map("requester_id")
+  requesterName  String        @map("requester_name")
+  title          String
+  author         String?
+  reason         String?
+  priority       RequestPriority @default(MEDIUM)
+  status         RequestStatus @default(PENDING)
+  reviewedBy     String?       @map("reviewed_by")
+  reviewedAt     DateTime?     @map("reviewed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("book_requests")
+}
+
+model BookTransfer {
+  id             String         @id @default(uuid())
+  organizationId String         @map("organization_id")
+  copyId         String         @map("copy_id")
+  fromOrgId      String         @map("from_org_id")
+  toOrgId        String         @map("to_org_id")
+  status         TransferStatus @default(PENDING)
+  requestedBy    String         @map("requested_by")
+  approvedBy     String?        @map("approved_by")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation("TransferFrom", fields: [organizationId], references: [organizationId])
+  tenantTo Tenant   @relation("TransferTo", fields: [toOrgId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([toOrgId])
+  @@map("book_transfers")
+}
+
+model LibrarySettings {
+  id                   String          @id @default(uuid())
+  organizationId       String          @unique @map("organization_id")
+  loanPeriodDays       Int             @default(7) @map("loan_period_days")
+  maxBooksStudent      Int             @default(3) @map("max_books_student")
+  maxBooksTeacher      Int             @default(5) @map("max_books_teacher")
+  renewalsAllowed      Boolean         @default(true) @map("renewals_allowed")
+  maxRenewals          Int             @default(1) @map("max_renewals")
+  finesEnabled         Boolean         @default(false) @map("fines_enabled")
+  finePerDay           Decimal?        @db.Decimal(10, 2) @map("fine_per_day")
+  maxFine              Decimal?        @db.Decimal(10, 2) @map("max_fine")
+  lostBookPolicy       LostBookPolicy  @default(REPLACEMENT_COST) @map("lost_book_policy")
+  qrEnabled            Boolean         @default(true) @map("qr_enabled")
+  barcodeEnabled       Boolean         @default(true) @map("barcode_enabled")
+  dueReminderDays      Int             @default(2) @map("due_reminder_days")
+  overdueReminderDays  Int             @default(1) @map("overdue_reminder_days")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@map("library_settings")
+}

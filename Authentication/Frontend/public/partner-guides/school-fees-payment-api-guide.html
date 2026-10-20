@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShulePlus | School Fees Payment API Guide</title>
+  <meta name="description" content="Official integration guide for banks and fintech partners: student lookup, fees, payments, and receipts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #000435;
+      --navy-mid: #1e3a5f;
+      --gold: #fcb038;
+      --gold-dim: #e5a032;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --green: #059669;
+      --blue: #2563eb;
+      --red: #dc2626;
+      --code-bg: #0f172a;
+      --sidebar-w: 280px;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Montserrat", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--navy); }
+    a:hover { color: var(--gold-dim); }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(120deg, #000435 0%, #0d1b4a 45%, #1a3268 100%);
+      border-bottom: 2px solid var(--gold);
+      padding: 0;
+      box-shadow: 0 8px 32px rgba(0, 4, 53, 0.35);
+    }
+    .topbar-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .topbar-logo-wrap {
+      flex-shrink: 0;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(252, 176, 56, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+    .topbar-logo-wrap img,
+    .topbar-logo-wrap svg { width: 44px; height: 44px; display: block; border-radius: 10px; }
+    .topbar-text { min-width: 0; }
+    .topbar-eyebrow {
+      margin: 0 0 4px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .topbar h1 .title-accent { color: var(--gold); font-weight: 700; }
+    .topbar-sub {
+      margin: 6px 0 0;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #94a3b8;
+      letter-spacing: 0.01em;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    .layout { display: flex; max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: sticky;
+      top: 72px;
+      height: calc(100vh - 72px);
+      overflow-y: auto;
+      padding: 24px 16px 48px;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar nav a {
+      display: block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .sidebar nav a:hover { background: var(--bg); color: var(--navy); }
+    .sidebar .nav-section {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 20px 0 8px 12px;
+    }
+
+    main {
+      flex: 1;
+      min-width: 0;
+      padding: 32px 40px 80px;
+    }
+    @media (max-width: 960px) {
+      .sidebar { display: none; }
+      main { padding: 24px 20px 64px; }
+    }
+
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow);
+    }
+    .hero h2 { margin: 0 0 12px; font-size: 1.75rem; color: var(--navy); font-weight: 800; letter-spacing: -0.02em; }
+    .hero .lead { color: var(--muted); font-size: 1.05rem; max-width: 720px; margin: 0 0 20px; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.85rem; color: var(--muted); }
+
+    section { margin-bottom: 48px; scroll-margin-top: 88px; }
+    section > h2 {
+      font-size: 1.35rem;
+      color: var(--navy);
+      margin: 0 0 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gold);
+      display: inline-block;
+    }
+    section > .section-desc { color: var(--muted); margin: 0 0 24px; max-width: 800px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--navy); }
+    .card h4 { margin: 16px 0 8px; font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 20px 0;
+    }
+    .flow-step {
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .flow-arrow { color: var(--gold); font-weight: bold; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 12px 0; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg); color: var(--navy); font-weight: 600; }
+    td code { font-size: 0.82rem; }
+
+    .endpoint {
+      border-left: 4px solid var(--gold);
+      padding-left: 16px;
+      margin: 24px 0;
+    }
+    .endpoint-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .method {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.03em;
+    }
+    .method-get { background: #d1fae5; color: var(--green); }
+    .method-post { background: #dbeafe; color: var(--blue); }
+    .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.85rem;
+      background: var(--bg);
+      padding: 6px 12px;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+    .scope-pill {
+      font-size: 0.7rem;
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--muted);
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e2e8f0;
+      padding: 16px 18px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      line-height: 1.55;
+      margin: 12px 0;
+    }
+    pre .key { color: #7dd3fc; }
+    pre .str { color: #86efac; }
+    pre .num { color: #fcd34d; }
+    pre .comment { color: #64748b; }
+
+    .note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.9rem;
+      margin: 16px 0;
+    }
+    .note strong { color: #92400e; }
+
+    .diagram {
+      font-family: Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      background: #0c1222;
+      color: #cbd5e1;
+      padding: 20px;
+      border-radius: 12px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .diagram .hl { color: var(--gold); }
+    .diagram .hl2 { color: #34d399; }
+
+    footer.doc-footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .print-hint { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-brand">
+      <div class="topbar-logo-wrap" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="ShulePlus">
+          <rect width="48" height="48" rx="12" fill="#FCB038"/>
+          <path d="M14 32V16h6.5c3.2 0 5.5 1.8 5.5 4.8 0 2.2-1.2 3.7-3 4.4l3.8 6.8h-3.4l-3.3-6.2H17.2V32H14zm3.2-9h3.1c1.6 0 2.5-.8 2.5-2.1s-.9-2.1-2.5-2.1h-3.1v4.2z" fill="#000435"/>
+          <path d="M28.5 32l5.2-16h3.3l5.2 16h-3.3l-1.1-3.6h-5l-1.1 3.6h-3.2zm4.4-6.2h3.5l-1.7-5.5-1.8 5.5z" fill="#000435"/>
+        </svg>
+      </div>
+      <div class="topbar-text">
+        <p class="topbar-eyebrow">ShulePlus partner documentation</p>
+        <h1>School Fees Payment <span class="title-accent">API Integration Guide</span></h1>
+        <p class="topbar-sub">For banks, fintechs and payment service providers in Rwanda</p>
+      </div>
+    </div>
+    <span class="badge"><span class="badge-dot"></span> Official v1.1</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <nav>
+      <div class="nav-section">Overview</div>
+      <a href="#introduction">Introduction</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#base-urls">Production base URLs</a>
+      <a href="#headers">Headers &amp; responses</a>
+      <div class="nav-section">Payment journey</div>
+      <a href="#flow">End-to-end flow</a>
+      <a href="#step1">Step 1: Student lookup</a>
+      <a href="#step2">Step 2: Load fees</a>
+      <a href="#step3">Step 3: Initiate payment</a>
+      <a href="#step4">Step 4: Status and receipt</a>
+      <div class="nav-section">Reference</div>
+      <a href="#bff">Alternative: Babyeyi BFF</a>
+      <a href="#authentication">Optional IAM OAuth</a>
+      <a href="#errors">Errors &amp; status codes</a>
+      <a href="#bank-integration">Bank integration notes</a>
+      <a href="#support">Support</a>
+    </nav>
+  </aside>
+
+  <main>
+
+    <div class="hero" id="introduction">
+      <h2>ShulePlus School Fees Payment APIs</h2>
+      <p class="lead">
+        This guide describes how partner systems integrate with ShulePlus to support
+        <strong>parent school fees payments</strong> — from student identification through fee quotation,
+        payment initiation, confirmation, and digital receipt verification.
+      </p>
+      <div class="meta-row">
+        <span><strong>Students API:</strong> <code>https://students-api.shuleplus.rw/api</code></span>
+        <span><strong>School Fees API:</strong> <code>https://fees.shuleplus.rw/api</code></span>
+        <span><strong>Babyeyi BFF:</strong> <code>https://babyeyi-api.shuleplus.rw/api</code></span>
+      </div>
+      <p class="print-hint">Tip: Use your browser’s Print → Save as PDF to share this guide with your integration team.</p>
+    </div>
+
+    <section id="architecture">
+      <h2>Architecture</h2>
+      <p class="section-desc">
+        Banks integrate by calling the <strong>same REST APIs</strong> used by ShulePlus public pay-fees (babyeyi.rw):
+        <strong>Student Management</strong> and <strong>School Fees Portal</strong> microservices — not the IAM developer gateway.
+      </p>
+      <div class="diagram"><span class="hl">┌─────────────────────┐</span>
+<span class="hl">│  Bank / Fintech     │</span>  Mobile app, internet banking, API hub
+<span class="hl">└──────────┬──────────┘</span>
+           │  HTTPS (public routes: no Bearer token)
+           ├──────────────────────────────┐
+           ▼                              ▼
+<span class="hl2"> students-api.shuleplus.rw/api</span>   <span class="hl2"> fees.shuleplus.rw/api</span>
+ GET /public/students/lookup        GET  /public/student-fees
+                                    POST /public/payments/initiate
+                                    GET  /public/payments/{ref}/status
+                                    GET  /public/receipts/{receiptNo}
+           │                              │
+           └───────────┬──────────────────┘
+                       ▼
+            School organization data (PostgreSQL)</div>
+      <div class="card" id="base-urls">
+        <h3>Production base URLs</h3>
+        <table>
+          <thead><tr><th>Service</th><th>Base URL</th><th>Postman variable</th></tr></thead>
+          <tbody>
+            <tr><td>Student Management</td><td><code>https://students-api.shuleplus.rw/api</code></td><td><code>students_api_url</code></td></tr>
+            <tr><td>School Fees Portal</td><td><code>https://fees.shuleplus.rw/api</code></td><td><code>fees_api_url</code></td></tr>
+            <tr><td>WebpageBabyeyi BFF</td><td><code>https://babyeyi-api.shuleplus.rw/api</code></td><td><code>babyeyi_bff_url</code></td></tr>
+            <tr><td>Babyeyi Wizard (circulars)</td><td><code>https://babyeyi-wizard-api.shuleplus.rw/api</code></td><td><code>babyeyi_wizard_api_url</code></td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:12px;font-size:0.9rem;color:var(--muted);">Paths below are appended to the base URL (e.g. <code>{fees_api_url}/public/student-fees</code>).</p>
+      </div>
+    </section>
+
+    <section id="headers">
+      <h2>Headers &amp; response format</h2>
+      <p class="section-desc">Public pay-fees endpoints do <strong>not</strong> require <code>Authorization</code> — same as the parent portal.</p>
+      <table>
+        <thead><tr><th>Header</th><th>Value</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><code>Accept</code></td><td><code>application/json</code></td><td>All requests</td></tr>
+          <tr><td><code>Content-Type</code></td><td><code>application/json</code></td><td>POST with JSON body</td></tr>
+          <tr><td><code>Idempotency-Key</code></td><td>Unique per payment attempt (max 128 chars, printable ASCII)</td><td><strong>Recommended</strong> on <code>POST …/payments/initiate</code> (scoped per <code>organizationId</code>)</td></tr>
+          <tr><td><code>Authorization</code></td><td><code>Bearer …</code></td><td>Only for authenticated school APIs (not public pay flow)</td></tr>
+        </tbody>
+      </table>
+      <div class="card">
+        <h3>Standard module response</h3>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: { <span class="comment">/* payload */</span> }
+}</pre>
+        <p>Errors: <code>{ "success": false, "message": "…" }</code> with HTTP 4xx/5xx.</p>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2>End-to-end payment flow</h2>
+      <p class="section-desc">Recommended sequence for a single fees payment (matches Postman collection <strong>1. End-to-End Pay Fees Flow</strong>).</p>
+      <div class="flow">
+        <span class="flow-step">1 · Student lookup</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">2 · Load fees</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">3 · Initiate payment</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">4 · Poll status</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-step">5 · Receipt</span>
+      </div>
+      <table>
+        <thead><tr><th>Step</th><th>Module</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>students_api_url</code></td><td><code>GET /public/students/lookup</code> → <code>organizationId</code></td></tr>
+          <tr><td>2</td><td><code>fees_api_url</code></td><td><code>GET /public/student-fees</code> — fee lines, remaining; optional auto-bill</td></tr>
+          <tr><td>3</td><td><code>fees_api_url</code></td><td><code>POST /public/payments/initiate</code> → <code>reference</code></td></tr>
+          <tr><td>4</td><td><code>fees_api_url</code></td><td><code>GET /public/payments/{reference}/status</code> until <code>COMPLETED</code></td></tr>
+          <tr><td>5</td><td><code>fees_api_url</code></td><td><code>GET /public/receipts/{receiptNumber}</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="step1">
+      <h2>Step 1: Student lookup</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-get">GET</span>
+          <span class="path">https://students-api.shuleplus.rw/api/public/students/lookup?code={student_code}</span>
+          <span class="scope-pill">Public · no auth</span>
+        </div>
+        <p>Public lookup by <strong>ShuleCode</strong> or <strong>SDMS code</strong> (case-insensitive).</p>
+        <h4>Query parameters</h4>
+        <table>
+          <tr><th>Parameter</th><th>Required</th><th>Example</th></tr>
+          <tr><td><code>code</code></td><td>Yes</td><td><code>04001042426</code></td></tr>
+        </table>
+        <h4>Example success</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"id"</span>: <span class="str">"uuid-student"</span>,
+    <span class="key">"organizationId"</span>: <span class="str">"a6c956cd-43c7-42a2-800d-3897d2fe9fdf"</span>,
+    <span class="key">"fullName"</span>: <span class="str">"Jean Uwimana"</span>,
+    <span class="key">"studentCode"</span>: <span class="str">"04001042426"</span>,
+    <span class="key">"shuleCode"</span>: <span class="str">"04001042426"</span>,
+    <span class="key">"schoolName"</span>: <span class="str">"GS Kimironko II"</span>,
+    <span class="key">"className"</span>: <span class="str">"S1 · A"</span>,
+    <span class="key">"academicYear"</span>: <span class="str">"2025-2026"</span>,
+    <span class="key">"term"</span>: <span class="str">"Term 1"</span>,
+    <span class="key">"parents"</span>: [{ <span class="key">"role"</span>: <span class="str">"FATHER"</span>, <span class="key">"name"</span>: <span class="str">"..."</span>, <span class="key">"phone"</span>: <span class="str">"078..."</span> }]
+  }
+}</pre>
+        <h4>Errors</h4>
+        <table>
+          <tr><td><code>400</code></td><td>Missing <code>code</code></td></tr>
+          <tr><td><code>404</code></td><td>No student found for that code</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="step2">
+      <h2>Step 2 — Load student fees</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-get">GET</span>
+          <span class="path">https://fees.shuleplus.rw/api/public/student-fees?organizationId=…&amp;studentCode=…&amp;academicYear=…&amp;term=…</span>
+          <span class="scope-pill">Public · no auth</span>
+        </div>
+        <h4>Query parameters</h4>
+        <table>
+          <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+          <tr><td><code>organizationId</code></td><td>Yes</td><td>From student lookup</td></tr>
+          <tr><td><code>studentCode</code></td><td>Yes*</td><td>ShuleCode</td></tr>
+          <tr><td><code>academicYear</code></td><td>Yes</td><td>e.g. <code>2025-2026</code></td></tr>
+          <tr><td><code>term</code></td><td>Yes</td><td>e.g. <code>Term 1</code></td></tr>
+          <tr><td><code>autoBill</code></td><td>No</td><td><code>1</code> (default) creates bill if missing</td></tr>
+          <tr><td><code>className</code></td><td>No</td><td>Improves structure matching</td></tr>
+        </table>
+        <h4>Example success</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"found"</span>: <span class="num">true</span>,
+    <span class="key">"structureName"</span>: <span class="str">"S1 Term 1 2025-2026"</span>,
+    <span class="key">"billId"</span>: <span class="str">"uuid-bill"</span>,
+    <span class="key">"billNumber"</span>: <span class="str">"BILL-2026-00042"</span>,
+    <span class="key">"fees"</span>: [
+      { <span class="key">"id"</span>: <span class="str">"..."</span>, <span class="key">"name"</span>: <span class="str">"Tuition"</span>, <span class="key">"amount"</span>: <span class="num">45000</span>, <span class="key">"required"</span>: <span class="num">true</span> },
+      { <span class="key">"id"</span>: <span class="str">"..."</span>, <span class="key">"name"</span>: <span class="str">"Activity fee"</span>, <span class="key">"amount"</span>: <span class="num">5000</span>, <span class="key">"required"</span>: <span class="num">true</span> }
+    ],
+    <span class="key">"total"</span>: <span class="num">50000</span>,
+    <span class="key">"paid"</span>: <span class="num">0</span>,
+    <span class="key">"remaining"</span>: <span class="num">50000</span>
+  }
+}</pre>
+        <p>If <code>found</code> is <code>false</code>, no active fee structure matches — contact the school or use Babyeyi circular fallback (separate module).</p>
+      </div>
+    </section>
+
+    <section id="step3">
+      <h2>Step 3 — Initiate payment</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-post">POST</span>
+          <span class="path">https://fees.shuleplus.rw/api/public/payments/initiate</span>
+          <span class="scope-pill">Public · no auth</span>
+        </div>
+        <p>Creates a <strong>PENDING</strong> payment. In production, your bank executes the debit/transfer and confirms via callback (roadmap). Sandbox may auto-complete after polling when configured.</p>
+        <div class="note"><strong>Idempotency:</strong> Send header <code>Idempotency-Key</code> with a unique value per customer transaction. Retrying with the <strong>same key and same JSON body</strong> returns the original <code>201</code> response (same <code>reference</code>). Reusing the key with a <strong>different body</strong> returns <code>409</code> — treat as an integration error and investigate.</div>
+        <div class="note"><strong>Important:</strong> Use JSON field <code>method</code> — values <code>MOMO</code>, <code>BANK</code>, or <code>CARD</code>. Do not use <code>channel</code>.</div>
+        <h4>Common body fields</h4>
+        <table>
+          <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+          <tr><td><code>organizationId</code></td><td>Yes</td><td>School UUID</td></tr>
+          <tr><td><code>studentCode</code></td><td>Yes*</td><td>ShuleCode</td></tr>
+          <tr><td><code>studentName</code></td><td>Recommended</td><td>Display on receipt</td></tr>
+          <tr><td><code>academicYear</code>, <code>term</code></td><td>Yes</td><td>Must match fee query</td></tr>
+          <tr><td><code>amount</code></td><td>Yes</td><td>Positive number (RWF)</td></tr>
+          <tr><td><code>method</code></td><td>Yes</td><td><code>MOMO</code> | <code>BANK</code> | <code>CARD</code></td></tr>
+        </table>
+        <h4>MoMo example</h4>
+<pre>{
+  <span class="key">"organizationId"</span>: <span class="str">"a6c956cd-43c7-42a2-800d-3897d2fe9fdf"</span>,
+  <span class="key">"studentCode"</span>: <span class="str">"04001042426"</span>,
+  <span class="key">"studentName"</span>: <span class="str">"Jean Uwimana"</span>,
+  <span class="key">"academicYear"</span>: <span class="str">"2025-2026"</span>,
+  <span class="key">"term"</span>: <span class="str">"Term 1"</span>,
+  <span class="key">"amount"</span>: <span class="num">5000</span>,
+  <span class="key">"method"</span>: <span class="str">"MOMO"</span>,
+  <span class="key">"phone"</span>: <span class="str">"0788123456"</span>,
+  <span class="key">"provider"</span>: <span class="str">"MTN"</span>
+}</pre>
+        <h4>Bank transfer example</h4>
+<pre>{
+  <span class="key">"organizationId"</span>: <span class="str">"a6c956cd-43c7-42a2-800d-3897d2fe9fdf"</span>,
+  <span class="key">"studentCode"</span>: <span class="str">"04001042426"</span>,
+  <span class="key">"academicYear"</span>: <span class="str">"2025-2026"</span>,
+  <span class="key">"term"</span>: <span class="str">"Term 1"</span>,
+  <span class="key">"amount"</span>: <span class="num">5000</span>,
+  <span class="key">"method"</span>: <span class="str">"BANK"</span>,
+  <span class="key">"bankName"</span>: <span class="str">"Bank of Africa"</span>,
+  <span class="key">"accountNumber"</span>: <span class="str">"0001234567890"</span>,
+  <span class="key">"accountHolder"</span>: <span class="str">"Jean Parent"</span>
+}</pre>
+        <h4>Success response (201)</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"PUB-MOMO-M5XK2ABC12XY"</span>,
+    <span class="key">"status"</span>: <span class="str">"PENDING"</span>,
+    <span class="key">"paymentNumber"</span>: <span class="str">"PAY-2026-00123"</span>,
+    <span class="key">"amount"</span>: <span class="num">5000</span>,
+    <span class="key">"method"</span>: <span class="str">"MOBILE_MONEY"</span>,
+    <span class="key">"provider"</span>: <span class="str">"MTN"</span>,
+    <span class="key">"autoConfirmSeconds"</span>: <span class="num">null</span>
+  }
+}</pre>
+        <p>Store <code>reference</code> — required for status polling.</p>
+        <table>
+          <tr><th><code>method</code></th><th>Additional fields</th></tr>
+          <tr><td><code>MOMO</code></td><td><code>phone</code> (Rwandan 07xxxxxxxx); optional <code>provider</code> MTN | AIRTEL</td></tr>
+          <tr><td><code>BANK</code></td><td><code>bankName</code>, <code>accountNumber</code>, <code>accountHolder</code></td></tr>
+          <tr><td><code>CARD</code></td><td>Production: use hosted PSP; sandbox validates format only (PCI: never log full PAN/CVV)</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="step4">
+      <h2>Step 4 — Payment status &amp; receipt</h2>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-get">GET</span>
+          <span class="path">https://fees.shuleplus.rw/api/public/payments/{reference}/status</span>
+          <span class="scope-pill">Public · no auth</span>
+        </div>
+        <h4>Example — pending</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"PUB-MOMO-M5XK2ABC12XY"</span>,
+    <span class="key">"status"</span>: <span class="str">"PENDING"</span>,
+    <span class="key">"paymentNumber"</span>: <span class="str">"PAY-2026-00123"</span>,
+    <span class="key">"amount"</span>: <span class="num">5000</span>,
+    <span class="key">"method"</span>: <span class="str">"MOBILE_MONEY"</span>,
+    <span class="key">"receiptNumber"</span>: <span class="num">null</span>
+  }
+}</pre>
+        <h4>Example — completed</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"reference"</span>: <span class="str">"PUB-MOMO-M5XK2ABC12XY"</span>,
+    <span class="key">"status"</span>: <span class="str">"COMPLETED"</span>,
+    <span class="key">"paymentNumber"</span>: <span class="str">"PAY-2026-00123"</span>,
+    <span class="key">"amount"</span>: <span class="num">5000</span>,
+    <span class="key">"method"</span>: <span class="str">"MOBILE_MONEY"</span>,
+    <span class="key">"receiptNumber"</span>: <span class="str">"RC-2026-00089"</span>
+  }
+}</pre>
+        <p><strong>Polling:</strong> Call every 2–5 seconds until <code>status</code> is <code>COMPLETED</code> or <code>FAILED</code> / timeout. Partial payments update the student bill balance when completed.</p>
+      </div>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-get">GET</span>
+          <span class="path">https://fees.shuleplus.rw/api/public/receipts/{receiptNumber}</span>
+          <span class="scope-pill">Public · no auth</span>
+        </div>
+        <h4>Example success</h4>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">true</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"receiptNumber"</span>: <span class="str">"RC-2026-00089"</span>,
+    <span class="key">"studentName"</span>: <span class="str">"Jean Uwimana"</span>,
+    <span class="key">"studentCode"</span>: <span class="str">"04001042426"</span>,
+    <span class="key">"className"</span>: <span class="str">"S1 · A"</span>,
+    <span class="key">"amountPaid"</span>: <span class="num">5000</span>,
+    <span class="key">"outstanding"</span>: <span class="num">45000</span>,
+    <span class="key">"method"</span>: <span class="str">"MOBILE_MONEY"</span>,
+    <span class="key">"issuedAt"</span>: <span class="str">"2026-03-14T10:22:00.000Z"</span>,
+    <span class="key">"reference"</span>: <span class="str">"PUB-MOMO-M5XK2ABC12XY"</span>,
+    <span class="key">"verifyUrl"</span>: <span class="str">"https://shuleplus.rw/receipt/RC-2026-00089"</span>,
+    <span class="key">"verifyValid"</span>: <span class="num">true</span>,
+    <span class="key">"verifyMessage"</span>: <span class="str">"Authentic Shule+ receipt"</span>,
+    <span class="key">"accountStatus"</span>: <span class="str">"PARTIAL"</span>,
+    <span class="key">"paymentStatus"</span>: <span class="str">"COMPLETED"</span>
+  }
+}</pre>
+      </div>
+    </section>
+
+    <section id="bff">
+      <h2>Alternative: Babyeyi BFF (single base URL)</h2>
+      <p class="section-desc">
+        The public website uses <strong>WebpageBabyeyi BFF</strong> — same backend logic, different paths (no <code>/public</code> prefix).
+        Postman collection <strong>3. WebpageBabyeyi</strong> uses <code>{{babyeyi_bff_url}}</code>.
+      </p>
+      <table>
+        <thead><tr><th>Step</th><th>BFF path</th><th>Equivalent module path</th></tr></thead>
+        <tbody>
+          <tr><td>Lookup</td><td><code>GET /students/lookup?code=</code></td><td><code>GET /public/students/lookup</code> on students API</td></tr>
+          <tr><td>Fees</td><td><code>GET /fees/student-fees</code></td><td><code>GET /public/student-fees</code> on fees API</td></tr>
+          <tr><td>Pay</td><td><code>POST /fees/payments/initiate</code></td><td><code>POST /public/payments/initiate</code></td></tr>
+          <tr><td>Status</td><td><code>GET /fees/payments/{ref}/status</code></td><td><code>GET /public/payments/{ref}/status</code></td></tr>
+          <tr><td>Receipt</td><td><code>GET /fees/receipts/{no}</code></td><td><code>GET /public/receipts/{no}</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="authentication">
+      <h2>Optional: IAM OAuth (Developer Portal)</h2>
+      <p class="section-desc">
+        The <strong>public pay-fees flow above does not require OAuth</strong>. Client credentials are used for
+        Developer Portal testing, school-authenticated APIs, and partner onboarding — not for <code>/public/…</code> routes.
+      </p>
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method method-post">POST</span>
+          <span class="path">https://shuleplus.rw/api/v1/developers/oauth/token</span>
+        </div>
+        <h4>Request body</h4>
+<pre>{
+  <span class="key">"grant_type"</span>: <span class="str">"client_credentials"</span>,
+  <span class="key">"client_id"</span>: <span class="str">"sp_test_xxxxxxxx"</span>,
+  <span class="key">"client_secret"</span>: <span class="str">"your_secret_from_portal"</span>
+}</pre>
+      </div>
+    </section>
+
+    <section id="errors">
+      <h2>Errors &amp; HTTP status codes</h2>
+      <table>
+        <thead><tr><th>HTTP</th><th>Meaning</th><th>Typical cause</th></tr></thead>
+        <tbody>
+          <tr><td><code>401</code></td><td>Unauthorized</td><td>On protected school APIs — invalid or missing Bearer token</td></tr>
+          <tr><td><code>403</code></td><td>Forbidden</td><td>License / tenant not provisioned for the school module</td></tr>
+          <tr><td><code>404</code></td><td>Not found</td><td>Unknown student, payment reference, or receipt</td></tr>
+          <tr><td><code>400</code></td><td>Bad request</td><td>Validation (amount, phone, missing academicYear/term)</td></tr>
+          <tr><td><code>409</code></td><td>Conflict / duplicate</td><td>Idempotency key already used with <strong>different</strong> payload; or business rule (e.g. amount exceeds remaining balance). Do not auto-retry — investigate.</td></tr>
+        </tbody>
+      </table>
+      <div class="card">
+        <h3>Error body shape</h3>
+<pre>{
+  <span class="key">"success"</span>: <span class="num">false</span>,
+  <span class="key">"message"</span>: <span class="str">"Human-readable description"</span>
+}</pre>
+      </div>
+    </section>
+
+    <section id="bank-integration">
+      <h2>Bank integration notes</h2>
+      <div class="card">
+        <h3>Current platform capabilities</h3>
+        <table>
+          <tr><td>✅</td><td>Direct module APIs + Babyeyi BFF (production URLs)</td></tr>
+          <tr><td>✅</td><td>Student lookup, fee quotation, payment record (PENDING → COMPLETED)</td></tr>
+          <tr><td>✅</td><td>Digital receipts with verification URL / QR</td></tr>
+          <tr><td>🔜</td><td>Bank webhook for payment confirmation</td></tr>
+          <tr><td>🔜</td><td>Real-time account debit / MoMo STK push via partner CBS</td></tr>
+          <tr><td>🔜</td><td>Reconciliation &amp; settlement reporting APIs</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Recommended integration pattern</h3>
+        <ol>
+          <li>Parent selects school fees payment in your channel.</li>
+          <li>Your backend calls ShulePlus Steps 1–2 to validate student and amount.</li>
+          <li>Initiate ShulePlus payment (Step 3) to obtain <code>reference</code>.</li>
+          <li>Execute debit/transfer in your core banking system.</li>
+          <li>On success, confirm payment with ShulePlus (callback API — coordinate with ShulePlus integration team).</li>
+          <li>Poll Step 4 or receive webhook when status is <code>COMPLETED</code>; show receipt to parent.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Sandbox testing</h3>
+        <ul>
+          <li>Use Postman collection <strong>1. End-to-End Pay Fees Flow</strong> (direct module URLs).</li>
+          <li>Set <code>students_api_url</code>, <code>fees_api_url</code>, and <code>organization_id</code> in the environment.</li>
+          <li>Optional: collection <strong>0</strong> for IAM health checks and OAuth (not required for public pay).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="support">
+      <h2>Support &amp; resources</h2>
+      <div class="card">
+        <table>
+          <tr><td><strong>Developer Portal</strong></td><td><a href="https://shuleplus.rw/developers">https://shuleplus.rw/developers</a></td></tr>
+          <tr><td><strong>Interactive API catalog</strong></td><td><a href="https://shuleplus.rw/developers/docs">https://shuleplus.rw/developers/docs</a></td></tr>
+          <tr><td><strong>OAuth token</strong></td><td><code>POST https://shuleplus.rw/api/v1/developers/oauth/token</code></td></tr>
+          <tr><td><strong>Postman pack</strong></td><td>Download from Developer Portal or request from ShulePlus</td></tr>
+        </table>
+      </div>
+      <footer class="doc-footer">
+        <p>© ShulePlus · Rwanda · Confidential — for authorized integration partners only.</p>
+        <p>Document version 1.0 · Generated from ShulePlus platform API definitions · For technical questions contact your ShulePlus integration manager.</p>
+      </footer>
+    </section>
+
+  </main>
+</div>
+
+</body>
+</html>

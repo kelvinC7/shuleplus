@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="gA" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCB038"/>
+      <stop offset="1" stop-color="#E89520"/>
+    </linearGradient>
+    <linearGradient id="gN" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#000435"/>
+      <stop offset="1" stop-color="#1A2A6C"/>
+    </linearGradient>
+    <linearGradient id="gT" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1FA8A0"/>
+      <stop offset="1" stop-color="#0D7A74"/>
+    </linearGradient>
+  </defs>
+<path d="M12 18 H18 L22 40 H46 L52 22 H24" stroke="url(#gN)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M20 20 H50 L46 36 H24 Z" fill="url(#gA)" opacity="0.9"/>
+  <circle cx="26" cy="48" r="4.5" fill="url(#gT)"/>
+  <circle cx="44" cy="48" r="4.5" fill="url(#gN)"/>
+  <rect x="28" y="24" width="4" height="8" rx="1" fill="url(#gN)" opacity="0.5"/>
+  <rect x="36" y="24" width="4" height="8" rx="1" fill="url(#gN)" opacity="0.5"/>
+</svg>

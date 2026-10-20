@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+  ARCHIVED
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// Audit trail for every outbound notification (email, SMS, push).
+model NotificationLog {
+  id            String              @id @default(uuid())
+  sourceService String              @map("source_service")
+  channel       NotificationChannel
+  recipient     String
+  subject       String?
+  body          String
+  templateSlug  String?             @map("template_slug")
+  status        NotificationStatus  @default(PENDING)
+  metadata      Json?
+  errorMessage  String?             @map("error_message")
+  sentAt        DateTime?           @map("sent_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([sourceService, createdAt])
+  @@index([channel, status])
+  @@index([recipient])
+  @@map("notification_logs")
+}
+
+/// Reusable templates — Finance can send fee receipts, IAM can send invites, etc.
+model NotificationTemplate {
+  id        String              @id @default(uuid())
+  slug      String              @unique
+  name      String
+  channel   NotificationChannel
+  subject   String?
+  bodyHtml  String?             @map("body_html") @db.Text
+  bodyText  String?             @map("body_text") @db.Text
+  variables Json?
+  isActive  Boolean             @default(true) @map("is_active")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}
+
+/// Per-user delivery preferences (email on/off, SMS on/off, etc.)
+model UserNotificationPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique @map("user_id")
+  emailEnabled       Boolean  @default(true) @map("email_enabled")
+  smsEnabled         Boolean  @default(true) @map("sms_enabled")
+  pushEnabled        Boolean  @default(true) @map("push_enabled")
+  inAppEnabled       Boolean  @default(true) @map("in_app_enabled")
+  marketingEnabled   Boolean  @default(false) @map("marketing_enabled")
+  quietHoursStart    String?  @map("quiet_hours_start")
+  quietHoursEnd      String?  @map("quiet_hours_end")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("user_notification_preferences")
+}
+
+/// In-app notification center items (bell dropdown, notification page).
+model InAppNotification {
+  id         String               @id @default(uuid())
+  userId     String               @map("user_id")
+  title      String
+  body       String
+  priority   NotificationPriority @default(NORMAL)
+  isRead     Boolean              @default(false) @map("is_read")
+  isArchived Boolean              @default(false) @map("is_archived")
+  actionUrl  String?              @map("action_url")
+  metadata   Json?
+  readAt     DateTime?            @map("read_at")
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  @@index([userId, isRead, isArchived, createdAt])
+  @@map("in_app_notifications")
+}

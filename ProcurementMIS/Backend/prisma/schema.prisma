@@ -1,0 +1,553 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PRStatus {
+  DRAFT
+  PENDING
+  DEPARTMENT_HEAD_APPROVED
+  FINANCE_APPROVED
+  PROCUREMENT_APPROVED
+  MD_APPROVED
+  REJECTED
+  CONVERTED_TO_PO
+  CANCELLED
+}
+
+enum POStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  PREPARING
+  IN_TRANSIT
+  DELIVERED
+  PARTIALLY_DELIVERED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  PREFERRED
+  BLACKLISTED
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  PENDING_RENEWAL
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum DeliverableType {
+  GOODS
+  SERVICES
+  WORKS
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  purchaseRequests  PurchaseRequest[]
+  purchaseOrders    PurchaseOrder[]
+  suppliers         Supplier[]
+  contracts         Contract[]
+  budgets           Budget[]
+  departments       Department[]
+  categories        ProcurementCategory[]
+  attachments       Attachment[]
+  settings          Setting[]
+  activityLogs      ActivityLog[]
+  notifications     Notification[]
+  goodsReceivings   GoodsReceiving[]
+  goodsReturns      GoodsReturn[]
+
+  @@map("tenants")
+}
+
+model UserCache {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  email          String?
+  displayName    String?  @map("display_name")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([organizationId, userId])
+  @@map("users_cache")
+}
+
+model Department {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  code           String
+  headUserId     String?  @map("head_user_id")
+  headName       String?  @map("head_name")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant   @relation(fields: [organizationId], references: [organizationId])
+  purchaseRequests PurchaseRequest[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("departments")
+}
+
+model ProcurementCategory {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  code           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant   @relation(fields: [organizationId], references: [organizationId])
+  purchaseRequestItems PurchaseRequestItem[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("procurement_categories")
+}
+
+model PurchaseRequest {
+  id                String   @id @default(uuid())
+  organizationId    String   @map("organization_id")
+  prNumber          String   @map("pr_number")
+  requestType       String   @map("request_type")
+  departmentId      String   @map("department_id")
+  departmentOther   String?  @map("department_other")
+  academicYear      String?  @map("academic_year")
+  term              String?  @map("term")
+  requestedBy       String   @map("requested_by")
+  requestedByName   String?  @map("requested_by_name")
+  purpose           String?
+  project           String?
+  budgetLine        String?  @map("budget_line")
+  priority          Priority @default(MEDIUM)
+  neededDate        DateTime @map("needed_date")
+  status            PRStatus @default(DRAFT)
+  totalEstimate     Decimal? @map("total_estimate") @db.Decimal(14, 2)
+  currentApprover   String?  @map("current_approver")
+  rejectionReason   String?  @map("rejection_reason")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  department        Department      @relation(fields: [departmentId], references: [id])
+  items             PurchaseRequestItem[]
+  approvals         PRApproval[]
+  purchaseOrders     PurchaseOrder[]
+  tenant            Tenant          @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, prNumber])
+  @@index([organizationId])
+  @@index([status])
+  @@index([departmentId])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                 String   @id @default(uuid())
+  prId               String   @map("pr_id")
+  itemName           String   @map("item_name")
+  description        String?
+  unit               String
+  quantity           Decimal  @db.Decimal(12, 2)
+  estimatedPrice     Decimal  @map("estimated_price") @db.Decimal(14, 2)
+  estimatedTotal     Decimal  @map("estimated_total") @db.Decimal(14, 2)
+  categoryId         String?  @map("category_id")
+  preferredSupplierId String? @map("preferred_supplier_id")
+  warehouseLocation  String?  @map("warehouse_location")
+  availableStock     Decimal? @map("available_stock") @db.Decimal(12, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  request            PurchaseRequest @relation(fields: [prId], references: [id], onDelete: Cascade)
+  category           ProcurementCategory? @relation(fields: [categoryId], references: [id])
+
+  @@index([prId])
+  @@map("purchase_request_items")
+}
+
+model PRApproval {
+  id             String   @id @default(uuid())
+  prId           String   @map("pr_id")
+  stage          String
+  approverId     String   @map("approver_id")
+  approverName   String?  @map("approver_name")
+  approverEmail  String?  @map("approver_email")
+  status         String   @default("PENDING")
+  comment        String?
+  approvedAt     DateTime? @map("approved_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  request        PurchaseRequest @relation(fields: [prId], references: [id], onDelete: Cascade)
+
+  @@index([prId])
+  @@map("pr_approvals")
+}
+
+model PurchaseOrder {
+  id                String      @id @default(uuid())
+  organizationId    String      @map("organization_id")
+  poNumber          String      @map("po_number")
+  prId              String?     @unique @map("pr_id")
+  supplierId        String      @map("supplier_id")
+  orderDate         DateTime    @default(now()) @map("order_date")
+  expectedDelivery  DateTime?   @map("expected_delivery")
+  deliveryAddress   String?     @map("delivery_address")
+  subtotal          Decimal     @db.Decimal(14, 2)
+  discount          Decimal?    @default(0) @db.Decimal(14, 2)
+  tax               Decimal?    @default(0) @db.Decimal(14, 2)
+  shippingCost      Decimal?    @default(0) @map("shipping_cost") @db.Decimal(14, 2)
+  totalAmount       Decimal     @map("total_amount") @db.Decimal(14, 2)
+  paymentTerms      String?     @map("payment_terms")
+  notes             String?
+  status            POStatus    @default(DRAFT)
+  paymentStatus     PaymentStatus @default(UNPAID)
+  createdBy         String      @map("created_by")
+  createdByName     String?     @map("created_by_name")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  supplier          Supplier    @relation(fields: [supplierId], references: [id])
+  purchaseRequest   PurchaseRequest? @relation(fields: [prId], references: [id])
+  items             PurchaseOrderItem[]
+  goodsReceivings   GoodsReceiving[]
+  tenant            Tenant      @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, poNumber])
+  @@index([organizationId])
+  @@index([status])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id          String  @id @default(uuid())
+  poId        String  @map("po_id")
+  itemName    String  @map("item_name")
+  description String?
+  unit        String
+  quantity    Decimal @db.Decimal(12, 2)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(14, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(14, 2)
+  receivedQty Decimal? @map("received_qty") @db.Decimal(12, 2)
+
+  order       PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("purchase_order_items")
+}
+
+model Supplier {
+  id                String        @id @default(uuid())
+  organizationId    String        @map("organization_id")
+  companyName       String        @map("company_name")
+  contactPerson     String?       @map("contact_person")
+  email             String?
+  phone             String?
+  alternativePhone  String?       @map("alternative_phone")
+  address           String?
+  city              String?
+  country           String?       @default("Rwanda")
+  tinNumber         String?       @map("tin_number")
+  registrationNumber String?      @map("registration_number")
+  website           String?
+  logoUrl           String?       @map("logo_url")
+  paymentTerms      String?       @map("payment_terms")
+  paymentMethod     String?       @map("payment_method")
+  bankName          String?       @map("bank_name")
+  bankAccountNumber String?       @map("bank_account_number")
+  mobileMoneyNumber String?       @map("mobile_money_number")
+  status            SupplierStatus @default(ACTIVE)
+  rating            Decimal?      @db.Decimal(3, 2)
+  notes             String?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  tenant            Tenant        @relation(fields: [organizationId], references: [organizationId])
+  contracts         Contract[]
+  purchaseOrders    PurchaseOrder[]
+  performanceRecords SupplierPerformance[]
+
+  @@unique([organizationId, companyName])
+  @@index([organizationId])
+  @@map("suppliers")
+}
+
+model SupplierPerformance {
+  id              String   @id @default(uuid())
+  supplierId      String   @map("supplier_id")
+  organizationId  String   @map("organization_id")
+  deliverySpeed   Decimal? @map("delivery_speed") @db.Decimal(5, 2)
+  qualityRating   Decimal? @map("quality_rating") @db.Decimal(5, 2)
+  priceScore      Decimal? @map("price_score") @db.Decimal(5, 2)
+  responseTime    Decimal? @map("response_time") @db.Decimal(5, 2)
+  reliability     Decimal? @db.Decimal(5, 2)
+  lateDeliveries  Int?     @default(0) @map("late_deliveries")
+  completedOrders Int?     @default(0) @map("completed_orders")
+  rejectedItems   Int?     @default(0) @map("rejected_items")
+  overallRating   Decimal? @map("overall_rating") @db.Decimal(3, 2)
+  period          String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@map("supplier_performance")
+}
+
+model Contract {
+  id              String         @id @default(uuid())
+  organizationId  String         @map("organization_id")
+  contractNumber  String         @map("contract_number")
+  supplierId      String         @map("supplier_id")
+  title           String
+  description     String?
+  startDate       DateTime       @map("start_date")
+  endDate         DateTime       @map("end_date")
+  value           Decimal?       @db.Decimal(14, 2)
+  status          ContractStatus @default(ACTIVE)
+  signedBy        String?        @map("signed_by")
+  renewalTerms    String?        @map("renewal_terms")
+  notes           String?
+  documentUrl     String?        @map("document_url")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  supplier        Supplier       @relation(fields: [supplierId], references: [id])
+  tenant          Tenant         @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, contractNumber])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([endDate])
+  @@map("contracts")
+}
+
+model Budget {
+  id              String        @id @default(uuid())
+  organizationId  String        @map("organization_id")
+  departmentId    String?       @map("department_id")
+  name            String
+  year            Int
+  period          BudgetPeriod  @default(YEARLY)
+  totalBudget     Decimal       @map("total_budget") @db.Decimal(14, 2)
+  spent           Decimal       @default(0) @db.Decimal(14, 2)
+  reserved        Decimal       @default(0) @db.Decimal(14, 2)
+  status          String        @default("ACTIVE")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tenant          Tenant        @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, name, year])
+  @@index([organizationId])
+  @@index([year])
+  @@map("budgets")
+}
+
+model GoodsReceiving {
+  id              String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  grnNumber       String   @map("grn_number")
+  poId            String   @map("po_id")
+  receivedBy      String   @map("received_by")
+  receivedByName  String?  @map("received_by_name")
+  receivedDate    DateTime @default(now()) @map("received_date")
+  notes           String?
+  inspectionNotes String?  @map("inspection_notes")
+  barcode         String?
+  status          String   @default("RECEIVED")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  items           GoodsReceivingItem[]
+  returns         GoodsReturn[]
+  purchaseOrder   PurchaseOrder @relation(fields: [poId], references: [id])
+  tenant          Tenant   @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, grnNumber])
+  @@index([organizationId])
+  @@index([poId])
+  @@map("goods_receivings")
+}
+
+model GoodsReceivingItem {
+  id          String  @id @default(uuid())
+  grnId       String  @map("grn_id")
+  poItemId    String  @map("po_item_id")
+  itemName    String  @map("item_name")
+  orderedQty  Decimal @map("ordered_qty") @db.Decimal(12, 2)
+  receivedQty Decimal @map("received_qty") @db.Decimal(12, 2)
+  acceptedQty Decimal @map("accepted_qty") @db.Decimal(12, 2)
+  rejectedQty Decimal @default(0) @map("rejected_qty") @db.Decimal(12, 2)
+  damagedQty  Decimal @default(0) @map("damaged_qty") @db.Decimal(12, 2)
+  condition         String?
+  qualityStatus     String?  @map("quality_status")
+  warehouseLocation String?  @map("warehouse_location")
+  batchNumber       String?  @map("batch_number")
+  serialNumber      String?  @map("serial_number")
+  expiryDate        DateTime? @map("expiry_date")
+  manufacturingDate DateTime? @map("manufacturing_date")
+  warrantyMonths    Int?     @map("warranty_months")
+  itemNotes         String?  @map("item_notes")
+
+  grn         GoodsReceiving @relation(fields: [grnId], references: [id], onDelete: Cascade)
+
+  @@index([grnId])
+  @@map("goods_receiving_items")
+}
+
+model GoodsReturn {
+  id                  String   @id @default(uuid())
+  organizationId      String   @map("organization_id")
+  returnNumber        String   @map("return_number")
+  grnId               String   @map("grn_id")
+  poId                String?  @map("po_id")
+  supplierId          String?  @map("supplier_id")
+  reason              String
+  reasonDescription   String?  @map("reason_description")
+  resolution          String?
+  status              String   @default("DRAFT")
+  returnValue         Decimal? @default(0) @map("return_value") @db.Decimal(14, 2)
+  createdBy           String   @map("created_by")
+  createdByName       String?  @map("created_by_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  grn                 GoodsReceiving @relation(fields: [grnId], references: [id])
+  items               GoodsReturnItem[]
+  tenant              Tenant   @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, returnNumber])
+  @@index([organizationId])
+  @@index([grnId])
+  @@map("goods_returns")
+}
+
+model GoodsReturnItem {
+  id          String  @id @default(uuid())
+  returnId    String  @map("return_id")
+  grnItemId   String? @map("grn_item_id")
+  itemName    String  @map("item_name")
+  receivedQty Decimal @map("received_qty") @db.Decimal(12, 2)
+  returnQty   Decimal @map("return_qty") @db.Decimal(12, 2)
+  unitPrice   Decimal? @map("unit_price") @db.Decimal(14, 2)
+  reason      String?
+
+  goodsReturn GoodsReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@map("goods_return_items")
+}
+
+model Attachment {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  referenceType  String   @map("reference_type")
+  referenceId    String   @map("reference_id")
+  fileName       String   @map("file_name")
+  fileUrl        String   @map("file_url")
+  fileType       String?  @map("file_type")
+  fileSize       Int?     @map("file_size")
+  uploadedBy     String   @map("uploaded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([referenceType, referenceId])
+  @@map("attachments")
+}
+
+model Notification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  title          String
+  message        String
+  type           String
+  referenceType  String?  @map("reference_type")
+  referenceId    String?  @map("reference_id")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId, userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, key])
+  @@map("settings")
+}
+
+model ActivityLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String?  @map("user_id")
+  userName       String?  @map("user_name")
+  action         String
+  entity         String?
+  entityId       String?  @map("entity_id")
+  metadata       Json?
+  ipAddress      String?  @map("ip_address")
+  browser        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId])
+  @@index([entity, entityId])
+  @@map("activity_logs")
+}
