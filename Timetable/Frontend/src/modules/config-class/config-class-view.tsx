@@ -27,7 +27,8 @@ import { SideDrawer } from '@/components/side-drawer';
 import { ConfirmDeleteModal } from '@/components/confirm-delete-modal';
 import { SetupModal, ModalSection } from '@/components/setup-modal';
 import { ModalFooterActions } from '@/components/setup-form-ui';
-import { FormField, SelectField, TextField } from '@/components/form-fields';
+import { FormField, SelectField, TextField, SearchableSelectField } from '@/components/form-fields';
+import { DefaultCourseMarksField, parseDefaultCourseMarksInput } from '@/components/default-course-marks-field';
 import { timetableApi } from '@/services/timetable-api';
 import { useAcademicSettings } from '@/contexts/academic-settings-context';
 import type {
@@ -1025,7 +1026,10 @@ function assignmentPayloadFromCourse(
     teacherUserId,
     teacherName,
     periodsPerWeek: cfg?.periodsPerWeek ?? 3,
-    defaultCourseMarks: null as number | null,
+    defaultCourseMarks:
+      cfg.defaultCourseMarks != null && Number.isFinite(Number(cfg.defaultCourseMarks))
+        ? Number(cfg.defaultCourseMarks)
+        : null,
     room: rules.preferredLabRoom ?? rules.preferredRoom ?? undefined,
     schedulingOverrides: {
       lessonDuration: lessonStructure === 'SINGLE' ? 'SINGLE' : 'DOUBLE',
@@ -1088,9 +1092,14 @@ function RegisterCourseModal({
       setTeacherUserId(editRow.teacherUserId);
       setTeacherName(editRow.teacherName);
       setPeriodsPerWeek(editRow.periodsPerWeek);
-      setDefaultCourseMarks(
-        editRow.defaultCourseMarks != null ? String(editRow.defaultCourseMarks) : ''
-      );
+      const cfgMarks = courseConfigs.find((c) => c.subjectName === editRow.subjectName)?.defaultCourseMarks;
+      const marks =
+        editRow.defaultCourseMarks != null
+          ? editRow.defaultCourseMarks
+          : cfgMarks != null
+            ? Number(cfgMarks)
+            : null;
+      setDefaultCourseMarks(marks != null ? String(marks) : '');
       setRoom(editRow.room ?? '');
       const ov = editRow.schedulingOverrides;
       if (ov.lessonDuration === 'DOUBLE' && ov.doublePeriodMode === 'REQUIRE') setLessonStructure('REQUIRE_DOUBLE');
@@ -1109,7 +1118,7 @@ function RegisterCourseModal({
       setEntries([newRegisterEntry()]);
       setTeacherCache({});
     }
-  }, [open, editRow]);
+  }, [open, editRow, courseConfigs]);
 
   const readyEntryCount = entries.filter((e) => e.courseConfigId && e.teacherUserId).length;
   const registeredCodeSet = useMemo(() => new Set(registeredCourseCodes), [registeredCourseCodes]);
@@ -1230,6 +1239,9 @@ function RegisterCourseModal({
     setRoomRequirement(r.roomRequirement);
     if (r.preferredLabRoom) setRoom(r.preferredLabRoom);
     else if (r.preferredRoom) setRoom(r.preferredRoom);
+    if (selectedCourse.defaultCourseMarks != null) {
+      setDefaultCourseMarks(String(selectedCourse.defaultCourseMarks));
+    }
   }, [selectedCourse, editRow]);
 
   async function handleSubmit() {
@@ -1242,10 +1254,9 @@ function RegisterCourseModal({
       doublePeriodMode: lessonStructure === 'REQUIRE_DOUBLE' ? 'REQUIRE' : 'PREFER',
       roomRequirement,
     };
-    const dcmRaw = defaultCourseMarks.trim();
-    const dcmParsed = dcmRaw ? parseFloat(dcmRaw) : null;
-    if (dcmRaw && (!Number.isFinite(dcmParsed!) || dcmParsed! <= 0)) {
-      toast.error('Default marks must be a positive number, or leave blank');
+    const dcmParsed = parseDefaultCourseMarksInput(defaultCourseMarks);
+    if (defaultCourseMarks.trim() && dcmParsed == null) {
+      toast.error('Default marks must be between 1 and 1000, or leave not set');
       return;
     }
 
@@ -1386,15 +1397,16 @@ function RegisterCourseModal({
                       ) : null}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <SelectField
+                      <SearchableSelectField
                         compact
                         label="Course"
                         value={entry.courseConfigId}
                         onChange={(v) => updateEntry(entry.localId, { courseConfigId: v })}
                         placeholder="Select course..."
+                        searchPlaceholder="Search courses..."
                         options={courseOpts}
                       />
-                      <SelectField
+                      <SearchableSelectField
                         compact
                         label="Teacher"
                         value={entry.teacherUserId}
@@ -1406,6 +1418,7 @@ function RegisterCourseModal({
                           });
                         }}
                         placeholder="Select teacher..."
+                        searchPlaceholder="Search teachers..."
                         options={teacherOpts}
                         disabled={!entry.courseConfigId}
                       />
@@ -1432,13 +1445,14 @@ function RegisterCourseModal({
           </>
         ) : (
           <>
-          <SelectField
+          <SearchableSelectField
             compact
             label="Course"
             value={subjectName}
             onChange={setSubjectName}
             placeholder="Select course..."
-            options={[{ value: '', label: 'Select course…' }, ...courseOptions]}
+            searchPlaceholder="Search courses..."
+            options={[{ value: '', label: 'Select course...' }, ...courseOptions]}
             disabled
           />
 
@@ -1460,7 +1474,7 @@ function RegisterCourseModal({
           </div>
         ) : null}
 
-        <SelectField
+        <SearchableSelectField
           compact
           label="Teacher"
           value={teacherUserId}
@@ -1469,28 +1483,24 @@ function RegisterCourseModal({
             setTeacherUserId(v);
             setTeacherName(t?.teacherName ?? '');
           }}
-          placeholder="Select teacher…"
+          placeholder="Select teacher..."
+          searchPlaceholder="Search teachers..."
           options={[
-            { value: '', label: teachers.length ? 'Select teacher…' : 'Loading teachers…' },
+            { value: '', label: teachers.length ? 'Select teacher...' : 'Loading teachers...' },
             ...teachers.map((t) => ({
               value: t.teacherUserId,
               label: t.teacherName,
             })),
           ]}
         />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField compact label="Periods per week" type="number" min={1} max={14} value={periodsPerWeek} onChange={(v) => setPeriodsPerWeek(Number(v) || 1)} />
-          <TextField
-            compact
-            label="Default course marks (optional)"
-            type="number"
-            min={1}
-            max={1000}
-            value={defaultCourseMarks}
-            onChange={setDefaultCourseMarks}
-            placeholder="e.g. 40"
-          />
-        </div>
+        <TextField compact label="Periods per week" type="number" min={1} max={14} value={periodsPerWeek} onChange={(v) => setPeriodsPerWeek(Number(v) || 1)} />
+
+        <DefaultCourseMarksField
+          compact
+          value={defaultCourseMarks}
+          onChange={setDefaultCourseMarks}
+          hint="Overrides class assignment only. Set the master value under Timetable → Courses for all classes."
+        />
 
         <ModalSection title="Lesson structure">
           <div className="grid gap-2 sm:grid-cols-3">

@@ -103,7 +103,7 @@ export function AcademicSettingsView() {
   return (
     <PlatformPageLayout
       title="Academic Settings"
-      subtitle="Shared with Organization Admin — same year and term across Babyeyi, Student Management, ShuleKit, and Uniform."
+      subtitle="Shared with Organization Admin. Same year and term across Babyeyi, Student Management, ShuleKit, and Uniform."
     >
       {loading ? (
         <div className="flex min-h-[240px] items-center justify-center">

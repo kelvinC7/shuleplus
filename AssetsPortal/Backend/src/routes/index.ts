@@ -54,6 +54,53 @@ import {
 import { getAnalytics, getDashboard } from "../services/dashboard.service";
 import { getReport, listReportTypes } from "../services/reports.service";
 import {
+  createLandRecord,
+  deleteLandRecord,
+  getLandMeta,
+  getLandRecord,
+  getLandSetup,
+  listLandAuditLogs,
+  listLandRecords,
+  recalcLandYear,
+  updateLandRecord,
+  upsertLandSetup,
+  type LandListFilters,
+} from "../services/land.service";
+import {
+  commitLandImport,
+  listLandImportBatches,
+  previewLandImport,
+} from "../services/land-import.service";
+import { getLandDashboard } from "../services/land-dashboard.service";
+import {
+  getLandReport,
+  listLandReportTypes,
+} from "../services/land-reports.service";
+import {
+  createVehicleRecord,
+  deleteVehicleRecord,
+  getVehicleMeta,
+  getVehicleRecord,
+  getVehicleSetup,
+  listVehicleAuditLogs,
+  listVehicleRecords,
+  recalcVehicleYear,
+  updateVehicleRecord,
+  upsertVehicleSetup,
+  type VehicleListFilters,
+} from "../services/vehicle.service";
+import {
+  commitVehicleImport,
+  listVehicleImportBatches,
+  previewVehicleImport,
+} from "../services/vehicle-import.service";
+import { getVehicleDashboard } from "../services/vehicle-dashboard.service";
+import { setModuleActiveYear } from "../services/module-year.service";
+import {
+  getVehicleReport,
+  listVehicleReportTypes,
+} from "../services/vehicle-reports.service";
+import {
   approveReplacement,
   createAssignment,
   createMaintenance,
@@ -89,6 +136,58 @@ function paramId(value: string | string[]): string {
 
 function ok(data: unknown, message?: string) {
   return { success: true, data, ...(message ? { message } : {}) };
+}
+
+function landFilters(req: AuthenticatedRequest): LandListFilters {
+  const q = req.query;
+  const text = (key: string) => (typeof q[key] === "string" && q[key] !== "all" ? String(q[key]) : undefined);
+  const yearRaw = q.year ?? q.register_year;
+  const year = yearRaw !== undefined && yearRaw !== "" ? Number(yearRaw) : undefined;
+  return {
+    year: Number.isFinite(year) ? year : undefined,
+    province: text("province"),
+    district: text("district"),
+    sector: text("sector"),
+    category: text("category"),
+    supplier: text("supplier"),
+    q: text("q"),
+    from: text("from"),
+    to: text("to"),
+    sortBy: text("sort_by"),
+    sortDir: q.sort_dir === "desc" ? "desc" : "asc",
+  };
+}
+
+function landActor(req: AuthenticatedRequest) {
+  return { userId: req.user?.sub ?? null, email: req.user?.email ?? null };
+}
+
+function vehicleFilters(req: AuthenticatedRequest): VehicleListFilters {
+  const q = req.query;
+  const text = (key: string) =>
+    typeof q[key] === "string" && q[key] !== "all" ? String(q[key]) : undefined;
+  const yearRaw = q.year ?? q.register_year;
+  const year = yearRaw !== undefined && yearRaw !== "" ? Number(yearRaw) : undefined;
+  const purchaseYearRaw = q.purchase_year ?? q.purchaseYear;
+  const purchaseYear =
+    purchaseYearRaw !== undefined && purchaseYearRaw !== "" ? Number(purchaseYearRaw) : undefined;
+  return {
+    year: Number.isFinite(year) ? year : undefined,
+    location: text("location"),
+    type: text("type"),
+    category: text("category"),
+    supplier: text("supplier"),
+    purchaseYear: Number.isFinite(purchaseYear) ? purchaseYear : undefined,
+    q: text("q"),
+    from: text("from"),
+    to: text("to"),
+    sortBy: text("sort_by"),
+    sortDir: q.sort_dir === "desc" ? "desc" : "asc",
+  };
+}
+
+function vehicleActor(req: AuthenticatedRequest) {
+  return { userId: req.user?.sub ?? null, email: req.user?.email ?? null };
 }
 
 router.get("/health", (_req, res) => {
@@ -994,6 +1093,471 @@ protectedRouter.patch("/assets/:id/health-status", async (req: AuthenticatedRequ
       assetHealthStatus: req.body?.asset_health_status ?? req.body?.assetHealthStatus,
     });
     return res.json(ok(updated));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Independent Land module
+// ---------------------------------------------------------------------------
+
+protectedRouter.get("/land/meta", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(ok(await getLandMeta(orgId(req))));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/land/active-year", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.body?.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    await setModuleActiveYear(orgId(req), "land", year);
+    return res.json(ok(await getLandMeta(orgId(req)), `Land active year set to ${year}`));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/setup", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.query.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    return res.json(ok(await getLandSetup(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+const saveLandSetup = async (req: AuthenticatedRequest, res: import("express").Response, next: import("express").NextFunction) => {
+  try {
+    const saved = await upsertLandSetup(
+      orgId(req),
+      {
+        year: req.body?.year,
+        opening_amount: req.body?.opening_amount ?? req.body?.openingAmount,
+      },
+      landActor(req)
+    );
+    return res.json(ok(saved, "Land opening amount saved"));
+  } catch (e) {
+    return next(e);
+  }
+};
+
+protectedRouter.post("/land/setup", saveLandSetup);
+protectedRouter.put("/land/setup", saveLandSetup);
+
+protectedRouter.get("/land/records", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
+    return res.json(
+      await listLandRecords(orgId(req), {
+        page: Number.isFinite(page) ? page : 1,
+        limit: Number.isFinite(limit) ? limit : 10,
+        filters: landFilters(req),
+      })
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/land/records", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const created = await createLandRecord(
+      orgId(req),
+      { ...req.body, year: req.body?.year },
+      landActor(req)
+    );
+    return res.status(201).json(ok(created, "Land record created"));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(ok(await getLandRecord(orgId(req), paramId(req.params.id))));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.patch("/land/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await updateLandRecord(orgId(req), paramId(req.params.id), req.body, landActor(req)),
+        "Land record updated"
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.delete("/land/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(await deleteLandRecord(orgId(req), paramId(req.params.id), landActor(req)), "Land record deleted")
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/land/recalc", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.body?.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    return res.json(ok(await recalcLandYear(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/land/import/preview", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await previewLandImport(orgId(req), {
+          year: req.body?.year,
+          rows: req.body?.rows,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/land/import", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await commitLandImport(
+          orgId(req),
+          {
+            year: req.body?.year,
+            rows: req.body?.rows,
+            fileName: req.body?.file_name ?? req.body?.fileName,
+          },
+          landActor(req)
+        ),
+        "Land records imported"
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/import/batches", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = req.query.year !== undefined ? Number(req.query.year) : undefined;
+    return res.json(ok(await listLandImportBatches(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/dashboard", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const filters = landFilters(req);
+    return res.json(
+      ok(
+        await getLandDashboard(orgId(req), {
+          year: filters.year,
+          province: filters.province,
+          district: filters.district,
+          sector: filters.sector,
+          category: filters.category,
+          supplier: filters.supplier,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/reports", async (_req, res) => {
+  return res.json(ok(listLandReportTypes()));
+});
+
+protectedRouter.get("/land/reports/:type", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const filters = landFilters(req);
+    return res.json(
+      ok(
+        await getLandReport(orgId(req), paramId(req.params.type), {
+          year: filters.year,
+          province: filters.province,
+          district: filters.district,
+          sector: filters.sector,
+          category: filters.category,
+          supplier: filters.supplier,
+          from: filters.from,
+          to: filters.to,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/land/audit-logs", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = req.query.year !== undefined ? Number(req.query.year) : undefined;
+    const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
+    return res.json(ok(await listLandAuditLogs(orgId(req), year, limit)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Independent Vehicle module
+// ---------------------------------------------------------------------------
+
+protectedRouter.get("/vehicles/meta", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(ok(await getVehicleMeta(orgId(req))));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/vehicles/active-year", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.body?.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    await setModuleActiveYear(orgId(req), "vehicles", year);
+    return res.json(ok(await getVehicleMeta(orgId(req)), `Vehicle active year set to ${year}`));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/setup", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.query.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    return res.json(ok(await getVehicleSetup(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+const saveVehicleSetup = async (
+  req: AuthenticatedRequest,
+  res: import("express").Response,
+  next: import("express").NextFunction
+) => {
+  try {
+    const saved = await upsertVehicleSetup(
+      orgId(req),
+      {
+        year: req.body?.year,
+        opening_amount: req.body?.opening_amount ?? req.body?.openingAmount,
+        accumulated_depreciation:
+          req.body?.accumulated_depreciation ?? req.body?.accumulatedDepreciation,
+        depreciation_mode: req.body?.depreciation_mode ?? req.body?.depreciationMode,
+        depreciation_rate: req.body?.depreciation_rate ?? req.body?.depreciationRate,
+        useful_years: req.body?.useful_years ?? req.body?.usefulYears,
+      },
+      vehicleActor(req)
+    );
+    return res.json(ok(saved, "Vehicle setup saved"));
+  } catch (e) {
+    return next(e);
+  }
+};
+
+protectedRouter.post("/vehicles/setup", saveVehicleSetup);
+protectedRouter.put("/vehicles/setup", saveVehicleSetup);
+
+protectedRouter.get("/vehicles/records", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
+    return res.json(
+      await listVehicleRecords(orgId(req), {
+        page: Number.isFinite(page) ? page : 1,
+        limit: Number.isFinite(limit) ? limit : 10,
+        filters: vehicleFilters(req),
+      })
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/vehicles/records", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const created = await createVehicleRecord(
+      orgId(req),
+      { ...req.body, year: req.body?.year },
+      vehicleActor(req)
+    );
+    return res.status(201).json(ok(created, "Vehicle record created"));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(ok(await getVehicleRecord(orgId(req), paramId(req.params.id))));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.patch("/vehicles/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await updateVehicleRecord(
+          orgId(req),
+          paramId(req.params.id),
+          req.body,
+          vehicleActor(req)
+        ),
+        "Vehicle record updated"
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.delete("/vehicles/records/:id", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await deleteVehicleRecord(orgId(req), paramId(req.params.id), vehicleActor(req)),
+        "Vehicle record deleted"
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/vehicles/recalc", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = Number(req.body?.year);
+    if (!Number.isFinite(year)) throw new AppError(400, "year is required");
+    return res.json(ok(await recalcVehicleYear(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/vehicles/import/preview", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await previewVehicleImport(orgId(req), {
+          year: req.body?.year,
+          rows: req.body?.rows,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.post("/vehicles/import", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    return res.json(
+      ok(
+        await commitVehicleImport(
+          orgId(req),
+          {
+            year: req.body?.year,
+            rows: req.body?.rows,
+            fileName: req.body?.file_name ?? req.body?.fileName,
+          },
+          vehicleActor(req)
+        ),
+        "Vehicle records imported"
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/import/batches", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = req.query.year !== undefined ? Number(req.query.year) : undefined;
+    return res.json(ok(await listVehicleImportBatches(orgId(req), year)));
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/dashboard", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const filters = vehicleFilters(req);
+    return res.json(
+      ok(
+        await getVehicleDashboard(orgId(req), {
+          year: filters.year,
+          location: filters.location,
+          type: filters.type,
+          category: filters.category,
+          supplier: filters.supplier,
+          purchaseYear: filters.purchaseYear,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/reports", async (_req, res) => {
+  return res.json(ok(listVehicleReportTypes()));
+});
+
+protectedRouter.get("/vehicles/reports/:type", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const filters = vehicleFilters(req);
+    return res.json(
+      ok(
+        await getVehicleReport(orgId(req), paramId(req.params.type), {
+          year: filters.year,
+          location: filters.location,
+          type: filters.type,
+          category: filters.category,
+          supplier: filters.supplier,
+          purchaseYear: filters.purchaseYear,
+          from: filters.from,
+          to: filters.to,
+        })
+      )
+    );
+  } catch (e) {
+    return next(e);
+  }
+});
+
+protectedRouter.get("/vehicles/audit-logs", async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const year = req.query.year !== undefined ? Number(req.query.year) : undefined;
+    const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
+    const recordId =
+      typeof req.query.record_id === "string" ? req.query.record_id : undefined;
+    return res.json(ok(await listVehicleAuditLogs(orgId(req), year, limit, recordId)));
   } catch (e) {
     return next(e);
   }

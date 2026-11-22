@@ -20,7 +20,7 @@ import {
   PersonAvatar,
 } from '@/components/attendance-ui';
 import { AttendanceFilterBar, filterSummary, useAttendanceFilters } from '@/components/attendance-filters';
-import { StatusBadge } from '@/components/status-badge';
+import { GeneralStatusBadge } from '@/modules/attendance/records/general-status-badge';
 import {
   attendanceApi,
   type LiveMonitorData,
@@ -87,7 +87,7 @@ function EventRow({
                   Student
                 </span>
               )}
-              <StatusBadge status={record.status} />
+              <GeneralStatusBadge row={record} />
             </div>
           </div>
           <p className="mt-1 font-bold text-navy">{record.studentName}</p>
@@ -146,7 +146,9 @@ export function LiveMonitorView() {
   const movement = (data?.movement ?? []).filter((m) => {
     if (eventFilter === 'entry') return m.direction === 'ENTRY' || Boolean(m.entryTime && !m.exitTime);
     if (eventFilter === 'exit') return m.direction === 'EXIT' || Boolean(m.exitTime);
-    if (eventFilter === 'late') return m.status === 'LATE';
+    if (eventFilter === 'late') {
+      return m.punctuality === 'LATE' || m.status === 'LATE' || m.checkoutStatus === 'EARLY_DEPARTURE';
+    }
     if (eventFilter === 'staff') return m.personType === 'STAFF';
     if (eventFilter === 'student') return m.personType !== 'STAFF';
     return true;
@@ -192,7 +194,7 @@ export function LiveMonitorView() {
           {
             label: 'Staff on site',
             value: k.staffInside ?? 0,
-            hint: `${k.staffPresent ?? 0} of ${k.enrolledStaffRoster ?? k.enrolledStaff ?? '—'} roster · HR/TT/IAM`,
+            hint: `${k.staffPresent ?? 0} of ${k.enrolledStaffRoster ?? k.enrolledStaff ?? '—'} roster · Users & Access (IAM)`,
             icon: <Briefcase size={18} />,
           },
           { label: 'Alerts', value: k.securityAlerts ?? 0, icon: <AlertTriangle size={18} /> },
@@ -298,7 +300,7 @@ export function LiveMonitorView() {
                       {selected.studentCode || '-'} · {selected.className || 'Staff'}
                     </p>
                     <div className="mt-2">
-                      <StatusBadge status={selected.status} />
+                      <GeneralStatusBadge row={selected} />
                     </div>
                   </div>
                 </div>
@@ -321,7 +323,7 @@ export function LiveMonitorView() {
                   </div>
                 </dl>
                 <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
-                  {selected.status === 'LATE' ? (
+                  {selected.punctuality === 'LATE' || selected.checkoutStatus === 'EARLY_DEPARTURE' ? (
                     <XCircle className="h-4 w-4 text-amber-500" />
                   ) : (
                     <CheckCircle2 className="h-4 w-4 text-emerald-500" />

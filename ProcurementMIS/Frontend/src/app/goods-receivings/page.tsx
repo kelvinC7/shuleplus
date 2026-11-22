@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MainLayout } from '@/layouts/main-layout';
 import { procurementApi } from '@/services/procurement-api';
+import { useAuth } from '@/contexts/auth-context';
 import type { GoodsReceiving, GrnSummary, Department, PurchaseOrder, Supplier } from '@/types';
 import {
   Package,
@@ -16,9 +17,10 @@ import {
   FileDown,
   Printer,
   MoreHorizontal,
+  Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { GoodsReceivingDetailDrawer } from '@/components/goods-receiving-detail-drawer';
 import { PlatformPageLayout } from '@/components/platform-page-layout';
 import { ReceiveGoodsDrawer } from '@/components/receive-goods-drawer';
 import { downloadGrnPdf, printGrnPdf } from '@/modules/documents/grn-pdf';
@@ -35,10 +37,25 @@ import {
   DataTableCard,
   DataTableEmpty,
   DataTableHead,
+  DataTableRow,
+  DataTableTd,
   DataTableTh,
+  ListFilterBar,
   PageLoading,
   StatusBadge,
+  TablePagination,
+  useTablePagination,
 } from '@/components/list-ui';
+import {
+  ReportFilterDrawer,
+  EMPTY_REPORT_FILTERS,
+  countActiveReportFilters,
+  reportFilterParams,
+  reportPeriodMeta,
+  reportPeriodLabel,
+  type ReportFilterValues,
+} from '@/components/report-filter-drawer';
+import { downloadProcurementReport } from '@/modules/documents/report-pdf';
 
 function computeGrnValue(grn: GoodsReceiving): number {
   const poItems = grn.purchaseOrder?.items ?? [];
@@ -56,33 +73,20 @@ function computeGrnTotals(grn: GoodsReceiving) {
   return { itemCount: items.length, ordered, received };
 }
 
-function exportGrnCsv(rows: GoodsReceiving[]) {
-  const header = ['GRN', 'PO', 'Supplier', 'Items', 'Ordered', 'Received', 'Value', 'Status', 'Date', 'Received By'];
-  const lines = rows.map((r) => {
-    const totals = computeGrnTotals(r);
-    return [
-      r.grnNumber,
-      r.purchaseOrder?.poNumber ?? r.poId,
-      r.purchaseOrder?.supplier?.companyName ?? '',
-      totals.itemCount,
-      totals.ordered,
-      totals.received,
-      computeGrnValue(r),
-      r.status,
-      new Date(r.receivedDate).toLocaleDateString(),
-      r.receivedByName ?? '',
-    ].join(',');
-  });
-  const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'goods-received.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
+const EXTRA_FILTER_KEYS = ['supplierId', 'poId', 'departmentId', 'status', 'receivedBy'] as const;
+
+type GrnExtraFilters = Record<(typeof EXTRA_FILTER_KEYS)[number], string>;
+
+const EMPTY_EXTRA_FILTERS: GrnExtraFilters = {
+  supplierId: '',
+  poId: '',
+  departmentId: '',
+  status: '',
+  receivedBy: '',
+};
 
 export default function GoodsReceivingsPage() {
+  const { user } = useAuth();
   const [receivings, setReceivings] = useState<GoodsReceiving[]>([]);
   const [summary, setSummary] = useState<GrnSummary | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -97,32 +101,19 @@ export default function GoodsReceivingsPage() {
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
-
-  const [draftFilters, setDraftFilters] = useState({
-    academicYear: '',
-    term: '',
-    dateFrom: '',
-    dateTo: '',
-    supplierId: '',
-    poId: '',
-    departmentId: '',
-    status: '',
-    receivedBy: '',
-  });
-  const [appliedFilters, setAppliedFilters] = useState(draftFilters);
+  const [search, setSearch] = useState('');
+  const [reportFilters, setReportFilters] = useState<ReportFilterValues>(EMPTY_REPORT_FILTERS);
+  const [extraFilters, setExtraFilters] = useState<GrnExtraFilters>(EMPTY_EXTRA_FILTERS);
+  const [extraDraft, setExtraDraft] = useState<GrnExtraFilters>(EMPTY_EXTRA_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const params: Record<string, string> = {};
-      if (appliedFilters.academicYear) params.academicYear = appliedFilters.academicYear;
-      if (appliedFilters.term) params.term = appliedFilters.term;
-      if (appliedFilters.dateFrom) params.dateFrom = appliedFilters.dateFrom;
-      if (appliedFilters.dateTo) params.dateTo = appliedFilters.dateTo;
-      if (appliedFilters.supplierId) params.supplierId = appliedFilters.supplierId;
-      if (appliedFilters.poId) params.poId = appliedFilters.poId;
-      if (appliedFilters.departmentId) params.departmentId = appliedFilters.departmentId;
-      if (appliedFilters.status) params.status = appliedFilters.status;
-      if (appliedFilters.receivedBy) params.receivedBy = appliedFilters.receivedBy;
+      const params: Record<string, string> = { ...reportFilterParams(reportFilters) };
+      for (const key of EXTRA_FILTER_KEYS) {
+        if (extraFilters[key]) params[key] = extraFilters[key];
+      }
 
       const [list, sum, sup, pos, deps, acad] = await Promise.all([
         procurementApi.goodsReceivings.list(params),
@@ -143,7 +134,7 @@ export default function GoodsReceivingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedFilters]);
+  }, [reportFilters, extraFilters]);
 
   useEffect(() => {
     void load();
@@ -168,6 +159,36 @@ export default function GoodsReceivingsPage() {
     return receivings.filter((r) => r.status === activeTab);
   }, [receivings, activeTab]);
 
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return tabFiltered;
+    return tabFiltered.filter((row) =>
+      [
+        row.grnNumber,
+        row.purchaseOrder?.poNumber,
+        row.purchaseOrder?.supplier?.companyName,
+        row.receivedByName,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [tabFiltered, search]);
+
+  const pagination = useTablePagination(visible, {
+    resetKey: `${activeTab}|${search}|${reportFilters.academicYear}|${reportFilters.term}|${reportFilters.dateFrom}|${reportFilters.dateTo}|${extraFilters.supplierId ?? ''}|${extraFilters.poId ?? ''}|${extraFilters.departmentId ?? ''}|${extraFilters.status ?? ''}|${extraFilters.receivedBy ?? ''}`,
+  });
+
+  const lookups = useMemo(
+    () => ({
+      supplierName: (id: string) => suppliers.find((s) => s.id === id)?.companyName ?? '',
+      poNumber: (id: string) => orders.find((o) => o.id === id)?.poNumber ?? '',
+      departmentName: (id: string) => departments.find((d) => d.id === id)?.name ?? '',
+      receiverName: (id: string) =>
+        receivings.find((r) => r.receivedBy === id)?.receivedByName ?? '',
+    }),
+    [suppliers, orders, departments, receivings],
+  );
+
   const viewDetail = async (grn: GoodsReceiving) => {
     try {
       const detail = await procurementApi.goodsReceivings.getById(grn.id);
@@ -189,6 +210,10 @@ export default function GoodsReceivingsPage() {
       const ctx = {
         schoolName: profile?.schoolName ?? 'School',
         logoUrl: profile?.logoUrl,
+        province: profile?.province,
+        district: profile?.district,
+        sector: profile?.sector,
+        website: profile?.website,
         stampUrl: profile?.stampUrl,
         receiptSettings,
       };
@@ -198,6 +223,100 @@ export default function GoodsReceivingsPage() {
       toast.error('Failed to generate GRN PDF');
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleDownloadReport = async (values: ReportFilterValues) => {
+    setReportLoading(true);
+    try {
+      const params: Record<string, string> = { ...reportFilterParams(values) };
+      for (const key of EXTRA_FILTER_KEYS) {
+        if (extraDraft[key]) params[key] = extraDraft[key];
+      }
+
+      const [profile, rows] = await Promise.all([
+        procurementApi.settings.getOrgProfile(),
+        procurementApi.goodsReceivings.list(params),
+      ]);
+
+      const meta = [...reportPeriodMeta(values)];
+      if (extraDraft.supplierId) {
+        meta.push({ label: 'Supplier', value: lookups.supplierName(extraDraft.supplierId) });
+      }
+      if (extraDraft.poId) {
+        meta.push({ label: 'Purchase order', value: lookups.poNumber(extraDraft.poId) });
+      }
+      if (extraDraft.departmentId) {
+        meta.push({ label: 'Department', value: lookups.departmentName(extraDraft.departmentId) });
+      }
+      if (extraDraft.status) {
+        meta.push({
+          label: 'Status',
+          value: GRN_STATUS_LABELS[extraDraft.status] ?? extraDraft.status,
+        });
+      }
+      if (extraDraft.receivedBy) {
+        meta.push({ label: 'Received by', value: lookups.receiverName(extraDraft.receivedBy) });
+      }
+
+      const totalValue = rows.reduce((sum, row) => sum + computeGrnValue(row), 0);
+      const fullyReceived = rows.filter((row) =>
+        ['FULLY_RECEIVED', 'COMPLETED', 'ACCEPTED'].includes(row.status),
+      ).length;
+
+      await downloadProcurementReport({
+        info: {
+          schoolName: profile?.schoolName ?? 'School',
+          logoUrl: profile?.logoUrl,
+          province: profile?.province,
+          district: profile?.district,
+          sector: profile?.sector,
+          website: profile?.website,
+        },
+        title: 'GOODS RECEIVED REPORT',
+        columns: [
+          { header: 'GRN', dataKey: 'grnNumber' },
+          { header: 'PO', dataKey: 'poNumber' },
+          { header: 'Supplier', dataKey: 'supplier' },
+          { header: 'Items', dataKey: 'items', align: 'right' },
+          { header: 'Ordered', dataKey: 'ordered', align: 'right' },
+          { header: 'Received', dataKey: 'received', align: 'right' },
+          { header: 'Value (Frw)', dataKey: 'value', align: 'right' },
+          { header: 'Status', dataKey: 'status', align: 'center' },
+          { header: 'Date', dataKey: 'date' },
+          { header: 'Received By', dataKey: 'receivedBy' },
+        ],
+        rows: rows.map((row) => {
+          const totals = computeGrnTotals(row);
+          return {
+            grnNumber: row.grnNumber,
+            poNumber: row.purchaseOrder?.poNumber ?? row.poId,
+            supplier: row.purchaseOrder?.supplier?.companyName ?? '—',
+            items: totals.itemCount,
+            ordered: totals.ordered,
+            received: totals.received,
+            value: computeGrnValue(row).toLocaleString(),
+            status: GRN_STATUS_LABELS[row.status] ?? row.status.replace(/_/g, ' '),
+            date: new Date(row.receivedDate).toLocaleDateString(),
+            receivedBy: row.receivedByName ?? '—',
+          };
+        }),
+        meta,
+        summary: [
+          { label: 'Records', value: String(rows.length) },
+          { label: 'Total value', value: `${totalValue.toLocaleString()} Frw` },
+          { label: 'Fully received', value: String(fullyReceived) },
+        ],
+        fileBase: 'goods-received-report',
+        verification: {
+          period: reportPeriodLabel(values),
+          generatedBy: user?.email ?? 'Procurement MIS User',
+        },
+      });
+    } catch {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -266,151 +385,37 @@ export default function GoodsReceivingsPage() {
           },
         ]}
       >
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-[0_2px_14px_-4px_rgba(0,4,53,0.08)]">
-          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-muted">Filters</p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Academic Year</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.academicYear}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, academicYear: e.target.value }))}
-              >
-                <option value="">All years</option>
-                {academic.academicYears.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Term</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.term}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, term: e.target.value }))}
-              >
-                <option value="">All terms</option>
-                {academic.terms.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Date From</span>
-              <input
-                type="date"
-                className="input !py-2 text-sm"
-                value={draftFilters.dateFrom}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Date To</span>
-              <input
-                type="date"
-                className="input !py-2 text-sm"
-                value={draftFilters.dateTo}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, dateTo: e.target.value }))}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Supplier</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.supplierId}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, supplierId: e.target.value }))}
-              >
-                <option value="">All suppliers</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.companyName}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Purchase Order</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.poId}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, poId: e.target.value }))}
-              >
-                <option value="">All POs</option>
-                {orders.map((o) => (
-                  <option key={o.id} value={o.id}>{o.poNumber}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Department</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.departmentId}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, departmentId: e.target.value }))}
-              >
-                <option value="">All departments</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Status</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.status}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="">All status</option>
-                {GRN_STATUSES.map((s) => (
-                  <option key={s} value={s}>{GRN_STATUS_LABELS[s]}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="block min-w-[180px]">
-              <span className="mb-1 block text-[11px] font-semibold uppercase text-muted">Received By</span>
-              <select
-                className="input !py-2 text-sm"
-                value={draftFilters.receivedBy}
-                onChange={(e) => setDraftFilters((f) => ({ ...f, receivedBy: e.target.value }))}
-              >
-                <option value="">All receivers</option>
-                {receivedByOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+        <ListFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by GRN, PO, supplier or receiver…"
+          onReset={() => {
+            setSearch('');
+            setReportFilters(EMPTY_REPORT_FILTERS);
+            setExtraFilters(EMPTY_EXTRA_FILTERS);
+            setExtraDraft(EMPTY_EXTRA_FILTERS);
+          }}
+          actions={
             <button
               type="button"
-              className="btn-primary !rounded-xl"
-              onClick={() => { setLoading(true); setAppliedFilters({ ...draftFilters }); }}
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              className="btn-ghost !rounded-xl"
               onClick={() => {
-                const empty = {
-                  academicYear: '', term: '', dateFrom: '', dateTo: '',
-                  supplierId: '', poId: '', departmentId: '', status: '', receivedBy: '',
-                };
-                setDraftFilters(empty);
-                setAppliedFilters(empty);
-                setLoading(true);
+                setExtraDraft(extraFilters);
+                setFilterOpen(true);
               }}
+              className="btn-ghost !rounded-xl inline-flex items-center gap-2 ring-1 ring-slate-200"
             >
-              Reset
+              <Filter className="h-4 w-4" /> Filter
+              {countActiveReportFilters(reportFilters) +
+                EXTRA_FILTER_KEYS.filter((key) => extraFilters[key]).length >
+              0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#fcb038] px-1.5 text-[10px] font-extrabold text-navy">
+                  {countActiveReportFilters(reportFilters) +
+                    EXTRA_FILTER_KEYS.filter((key) => extraFilters[key]).length}
+                </span>
+              ) : null}
             </button>
-            <button
-              type="button"
-              className="btn-ghost !rounded-xl inline-flex items-center gap-1"
-              onClick={() => exportGrnCsv(tabFiltered)}
-            >
-              <FileDown className="h-4 w-4" /> Export
-            </button>
-          </div>
-        </div>
+          }
+        />
 
         <div className="flex flex-wrap gap-2">
           {GRN_TABS.map((tab) => (
@@ -444,34 +449,34 @@ export default function GoodsReceivingsPage() {
               <DataTableTh className="text-center">Actions</DataTableTh>
             </DataTableHead>
             <tbody>
-              {tabFiltered.map((r) => {
+              {pagination.rows.map((r) => {
                 const totals = computeGrnTotals(r);
                 const value = computeGrnValue(r);
                 return (
-                  <tr key={r.id} className="border-b border-border/70 transition hover:bg-[#f8fafc]">
-                    <td className="px-4 py-3 font-semibold text-navy">{r.grnNumber}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">
+                  <DataTableRow key={r.id}>
+                    <DataTableTd className="font-semibold text-navy">{r.grnNumber}</DataTableTd>
+                    <DataTableTd className="font-mono text-xs text-muted">
                       {r.purchaseOrder?.poNumber ?? r.poId.slice(0, 8)}
-                    </td>
-                    <td className="px-4 py-3">{r.purchaseOrder?.supplier?.companyName ?? '—'}</td>
-                    <td className="px-4 py-3 text-center tabular-nums">{totals.itemCount}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{totals.ordered}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{totals.received}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                    </DataTableTd>
+                    <DataTableTd>{r.purchaseOrder?.supplier?.companyName ?? '—'}</DataTableTd>
+                    <DataTableTd className="text-center tabular-nums">{totals.itemCount}</DataTableTd>
+                    <DataTableTd className="text-right tabular-nums">{totals.ordered}</DataTableTd>
+                    <DataTableTd className="text-right tabular-nums">{totals.received}</DataTableTd>
+                    <DataTableTd className="text-right tabular-nums font-semibold">
                       {formatFrwCompact(value)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
+                    </DataTableTd>
+                    <DataTableTd className="text-center">
                       <StatusBadge tone={grnStatusTone(r.status)}>
                         {GRN_STATUS_LABELS[r.status] ?? r.status.replace(/_/g, ' ')}
                       </StatusBadge>
-                    </td>
-                    <td className="px-4 py-3 text-muted">
+                    </DataTableTd>
+                    <DataTableTd className="text-muted">
                       {new Date(r.receivedDate).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
                       })}
-                    </td>
-                    <td className="px-4 py-3">
+                    </DataTableTd>
+                    <DataTableTd>
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
@@ -518,15 +523,25 @@ export default function GoodsReceivingsPage() {
                           ) : null}
                         </div>
                       </div>
-                    </td>
-                  </tr>
+                    </DataTableTd>
+                  </DataTableRow>
                 );
               })}
-              {tabFiltered.length === 0 ? (
+              {visible.length === 0 ? (
                 <DataTableEmpty colSpan={10} message="No goods receiving records yet" />
               ) : null}
             </tbody>
           </DataTable>
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </DataTableCard>
       </PlatformPageLayout>
 
@@ -537,87 +552,110 @@ export default function GoodsReceivingsPage() {
         onSuccess={() => { setLoading(true); void load(); }}
       />
 
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{selected?.grnNumber} — Goods Received</DialogTitle>
-          </DialogHeader>
-          {selected ? (
-            <div className="space-y-4 text-sm">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <span className="text-muted">PO:</span>{' '}
-                  <span className="font-semibold">{selected.purchaseOrder?.poNumber ?? '—'}</span>
-                </div>
-                <div>
-                  <span className="text-muted">Supplier:</span>{' '}
-                  <span className="font-semibold">
-                    {selected.purchaseOrder?.supplier?.companyName ?? '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted">Received By:</span>{' '}
-                  <span>{selected.receivedByName ?? '—'}</span>
-                </div>
-                <div>
-                  <span className="text-muted">Date:</span>{' '}
-                  <span>{new Date(selected.receivedDate).toLocaleString()}</span>
-                </div>
-              </div>
-              {selected.inspectionNotes ? (
-                <div className="rounded-xl bg-[#f8fafc] p-3">
-                  <p className="text-xs font-bold uppercase text-muted">Inspection Notes</p>
-                  <p className="mt-1">{selected.inspectionNotes}</p>
-                </div>
-              ) : null}
-              {selected.items && selected.items.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-navy text-left text-[11px] font-bold uppercase text-[#fcb038]">
-                      <tr>
-                        <th className="px-3 py-2">Item</th>
-                        <th className="px-3 py-2 text-right">Ordered</th>
-                        <th className="px-3 py-2 text-right">Received</th>
-                        <th className="px-3 py-2 text-right">Accepted</th>
-                        <th className="px-3 py-2">Condition</th>
-                        <th className="px-3 py-2">Storage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.items.map((item) => (
-                        <tr key={item.id} className="border-t border-border/70">
-                          <td className="px-3 py-2 font-medium">{item.itemName}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Number(item.orderedQty)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Number(item.receivedQty)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Number(item.acceptedQty)}</td>
-                          <td className="px-3 py-2">{item.condition ?? '—'}</td>
-                          <td className="px-3 py-2">{item.warehouseLocation ?? '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <button
-                  type="button"
-                  className="btn-ghost inline-flex items-center gap-1 text-xs"
-                  onClick={() => void handlePdf(selected, 'download')}
-                >
-                  <FileDown className="h-4 w-4" /> Download PDF
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost inline-flex items-center gap-1 text-xs"
-                  onClick={() => void handlePdf(selected, 'print')}
-                >
-                  <Printer className="h-4 w-4" /> Print GRN
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <GoodsReceivingDetailDrawer
+        open={detailOpen}
+        grn={selected}
+        pdfLoading={pdfLoading}
+        onClose={() => setDetailOpen(false)}
+        onDownloadPdf={(grn) => { void handlePdf(grn, 'download'); }}
+        onPrint={(grn) => { void handlePdf(grn, 'print'); }}
+      />
+
+      <ReportFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter goods received"
+        description="Narrow receipts by academic period, date, supplier or status, then download a branded PDF report."
+        academicSettings={academic}
+        value={reportFilters}
+        onApply={(values) => {
+          setReportFilters(values);
+          setExtraFilters(extraDraft);
+        }}
+        onReset={() => setExtraDraft(EMPTY_EXTRA_FILTERS)}
+        onDownload={handleDownloadReport}
+        downloading={reportLoading}
+      >
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Supplier
+          </span>
+          <select
+            className="input !rounded-xl !py-2.5 text-sm"
+            value={extraDraft.supplierId}
+            onChange={(event) => setExtraDraft((f) => ({ ...f, supplierId: event.target.value }))}
+          >
+            <option value="">All suppliers</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.companyName}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Purchase order
+          </span>
+          <select
+            className="input !rounded-xl !py-2.5 text-sm"
+            value={extraDraft.poId}
+            onChange={(event) => setExtraDraft((f) => ({ ...f, poId: event.target.value }))}
+          >
+            <option value="">All purchase orders</option>
+            {orders.map((o) => (
+              <option key={o.id} value={o.id}>{o.poNumber}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Department
+          </span>
+          <select
+            className="input !rounded-xl !py-2.5 text-sm"
+            value={extraDraft.departmentId}
+            onChange={(event) => setExtraDraft((f) => ({ ...f, departmentId: event.target.value }))}
+          >
+            <option value="">All departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Status
+          </span>
+          <select
+            className="input !rounded-xl !py-2.5 text-sm"
+            value={extraDraft.status}
+            onChange={(event) => setExtraDraft((f) => ({ ...f, status: event.target.value }))}
+          >
+            <option value="">All statuses</option>
+            {GRN_STATUSES.map((s) => (
+              <option key={s} value={s}>{GRN_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Received by
+          </span>
+          <select
+            className="input !rounded-xl !py-2.5 text-sm"
+            value={extraDraft.receivedBy}
+            onChange={(event) => setExtraDraft((f) => ({ ...f, receivedBy: event.target.value }))}
+          >
+            <option value="">All receivers</option>
+            {receivedByOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+      </ReportFilterDrawer>
     </MainLayout>
   );
 }

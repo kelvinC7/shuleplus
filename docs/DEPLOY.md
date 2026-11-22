@@ -141,6 +141,7 @@ This runs `prisma migrate deploy` where needed and `npm run migrate:staff-ids` i
 
 | Module | Failed migration (example) | Fix |
 |--------|---------------------------|-----|
+| IAM | `manual_developer_portal` (failed mid-run; portal often applied via `apply-developer-portal-db.sh`) | `fix-migration-blocks.sh` or `cd Authentication/Backend && npx tsx scripts/fix-iam-migrations.ts` |
 | IAM | `20260713202015_babyeyiwizard_migrate` (removed from repo) | `fix-migration-blocks.sh` → rolls back ghost record, deploys e.g. chief accountant |
 | Timetable | `20260814120000_live_alert_settings` | Same script; re-applies alert columns and teacher `employee_number` / `position` |
 
@@ -330,6 +331,76 @@ pm2 save
 ```
 
 Always open modules from **Organization Dashboard** (or post-login launcher), not by typing the subdomain alone.
+
+---
+
+## ShuleTrip (`shuletrip.shuleplus.rw`)
+
+| | Host | Port | PM2 |
+|--|------|------|-----|
+| App | `https://shuletrip.shuleplus.rw` | Nginx → `ShuleTrip/Frontend_react/dist` | — |
+| API | `https://shuletrip-api.shuleplus.rw` | **4033** | `shule-trip-api` |
+
+Slug: `shule-trip` · DB: `shule_trip_db` · Local dev: FE **3077**, BE **3076**
+
+### One-time on the server
+
+```bash
+# 0) DNS A records → your server IP:
+#    shuletrip.shuleplus.rw
+#    shuletrip-api.shuleplus.rw
+
+cd /root/apps/shuleplus/ShulePlus
+git fetch origin main && git reset --hard origin/main
+chmod +x scripts/*.sh
+
+# 1) Database + schema
+bash scripts/fix-shule-trip-db.sh
+
+# 2) Backend env (first deploy only)
+cd ShuleTrip/Backend
+cp -n .env.production.example .env
+# Edit DATABASE_URL to production Postgres (same host/user as other modules)
+# JWT_ACCESS_SECRET + SERVICE keys are synced from Authentication/Backend on redeploy
+
+# 3) Nginx + TLS + build + PM2
+cd /root/apps/shuleplus/ShulePlus
+sudo bash scripts/generate-nginx-modules.sh
+sudo bash scripts/ensure-shuleplus-tls.sh
+bash scripts/redeploy-module.sh true ShuleTrip shule-trip-api shule-trip-web
+
+# 4) IAM catalog URLs + tenant provisioning loopback
+node scripts/apply-module-subdomains.mjs
+pm2 restart auth-api --update-env
+pm2 save
+```
+
+### Verify
+
+```bash
+curl -sI https://shuletrip.shuleplus.rw | head -5
+curl -s https://shuletrip-api.shuleplus.rw/api/health
+pm2 status shule-trip-api
+```
+
+### After code changes
+
+**Fast (API + env only, ~3–10 min)** — keep or upload `Frontend_react/dist` from your PC:
+
+```bash
+cd /root/apps/shuleplus/ShulePlus
+git fetch origin main && git reset --hard origin/main
+bash scripts/redeploy-shule-trip-fast.sh
+```
+
+**Full (includes Vite on server — slow on small VPS):**
+
+```bash
+bash scripts/redeploy-shule-trip-fast.sh --frontend
+# or: bash scripts/redeploy-module.sh true ShuleTrip shule-trip-api shule-trip-web
+```
+
+Ensure organizations have the **ShuleTrip** module licensed in IAM. Government users are created under **Super Admin → ShuleTrip Government Users**.
 
 ## Library module (`feature/library`)
 

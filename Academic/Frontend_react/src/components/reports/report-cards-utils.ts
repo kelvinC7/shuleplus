@@ -10,12 +10,62 @@ export type ReportTypeId =
 
 export type ReportRowStatus = 'published' | 'generated' | 'draft' | 'not_generated';
 
+export const NOT_RECORDED = 'N/A';
+
+const LOCAL_VERIFY = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i;
+
+/** QR must use public Parent portal URL — never localhost on production PDFs. */
+export function resolveReportVerifyUrl(report: {
+  meta?: { verifyUrl?: string | null; reportNumber?: string | null };
+  school?: { organizationCode?: string | null };
+}): string {
+  const raw = report.meta?.verifyUrl?.trim() || '';
+  if (raw && !LOCAL_VERIFY.test(raw)) return raw;
+  const ref = report.meta?.reportNumber?.trim();
+  if (!ref) return raw;
+
+  const envBase = import.meta.env.VITE_PARENT_PORTAL_URL?.replace(/\/$/, '').replace(/\/login$/, '');
+  const base =
+    envBase && !LOCAL_VERIFY.test(envBase) ? envBase : 'https://parents.shuleplus.rw';
+  const q = new URLSearchParams({ ref });
+  const org = report.school?.organizationCode?.trim();
+  if (org) q.set('org', org);
+  return `${base}/verify/report?${q.toString()}`;
+}
+
+export type ReportManagementTab =
+  | 'overview'
+  | 'beginning'
+  | 'midterm'
+  | 'term'
+  | 'annual'
+  | 'comparison'
+  | 'approvals';
+
+export function formatReportAverage(avg: number | null | undefined): string {
+  if (avg == null || !Number.isFinite(avg) || avg < 0) return NOT_RECORDED;
+  return `${avg.toFixed(2)}%`;
+}
+
+export function formatReportPosition(pos: number | null | undefined, size: number | null | undefined): string {
+  if (pos == null || size == null) return NOT_RECORDED;
+  return `${pos}/${size}`;
+}
+
+export function reportTypeLabel(scope: ReportScopeMode, term: string): string {
+  if (scope === 'year') return 'Annual';
+  if (scope === 'combined') return `Combined · ${term}`;
+  return term || 'Term report';
+}
+
+export type ReportResultStatus = 'PASS' | 'FAIL' | 'Pending';
+
 export interface ReportStudentSummary {
   studentId: string;
   average: number | null;
   position: number | null;
   classSize: number | null;
-  result: 'PASS' | 'FAIL' | '—';
+  result: ReportResultStatus;
   generatedAt: string | null;
   hasMarks: boolean;
 }
@@ -59,7 +109,52 @@ export function studentCodeLabel(s: {
   studentUid?: string | null;
   admissionNumber?: string | null;
 }) {
-  return s.studentCode || s.admissionNumber || s.studentUid || '—';
+  return s.studentCode || s.admissionNumber || s.studentUid || NOT_RECORDED;
+}
+
+/** User-facing copy for report load / API errors (no internal product names). */
+export function friendlyReportCardError(raw: string): { title: string; detail?: string } {
+  const text = raw.trim();
+  const lower = text.toLowerCase();
+  if (lower.includes('beginning-term assessment marks')) {
+    return {
+      title: 'No beginning term marks yet',
+      detail:
+        'Mark the assessments as Beginning Test in TichaPortal, or classify existing marks under Update Assessment Status.',
+    };
+  }
+  if (lower.includes('mid-term assessment marks')) {
+    return {
+      title: 'No mid-term marks yet',
+      detail:
+        'Mark the assessments as Mid-Term Test in TichaPortal, or classify existing marks under Update Assessment Status.',
+    };
+  }
+  if (lower.includes('continuous assessment') || lower.includes('cat, quiz')) {
+    return {
+      title: 'No mid-term marks yet',
+      detail:
+        'Teachers should enter CAT, quiz, or class test marks (not final exams). Refresh after marks are submitted.',
+    };
+  }
+  if (
+    lower.includes('no results found') ||
+    lower.includes('tichaportal') ||
+    lower.includes('enter and publish marks')
+  ) {
+    return {
+      title: 'No marks for this student yet',
+      detail:
+        'Ask the class teacher to enter and submit assessment marks for this term. Then refresh and open the report again.',
+    };
+  }
+  if (lower.includes('not found') && lower.includes('student')) {
+    return { title: 'Student not found', detail: 'Check class, stream, and academic year, then try again.' };
+  }
+  if (text.length > 120) {
+    return { title: 'Could not open report', detail: text };
+  }
+  return { title: text };
 }
 
 export function termsThroughSelected(allTerms: string[], selectedTerm: string): string[] {
@@ -90,9 +185,9 @@ export function scopeLabel(scope: ReportScopeMode, term: string, allTerms: strin
   return through.join(' + ');
 }
 
-export function deriveResult(report: ReportCardDataV2): 'PASS' | 'FAIL' | '—' {
+export function deriveResult(report: ReportCardDataV2): ReportResultStatus {
   const pct = report.summary?.currentTermAverage ?? report.overallScore;
-  if (!Number.isFinite(pct) || pct <= 0) return '—';
+  if (!Number.isFinite(pct) || pct <= 0) return 'Pending';
   const g = (report.overallGrade || '').toUpperCase();
   if (g === 'F' || g === 'E') return 'FAIL';
   return pct >= 50 ? 'PASS' : 'FAIL';

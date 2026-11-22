@@ -6,7 +6,6 @@ import {
 } from "../services/payroll-bridge.service";
 import { upsertDirectoryPerson } from "../services/staff-directory.service";
 import { ensureTenant } from "../services/tenant.service";
-
 export const internalRouter = Router();
 
 /** IAM Users & Access → upsert a Kazi employee (eligibility still depends on salary/policy). */

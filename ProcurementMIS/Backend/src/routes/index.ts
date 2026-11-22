@@ -12,12 +12,14 @@ import { notificationController } from '../controllers/notification.controller';
 import { departmentController } from '../controllers/department.controller';
 import { analyticsController } from '../controllers/analytics.controller';
 import { settingsController } from '../controllers/settings.controller';
+import { documentVerificationController } from '../controllers/document-verification.controller';
 import {
   authenticate,
   requireModuleLicense,
   requireServiceAuth,
 } from '../middleware/auth.middleware';
 import { requireTenant, requireServiceTenant } from '../middleware/tenant.middleware';
+import { purchaseRequestServiceController } from '../controllers/purchase-request-service.controller';
 
 const router = Router();
 
@@ -39,6 +41,25 @@ router.post('/tenant/ensure', authenticate, requireModuleLicense, (req, res, nex
   tenantController.ensure(req, res, next)
 );
 
+/** Public QR verification — intentionally unauthenticated and audit logged. */
+router.get('/public/procurement/verify/:token', (req, res, next) =>
+  documentVerificationController.verifyPublic(req, res, next)
+);
+
+/** Director Console (service-to-service): list and decide purchase requests. */
+const procurementService = Router();
+procurementService.use(requireServiceAuth, requireServiceTenant);
+procurementService.get('/purchase-requests', (req, res, next) =>
+  purchaseRequestServiceController.list(req, res, next)
+);
+procurementService.put('/purchase-requests/:id/approve', (req, res, next) =>
+  purchaseRequestServiceController.approve(req, res, next)
+);
+procurementService.put('/purchase-requests/:id/reject', (req, res, next) =>
+  purchaseRequestServiceController.reject(req, res, next)
+);
+router.use('/service', procurementService);
+
 const p = Router();
 p.use(authenticate, requireModuleLicense, requireTenant);
 
@@ -58,6 +79,12 @@ p.get('/settings/academic', (req, res, next) => settingsController.getAcademicSe
 p.put('/settings/academic', (req, res, next) => settingsController.updateAcademicSettings(req, res, next));
 p.get('/settings/org-profile', (req, res, next) => settingsController.getOrgProfile(req, res, next));
 
+p.post('/document-verifications', (req, res, next) =>
+  documentVerificationController.ensure(req, res, next)
+);
+
+p.get('/purchase-requests/item-catalog', (req, res, next) => purchaseRequestController.itemCatalog(req, res, next));
+p.post('/purchase-requests/import', (req, res, next) => purchaseRequestController.importRequests(req, res, next));
 p.get('/purchase-requests', (req, res, next) => purchaseRequestController.list(req, res, next));
 p.get('/purchase-requests/:id', (req, res, next) => purchaseRequestController.getById(req, res, next));
 p.post('/purchase-requests', (req, res, next) => purchaseRequestController.create(req, res, next));
@@ -68,6 +95,7 @@ p.put('/purchase-requests/:id/cancel', (req, res, next) => purchaseRequestContro
 p.delete('/purchase-requests/:id', (req, res, next) => purchaseRequestController.remove(req, res, next));
 
 p.get('/purchase-orders', (req, res, next) => purchaseOrderController.list(req, res, next));
+p.post('/purchase-orders/import', (req, res, next) => purchaseOrderController.importOrders(req, res, next));
 p.get('/purchase-orders/:id', (req, res, next) => purchaseOrderController.getById(req, res, next));
 p.post('/purchase-orders', (req, res, next) => purchaseOrderController.create(req, res, next));
 p.put('/purchase-orders/:id/status', (req, res, next) => purchaseOrderController.updateStatus(req, res, next));

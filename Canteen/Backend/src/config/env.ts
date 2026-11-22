@@ -20,6 +20,9 @@ export const env = {
     process.env.SERVICE_API_KEY ??
     process.env.PLATFORM_SERVICE_KEY ??
     'dev-service-key',
+  PARENT_MIS_API_URL:
+    process.env.PARENT_MIS_API_URL ??
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3048/api'),
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? 'http://localhost:3050',
   MODULE_SLUG: process.env.MODULE_SLUG ?? 'canteen',
   ACADEMIC_API_URL: process.env.ACADEMIC_API_URL ?? 'http://localhost:3003/api',

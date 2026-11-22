@@ -23,6 +23,7 @@ import { procurementApi } from '@/services/procurement-api';
 import type { PurchaseOrder, PoReceivingLineItem } from '@/types';
 import { FormField, SelectField } from '@/components/procurement-form-ui';
 import { formatFrw } from '@/utils/currency';
+import { formatPersonName } from '@/utils/person-name';
 import {
   ITEM_CONDITIONS,
   QUALITY_STATUSES,
@@ -295,7 +296,7 @@ export function ReceiveGoodsDrawer({
                 onChange={setPoId}
                 options={purchaseOrders.map((o) => ({
                   value: o.id,
-                  label: `${o.poNumber} — ${o.supplier?.companyName ?? 'Supplier'}`,
+                  label: `${o.poNumber} · ${o.supplier?.companyName ?? 'Supplier'}`,
                 }))}
                 placeholder="Search / select PO"
               />
@@ -325,7 +326,9 @@ export function ReceiveGoodsDrawer({
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Requester</p>
                     <p className="mt-0.5 font-semibold text-navy">
-                      {po.purchaseRequest?.requestedByName ?? po.createdByName ?? '—'}
+                      {formatPersonName(po.purchaseRequest?.requestedByName) ||
+                        formatPersonName(po.createdByName) ||
+                        '—'}
                     </p>
                   </div>
                   <div>

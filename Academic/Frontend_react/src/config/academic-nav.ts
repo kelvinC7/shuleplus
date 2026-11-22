@@ -50,7 +50,7 @@ export const ACADEMIC_TILES: AcademicNavLink[] = [
   { label: 'Courses', href: '/courses/catalog', icon: 'subjects', tileIcon: '/svg-shapes/subjects.svg' },
   { label: 'Marks Entry', href: '/marks', icon: 'marks', tileIcon: '/svg-shapes/marks-entry.svg' },
   { label: 'Assessments', href: '/assessments', icon: 'assessments', tileIcon: '/svg-shapes/assessments.svg' },
-  { label: 'Examinations', href: '/exams', icon: 'exams', tileIcon: '/svg-shapes/examination.svg' },
+  { label: 'Examination', href: '/examination-timetable', icon: 'exams', tileIcon: '/svg-shapes/examination.svg' },
   { label: 'Invigilator Desk', href: '/exams/invigilator-desk', icon: 'invigilators', tileIcon: '/svg-shapes/attendance.svg' },
   { label: 'Report Cards', href: '/report-cards/v2', icon: 'reports', tileIcon: '/svg-shapes/report-cards.svg' },
   { label: 'Analytics', href: '/analytics', icon: 'analytics', tileIcon: '/svg-shapes/analytics.svg' },
@@ -73,24 +73,21 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
     icon: 'assessments',
     children: [
       { label: 'Marks Entry', href: '/marks' },
-      { label: 'Marks records', href: '/marks-records' },
+      { label: 'Course Monitoring', href: '/course-monitoring' },
+      { label: 'Reports', href: '/marks-reports' },
+      { label: 'Marks Records', href: '/marks-records' },
       { label: 'Assessments', href: '/assessments' },
       { label: 'Templates', href: '/assessment-templates' },
     ],
   },
   {
-    label: 'Examinations',
+    label: 'Examination',
     icon: 'exams',
     children: [
-      { label: 'Overview', href: '/exams' },
-      { label: 'Exam Sessions', href: '/exams/sessions' },
-      { label: 'Timetable', href: '/exams/timetable' },
-      { label: 'Seating', href: '/exams/seating' },
-      { label: 'Invigilators', href: '/exams/invigilators' },
-      { label: 'Invigilator Desk', href: '/exams/invigilator-desk' },
-      { label: 'Live Center', href: '/exams/live' },
-      { label: 'Published Schedule', href: '/exams/published' },
-      { label: 'Reports', href: '/exams/reports' },
+      { label: 'Examination Timetable', href: '/examination-timetable' },
+      { label: 'Examination Lists', href: '/examination-lists' },
+      { label: 'Invigilators', href: '/examination-invigilators' },
+      { label: 'Examination Attendance', href: '/examination-attendance' },
     ],
   },
   {
@@ -98,6 +95,7 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
     icon: 'reports',
     children: [
       { label: 'Report Cards', href: '/report-cards/v2' },
+      { label: 'Publishing', href: '/publishing' },
       { label: 'Grading Scales', href: '/grading-scales' },
       { label: 'Competency', href: '/competency' },
       { label: 'Mark Corrections', href: '/mark-corrections' },
@@ -106,11 +104,20 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
       { label: 'Graduation', href: '/graduation' },
     ],
   },
-  { label: 'Analytics', href: '/analytics', icon: 'analytics' },
+  {
+    label: 'Analytics',
+    icon: 'analytics',
+    children: [
+      { label: 'Overview', href: '/analytics' },
+      { label: 'Report footer settings', href: '/analytics/report-footer' },
+    ],
+  },
 ];
 
 export function isAssessmentGroupActive(pathname: string): boolean {
   return (
+    pathname.startsWith('/course-monitoring') ||
+    pathname.startsWith('/marks-reports') ||
     pathname.startsWith('/marks-records') ||
     pathname.startsWith('/marks') ||
     pathname.startsWith('/assessments') ||
@@ -121,12 +128,13 @@ export function isAssessmentGroupActive(pathname: string): boolean {
 }
 
 export function isExaminationsGroupActive(pathname: string): boolean {
-  return pathname.startsWith('/exams');
+  return pathname.startsWith('/examination-timetable') || pathname.startsWith('/examination-lists') || pathname.startsWith('/examination-invigilators') || pathname.startsWith('/examination-attendance') || pathname.startsWith('/exams');
 }
 
 export function isResultsGroupActive(pathname: string): boolean {
   return (
     pathname.startsWith('/report-cards') ||
+    pathname.startsWith('/publishing') ||
     pathname.startsWith('/grading-scales') ||
     pathname.startsWith('/competency') ||
     pathname.startsWith('/mark-corrections') ||
@@ -142,9 +150,10 @@ export function isCoursesGroupActive(pathname: string): boolean {
 
 export function isAcademicNavGroupActive(label: string, pathname: string): boolean {
   if (label === 'Assessment') return isAssessmentGroupActive(pathname);
-  if (label === 'Examinations') return isExaminationsGroupActive(pathname);
+  if (label === 'Examination' || label === 'Examinations') return isExaminationsGroupActive(pathname);
   if (label === 'Results') return isResultsGroupActive(pathname);
   if (label === 'Courses') return isCoursesGroupActive(pathname);
+  if (label === 'Analytics') return pathname.startsWith('/analytics');
   return false;
 }
 
@@ -163,8 +172,14 @@ export function isAcademicNavActive(pathname: string, href: string): boolean {
   if (href === '/courses') return pathname.startsWith('/courses') || pathname.startsWith('/subjects');
   if (href === '/subjects') return pathname.startsWith('/subjects') || pathname.startsWith('/courses');
   if (href === '/examinations') return pathname.startsWith('/examinations');
+  if (href === '/examination-timetable') return pathname.startsWith('/examination-timetable');
+  if (href === '/examination-lists') return pathname.startsWith('/examination-lists');
+  if (href === '/examination-invigilators') return pathname.startsWith('/examination-invigilators');
+  if (href === '/examination-attendance') return pathname.startsWith('/examination-attendance');
+  if (href === '/course-monitoring') return pathname.startsWith('/course-monitoring');
+  if (href === '/marks-reports') return pathname.startsWith('/marks-reports');
   if (href === '/marks-records') return pathname.startsWith('/marks-records');
-  if (href === '/marks') return pathname === '/marks' || (pathname.startsWith('/marks/') && !pathname.startsWith('/marks-records'));
+  if (href === '/marks') return pathname === '/marks' || (pathname.startsWith('/marks/') && !pathname.startsWith('/marks-records') && !pathname.startsWith('/marks-reports'));
   if (href === '/students') return pathname.startsWith('/students');
   if (href === '/classes') return pathname.startsWith('/classes');
   if (href === '/exams') return pathname === '/exams';
@@ -173,7 +188,10 @@ export function isAcademicNavActive(pathname: string, href: string): boolean {
   if (href === '/exams/invigilators') return pathname.startsWith('/exams/invigilators');
   if (href === '/exams/live') return pathname.startsWith('/exams/live');
   if (href === '/exams/reports') return pathname.startsWith('/exams/reports');
-  if (href === '/analytics') return pathname.startsWith('/analytics');
+  if (href === '/course-monitoring') return pathname.startsWith('/course-monitoring');
+  if (href === '/marks-reports') return pathname.startsWith('/marks-reports');
+  if (href === '/analytics') return pathname.startsWith('/analytics') && !pathname.startsWith('/analytics/report-footer');
+  if (href === '/analytics/report-footer') return pathname.startsWith('/analytics/report-footer');
   if (href === '/assignments') return pathname.startsWith('/assignments');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -187,16 +205,24 @@ export function pageTitleFromPath(pathname: string): string {
   if (pathname.startsWith('/mark-entry')) return 'Mark Entry';
   if (pathname.startsWith('/assessments')) return 'Assessments';
   if (pathname.startsWith('/assignments')) return 'Assignments';
+  if (pathname.startsWith('/publishing')) return 'Publishing';
   if (pathname.startsWith('/report-cards')) return 'Report Cards';
   if (pathname.startsWith('/grading-scales')) return 'Grading Scales';
   if (pathname.startsWith('/courses/catalog') || pathname === '/courses') return 'Course catalog';
   if (pathname.startsWith('/courses/by-class')) return 'Class courses';
   if (pathname.startsWith('/courses') || pathname.startsWith('/subjects')) return 'Courses';
+  if (pathname.startsWith('/examination-timetable')) return 'Examination Timetable';
+  if (pathname.startsWith('/examination-lists')) return 'Examination Lists';
+  if (pathname.startsWith('/examination-invigilators')) return 'Invigilators';
+  if (pathname.startsWith('/examination-attendance')) return 'Examination Attendance';
   if (pathname.startsWith('/examinations')) return 'Marks Examinations';
-  if (pathname.startsWith('/marks-records')) return 'Marks records';
+  if (pathname.startsWith('/course-monitoring')) return 'Course Monitoring';
+  if (pathname.startsWith('/marks-reports')) return 'Marks Reports';
+  if (pathname.startsWith('/marks-records')) return 'Marks Records';
   if (pathname.startsWith('/marks')) return 'Marks Entry';
   if (pathname.startsWith('/students')) return 'Students';
   if (pathname.startsWith('/classes')) return 'Classes';
+  if (pathname.startsWith('/analytics/report-footer')) return 'Report Footer Settings';
   if (pathname.startsWith('/analytics')) return 'Analytics';
   if (pathname.startsWith('/competency')) return 'Competency';
   if (pathname.startsWith('/mark-corrections')) return 'Corrections';

@@ -1,11 +1,11 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Typography — Montserrat (matches Shule+ platform) */
+  /* Typography - Montserrat (matches Shule+ platform) */
   --font-sans: var(--font-montserrat), 'Montserrat', ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-montserrat), 'Montserrat', ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand palette — babyeyi.rw design system */
+  /* Brand palette - babyeyi.rw design system */
   --color-sky-50: #f0f9ff;
   --color-sky-100: #e0f2fe;
   --color-sky-200: #bae6fd;

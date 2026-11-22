@@ -35,9 +35,10 @@ import { ChatSubNav } from '@/components/chat/chat-subnav';
 import { AvatarWithStatus } from '@/components/chat/avatar-with-status';
 import { useChat } from '@/contexts/chat-context';
 import { getDashboard } from '@/services/api';
-import { CUSTOM_SCROLLBAR, CARD, GLASS_CARD, PAGE_TITLE, PRIMARY, ACCENT, ACCENT_BORDER, TABLE_HEAD_CELL } from '@/shared/styles';
+import { CUSTOM_SCROLLBAR, CARD, GLASS_CARD, PAGE_TITLE, PRIMARY, ACCENT, ACCENT_BORDER, ACCENT_HOVER, ACCENT_TINT, TABLE_HEAD_CELL } from '@/shared/styles';
 import { conversationTitle, formatTime } from '@/utils/chat';
 import type { DashboardOverview } from '@/types';
+import { useMainPaneModal } from '@/shared/main-pane-modal';
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
   members: <Groups sx={{ fontSize: 20 }} />,
@@ -59,7 +60,7 @@ function StatCard({ label, value, icon, hint }: { label: string; value: number; 
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'rgba(245,158,11,0.12)',
+          bgcolor: ACCENT_TINT,
           color: ACCENT,
           border: `1px solid ${ACCENT_BORDER}`,
           flexShrink: 0,
@@ -122,7 +123,7 @@ function ComposeDialog({ open, onClose }: ComposeDialogProps) {
       }
       await openConversation(conv.id);
       handleClose();
-      navigate('/');
+      navigate('/chat');
     } catch (err) {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (err as Error).message);
     } finally {
@@ -130,8 +131,18 @@ function ComposeDialog({ open, onClose }: ComposeDialogProps) {
     }
   };
 
+  const { disablePortal, container, scopedSx } = useMainPaneModal(open, handleClose);
+
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      fullWidth
+      maxWidth="sm"
+      disablePortal={disablePortal}
+      container={container}
+      sx={scopedSx}
+    >
       <DialogTitle sx={{ fontWeight: 800, color: PRIMARY, fontSize: '1.05rem' }}>
         New Broadcast
       </DialogTitle>
@@ -301,7 +312,7 @@ export function AdminPage() {
                           sx={{
                             fontSize: '0.6rem',
                             fontWeight: 700,
-                            bgcolor: 'rgba(245,158,11,0.1)',
+                            bgcolor: ACCENT_HOVER,
                             color: ACCENT,
                             border: `1px solid ${ACCENT_BORDER}`,
                           }}

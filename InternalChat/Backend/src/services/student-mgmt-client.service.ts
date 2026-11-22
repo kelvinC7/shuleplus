@@ -17,6 +17,7 @@ export interface SmParent {
   phone: string;
   email: string | null;
   occupation: string | null;
+  smsEnabled?: boolean;
   students: SmStudent[];
 }
 

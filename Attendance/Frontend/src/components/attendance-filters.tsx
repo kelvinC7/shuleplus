@@ -1,21 +1,76 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Filter, Search, X } from 'lucide-react';
+import { Calendar, CalendarDays, ChevronLeft, ChevronRight, Filter, Search, X } from 'lucide-react';
 import { attendanceApi, type AcademicContext, type AttendanceFilterParams } from '@/services/attendance-api';
 import { filterSelectClass } from '@/components/attendance-ui';
 
-export type FilterMode = 'today' | 'term' | 'year' | 'range' | 'date';
+export type FilterMode = 'today' | 'week' | 'term' | 'year' | 'range' | 'date';
 
 export interface AttendanceFiltersState {
   mode: FilterMode;
   academicYear: string;
   term: string;
   date: string;
+  /** Monday (YYYY-MM-DD) for week mode. */
+  weekStart: string;
   from: string;
   to: string;
   q: string;
   className: string;
+}
+
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Monday for the week containing `iso` (or today). */
+export function startOfWeekIso(iso?: string | null): string {
+  const base = iso?.slice(0, 10);
+  const d = base ? new Date(`${base}T12:00:00`) : new Date();
+  if (Number.isNaN(d.getTime())) return localIsoDate(new Date());
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return localIsoDate(d);
+}
+
+export function shiftWeekIso(weekStart: string, deltaWeeks: number): string {
+  const d = new Date(`${startOfWeekIso(weekStart)}T12:00:00`);
+  d.setDate(d.getDate() + deltaWeeks * 7);
+  return localIsoDate(d);
+}
+
+/** Monday–Sunday range for a given week start. */
+export function weekRangeIso(weekStart?: string | null): { from: string; to: string } {
+  const from = startOfWeekIso(weekStart);
+  const d = new Date(`${from}T12:00:00`);
+  d.setDate(d.getDate() + 6);
+  return { from, to: localIsoDate(d) };
+}
+
+/** Inclusive ISO days for the week (Mon–Sun). */
+export function weekDaysIso(weekStart?: string | null): string[] {
+  const from = startOfWeekIso(weekStart);
+  const d = new Date(`${from}T12:00:00`);
+  return Array.from({ length: 7 }, (_, i) => {
+    const copy = new Date(d);
+    copy.setDate(d.getDate() + i);
+    return localIsoDate(copy);
+  });
+}
+
+/** ISO-8601 week number. */
+export function isoWeekNumber(iso: string): number {
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return 0;
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 const defaultFilters = (): AttendanceFiltersState => ({
@@ -23,6 +78,7 @@ const defaultFilters = (): AttendanceFiltersState => ({
   academicYear: '',
   term: '',
   date: new Date().toISOString().slice(0, 10),
+  weekStart: startOfWeekIso(),
   from: '',
   to: '',
   q: '',
@@ -36,6 +92,10 @@ export function filtersToParams(filters: AttendanceFiltersState): AttendanceFilt
 
   if (filters.mode === 'today') {
     params.date = new Date().toISOString().slice(0, 10);
+  } else if (filters.mode === 'week') {
+    const range = weekRangeIso(filters.weekStart);
+    params.from = range.from;
+    params.to = range.to;
   } else if (filters.mode === 'date' && filters.date) {
     params.date = filters.date;
   } else if (filters.mode === 'term' && filters.term) {
@@ -50,14 +110,47 @@ export function filtersToParams(filters: AttendanceFiltersState): AttendanceFilt
   return params;
 }
 
+function formatLongDate(iso: string) {
+  const day = iso.slice(0, 10);
+  const d = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+/** ISO date used for single-day roster exports (staff/student day lists). */
+export function primaryAttendanceDateIso(filters: AttendanceFiltersState): string {
+  if (filters.mode === 'date' && filters.date) return filters.date.slice(0, 10);
+  if (filters.mode === 'today') return new Date().toISOString().slice(0, 10);
+  if (filters.mode === 'week') return startOfWeekIso(filters.weekStart);
+  if (filters.mode === 'range' && filters.from) return filters.from.slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function filterSummary(filters: AttendanceFiltersState, academic?: AcademicContext | null) {
-  if (filters.mode === 'today') return 'Today';
-  if (filters.mode === 'date' && filters.date) return filters.date;
+  if (filters.mode === 'today') {
+    return formatLongDate(new Date().toISOString().slice(0, 10));
+  }
+  if (filters.mode === 'week') {
+    const { from, to } = weekRangeIso(filters.weekStart);
+    return `${formatLongDate(from)} → ${formatLongDate(to)} · Week ${isoWeekNumber(from)}`;
+  }
+  if (filters.mode === 'date' && filters.date) return formatLongDate(filters.date);
   if (filters.mode === 'term' && filters.term) return filters.term;
   if (filters.mode === 'year' && filters.academicYear) return filters.academicYear;
-  if (filters.mode === 'range' && filters.from && filters.to) return `${filters.from} → ${filters.to}`;
+  if (filters.mode === 'range' && filters.from && filters.to) {
+    return `${formatLongDate(filters.from)} → ${formatLongDate(filters.to)}`;
+  }
   if (academic?.currentTerm) return academic.currentTerm;
-  return 'Today';
+  return formatLongDate(new Date().toISOString().slice(0, 10));
+}
+
+export function filterSummaryShort(filters: AttendanceFiltersState): string {
+  return primaryAttendanceDateIso(filters);
 }
 
 export function useAttendanceFilters(initial?: Partial<AttendanceFiltersState>) {
@@ -90,11 +183,54 @@ export function useAttendanceFilters(initial?: Partial<AttendanceFiltersState>) 
 
 const PERIOD_MODES: { id: FilterMode; label: string }[] = [
   { id: 'today', label: 'Today' },
+  { id: 'week', label: 'Week' },
   { id: 'term', label: 'Term' },
   { id: 'year', label: 'Year' },
   { id: 'date', label: 'Date' },
   { id: 'range', label: 'Range' },
 ];
+
+function WeekPicker({
+  value,
+  onChange,
+  label = 'Week of',
+}: {
+  value: string;
+  onChange: (weekStart: string) => void;
+  label?: string;
+}) {
+  return (
+    <div className="flex w-full items-center gap-1 rounded-full border border-border bg-white p-1 shadow-sm sm:w-auto">
+      <button
+        type="button"
+        onClick={() => onChange(shiftWeekIso(value, -1))}
+        className="rounded-full p-1.5 text-muted transition hover:bg-slate-100 hover:text-navy"
+        aria-label="Previous week"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      <div className="relative min-w-0 flex-1 sm:flex-none">
+        <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+        <input
+          type="date"
+          aria-label={label}
+          title={label}
+          className="w-full rounded-full border-0 bg-transparent py-1.5 pl-8 pr-1 text-xs font-semibold text-navy outline-none sm:w-[148px]"
+          value={startOfWeekIso(value)}
+          onChange={(e) => onChange(startOfWeekIso(e.target.value))}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(shiftWeekIso(value, 1))}
+        className="rounded-full p-1.5 text-muted transition hover:bg-slate-100 hover:text-navy"
+        aria-label="Next week"
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
 
 export function AttendanceFilterBar({
   filters,
@@ -150,6 +286,13 @@ export function AttendanceFilterBar({
             onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
           />
         </div>
+
+        {filters.mode === 'week' ? (
+          <WeekPicker
+            value={filters.weekStart}
+            onChange={(weekStart) => setFilters((f) => ({ ...f, weekStart }))}
+          />
+        ) : null}
 
         {filters.mode === 'term' ? (
           <select
@@ -278,12 +421,26 @@ export function FilterModal({
               onChange={(e) => setDraft((d) => ({ ...d, mode: e.target.value as FilterMode }))}
             >
               <option value="today">Today</option>
+              <option value="week">By week</option>
               <option value="term">By term</option>
               <option value="year">By academic year</option>
               <option value="date">Specific date</option>
               <option value="range">Custom date range</option>
             </select>
           </label>
+
+          {draft.mode === 'week' ? (
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">Week</span>
+              <WeekPicker
+                value={draft.weekStart}
+                onChange={(weekStart) => setDraft((d) => ({ ...d, weekStart }))}
+              />
+              <span className="mt-1.5 block text-xs text-muted">
+                Monday to Sunday · Week {isoWeekNumber(startOfWeekIso(draft.weekStart))}
+              </span>
+            </label>
+          ) : null}
 
           {draft.mode === 'term' ? (
             <label className="block text-sm">

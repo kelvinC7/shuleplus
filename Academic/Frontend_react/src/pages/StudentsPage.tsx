@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Checkbox, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress, Accordion,
-  AccordionSummary, AccordionDetails, ListItemButton, Drawer, Collapse,
+  AccordionSummary, AccordionDetails, ListItemButton, Drawer, Collapse, useMediaQuery,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
@@ -117,6 +117,47 @@ function formatDate(d?: string | Date | null): string {
   return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function StudentProfileContent({ student, onClose }: { student: Student; onClose: () => void }) {
+  return (
+    <>
+      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, bgcolor: 'white', zIndex: 1 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Profile</Typography>
+        <IconButton size="small" onClick={onClose}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+      </Box>
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+        <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: student.studentPhoto ? 'transparent' : 'rgba(0,31,63,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', mb: 1.5 }}>
+          {student.studentPhoto ? <img src={student.studentPhoto} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover' }} /> : <PersonIcon sx={{ fontSize: 32, color: '#94a3b8' }} />}
+        </Box>
+        <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>{student.firstName} {student.lastName}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 0.25 }}>{student.studentUid}</Typography>
+      </Box>
+      <Box sx={{ px: 2, py: 1 }}>
+        <ProfileSection title="Personal Information">
+          <ProfileRow icon={<BadgeIcon sx={{ fontSize: 16 }} />} label="Student Code" value={student.studentCode} />
+          <ProfileRow icon={<PersonIcon sx={{ fontSize: 16 }} />} label="Gender" value={student.gender} />
+          <ProfileRow icon={<CakeIcon sx={{ fontSize: 16 }} />} label="Date of Birth" value={formatDate(student.dateOfBirth)} />
+          <ProfileRow icon={<HomeIcon sx={{ fontSize: 16 }} />} label="Address" value={[student.district, student.sector, student.cell, student.village].filter(Boolean).join(', ') || null} />
+        </ProfileSection>
+        <ProfileSection title="Contact">
+          <ProfileRow icon={<PhoneIcon sx={{ fontSize: 16 }} />} label="Phone" value={null} />
+          <ProfileRow icon={<MailIcon sx={{ fontSize: 16 }} />} label="Email" value={null} />
+        </ProfileSection>
+        <ProfileSection title="Academic">
+          <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Class" value={getCurrentClassName(student)} />
+          <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Enrolled" value={student.enrollments?.[0]?.joiningDate ? formatDate(student.enrollments[0].joiningDate) : null} />
+        </ProfileSection>
+        {student.studentParents && student.studentParents.length > 0 && (
+          <ProfileSection title="Parent/Guardian">
+            {student.studentParents.map((sp) => (
+              <ProfileRow key={sp.id} icon={<PersonIcon sx={{ fontSize: 16 }} />} label={sp.role} value={`${sp.parent.firstName} ${sp.parent.lastName}${sp.parent.phone ? ` — ${sp.parent.phone}` : ''}`} />
+            ))}
+          </ProfileSection>
+        )}
+      </Box>
+    </>
+  );
+}
+
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ApiClass[]>([]);
@@ -126,6 +167,7 @@ export default function StudentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width:899.95px)');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -286,48 +328,23 @@ export default function StudentsPage() {
           )}
         </TableContainer>
 
-        {/* Profile Panel */}
-        <Collapse in={!!profileStudent} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0 } } }}>
-          <Box sx={{ width: { md: 300 }, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, display: { xs: 'none', md: 'block' }, bgcolor: 'white' }}>
-            {profileStudent && (<>
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Profile</Typography>
-              <IconButton size="small" onClick={() => setProfileStudent(null)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
-            </Box>
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-              <Box sx={{ width: 64, height: 64, borderRadius: '50%', bgcolor: profileStudent.studentPhoto ? 'transparent' : 'rgba(0,31,63,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', mb: 1.5 }}>
-                {profileStudent.studentPhoto ? <img src={profileStudent.studentPhoto} alt="" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover' }} /> : <PersonIcon sx={{ fontSize: 32, color: '#94a3b8' }} />}
-              </Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>{profileStudent.firstName} {profileStudent.lastName}</Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 0.25 }}>{profileStudent.studentUid}</Typography>
-            </Box>
-            <Box sx={{ px: 2, py: 1 }}>
-              <ProfileSection title="Personal Information">
-                <ProfileRow icon={<BadgeIcon sx={{ fontSize: 16 }} />} label="Student Code" value={profileStudent.studentCode} />
-                <ProfileRow icon={<PersonIcon sx={{ fontSize: 16 }} />} label="Gender" value={profileStudent.gender} />
-                <ProfileRow icon={<CakeIcon sx={{ fontSize: 16 }} />} label="Date of Birth" value={formatDate(profileStudent.dateOfBirth)} />
-                <ProfileRow icon={<HomeIcon sx={{ fontSize: 16 }} />} label="Address" value={[profileStudent.district, profileStudent.sector, profileStudent.cell, profileStudent.village].filter(Boolean).join(', ') || null} />
-              </ProfileSection>
-              <ProfileSection title="Contact">
-                <ProfileRow icon={<PhoneIcon sx={{ fontSize: 16 }} />} label="Phone" value={null} />
-                <ProfileRow icon={<MailIcon sx={{ fontSize: 16 }} />} label="Email" value={null} />
-              </ProfileSection>
-              <ProfileSection title="Academic">
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Class" value={getCurrentClassName(profileStudent)} />
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Enrolled" value={profileStudent.enrollments?.[0]?.joiningDate ? formatDate(profileStudent.enrollments[0].joiningDate) : null} />
-              </ProfileSection>
-              {profileStudent.studentParents && profileStudent.studentParents.length > 0 && (
-                <ProfileSection title="Parent/Guardian">
-                  {profileStudent.studentParents.map((sp) => (
-                    <ProfileRow key={sp.id} icon={<PersonIcon sx={{ fontSize: 16 }} />} label={sp.role} value={`${sp.parent.firstName} ${sp.parent.lastName}${sp.parent.phone ? ` — ${sp.parent.phone}` : ''}`} />
-                  ))}
-                </ProfileSection>
-              )}
-            </Box>
-            </>)}
+        {/* Desktop Profile Panel */}
+        <Collapse in={!!profileStudent} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0, display: { xs: 'none', md: 'block' } } } }}>
+          <Box sx={{ width: 300, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, bgcolor: 'white' }}>
+            {profileStudent && <StudentProfileContent student={profileStudent} onClose={() => setProfileStudent(null)} />}
           </Box>
         </Collapse>
       </Box>
+
+      {/* Mobile Profile Drawer */}
+      <Drawer
+        anchor="right"
+        open={isMobile && !!profileStudent}
+        onClose={() => setProfileStudent(null)}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 360 }, maxWidth: '100%' } } }}
+      >
+        {profileStudent && <StudentProfileContent student={profileStudent} onClose={() => setProfileStudent(null)} />}
+      </Drawer>
 
     </Box>
   );

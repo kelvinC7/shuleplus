@@ -75,3 +75,12 @@ export function studentDisplayName(m: ApiAssessmentMark): string {
   if (m.student) return `${m.student.firstName} ${m.student.lastName}`.trim();
   return m.studentId.slice(0, 8);
 }
+
+const studentNameCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
+export function sortAssessmentMarksByStudentName(marks: ApiAssessmentMark[]): ApiAssessmentMark[] {
+  return [...marks].sort((a, b) => {
+    const nameOrder = studentNameCollator.compare(studentDisplayName(a), studentDisplayName(b));
+    return nameOrder || studentNameCollator.compare(a.studentId, b.studentId);
+  });
+}

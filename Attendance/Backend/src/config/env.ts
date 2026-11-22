@@ -46,7 +46,13 @@ export const env = {
     firstEnv("PARENT_MIS_API_URL") || "http://localhost:4015/api",
   IAM_API_URL: process.env.IAM_API_URL ?? "http://localhost:3001/api/v1",
   HR_API_URL: process.env.HR_API_URL ?? "http://localhost:3005/api",
+  STUDENT_DISCIPLINE_API_URL:
+    firstEnv("STUDENT_DISCIPLINE_API_URL", "DISCIPLINE_API_URL") ||
+    "http://localhost:3032/api",
   TIMETABLE_API_URL: process.env.TIMETABLE_API_URL ?? "http://localhost:3010/api",
+  TICHA_PORTAL_API_URL:
+    firstEnv("TICHA_PORTAL_API_URL", "TEACHER_PORTAL_API_URL") ||
+    "http://localhost:5100/api",
   NOTIFICATION_SERVICE_URL:
     firstEnv("NOTIFICATION_SERVICE_URL") ||
     "http://localhost:4001/api/v1/notifications",
@@ -93,4 +99,5 @@ export function logAttendanceIntegrations() {
   console.log(
     `  STUDENT_MANAGEMENT_API_URL=${env.STUDENT_MANAGEMENT_API_URL || "(empty)"}`
   );
+  console.log(`  TICHA_PORTAL_API_URL=${env.TICHA_PORTAL_API_URL || "(empty)"}`);
 }

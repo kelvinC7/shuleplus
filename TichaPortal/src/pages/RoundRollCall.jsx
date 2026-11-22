@@ -1,43 +1,64 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import IconButton from '@mui/material/IconButton';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import InputAdornment from '@mui/material/InputAdornment';
+import Divider from '@mui/material/Divider';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import SearchIcon from '@mui/icons-material/Search';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import api from '../services/api';
-import { normalizeGradebookLabel, TEACHER_SELECT_CHEVRON } from '../utils/teacherGradebookUi';
+import { normalizeGradebookLabel } from '../utils/teacherGradebookUi';
+import { getSchoolDateIso } from '../utils/schoolTime';
 import TablePagination from '../components/TablePagination';
-import {
-    Calendar,
-    Users,
-    CheckCircle,
-    XCircle,
-    FileText,
-    Search,
-    CheckSquare,
-    Check,
-    X,
-    User,
-    ChevronLeft,
-    ChevronRight,
-    Tag,
-    List,
-    ClipboardList,
-    Eye,
-    ArrowLeft,
-} from 'lucide-react';
+import { brand } from '../theme/theme';
 
 function normalizeRollLabel(s) {
     return String(s ?? '').trim().slice(0, 160);
 }
 
-const flatInput =
-    'min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-re-text outline-none transition-colors placeholder:text-slate-400 focus:border-re-orange/45 focus:ring-2 focus:ring-re-orange/12 md:min-h-[40px]';
-const flatSelect = `${TEACHER_SELECT_CHEVRON} pr-10 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white pl-10 text-sm font-medium text-re-text outline-none focus:border-re-orange/45 focus:ring-2 focus:ring-re-orange/12 md:min-h-[40px]`;
+function validDateParam(value) {
+    const date = String(value || '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+}
 
 export default function RoundRollCall() {
-    const navigate = useNavigate();
+    const { pathname } = useLocation();
+    const [searchParams] = useSearchParams();
+    const requestedClass = searchParams.get('className') || searchParams.get('class_name') || '';
+    const requestedDate = searchParams.get('date') || '';
+    const requestedRollName = searchParams.get('rollName') || searchParams.get('roll_label') || '';
+    const requestedSubject = searchParams.get('subject') || '';
+    const requestedPeriod = searchParams.get('periodLabel') || searchParams.get('period') || '';
     const [tab, setTab] = useState('take');
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(
+        () => validDateParam(requestedDate) || getSchoolDateIso()
+    );
     const [classes, setClasses] = useState([]);
     const [selectedClass, setSelectedClass] = useState('');
-    const [rollName, setRollName] = useState('');
+    const [rollName, setRollName] = useState(requestedRollName);
     const [sessions, setSessions] = useState([]);
     const [roster, setRoster] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +96,35 @@ export default function RoundRollCall() {
     useEffect(() => {
         fetchClasses();
     }, [fetchClasses]);
+
+    useEffect(() => {
+        const nextDate = validDateParam(requestedDate);
+        if (nextDate) setSelectedDate(nextDate);
+        if (requestedRollName) setRollName(requestedRollName);
+    }, [requestedDate, requestedRollName]);
+
+    useEffect(() => {
+        if (!requestedClass || !classes.length) return;
+        const match = classes.find(
+            (className) =>
+                normalizeGradebookLabel(className).toLowerCase() ===
+                normalizeGradebookLabel(requestedClass).toLowerCase()
+        );
+        setSelectedClass(match || '');
+    }, [classes, requestedClass]);
+
+    const lessonContext = [requestedSubject, requestedPeriod].filter(Boolean).join(' ┬À ');
+    const isPeriodAttendance =
+        pathname === '/period-attendance' || Boolean(requestedSubject || requestedPeriod);
+    const attendanceName = isPeriodAttendance ? 'attendance' : 'roll';
+    const requestedClassMissing =
+        Boolean(requestedClass) &&
+        classes.length > 0 &&
+        !classes.some(
+            (className) =>
+                normalizeGradebookLabel(className).toLowerCase() ===
+                normalizeGradebookLabel(requestedClass).toLowerCase()
+        );
 
     useEffect(() => {
         if (tab !== 'take' || !selectedClass || !selectedDate) {
@@ -184,7 +234,7 @@ export default function RoundRollCall() {
             }
         } catch (e) {
             console.error(e);
-            alert('Could not load this roll call.');
+            alert(isPeriodAttendance ? 'Could not load this period attendance.' : 'Could not load this roll call.');
         } finally {
             setLoading(false);
         }
@@ -193,7 +243,13 @@ export default function RoundRollCall() {
     const handleSave = async () => {
         if (readOnly) return;
         if (!selectedClass) return alert('Choose a class.');
-        if (!rollLabelNorm) return alert('Enter a roll name (e.g. Morning Prep).');
+        if (!rollLabelNorm) {
+            return alert(
+                isPeriodAttendance
+                    ? 'Enter an attendance name (e.g. Mathematics ┬À P4).'
+                    : 'Enter a roll name (e.g. Morning Prep).'
+            );
+        }
         if (!roster.length) return alert('No students loaded.');
         try {
             setLoading(true);
@@ -203,11 +259,15 @@ export default function RoundRollCall() {
             });
             if (existingRes.data?.success && existingRes.data?.data?.log_exists) {
                 if (!existingRes.data.data.owned_by_me) {
-                    alert('Another teacher already saved this roll. View it from history.');
+                    alert(
+                        isPeriodAttendance
+                            ? 'Another teacher already saved this attendance. View it from history.'
+                            : 'Another teacher already saved this roll. View it from history.'
+                    );
                     return;
                 }
                 const ok = window.confirm(
-                    `Replace saved "${rollLabelNorm}" roll for ${selectedClass} on ${selectedDate}?`
+                    `Replace saved "${rollLabelNorm}" ${attendanceName} for ${selectedClass} on ${selectedDate}?`
                 );
                 if (!ok) return;
             }
@@ -225,7 +285,7 @@ export default function RoundRollCall() {
                 records,
             });
             if (res.data.success) {
-                alert(`Saved “${rollLabelNorm}” for ${selectedClass}.`);
+                alert(`Saved ÔÇ£${rollLabelNorm}ÔÇØ ${attendanceName} for ${selectedClass}.`);
                 const sr = await api.get('/teacher-portal/round-roll-call/sessions', {
                     params: { class_name: cn, date: selectedDate },
                 });
@@ -274,222 +334,430 @@ export default function RoundRollCall() {
 
     const rosterReadOnly = readOnly || tab === 'view';
 
+
+    const tabs = [
+        { id: 'take', label: isPeriodAttendance ? 'Take attendance' : 'Take roll' },
+        { id: 'history', label: isPeriodAttendance ? 'Attendance history' : 'All roll calls' },
+    ];
+
+    const barSelectSx = {
+        fontSize: 12,
+        fontWeight: 600,
+        color: brand.navy,
+        bgcolor: 'transparent',
+        '&:before, &:after': { borderBottom: 'none !important' },
+        '& .MuiSelect-select': { py: 0.75, pr: '24px !important', bgcolor: 'transparent !important' },
+        '& .MuiSelect-icon': { fontSize: 18 },
+    };
+    const barInputSx = {
+        fontSize: 12,
+        fontWeight: 600,
+        color: brand.navy,
+        '& .MuiOutlinedInput-root': {
+            bgcolor: 'transparent',
+            fontSize: 12,
+            fontWeight: 600,
+            '& fieldset': { border: 'none' },
+            '&:hover fieldset': { border: 'none' },
+            '&.Mui-focused fieldset': { border: 'none' },
+        },
+        '& .MuiInputBase-input': { py: 0.85, px: 0.25 },
+    };
+
+    const headCellSx = {
+        py: 0.85,
+        px: { xs: 1, sm: 1.5 },
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        color: '#94A3B8',
+        bgcolor: '#F8F9FC',
+        borderBottom: '1px solid rgba(19,33,61,0.08)',
+        whiteSpace: 'nowrap',
+    };
+    const cellSx = {
+        py: 1,
+        px: { xs: 1, sm: 1.5 },
+        fontSize: 13,
+        borderBottom: '1px solid rgba(19,33,61,0.06)',
+    };
+
+    const activeTabId = tab === 'view' ? 'history' : tab;
+
     return (
-        <div className="animate-in fade-in duration-700 bg-[#f0f2f9] min-h-screen pb-28 md:pb-12">
-            <section className="relative flex min-h-[160px] w-full items-end overflow-hidden bg-[#FF8C00] text-white md:min-h-[220px] md:items-center">
-                <div className="absolute inset-0 z-[1]">
-                    <img
-                        src="/teacher.png"
-                        alt=""
-                        className="block h-full w-full object-cover object-top opacity-95 md:opacity-100"
-                    />
-                    <div
-                        className="absolute inset-0 z-[2] bg-gradient-to-t from-black/50 via-black/20 to-black/10 md:bg-black/25"
-                        aria-hidden
-                    />
-                </div>
-                <div className="relative z-10 mx-auto w-full max-w-[1600px] px-4 pb-6 pt-10 md:px-10 md:pb-8 md:pt-12">
-                    <div className="max-w-3xl space-y-1">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/20 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/90 backdrop-blur-sm">
-                            Roll call module
-                        </span>
-                        <h1 className="font-sans text-xl font-black tracking-tight text-white md:text-4xl">
-                            Round roll call
-                        </h1>
-                        <p className="text-[11px] font-semibold text-white/85 md:text-sm">
-                            All school classes · history & attendance view
-                        </p>
-                    </div>
-                </div>
-            </section>
-
-            <div className="relative z-30 mx-auto max-w-[1600px] px-3 md:px-6 -mt-6 md:-mt-8">
-                <div className="mb-3 flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 md:w-fit">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/attendance')}
-                        className="min-h-[44px] rounded-xl px-4 text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-600 md:h-10 md:min-h-0"
-                    >
-                        Period attendance
-                    </button>
-                    <button
-                        type="button"
-                        aria-current="page"
-                        className="min-h-[44px] rounded-xl px-4 text-[10px] font-black uppercase tracking-widest bg-re-grad-orange text-white md:h-10 md:min-h-0"
-                    >
-                        Round roll call
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => navigate('/teacher-attendance')}
-                        className="min-h-[44px] rounded-xl px-4 text-[10px] font-black uppercase tracking-widest bg-slate-50 text-slate-600 md:h-10 md:min-h-0"
-                    >
-                        Teacher attendance
-                    </button>
-                </div>
-
-                <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5">
-                    {[
-                        { id: 'take', label: 'Take roll', icon: ClipboardList },
-                        { id: 'history', label: 'All roll calls', icon: List },
-                    ].map(({ id, label, icon: Icon }) => (
-                        <button
-                            key={id}
-                            type="button"
+        <Box sx={{ minHeight: '100%', pb: { xs: 12, md: 4 } }}>
+            {/* Sticky chrome: tabs + filters (marks / assessments language) */}
+            <Box
+                sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 20,
+                    width: '100%',
+                    bgcolor: '#fff',
+                    borderBottom: '1px solid rgba(19,33,61,0.08)',
+                    boxShadow: '0 2px 8px -4px rgba(19,33,61,0.12)',
+                }}
+            >
+                <Box sx={{ display: 'flex', borderBottom: '1px solid rgba(19,33,61,0.08)' }}>
+                    {tabs.map((tItem) => (
+                        <ButtonBase
+                            key={tItem.id}
                             onClick={() => {
-                                setTab(id);
-                                if (id === 'take') setViewSession(null);
+                                setTab(tItem.id);
+                                if (tItem.id === 'take') setViewSession(null);
                             }}
-                            className={`inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl px-3 text-[10px] font-black uppercase tracking-widest md:flex-none md:px-5 md:min-h-[40px] ${
-                                tab === id || (tab === 'view' && id === 'history')
-                                    ? 'bg-slate-900 text-white'
-                                    : 'bg-slate-50 text-slate-600'
-                            }`}
+                            sx={{
+                                flex: 1,
+                                py: 1.25,
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: activeTabId === tItem.id ? brand.navy : '#64748B',
+                                borderBottom: activeTabId === tItem.id ? `2px solid ${brand.navy}` : '2px solid transparent',
+                                borderRadius: 0,
+                                bgcolor: activeTabId === tItem.id ? 'rgba(19,33,61,0.03)' : 'transparent',
+                            }}
                         >
-                            <Icon size={16} />
-                            {label}
-                        </button>
+                            {tItem.label}
+                        </ButtonBase>
                     ))}
-                </div>
+                </Box>
 
+                <Box sx={{ px: { xs: 1.25, sm: 1.5 }, py: 0.35 }}>
+                    {tab === 'history' ? (
+                        <Stack spacing={0.25}>
+                            <Stack direction="row" alignItems="center">
+                                <Box sx={{ flex: 1.2, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        placeholder={isPeriodAttendance ? 'SearchÔÇª' : 'SearchÔÇª'}
+                                        value={historyQ}
+                                        onChange={(e) => setHistoryQ(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <SearchIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={barInputSx}
+                                    />
+                                </Box>
+                                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <FormControl variant="standard" size="small" fullWidth>
+                                        <Select
+                                            variant="standard"
+                                            disableUnderline
+                                            displayEmpty
+                                            value={historyClass}
+                                            onChange={(e) => setHistoryClass(e.target.value)}
+                                            sx={barSelectSx}
+                                            inputProps={{ 'aria-label': 'Class' }}
+                                        >
+                                            <MenuItem value="">All classes</MenuItem>
+                                            {classes.map((c) => (
+                                                <MenuItem key={c} value={c}>{c}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                            </Stack>
+                            <Stack direction="row" alignItems="center">
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        type="date"
+                                        fullWidth
+                                        value={historyFrom}
+                                        onChange={(e) => setHistoryFrom(e.target.value)}
+                                        sx={barInputSx}
+                                        inputProps={{ 'aria-label': 'From date' }}
+                                    />
+                                </Box>
+                                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        type="date"
+                                        fullWidth
+                                        value={historyTo}
+                                        onChange={(e) => setHistoryTo(e.target.value)}
+                                        sx={barInputSx}
+                                        inputProps={{ 'aria-label': 'To date' }}
+                                    />
+                                </Box>
+                                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+                                <Button
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => {
+                                        setHistoryPage(1);
+                                        void loadHistory();
+                                    }}
+                                    sx={{
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        flexShrink: 0,
+                                        bgcolor: brand.primary,
+                                        color: brand.navy,
+                                        minHeight: 34,
+                                        px: 1.75,
+                                        boxShadow: 'none',
+                                        '&:hover': { bgcolor: brand.primaryStrong, boxShadow: 'none' },
+                                    }}
+                                >
+                                    Apply
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    ) : tab === 'view' ? (
+                        <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
+                            <IconButton
+                                size="small"
+                                onClick={() => {
+                                    setTab('history');
+                                    setViewSession(null);
+                                }}
+                                aria-label="Back"
+                            >
+                                <ArrowBackIcon fontSize="small" />
+                            </IconButton>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>
+                                    {viewSession?.roll_label}
+                                </Typography>
+                                <Typography noWrap sx={{ fontSize: 11, color: '#64748B' }}>
+                                    {[viewSession?.class_name, viewSession?.date, viewSession?.teacher_name].filter(Boolean).join(' ┬À ')}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    ) : (
+                        <Stack spacing={0.25}>
+                            <Stack direction="row" alignItems="center">
+                                <Box sx={{ flex: 1.2, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        value={rollName}
+                                        onChange={(e) => setRollName(e.target.value)}
+                                        placeholder={isPeriodAttendance ? 'Subject / attendance *' : 'Roll name *'}
+                                        disabled={readOnly}
+                                        sx={barInputSx}
+                                    />
+                                </Box>
+                                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <FormControl variant="standard" size="small" fullWidth disabled={readOnly}>
+                                        <Select
+                                            variant="standard"
+                                            disableUnderline
+                                            displayEmpty
+                                            value={selectedClass}
+                                            onChange={(e) => setSelectedClass(e.target.value)}
+                                            sx={barSelectSx}
+                                            inputProps={{ 'aria-label': 'Class' }}
+                                        >
+                                            <MenuItem value="">Choose class</MenuItem>
+                                            {classes.map((c) => (
+                                                <MenuItem key={c} value={c}>{c}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+                            </Stack>
+                            <Stack direction="row" alignItems="center">
+                                <IconButton size="small" onClick={() => shiftDateByDays(-1)} disabled={readOnly} aria-label="Previous day">
+                                    <ChevronLeftIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        type="date"
+                                        fullWidth
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        disabled={readOnly}
+                                        sx={barInputSx}
+                                    />
+                                </Box>
+                                <IconButton size="small" onClick={() => shiftDateByDays(1)} disabled={readOnly} aria-label="Next day">
+                                    <ChevronRightIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        placeholder="Search studentÔÇª"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <SearchIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={barInputSx}
+                                    />
+                                </Box>
+                            </Stack>
+                        </Stack>
+                    )}
+                </Box>
+            </Box>
+
+            <Stack spacing={1.75} sx={{ p: { xs: 1.5, sm: 2 }, pt: 2, maxWidth: 1200, mx: 'auto' }}>
+
+                {lessonContext && tab === 'take' ? (
+                    <Alert severity="info" sx={{ borderRadius: 1 }}>
+                        Lesson: {lessonContext}
+                        {requestedClass ? ` ┬À ${requestedClass}` : ''}
+                    </Alert>
+                ) : null}
+                {requestedClassMissing && tab === 'take' ? (
+                    <Alert severity="warning" sx={{ borderRadius: 1 }}>
+                        Could not match ÔÇ£{requestedClass}ÔÇØ to a class. Choose the correct class above.
+                    </Alert>
+                ) : null}
+                {readOnly && tab === 'take' ? (
+                    <Alert severity="warning" sx={{ borderRadius: 1 }}>
+                        {isPeriodAttendance
+                            ? 'This attendance was saved by another teacher (view only).'
+                            : 'This roll was saved by another teacher (view only).'}
+                    </Alert>
+                ) : null}
+
+                {/* Navy squarish stats */}
+                {(tab === 'take' || tab === 'view') && (
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gap: 0,
+                            border: `1px solid ${brand.navy}`,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {[
+                            { label: 'Class size', value: stats.total },
+                            { label: 'Present', value: stats.present },
+                            { label: 'Absent', value: stats.absent },
+                            { label: 'Excused', value: stats.excused },
+                        ].map((s, i) => (
+                            <Box
+                                key={s.label}
+                                sx={{
+                                    bgcolor: brand.navy,
+                                    color: '#fff',
+                                    px: 1.75,
+                                    py: 1.5,
+                                    minHeight: 84,
+                                    borderRadius: 0,
+                                    borderRight: i % 2 === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                }}
+                            >
+                                <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.65)' }}>
+                                    {s.label}
+                                </Typography>
+                                <Typography sx={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                                    {s.value}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+
+                {tab === 'take' && sessions.length > 0 && (
+                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                        {sessions.map((s) => (
+                            <Chip
+                                key={s.id || s.roll_label}
+                                size="small"
+                                label={s.roll_label}
+                                onClick={() => pickSession(s.roll_label)}
+                                sx={{
+                                    fontWeight: 600,
+                                    bgcolor: rollLabelNorm === normalizeRollLabel(s.roll_label) ? brand.navy : '#F1F5F9',
+                                    color: rollLabelNorm === normalizeRollLabel(s.roll_label) ? '#fff' : brand.navy,
+                                }}
+                            />
+                        ))}
+                    </Stack>
+                )}
+
+                {tab === 'take' && !rosterReadOnly && canLoadRoster && roster.length > 0 && (
+                    <Stack direction="row" spacing={1}>
+                        <Button size="small" variant="outlined" onClick={() => handleMarkAll('present')} sx={{ textTransform: 'none', fontWeight: 600, flex: 1, borderColor: '#A7F3D0', color: '#047857' }}>
+                            All present
+                        </Button>
+                        <Button size="small" variant="outlined" onClick={() => handleMarkAll('absent')} sx={{ textTransform: 'none', fontWeight: 600, flex: 1, borderColor: '#FECACA', color: '#B91C1C' }}>
+                            All absent
+                        </Button>
+                    </Stack>
+                )}
+
+                {/* History table */}
                 {tab === 'history' && (
-                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white md:rounded-3xl">
-                        <div className="grid gap-3 border-b border-slate-100 p-4 md:grid-cols-2 lg:grid-cols-5">
-                            <input
-                                type="text"
-                                placeholder="Search roll, class, teacher…"
-                                value={historyQ}
-                                onChange={(e) => {
-                                    setHistoryQ(e.target.value);
-                                    setHistoryPage(1);
-                                }}
-                                className={flatInput}
-                            />
-                            <select
-                                value={historyClass}
-                                onChange={(e) => {
-                                    setHistoryClass(e.target.value);
-                                    setHistoryPage(1);
-                                }}
-                                className={flatSelect}
-                            >
-                                <option value="">All classes</option>
-                                {classes.map((c) => (
-                                    <option key={c} value={c}>
-                                        {c}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                type="date"
-                                value={historyFrom}
-                                onChange={(e) => {
-                                    setHistoryFrom(e.target.value);
-                                    setHistoryPage(1);
-                                }}
-                                className={flatInput}
-                            />
-                            <input
-                                type="date"
-                                value={historyTo}
-                                onChange={(e) => {
-                                    setHistoryTo(e.target.value);
-                                    setHistoryPage(1);
-                                }}
-                                className={flatInput}
-                            />
-                            <button
-                                type="button"
-                                onClick={loadHistory}
-                                className="min-h-[44px] rounded-xl bg-re-grad-orange text-[10px] font-black uppercase tracking-widest text-white md:min-h-[40px]"
-                            >
-                                Apply filters
-                            </button>
-                        </div>
-
-                        <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full min-w-[720px] text-left text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/80 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                        <th className="px-4 py-3">Date</th>
-                                        <th className="px-4 py-3">Roll</th>
-                                        <th className="px-4 py-3">Class</th>
-                                        <th className="px-4 py-3">Teacher</th>
-                                        <th className="px-4 py-3 text-center">Present</th>
-                                        <th className="px-4 py-3 text-center">Absent</th>
-                                        <th className="px-4 py-3 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(19,33,61,0.08)', overflow: 'hidden' }}>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
+                            <Table size="small" sx={{ minWidth: 640 }}>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={headCellSx}>Date</TableCell>
+                                        <TableCell sx={headCellSx}>{isPeriodAttendance ? 'Attendance' : 'Roll'}</TableCell>
+                                        <TableCell sx={headCellSx}>Class</TableCell>
+                                        <TableCell sx={{ ...headCellSx, display: { xs: 'none', sm: 'table-cell' } }}>Teacher</TableCell>
+                                        <TableCell sx={headCellSx} align="center">Present</TableCell>
+                                        <TableCell sx={headCellSx} align="center">Absent</TableCell>
+                                        <TableCell sx={headCellSx} align="right">Action</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
                                     {historyLoading ? (
-                                        <tr>
-                                            <td colSpan={7} className="py-12 text-center text-slate-500">
-                                                Loading…
-                                            </td>
-                                        </tr>
+                                        <TableRow>
+                                            <TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', borderBottom: 0 }}>
+                                                <CircularProgress size={22} />
+                                            </TableCell>
+                                        </TableRow>
                                     ) : historyRows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={7} className="py-12 text-center text-slate-500">
-                                                No roll calls yet.
-                                            </td>
-                                        </tr>
+                                        <TableRow>
+                                            <TableCell colSpan={7} sx={{ py: 5, textAlign: 'center', color: '#94A3B8', borderBottom: 0, fontSize: 13 }}>
+                                                No records yet.
+                                            </TableCell>
+                                        </TableRow>
                                     ) : (
-                                        historyRows.map((row) => (
-                                            <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                                                <td className="px-4 py-3 font-medium">{row.date}</td>
-                                                <td className="px-4 py-3">{row.roll_label}</td>
-                                                <td className="px-4 py-3">{row.class_name}</td>
-                                                <td className="px-4 py-3 text-slate-600">{row.teacher_name || '-'}</td>
-                                                <td className="px-4 py-3 text-center tabular-nums text-emerald-700">
-                                                    {row.present ?? 0}/{row.total ?? 0}
-                                                </td>
-                                                <td className="px-4 py-3 text-center tabular-nums text-red-600">
-                                                    {row.absent ?? 0}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openSessionView(row.id)}
-                                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-700 hover:border-re-orange/40"
-                                                    >
-                                                        <Eye size={14} /> View
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                        historyRows.map((row, idx) => (
+                                            <TableRow
+                                                key={row.id}
+                                                hover
+                                                sx={{ bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff', '&:last-child td': { borderBottom: 0 } }}
+                                            >
+                                                <TableCell sx={{ ...cellSx, whiteSpace: 'nowrap', fontWeight: 600, color: brand.navy }}>{row.date}</TableCell>
+                                                <TableCell sx={cellSx}>{row.roll_label}</TableCell>
+                                                <TableCell sx={cellSx}>{row.class_name}</TableCell>
+                                                <TableCell sx={{ ...cellSx, display: { xs: 'none', sm: 'table-cell' }, color: '#64748B' }}>
+                                                    {row.teacher_name || 'ÔÇö'}
+                                                </TableCell>
+                                                <TableCell sx={cellSx} align="center">{row.present}</TableCell>
+                                                <TableCell sx={cellSx} align="center">{row.absent}</TableCell>
+                                                <TableCell sx={cellSx} align="right">
+                                                    <Button size="small" onClick={() => void openSessionView(row.id)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+                                                        View
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
                                         ))
                                     )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="md:hidden divide-y divide-slate-100">
-                            {historyLoading ? (
-                                <p className="py-10 text-center text-sm text-slate-500">Loading…</p>
-                            ) : (
-                                historyRows.map((row) => (
-                                    <div key={row.id} className="p-4">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                            {row.date}
-                                        </p>
-                                        <p className="mt-1 font-bold text-re-text">{row.roll_label}</p>
-                                        <p className="text-sm text-slate-600">
-                                            {row.class_name} · {row.teacher_name || 'Teacher'}
-                                        </p>
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Present {row.present}/{row.total} · Absent {row.absent}
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => openSessionView(row.id)}
-                                            className="mt-3 w-full min-h-[44px] rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest"
-                                        >
-                                            View attendance
-                                        </button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                         <TablePagination
                             page={historyPage}
                             totalPages={Math.max(1, Math.ceil(historyTotal / historyPerPage))}
@@ -503,284 +771,188 @@ export default function RoundRollCall() {
                                 setHistoryPage(1);
                             }}
                         />
-                    </div>
+                    </Paper>
                 )}
 
+                {/* Roster table */}
                 {(tab === 'take' || tab === 'view') && (
-                    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white md:rounded-3xl">
-                        {tab === 'view' && viewSession && (
-                            <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setTab('history');
-                                        setViewSession(null);
-                                    }}
-                                    className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-600"
-                                >
-                                    <ArrowLeft size={16} /> Back to list
-                                </button>
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate font-bold text-re-text">{viewSession.roll_label}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {viewSession.class_name} · {viewSession.date} ·{' '}
-                                        {viewSession.teacher_name || 'Teacher'}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 md:grid-cols-4">
-                            {[
-                                { label: 'Class size', value: stats.total, icon: <Users size={14} className="text-re-orange/70" /> },
-                                { label: 'Present', value: stats.present, icon: <CheckCircle size={14} className="text-emerald-500/80" /> },
-                                { label: 'Absent', value: stats.absent, icon: <XCircle size={14} className="text-red-500/80" /> },
-                                { label: 'Excused', value: stats.excused, icon: <FileText size={14} className="text-blue-500/80" /> },
-                            ].map((s, i) => (
-                                <div key={i} className="flex flex-col items-center justify-center px-2 py-4 text-center sm:p-6">
-                                    <div className="mb-1 opacity-90">{s.icon}</div>
-                                    <div className="text-2xl font-black tabular-nums text-re-text">{s.value}</div>
-                                    <div className="mt-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-re-text-muted">
-                                        {s.label}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {tab === 'take' && (
-                            <div className="space-y-3 border-b border-slate-100 bg-slate-50/40 p-4 md:p-5">
-                                {readOnly && (
-                                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-900">
-                                        This roll was saved by another teacher (view only). Choose a different roll name to
-                                        create your own.
-                                    </p>
-                                )}
-                                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-12 lg:items-end lg:gap-4">
-                                    <label className="block lg:col-span-4">
-                                        <span className="mb-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-re-text-muted">
-                                            <Tag size={12} className="text-re-orange" />
-                                            Roll name <span className="text-red-500">*</span>
-                                        </span>
-                                        <input
-                                            type="text"
-                                            value={rollName}
-                                            onChange={(e) => setRollName(e.target.value)}
-                                            placeholder="e.g. Morning Prep, Registration"
-                                            maxLength={160}
-                                            disabled={readOnly}
-                                            className={flatInput}
-                                        />
-                                    </label>
-                                    <div className="relative lg:col-span-3">
-                                        <Users
-                                            size={14}
-                                            className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-re-text-muted"
-                                        />
-                                        <select
-                                            value={selectedClass}
-                                            onChange={(e) => setSelectedClass(e.target.value)}
-                                            disabled={readOnly}
-                                            className={flatSelect}
-                                        >
-                                            <option value="">Choose class</option>
-                                            {classes.map((c) => (
-                                                <option key={c} value={c}>
-                                                    {c}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center gap-2 lg:col-span-5">
-                                        <button
-                                            type="button"
-                                            onClick={() => shiftDateByDays(-1)}
-                                            disabled={readOnly}
-                                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-re-orange md:h-10 md:w-10"
-                                            aria-label="Previous day"
-                                        >
-                                            <ChevronLeft size={20} />
-                                        </button>
-                                        <div className="relative min-w-0 flex-1">
-                                            <Calendar
-                                                size={14}
-                                                className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2 text-re-text-muted"
-                                            />
-                                            <input
-                                                type="date"
-                                                value={selectedDate}
-                                                onChange={(e) => setSelectedDate(e.target.value)}
-                                                disabled={readOnly}
-                                                className={`${flatInput} !pl-11 font-bold`}
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => shiftDateByDays(1)}
-                                            disabled={readOnly}
-                                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-re-orange md:h-10 md:w-10"
-                                            aria-label="Next day"
-                                        >
-                                            <ChevronRight size={20} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {sessions.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="w-full text-[9px] font-black uppercase tracking-widest text-re-text-muted md:w-auto md:shrink-0 md:py-1.5">
-                                            Saved rolls this day
-                                        </span>
-                                        {sessions.map((s) => (
-                                            <button
-                                                key={`${s.roll_label}-${s.log_id}`}
-                                                type="button"
-                                                onClick={() => pickSession(s.roll_label)}
-                                                className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${
-                                                    normalizeRollLabel(rollName) === normalizeRollLabel(s.roll_label)
-                                                        ? 'border-re-orange bg-orange-50 text-re-orange'
-                                                        : 'border-slate-200 bg-white text-re-text'
-                                                }`}
-                                            >
-                                                {s.roll_label || '(unnamed)'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <button
-                                    type="button"
-                                    onClick={handleSave}
-                                    disabled={readOnly || !canLoadRoster || !roster.length || loading}
-                                    className="hidden w-full min-h-[48px] items-center justify-center gap-2 rounded-xl bg-re-grad-orange text-[11px] font-black uppercase tracking-[0.15em] text-white disabled:opacity-45 md:inline-flex md:min-h-0 md:w-auto md:px-6 md:py-2.5"
-                                >
-                                    <CheckSquare size={18} /> Save roll
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="relative border-b border-slate-100 px-4 py-3">
-                            <Search
-                                size={14}
-                                className="pointer-events-none absolute left-7 top-1/2 z-[1] -translate-y-1/2 text-re-text-muted/60"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Search learner…"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className={`${flatInput} !pl-10`}
-                            />
-                        </div>
-
-                        {tab === 'take' && selectedClass && canLoadRoster && !readOnly && (
-                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white px-4 py-3">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-re-text-muted">Bulk</span>
-                                {['present', 'absent', 'excused'].map((st) => (
-                                    <button
-                                        key={st}
-                                        type="button"
-                                        onClick={() => handleMarkAll(st)}
-                                        className="min-h-[40px] rounded-xl border border-slate-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700"
-                                    >
-                                        All {st}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        <RosterPanels
-                            loading={loading && (canLoadRoster || tab === 'view')}
-                            selectedClass={tab === 'view' ? viewSession?.class_name : selectedClass}
-                            canLoadRoster={tab === 'view' ? Boolean(viewSession) : canLoadRoster}
+                    <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(19,33,61,0.08)', overflow: 'hidden' }}>
+                        <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25 }}>
+                            <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>Students</Typography>
+                            <Box component="span" sx={{ ml: 'auto', borderRadius: 999, bgcolor: '#F1F5F9', px: 1, py: 0.25, fontSize: 10, fontWeight: 700, color: '#64748B' }}>
+                                {filtered.length}
+                            </Box>
+                        </Stack>
+                        <RosterTable
+                            loading={loading}
+                            selectedClass={selectedClass}
+                            canLoadRoster={tab === 'view' ? true : canLoadRoster}
                             filtered={filtered}
-                            roster={activeRoster}
-                            readOnly={rosterReadOnly}
+                            rosterReadOnly={rosterReadOnly}
+                            attendanceName={attendanceName}
                             onStatusChange={handleStatusChange}
                             setRoster={setRoster}
+                            headCellSx={headCellSx}
+                            cellSx={cellSx}
                         />
-                    </div>
+                        {tab === 'take' && !rosterReadOnly && (
+                            <Box sx={{ p: 1.5, borderTop: '1px solid rgba(19,33,61,0.08)', display: { xs: 'none', md: 'block' } }}>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    disabled={!canLoadRoster || !roster.length || loading}
+                                    onClick={() => void handleSave()}
+                                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: brand.primary, color: brand.navy, '&:hover': { bgcolor: brand.primaryStrong } }}
+                                >
+                                    Save {attendanceName}
+                                </Button>
+                            </Box>
+                        )}
+                    </Paper>
                 )}
-            </div>
+            </Stack>
 
             {tab === 'take' && !readOnly && (
-                <div className="fixed bottom-[4.5rem] left-0 right-0 z-[85] border-t border-slate-200 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden">
-                    <button
-                        type="button"
-                        onClick={handleSave}
+                <Box
+                    sx={{
+                        display: { xs: 'block', md: 'none' },
+                        position: 'fixed',
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 85,
+                        borderTop: '1px solid rgba(19,33,61,0.08)',
+                        bgcolor: 'rgba(255,255,255,0.96)',
+                        px: 2,
+                        py: 1.25,
+                        pb: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+                    }}
+                >
+                    <Button
+                        fullWidth
+                        variant="contained"
                         disabled={!canLoadRoster || !roster.length || loading}
-                        className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-re-grad-orange text-[11px] font-black uppercase tracking-[0.2em] text-white disabled:opacity-45"
+                        onClick={() => void handleSave()}
+                        sx={{ textTransform: 'none', fontWeight: 700, height: 48, bgcolor: brand.primary, color: brand.navy, '&:hover': { bgcolor: brand.primaryStrong } }}
                     >
-                        <CheckSquare size={20} /> Save roll
-                    </button>
-                </div>
+                        Save {attendanceName}
+                    </Button>
+                </Box>
             )}
-        </div>
+        </Box>
     );
 }
 
-function RosterPanels({ loading, selectedClass, canLoadRoster, filtered, roster, readOnly, onStatusChange, setRoster }) {
+function RosterTable({
+    loading,
+    selectedClass,
+    canLoadRoster,
+    filtered,
+    rosterReadOnly,
+    attendanceName,
+    onStatusChange,
+    setRoster,
+    headCellSx,
+    cellSx,
+}) {
+    if (loading) {
+        return (
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
+                <CircularProgress size={22} />
+            </Stack>
+        );
+    }
+    if (!selectedClass || !canLoadRoster) {
+        return (
+            <Typography sx={{ py: 5, textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+                {canLoadRoster
+                    ? `Choose a class and ${attendanceName === 'attendance' ? 'attendance' : 'roll'} name.`
+                    : `Select a ${attendanceName} to view learners.`}
+            </Typography>
+        );
+    }
+    if (!filtered.length) {
+        return (
+            <Typography sx={{ py: 5, textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+                No learners to show.
+            </Typography>
+        );
+    }
+
     return (
-        <>
-            <div className="md:hidden">
-                {loading ? (
-                    <div className="flex flex-col items-center gap-3 py-16">
-                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-re-orange border-t-transparent" />
-                    </div>
-                ) : !selectedClass || !canLoadRoster ? (
-                    <p className="py-14 text-center text-sm font-semibold text-re-text-muted">
-                        {canLoadRoster ? 'Choose a class and roll name.' : 'Select a roll to view learners.'}
-                    </p>
-                ) : filtered.length === 0 ? (
-                    <p className="py-14 text-center text-sm font-semibold text-re-text-muted">No learners to show.</p>
-                ) : (
-                    <ul className="divide-y divide-slate-100">
-                        {filtered.map((student, idx) => (
-                            <li key={student.id} className="bg-white px-4 py-4">
-                                <div className="flex gap-3">
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
-                                        <User size={18} className="text-slate-400" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <span className="text-[10px] font-black text-slate-400">#{idx + 1}</span>
-                                            <span className="font-mono text-[10px] font-bold text-slate-500">{student.adm}</span>
-                                        </div>
-                                        <p className="mt-0.5 text-[14px] font-black leading-snug text-re-text">{student.name}</p>
-                                    </div>
-                                </div>
-                                <div className="mt-4 grid grid-cols-3 gap-2">
-                                    <RoundStatusBtn
+        <TableContainer sx={{ overflowX: 'visible' }}>
+            <Table size="small" sx={{ width: '100%', tableLayout: 'fixed' }}>
+                <TableHead>
+                    <TableRow>
+                        <TableCell sx={{ ...headCellSx, width: 36 }}>#</TableCell>
+                        <TableCell sx={headCellSx}>Student</TableCell>
+                        <TableCell sx={{ ...headCellSx, width: { xs: 118, sm: 140 } }}>Status</TableCell>
+                        <TableCell sx={{ ...headCellSx, display: { xs: 'none', md: 'table-cell' }, width: 140 }}>Remarks</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {filtered.map((student, idx) => (
+                        <TableRow
+                            key={student.id}
+                            sx={{
+                                bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                                '&:last-child td': { borderBottom: 0 },
+                            }}
+                        >
+                            <TableCell sx={{ ...cellSx, color: '#94A3B8', fontSize: 12, width: 36 }}>{idx + 1}</TableCell>
+                            <TableCell sx={{ ...cellSx, fontWeight: 600, color: brand.navy, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, color: brand.navy }}>
+                                    {student.name}
+                                </Typography>
+                                {student.adm ? (
+                                    <Typography noWrap sx={{ fontSize: 11, color: '#94A3B8', fontFamily: 'ui-monospace, monospace' }}>
+                                        {student.adm}
+                                    </Typography>
+                                ) : null}
+                            </TableCell>
+                            <TableCell sx={{ ...cellSx, width: { xs: 118, sm: 140 }, px: { xs: 0.5, sm: 1 } }}>
+                                <Stack direction="row" spacing={0.4} justifyContent="flex-start">
+                                    <StatusBtn
                                         active={student.status === 'present'}
+                                        disabled={rosterReadOnly}
                                         onClick={() => onStatusChange(student.id, 'present')}
-                                        base="emerald"
-                                        icon={<Check size={16} strokeWidth={3} />}
-                                        label="Present"
-                                        showLabel
-                                        disabled={readOnly}
+                                        color="#047857"
+                                        activeBg="#10B981"
+                                        label="P"
+                                        title="Present"
+                                        icon={<CheckIcon sx={{ fontSize: 14 }} />}
                                     />
-                                    <RoundStatusBtn
+                                    <StatusBtn
                                         active={student.status === 'absent'}
+                                        disabled={rosterReadOnly}
                                         onClick={() => onStatusChange(student.id, 'absent')}
-                                        base="red"
-                                        icon={<X size={16} strokeWidth={3} />}
-                                        label="Absent"
-                                        showLabel
-                                        disabled={readOnly}
+                                        color="#B91C1C"
+                                        activeBg="#EF4444"
+                                        label="A"
+                                        title="Absent"
+                                        icon={<CloseIcon sx={{ fontSize: 14 }} />}
                                     />
-                                    <RoundStatusBtn
+                                    <StatusBtn
                                         active={student.status === 'excused'}
+                                        disabled={rosterReadOnly}
                                         onClick={() => onStatusChange(student.id, 'excused')}
-                                        base="blue"
-                                        icon={<FileText size={15} />}
-                                        label="Excused"
-                                        showLabel
-                                        disabled={readOnly}
+                                        color="#1D4ED8"
+                                        activeBg="#3B82F6"
+                                        label="E"
+                                        title="Excused"
+                                        icon={<DescriptionOutlinedIcon sx={{ fontSize: 14 }} />}
                                     />
-                                </div>
-                                {!readOnly && (
-                                    <input
-                                        type="text"
+                                </Stack>
+                            </TableCell>
+                            <TableCell sx={{ ...cellSx, display: { xs: 'none', md: 'table-cell' }, minWidth: 120 }}>
+                                {rosterReadOnly ? (
+                                    <Typography sx={{ fontSize: 12, color: '#64748B' }}>{student.remarks || 'ÔÇö'}</Typography>
+                                ) : (
+                                    <TextField
+                                        size="small"
+                                        fullWidth
                                         value={student.remarks || ''}
+                                        placeholder="Remarks"
                                         onChange={(e) =>
                                             setRoster((prev) =>
                                                 prev.map((row) =>
@@ -788,157 +960,48 @@ function RosterPanels({ loading, selectedClass, canLoadRoster, filtered, roster,
                                                 )
                                             )
                                         }
-                                        placeholder="Remarks (optional)"
-                                        className={`${flatInput} mt-3 text-[13px]`}
+                                        sx={{
+                                            '& .MuiOutlinedInput-root': {
+                                                fontSize: 12,
+                                                bgcolor: '#F8F9FC',
+                                                '& fieldset': { borderColor: 'transparent' },
+                                            },
+                                        }}
                                     />
                                 )}
-                                {readOnly && student.remarks ? (
-                                    <p className="mt-2 text-xs text-slate-500">Remarks: {student.remarks}</p>
-                                ) : null}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[720px] border-collapse text-left">
-                    <thead>
-                        <tr>
-                            <th className="w-11 border-b border-r border-slate-100 bg-slate-50/80 px-2 py-3 text-center text-[9px] font-black uppercase tracking-widest text-re-text-muted">
-                                #
-                            </th>
-                            <th className="hidden border-b border-r border-slate-100 bg-slate-50/80 px-3 py-3 text-left text-[9px] font-black uppercase tracking-widest text-re-text-muted sm:table-cell">
-                                ID
-                            </th>
-                            <th className="border-b border-r border-slate-100 bg-slate-50/80 px-3 py-3 text-left text-[9px] font-black uppercase tracking-widest text-re-text-muted">
-                                Student
-                            </th>
-                            <th className="min-w-[260px] border-b border-slate-100 bg-slate-50/80 px-3 py-3 text-center text-[9px] font-black uppercase tracking-widest text-re-text-muted">
-                                Status
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan={4} className="p-12 text-center">
-                                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-re-orange border-t-transparent" />
-                                </td>
-                            </tr>
-                        ) : !selectedClass || !canLoadRoster ? (
-                            <tr>
-                                <td colSpan={4} className="p-10 text-center text-sm font-bold text-re-text-muted">
-                                    No roster loaded.
-                                </td>
-                            </tr>
-                        ) : filtered.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="p-10 text-center text-sm font-bold text-re-text-muted">
-                                    No matches.
-                                </td>
-                            </tr>
-                        ) : (
-                            filtered.map((student, idx) => (
-                                <tr key={student.id} className="hover:bg-slate-50/50">
-                                    <td className="border-r border-b border-slate-100 px-2 py-3 text-center text-[11px] font-black text-slate-300">
-                                        {idx + 1}
-                                    </td>
-                                    <td className="hidden border-r border-b border-slate-100 px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:table-cell">
-                                        {student.adm}
-                                    </td>
-                                    <td className="border-r border-b border-slate-100 px-2 py-3 align-middle">
-                                        <p className="truncate text-[12px] font-black text-re-text">{student.name}</p>
-                                        <p className="font-mono text-[9px] font-bold text-re-text-muted sm:hidden">{student.adm}</p>
-                                    </td>
-                                    <td className="border-b border-slate-100 px-2 py-2">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex flex-wrap items-center justify-center gap-2">
-                                                <RoundStatusBtn
-                                                    active={student.status === 'present'}
-                                                    onClick={() => onStatusChange(student.id, 'present')}
-                                                    base="emerald"
-                                                    icon={<Check size={14} strokeWidth={3} />}
-                                                    label="Present"
-                                                    disabled={readOnly}
-                                                />
-                                                <RoundStatusBtn
-                                                    active={student.status === 'absent'}
-                                                    onClick={() => onStatusChange(student.id, 'absent')}
-                                                    base="red"
-                                                    icon={<X size={14} strokeWidth={3} />}
-                                                    label="Absent"
-                                                    disabled={readOnly}
-                                                />
-                                                <RoundStatusBtn
-                                                    active={student.status === 'excused'}
-                                                    onClick={() => onStatusChange(student.id, 'excused')}
-                                                    base="blue"
-                                                    icon={<FileText size={13} />}
-                                                    label="Excused"
-                                                    disabled={readOnly}
-                                                />
-                                            </div>
-                                            {!readOnly ? (
-                                                <input
-                                                    type="text"
-                                                    value={student.remarks || ''}
-                                                    onChange={(e) =>
-                                                        setRoster((prev) =>
-                                                            prev.map((row) =>
-                                                                row.id === student.id
-                                                                    ? { ...row, remarks: e.target.value }
-                                                                    : row
-                                                            )
-                                                        )
-                                                    }
-                                                    placeholder="Remarks"
-                                                    className="h-9 w-full rounded-lg border border-slate-200 px-2 text-[11px]"
-                                                />
-                                            ) : student.remarks ? (
-                                                <p className="text-center text-[11px] text-slate-500">{student.remarks}</p>
-                                            ) : null}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
     );
 }
 
-function RoundStatusBtn({ active, onClick, base, icon, label, showLabel, disabled }) {
-    const themes = {
-        emerald: {
-            on: 'border-emerald-600 bg-emerald-500 text-white',
-            off: 'border-emerald-200 bg-white text-emerald-700',
-        },
-        red: {
-            on: 'border-red-600 bg-red-500 text-white',
-            off: 'border-red-200 bg-white text-red-700',
-        },
-        blue: {
-            on: 'border-blue-600 bg-blue-500 text-white',
-            off: 'border-blue-200 bg-white text-blue-700',
-        },
-    };
-    const t = themes[base];
+function StatusBtn({ active, disabled, onClick, color, activeBg, label, title, icon }) {
     return (
-        <button
-            type="button"
+        <ButtonBase
             onClick={onClick}
             disabled={disabled}
-            title={label}
-            aria-label={label}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl border-2 py-2.5 text-[9px] font-black uppercase tracking-wide transition-all sm:flex-row sm:gap-1 sm:py-1.5 sm:text-[8px] disabled:opacity-50 ${
-                showLabel ? 'min-h-[72px] flex-1 sm:min-h-0' : 'min-h-[40px] min-w-[40px] px-2 sm:min-h-0'
-            } ${active ? t.on : t.off}`}
+            title={title}
+            aria-label={title}
+            sx={{
+                minWidth: { xs: 30, sm: 34 },
+                width: { xs: 30, sm: 'auto' },
+                height: 30,
+                px: { xs: 0, sm: 0.6 },
+                borderRadius: 1,
+                border: `1.5px solid ${active ? activeBg : `${color}33`}`,
+                bgcolor: active ? activeBg : '#fff',
+                color: active ? '#fff' : color,
+                fontSize: 10,
+                fontWeight: 800,
+                gap: 0.2,
+                '&.Mui-disabled': { opacity: 0.45 },
+            }}
         >
             {icon}
-            <span className={showLabel ? 'leading-tight' : 'hidden sm:inline'}>{label}</span>
-        </button>
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{label}</Box>
+        </ButtonBase>
     );
 }

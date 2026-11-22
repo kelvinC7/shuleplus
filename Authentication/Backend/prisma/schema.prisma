@@ -196,6 +196,7 @@ model Organization {
   representativeAssignments SchoolRepresentativeAssignment[]
   representativeAlerts       RepresentativeAlert[]
   chiefAccountantAssignments ChiefAccountantAssignment[]
+  staffSchoolAssignments     StaffSchoolAssignment[]
 
   @@map("organizations")
 }
@@ -247,8 +248,11 @@ model User {
   chiefAccountantProfile       ChiefAccountantProfile?
   chiefAccountantAssignments   ChiefAccountantAssignment[] @relation("ChiefAccountantUser")
   chiefAccountantAssignmentsMade ChiefAccountantAssignment[] @relation("ChiefAccountantAssignedBy")
+  staffSchoolAssignmentIamLinks  StaffSchoolAssignment[] @relation("StaffAssignmentIamUser")
+  staffSchoolAssignmentsMade     StaffSchoolAssignment[] @relation("StaffAssignmentBy")
   seiOfficerProfile            SeiOfficerProfile?
   deoOfficerProfile            DeoOfficerProfile?
+  shuleTripOfficialProfile     ShuleTripOfficialProfile?
 
   @@unique([organizationId, email])
   @@index([organizationId, department])
@@ -1240,6 +1244,37 @@ model ChiefAccountantAssignment {
 
 // ─── SEI (Sector Education Inspector — Sector MIS) ─────────────────────────
 
+/// General staff multi-school attendance/access assignment (no duplicate staff accounts).
+model StaffSchoolAssignment {
+  id                 String                         @id @default(uuid())
+  organizationId     String                         @map("organization_id")
+  staffKey           String                         @map("staff_key")
+  iamUserId          String?                        @map("iam_user_id")
+  email              String?
+  externalId         String?                        @map("external_id")
+  source             String?
+  staffName          String?                        @map("staff_name")
+  homeOrganizationId String?                        @map("home_organization_id")
+  status             RepresentativeAssignmentStatus @default(ACTIVE)
+  assignedAt         DateTime                       @default(now()) @map("assigned_at")
+  assignedById       String?                        @map("assigned_by_id")
+  notes              String?
+  createdAt          DateTime                       @default(now()) @map("created_at")
+  updatedAt          DateTime                       @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  iamUser      User?        @relation("StaffAssignmentIamUser", fields: [iamUserId], references: [id], onDelete: SetNull)
+  assignedBy   User?        @relation("StaffAssignmentBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, staffKey])
+  @@index([organizationId, status])
+  @@index([staffKey, status])
+  @@index([iamUserId])
+  @@index([email])
+  @@index([externalId, source])
+  @@map("staff_school_assignments")
+}
+
 model SeiOfficerProfile {
   userId           String   @id @map("user_id")
   provinceId       String?  @map("province_id")
@@ -1276,4 +1311,28 @@ model DeoOfficerProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("deo_officer_profiles")
+}
+
+// ─── ShuleTrip government officials (platform users → Government console) ───
+
+model ShuleTripOfficialProfile {
+  userId            String   @id @map("user_id")
+  tripRoleSlug      String   @map("trip_role_slug")
+  authority         String?
+  jurisdictionScope String   @default("districts") @map("jurisdiction_scope")
+  provinceId        String?  @map("province_id")
+  provinceName      String?  @map("province_name")
+  districtId        String?  @map("district_id")
+  districtName      String?  @map("district_name")
+  sectorId          String?  @map("sector_id")
+  sectorName        String?  @map("sector_name")
+  canFinalApprove   Boolean  @default(false) @map("can_final_approve")
+  employeeRef       String?  @map("employee_ref")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shule_trip_official_profiles")
 }

@@ -1,4 +1,15 @@
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { formatProcurementDate } from './procurementFormat';
+import { brand } from '../theme/theme';
+
+const underlineSx = {
+  display: 'inline-block',
+  minWidth: '7rem',
+  borderBottom: '1px solid rgba(0,0,0,0.25)',
+  verticalAlign: 'bottom',
+  pb: 0.25,
+};
 
 /** Three-column approval block - matches PDF / other portal request documents. */
 export default function ProcurementApprovalSignatures({
@@ -6,7 +17,6 @@ export default function ProcurementApprovalSignatures({
   reviewer = '',
   approver = '',
   requestDate = '',
-  className = '',
 }) {
   const cols = [
     { title: 'Requested By', name: requestedBy, date: requestDate },
@@ -15,37 +25,33 @@ export default function ProcurementApprovalSignatures({
   ];
 
   return (
-    <div className={`rounded-2xl border border-black/10 bg-white p-4 sm:p-5 ${className}`}>
-      <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#000435]/50 mb-4">Approval</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-4">
+    <Box sx={{ borderRadius: 3, border: '1px solid rgba(0,0,0,0.1)', bgcolor: '#fff', p: { xs: 2, sm: 2.5 } }}>
+      <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: 'rgba(19,33,61,0.5)', mb: 2 }}>
+        Approval
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: { xs: 2.5, sm: 2 } }}>
         {cols.map((col) => (
-          <div key={col.title} className="min-w-0">
-            <p className="text-xs font-bold text-[#000435] border-b border-black/20 pb-2 mb-3 leading-snug">
+          <Box key={col.title} sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: brand.navy, borderBottom: '1px solid rgba(0,0,0,0.2)', pb: 1, mb: 1.5, lineHeight: 1.3 }}>
               {col.title}
-            </p>
-            <div className="space-y-3 text-[11px] text-black/60">
-              <p>
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, fontSize: 11, color: 'rgba(0,0,0,0.6)' }}>
+              <Typography component="p" sx={{ fontSize: 11 }}>
                 Name:{' '}
-                <span className="inline-block min-w-[7rem] border-b border-black/25 text-[#000435] font-medium align-bottom pb-0.5">
-                  {col.name || '\u00A0'}
-                </span>
-              </p>
-              <p>
+                <Box component="span" sx={{ ...underlineSx, color: brand.navy, fontWeight: 500 }}>{col.name || '\u00A0'}</Box>
+              </Typography>
+              <Typography component="p" sx={{ fontSize: 11 }}>
                 Signature:{' '}
-                <span className="inline-block min-w-[7rem] border-b border-black/25 align-bottom pb-0.5">
-                  {'\u00A0'}
-                </span>
-              </p>
-              <p>
+                <Box component="span" sx={underlineSx}>{'\u00A0'}</Box>
+              </Typography>
+              <Typography component="p" sx={{ fontSize: 11 }}>
                 Date:{' '}
-                <span className="inline-block min-w-[7rem] border-b border-black/25 text-[#000435] align-bottom pb-0.5">
-                  {col.date ? formatProcurementDate(col.date) : '\u00A0'}
-                </span>
-              </p>
-            </div>
-          </div>
+                <Box component="span" sx={{ ...underlineSx, color: brand.navy }}>{col.date ? formatProcurementDate(col.date) : '\u00A0'}</Box>
+              </Typography>
+            </Box>
+          </Box>
         ))}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

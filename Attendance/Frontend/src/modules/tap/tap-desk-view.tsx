@@ -21,14 +21,18 @@ import {
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useToast } from '@/shared/notifications';
 
-type Props = { direction: 'ENTRY' | 'EXIT' };
+type Props = {
+  direction: 'ENTRY' | 'EXIT';
+  compact?: boolean;
+  onSuccess?: () => void;
+};
 
 function deviceLabel(d: RfidDevice) {
   const gate = d.gateName || d.location || d.name;
   return `${gate} (${d.deviceCode})`;
 }
 
-export function TapDeskView({ direction }: Props) {
+export function TapDeskView({ direction, compact = false, onSuccess }: Props) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [cardNumber, setCardNumber] = useState('');
@@ -59,6 +63,15 @@ export function TapDeskView({ direction }: Props) {
   useEffect(() => {
     inputRef.current?.focus();
   }, [last]);
+
+  useEffect(() => {
+    const uid = cardNumber.trim();
+    if (uid.length < 8 || busy) return;
+    const timer = window.setTimeout(() => {
+      void submit();
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [cardNumber, busy]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -92,6 +105,7 @@ export function TapDeskView({ direction }: Props) {
         );
       }
       setCardNumber('');
+      onSuccess?.();
     } catch (err) {
       setFlash('err');
       setLast(null);
@@ -107,12 +121,16 @@ export function TapDeskView({ direction }: Props) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
+        {!compact ? (
         <div>
           <h1 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">
             {isEntry ? 'Entry Attendance' : 'Exit Attendance'}
           </h1>
           <p className="mt-1 text-sm text-muted">Scan a card or enter UID</p>
         </div>
+        ) : (
+          <p className="text-sm text-muted">Scan card — tap processes automatically when UID is read.</p>
+        )}
         <span
           className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide ${
             isEntry ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'

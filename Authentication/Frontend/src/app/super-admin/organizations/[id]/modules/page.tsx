@@ -109,7 +109,17 @@ export default function OrganizationModulesPage() {
         { action }
       );
       setData(res.data.data);
-      toast.success(res.data.message ?? `Module ${action} applied.`, 'Module updated');
+      const provisioning = res.data?.data?.provisioning as
+        | { attempted?: boolean; provisioned?: boolean; error?: string }
+        | undefined;
+      if (provisioning?.attempted && !provisioning.provisioned) {
+        toast.error(
+          res.data.message ?? `Module ${action} applied, but tenant setup failed.`,
+          'Tenant setup pending'
+        );
+      } else {
+        toast.success(res.data.message ?? `Module ${action} applied.`, 'Module updated');
+      }
     } catch (err: unknown) {
       toast.error(
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??

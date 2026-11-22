@@ -1,8 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { orgAdminApi, type AcademicSettings } from '@/lib/org-admin-api';
 import { useToast } from '@/shared/notifications';
+import { resolvePublicAssetUrl } from '@/lib/organization-registration';
+
+function reportHeaderLines(settings: AcademicSettings | null): string[] {
+  const lines = settings?.reportCard?.reportHeaderLines;
+  if (lines?.length) return [...lines];
+  return [''];
+}
+
+function setReportHeaderLines(settings: AcademicSettings, lines: string[]): AcademicSettings {
+  const cleaned = lines.map((l) => l.trim()).filter(Boolean);
+  return {
+    ...settings,
+    reportCard: {
+      ...settings.reportCard,
+      reportHeaderLines: cleaned.length ? cleaned : [],
+    },
+  };
+}
 
 const YEAR_PATTERN = /^\d{4}-\d{4}$/;
 
@@ -34,6 +53,39 @@ export function AcademicSettingsView({ embedded = false }: AcademicSettingsViewP
   const [settings, setSettings] = useState<AcademicSettings | null>(null);
   const [newYear, setNewYear] = useState('');
   const [newTerm, setNewTerm] = useState('');
+  const [uploadingRightLogo, setUploadingRightLogo] = useState(false);
+
+  async function handleRightLogoFile(file: File | undefined) {
+    if (!file || !settings) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Choose an image file', 'Invalid file');
+      return;
+    }
+    setUploadingRightLogo(true);
+    try {
+      const contentBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+      const { data } = await orgAdminApi.uploadReportRightLogo({
+        fileName: file.name,
+        contentBase64,
+        mimeType: file.type,
+      });
+      const url = String(data.data?.url ?? '').trim();
+      if (!url) throw new Error('Upload did not return a file URL');
+      setSettings((prev) =>
+        prev ? { ...prev, reportCard: { ...prev.reportCard, reportRightLogoUrl: url } } : prev
+      );
+      toast.success('Save settings to apply the logo to reports.', 'Logo uploaded');
+    } catch {
+      toast.error('Could not upload the logo', 'Upload failed');
+    } finally {
+      setUploadingRightLogo(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +109,8 @@ export function AcademicSettingsView({ embedded = false }: AcademicSettingsViewP
     setSaving(true);
     setError(null);
     try {
-      const { data } = await orgAdminApi.updateAcademicSettings(settings);
+      const payload = setReportHeaderLines(settings, reportHeaderLines(settings));
+      const { data } = await orgAdminApi.updateAcademicSettings(payload);
       setSettings(data.data);
       toast.success(
         'All modules will use this current year.',
@@ -278,6 +331,155 @@ export function AcademicSettingsView({ embedded = false }: AcademicSettingsViewP
             Add term
           </button>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-navy">Report header on all student reports</h3>
+        <p className="mt-1 text-xs text-muted">
+          Used on every Beginning Term, Mid-Term, Termly and student report card. The school logo sits on the left,
+          the description below is centered, and the optional right-side logo sits on the right. Add one line per row
+          (motto, location, phone, email, etc.).
+        </p>
+        {settings && (
+          <div className="mt-4 space-y-3">
+            <div className="rounded-xl border border-border bg-[#f8f9fb] p-4">
+              <p className="text-xs font-semibold text-navy">
+                Right-side logo <span className="text-[10px] font-medium text-muted">(optional)</span>
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Second logo for the right side of the header (partner, district or ministry logo). The school logo stays on the left.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {settings.reportCard?.reportRightLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resolvePublicAssetUrl(settings.reportCard.reportRightLogoUrl)}
+                    alt="Right-side report logo"
+                    className="h-14 w-14 rounded-lg border border-border bg-white object-contain p-1"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted">
+                    None
+                  </div>
+                )}
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-sm font-semibold text-navy hover:bg-navy/5">
+                  {uploadingRightLogo ? 'Uploading...' : 'Upload logo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingRightLogo}
+                    onChange={(e) => {
+                      void handleRightLogoFile(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {settings.reportCard?.reportRightLogoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSettings({
+                        ...settings,
+                        reportCard: { ...settings.reportCard, reportRightLogoUrl: null },
+                      })
+                    }
+                    className="text-xs font-semibold text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {reportHeaderLines(settings).map((line, idx) => (
+              <div key={idx} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <span className="hidden w-6 shrink-0 text-center text-xs font-bold text-muted sm:block">{idx + 1}</span>
+                <input
+                  value={line}
+                  onChange={(e) => {
+                    const next = [...reportHeaderLines(settings)];
+                    next[idx] = e.target.value;
+                    setSettings({
+                      ...settings,
+                      reportCard: { ...settings.reportCard, reportHeaderLines: next },
+                    });
+                  }}
+                  placeholder={
+                    idx === 0
+                      ? 'e.g. Excellence in Education'
+                      : idx === 1
+                        ? 'e.g. Kigali, Rwanda · Tel: +250 788 000 000'
+                        : 'Additional line (optional)'
+                  }
+                  className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                />
+                <button
+                  type="button"
+                  aria-label="Remove line"
+                  disabled={reportHeaderLines(settings).length <= 1}
+                  onClick={() => {
+                    const next = reportHeaderLines(settings).filter((_, i) => i !== idx);
+                    setSettings(setReportHeaderLines(settings, next.length ? next : ['']));
+                  }}
+                  className="inline-flex shrink-0 items-center justify-center rounded-xl border border-border p-2.5 text-muted hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const current = reportHeaderLines(settings);
+                setSettings({
+                  ...settings,
+                  reportCard: {
+                    ...settings.reportCard,
+                    reportHeaderLines: [...current, ''],
+                  },
+                });
+              }}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-semibold text-navy hover:bg-primary/10 sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              Add header line
+            </button>
+            <div className="rounded-xl border border-border bg-navy/[0.03] p-4">
+              <p className="text-center text-[10px] font-bold uppercase tracking-wider text-muted">Preview</p>
+              <div className="mt-2 grid grid-cols-[48px_1fr_48px] items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-[9px] text-muted">
+                  School logo
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-navy">Your school name</p>
+                  {reportHeaderLines(settings)
+                    .map((l) => l.trim())
+                    .filter(Boolean)
+                    .map((l) => (
+                      <p key={l} className="mt-1 text-xs text-muted">
+                        {l}
+                      </p>
+                    ))}
+                </div>
+                {settings.reportCard?.reportRightLogoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resolvePublicAssetUrl(settings.reportCard.reportRightLogoUrl)}
+                    alt=""
+                    className="h-12 w-12 object-contain"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-[9px] text-muted">
+                    Right logo
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 border-t border-border pt-2 text-center text-[10px] font-bold uppercase tracking-wide text-navy">
+                Student academic report
+              </p>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">

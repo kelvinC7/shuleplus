@@ -19,6 +19,10 @@ export function courseConfigWritePayload(
     customWindowEnd: course.customWindowEnd ?? null,
     schedulingRules: course.schedulingRules ?? {},
     isCore: course.isCore !== false,
+    defaultCourseMarks:
+      course.defaultCourseMarks != null && Number.isFinite(Number(course.defaultCourseMarks))
+        ? Number(course.defaultCourseMarks)
+        : null,
     ...(opts?.newSubjectName ? { newSubjectName: opts.newSubjectName.trim() } : {}),
   };
 }

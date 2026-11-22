@@ -41,6 +41,7 @@ const courseConfigBodySchema = z.object({
   customWindowEnd: z.string().nullable().optional(),
   schedulingRules: z.any().optional(),
   isCore: z.boolean().optional(),
+  defaultCourseMarks: z.number().min(1).max(1000).nullable().optional(),
 });
 
 const courseConfigCreateSchema = courseConfigBodySchema.extend({
@@ -116,7 +117,10 @@ export class TimetableController {
           academicYear: z.string(),
         })
         .parse(req.body);
-      const data = await timetableService.create(orgId(req), body);
+      const data = await timetableService.create(orgId(req), {
+        ...body,
+        room: body.room ?? undefined,
+      });
       res.status(201).json({ success: true, data });
     } catch (e) {
       next(e);

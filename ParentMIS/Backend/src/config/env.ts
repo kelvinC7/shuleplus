@@ -22,11 +22,10 @@ function requireEnv(key: string, fallback?: string): string {
 
 /**
  * ParentMIS talks to other modules via these URLs (server-side only).
- * On production, redeploy-module.sh sets localhost:<port> so calls stay on-box.
- * Public https://*-api.shuleplus.rw/api URLs also work if set manually.
+ * Production uses the public https://*-api.shuleplus.rw/api hosts.
  *
- * Academics / marks → STUDENT_MANAGEMENT_API_URL (not ACADEMIC_API_URL).
- * Setting ACADEMIC_API_URL alone does nothing for ParentMIS grades.
+ * Parent login / profiles → STUDENT_MANAGEMENT_API_URL.
+ * Published marks & assessment schedule → ACADEMIC_API_URL (/service/parent-academics).
  */
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',
@@ -43,19 +42,19 @@ export const env = {
   MODULE_SLUG: process.env.MODULE_SLUG ?? 'parentmis',
 
   /** IAM — org academic year/term from Authentication admin */
-  IAM_API_URL: firstOf('IAM_API_URL', 'AUTH_API_URL', 'http://localhost:3001/api/v1'),
+  IAM_API_URL: firstOf('IAM_API_URL', 'AUTH_API_URL', 'https://shuleplus.rw/api/v1'),
 
-  ATTENDANCE_API_URL: firstOf('ATTENDANCE_API_URL', 'http://localhost:3024/api'),
+  ATTENDANCE_API_URL: firstOf('ATTENDANCE_API_URL', 'https://attendanceapi.shuleplus.rw/api'),
 
   /** Live class timetable + period attendance from Timetable module */
-  TIMETABLE_API_URL: firstOf('TIMETABLE_API_URL', 'http://localhost:3010/api'),
+  TIMETABLE_API_URL: firstOf('TIMETABLE_API_URL', 'https://timetableapi.shuleplus.rw/api'),
 
   /** Profiles, PIN login, academics/marks proxy */
   STUDENT_MANAGEMENT_API_URL: firstOf(
     'STUDENT_MANAGEMENT_API_URL',
     'STUDENTMANAGEMENT_API_URL',
     'SM_API_URL',
-    'http://localhost:3052/api'
+    'https://studentmanagement-api.shuleplus.rw/api'
   ),
 
   /**
@@ -75,26 +74,42 @@ export const env = {
     'FEES_API_URL',
     'SCHOOLFEES_API_URL',
     'SCHOOL_FEES_PORTAL_API_URL',
-    'http://localhost:3014/api'
+    'https://feesapi.shuleplus.rw/api'
   ),
 
-  CANTEEN_API_URL: firstOf('CANTEEN_API_URL', 'CAFETERIA_API_URL', 'http://localhost:4013/api'),
+  CANTEEN_API_URL: firstOf('CANTEEN_API_URL', 'CAFETERIA_API_URL', 'https://canteenapi.shuleplus.rw/api'),
 
-  SHULEKIT_API_URL: firstOf('SHULEKIT_API_URL', 'MATERIALS_API_URL', 'http://localhost:4021/api'),
+  SHULEKIT_API_URL: firstOf('SHULEKIT_API_URL', 'MATERIALS_API_URL', 'https://materialsapi.shuleplus.rw/api'),
 
   DISCIPLINE_API_URL: firstOf(
     'DISCIPLINE_API_URL',
     'STUDENT_DISCIPLINE_API_URL',
     'STUDENTDISCIPLINE_API_URL',
-    'http://localhost:4019/api'
+    'https://disciplineapi.shuleplus.rw/api'
   ),
 
-  TRANSPORT_API_URL: firstOf('TRANSPORT_API_URL', 'http://localhost:3064/api'),
+  TRANSPORT_API_URL: firstOf('TRANSPORT_API_URL', 'https://transportapi.shuleplus.rw/api'),
+
+  /** ShuleTrip — guardian consent for school trip manifests */
+  SHULETRIP_API_URL: firstOf('SHULETRIP_API_URL', 'SHULE_TRIP_API_URL', 'http://localhost:3076/api'),
 
   PUBLIC_SITE_URL: firstOf('PUBLIC_SITE_URL', 'https://shuleplus.rw'),
 
   /** Teacher assessments & published marks (TichaPortal / Academic module). */
-  ACADEMIC_API_URL: firstOf('ACADEMIC_API_URL', 'ACADEMIC_MODULE_API_URL', 'http://localhost:3003/api'),
+  ACADEMIC_API_URL: firstOf('ACADEMIC_API_URL', 'ACADEMIC_MODULE_API_URL', 'https://academicapi.shuleplus.rw/api'),
+
+  INTERNAL_CHAT_API_URL: firstOf(
+    'INTERNAL_CHAT_API_URL',
+    'CHAT_API_URL',
+    'https://shulechatapi.shuleplus.rw/api'
+  ),
+
+  /**
+   * XentriPay collections gateway — sends mobile-money billing prompts (MoMo)
+   * to a parent's SIM and exposes the collection status for polling.
+   */
+  XENTRIPAY_BASE_URL: firstOf('XENTRIPAY_BASE_URL', 'https://test.xentripay.com/api'),
+  XENTRIPAY_KEY: process.env.XENTRIPAY_KEY?.trim() || '',
 } as const;
 
 export function logIntegrationUrls() {
@@ -108,6 +123,7 @@ export function logIntegrationUrls() {
     ['SHULEKIT_API_URL', env.SHULEKIT_API_URL],
     ['TRANSPORT_API_URL', env.TRANSPORT_API_URL],
     ['PUBLIC_SITE_URL', env.PUBLIC_SITE_URL],
+    ['XENTRIPAY_BASE_URL', env.XENTRIPAY_BASE_URL],
   ];
   rows.push(['IAM_API_URL', env.IAM_API_URL]);
   rows.push(['ACADEMIC_API_URL', env.ACADEMIC_API_URL]);

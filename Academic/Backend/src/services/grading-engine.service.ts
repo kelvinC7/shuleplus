@@ -12,9 +12,29 @@ import {
 import {
   accumulateAssessmentMark,
   buildSubjectScoresFromComponents,
+  poolMarksOnCourseDefault,
+  percentageFromTotalMarks,
+  normalizeComponentKey,
   resolveToTemplateComponentName,
   type ComponentAccumulator,
 } from '../utils/report-card-component-calc';
+import {
+  filterAssessmentsForMidTerm,
+  filterTemplateComponentsForMidTerm,
+  filterTemplateComponentsForStage,
+} from '../utils/mid-term-report-components';
+import { filterAssessmentsByReportingStage } from '../utils/report-stage-filter';
+import {
+  findTimetableClassRow,
+  reconcileReportCardCourses,
+} from '../utils/report-card-course-sync';
+
+function isLegacyContinuousForMidTerm(name: string, code?: string | null): boolean {
+  return filterAssessmentsForMidTerm([{ component: { name, code } } as any]).length > 0;
+}
+
+/** A student is ranked only if they have marks in at least this share of the class subjects. */
+const RANK_MIN_SUBJECT_COVERAGE = 0.5;
 
 function normClassLabel(name: string) {
   return String(name ?? '')
@@ -30,6 +50,87 @@ function normSubjectKey(name: string) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+type TimetableCatalogRow = Awaited<ReturnType<typeof fetchTimetableClassCatalog>>[number];
+
+function findTimetableCatalogRow(
+  catalog: TimetableCatalogRow[],
+  cls: { id: string; name: string; stream: string | null }
+) {
+  const classLabel = normClassLabel([cls.name, cls.stream].filter(Boolean).join(' '));
+  return catalog.find(
+    (c) =>
+      (c.classId && c.classId === cls.id) ||
+      normClassLabel(c.className) === classLabel ||
+      normClassLabel(c.className) === normClassLabel(cls.name) ||
+      (c.section && normClassLabel(`${c.level ?? cls.name} ${c.section}`) === classLabel)
+  );
+}
+
+function timetableDefaultsBySubjectName(
+  catalogRow: TimetableCatalogRow | undefined
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const course of catalogRow?.courses ?? []) {
+    const dcm = course.defaultCourseMarks;
+    if (dcm == null || !Number.isFinite(Number(dcm))) continue;
+    map.set(normSubjectKey(course.subjectName), Math.max(1, Number(dcm)));
+  }
+  return map;
+}
+
+function resolveSubjectCourseDefault(
+  subjectId: string,
+  subjectName: string,
+  subjectDefaultMarks: Map<string, number>,
+  defaultsBySubjectName: Map<string, number>,
+  templateFallback: number
+): number {
+  const fromId = subjectDefaultMarks.get(subjectId);
+  if (fromId != null && fromId > 0) return fromId;
+  const fromName = defaultsBySubjectName.get(normSubjectKey(subjectName));
+  if (fromName != null && fromName > 0) return fromName;
+  return templateFallback;
+}
+
+async function resolveSubjectDefaults(
+  organizationId: string,
+  classId: string,
+  academicYear: string,
+  term: string | undefined,
+  cls: { id: string; name: string; stream: string | null },
+  assessments: Array<{ subjectId: string; subject: { name: string } }>
+): Promise<{ subjectDefaultMarks: Map<string, number>; defaultsBySubjectName: Map<string, number> }> {
+  const subjectIds = [...new Set(assessments.map((assessment) => assessment.subjectId))];
+  let subjectDefaultMarks = new Map<string, number>();
+  if (term && subjectIds.length) {
+    try {
+      subjectDefaultMarks = await findCourseDefaultMarksForSubjects(
+        organizationId,
+        classId,
+        academicYear,
+        term,
+        subjectIds
+      );
+    } catch (err) {
+      console.warn('[report-card] course default marks lookup skipped:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  let defaultsBySubjectName = new Map<string, number>();
+  try {
+    const catalog = await fetchTimetableClassCatalog(organizationId, { academicYear, term });
+    defaultsBySubjectName = timetableDefaultsBySubjectName(findTimetableCatalogRow(catalog, cls));
+    for (const assessment of assessments) {
+      const value = defaultsBySubjectName.get(normSubjectKey(assessment.subject.name));
+      if (value) subjectDefaultMarks.set(assessment.subjectId, value);
+    }
+  } catch {
+    // Timetable course defaults are optional; retain the course-default fallback.
+  }
+
+  return { subjectDefaultMarks, defaultsBySubjectName };
 }
 
 function resolveIsCoreFromMap(subjectName: string, coreMap: Map<string, boolean>): boolean | undefined {
@@ -410,8 +511,14 @@ export class GradingEngineService {
     classId: string,
     academicYear: string,
     term?: string,
-    includeTerms?: string[]
+    includeTerms?: string[],
+    reportKind: 'standard' | 'midterm' | 'beginning' = 'standard'
   ) {
+    const midTermOnly = reportKind === 'midterm';
+    const beginningOnly = reportKind === 'beginning';
+    if ((midTermOnly || beginningOnly) && (includeTerms?.length ?? 0) > 1) {
+      throw new AppError(400, 'Beginning and mid-term reports use a single term only.');
+    }
     const cls = await resolveAcademicClass(organizationId, { classId });
     if (!cls) throw new AppError(404, 'Class not found');
 
@@ -419,7 +526,12 @@ export class GradingEngineService {
     const resolvedStudentId = student.id;
     const resolvedClassId = cls.id;
 
-    const termsList = (includeTerms ?? []).map((t) => t.trim()).filter(Boolean);
+    const includeTermsList = Array.isArray(includeTerms)
+      ? includeTerms
+      : includeTerms != null && includeTerms !== ''
+        ? [String(includeTerms)]
+        : [];
+    const termsList = includeTermsList.map((t) => String(t).trim()).filter(Boolean);
     if (termsList.length > 1) {
       const built = await this.buildCombinedTermReport(
         organizationId,
@@ -469,7 +581,8 @@ export class GradingEngineService {
         academicYear,
         activeTerm,
         student,
-        cls
+        cls,
+        { midTermOnly, beginningOnly }
       );
       return enrichReportPayload(organizationId, built as Record<string, unknown>, {
         studentId: resolvedStudentId,
@@ -478,6 +591,19 @@ export class GradingEngineService {
         term: activeTerm,
         studentUid: student.studentUid,
       });
+    }
+
+    if (midTermOnly) {
+      throw new AppError(
+        404,
+        'No mid-term assessment marks found for this student. Enter and classify mid-term marks first.'
+      );
+    }
+    if (beginningOnly) {
+      throw new AppError(
+        404,
+        'No beginning-term assessment marks found for this student. Enter and classify beginning-term marks first.'
+      );
     }
 
     const results = await prisma.studentResult.findMany({
@@ -787,8 +913,11 @@ export class GradingEngineService {
     academicYear: string,
     term: string | undefined,
     student: { id: string; firstName: string; lastName: string; studentUid: string; gender: string | null; dateOfBirth: Date | null },
-    cls: { id: string; name: string; stream: string | null }
+    cls: { id: string; name: string; stream: string | null },
+    options?: { midTermOnly?: boolean; beginningOnly?: boolean }
   ) {
+    const midTermOnly = Boolean(options?.midTermOnly);
+    const beginningOnly = Boolean(options?.beginningOnly);
     const assessmentWhere: any = {
       organizationId,
       classId,
@@ -797,7 +926,7 @@ export class GradingEngineService {
     };
     if (term) assessmentWhere.term = term;
 
-    const assessments = await prisma.assessment.findMany({
+    let assessments = await prisma.assessment.findMany({
       where: assessmentWhere,
       include: {
         subject: true,
@@ -825,70 +954,46 @@ export class GradingEngineService {
         })
       : null;
     const defaultCourseMarks = Math.max(1, Number(templateMeta?.defaultCourseMarks ?? 100));
-    const templateComponents =
+    let templateComponents =
       templateMeta?.components.map((c) => ({
         name: c.name,
         weightPercentage: Number(c.weightPercentage ?? 0),
+        maxMark: Number(c.maxMark ?? 0),
         sortOrder: c.sortOrder,
         code: c.code,
+        reportingStage: c.reportingStage,
       })) ?? [];
 
-    const termKey = term ?? assessments[0]?.term ?? '';
-    const subjectIdsForDefaults = [...new Set(assessments.map((a) => a.subjectId))];
-    let subjectDefaultMarks = new Map<string, number>();
-    if (termKey && subjectIdsForDefaults.length) {
-      try {
-        subjectDefaultMarks = await findCourseDefaultMarksForSubjects(
-          organizationId,
-          classId,
-          academicYear,
-          termKey,
-          subjectIdsForDefaults
-        );
-      } catch (err) {
-        console.warn('[report-card] course default marks lookup skipped:', err instanceof Error ? err.message : err);
-      }
+    if (midTermOnly || beginningOnly) {
+      assessments = filterAssessmentsByReportingStage(assessments as any, { midTermOnly, beginningOnly }, isLegacyContinuousForMidTerm) as any;
+      templateComponents = filterTemplateComponentsForStage(templateComponents, midTermOnly ? 'MID_TERM' : 'BEGINNING_TERM');
     }
 
-    try {
-      const catalog = await fetchTimetableClassCatalog(organizationId, {
-        academicYear,
-        term: termKey || term,
-      });
-      const classLabel = normClassLabel([cls.name, cls.stream].filter(Boolean).join(' '));
-      const catalogRow = catalog.find(
-        (c) =>
-          normClassLabel(c.className) === classLabel ||
-          normClassLabel(c.className) === normClassLabel(cls.name)
-      );
-      if (catalogRow?.courses?.length) {
-        const nameToSubjectId = new Map<string, string>();
-        for (const a of assessments) {
-          nameToSubjectId.set(normClassLabel(a.subject.name), a.subjectId);
-        }
-        for (const course of catalogRow.courses) {
-          const dcm = course.defaultCourseMarks;
-          if (dcm == null || !Number.isFinite(Number(dcm))) continue;
-          const sid = nameToSubjectId.get(normClassLabel(course.subjectName));
-          if (sid && !subjectDefaultMarks.has(sid)) {
-            subjectDefaultMarks.set(sid, Math.max(1, Number(dcm)));
-          }
-        }
-      }
-    } catch {
-      /* timetable optional */
-    }
+    const termKey = term ?? assessments[0]?.term ?? '';
+    const { subjectDefaultMarks, defaultsBySubjectName } = await resolveSubjectDefaults(
+      organizationId,
+      classId,
+      academicYear,
+      termKey || term,
+      cls,
+      assessments
+    );
 
     const classReports = this.buildClassSubjectReportsFromAssessments(assessments, {
       defaultCourseMarks,
       subjectDefaultMarks,
       templateComponents,
+      stageOnly: midTermOnly || beginningOnly,
     });
 
     if (assessments.length === 0 || classReports.size === 0) {
       throw new AppError(
         404,
-        'No results found for this student. Enter and publish marks in TichaPortal first.'
+        beginningOnly
+          ? 'No beginning-term assessment marks found for this student. Enter and classify beginning-term marks first.'
+          : midTermOnly
+          ? 'No mid-term assessment marks found for this student. Enter and classify mid-term marks first.'
+          : 'No results found for this student. Enter and publish marks in TichaPortal first.'
       );
     }
 
@@ -936,21 +1041,41 @@ export class GradingEngineService {
 
     const subjects = this.applyCoreFlagsAndSort(
       [...merged.values()].map((bucket) => {
-      const pct = Math.round(bucket.percentage * 100) / 100;
-      const totalMax = Math.round((bucket.totalMax ?? defaultCourseMarks) * 100) / 100;
       const marksEntered = Boolean((bucket as { hasComponentMarks?: boolean }).hasComponentMarks);
       const courseComplete = Boolean((bucket as { courseComplete?: boolean }).courseComplete);
-      const subjectGrade =
-        marksEntered && courseComplete ? this.matchGradeScale(pct, gradingScale) : null;
+      const courseDcm = resolveSubjectCourseDefault(
+        bucket.subjectId,
+        bucket.subject,
+        subjectDefaultMarks,
+        defaultsBySubjectName,
+        defaultCourseMarks
+      );
+      const oldDcm =
+        (bucket as { defaultCourseMarks?: number }).defaultCourseMarks ??
+        bucket.totalMax ??
+        defaultCourseMarks;
+      let totalScore = bucket.totalScore;
+      let studentMarksOnDefault =
+        (bucket as { studentMarksOnDefault?: number }).studentMarksOnDefault ?? totalScore;
+      const totalMax = Math.max(1, courseDcm);
+      let pct = Math.round(bucket.percentage * 100) / 100;
+      if (marksEntered && oldDcm > 0 && Math.abs(oldDcm - totalMax) > 0.01) {
+        totalScore = Math.round((totalScore / oldDcm) * totalMax * 100) / 100;
+        studentMarksOnDefault = Math.round((studentMarksOnDefault / oldDcm) * totalMax * 100) / 100;
+        if (courseComplete) {
+          pct = Math.round((totalScore / totalMax) * 10000) / 100;
+        }
+      }
+      const subjectGrade = marksEntered ? this.matchGradeScale(pct, gradingScale) : null;
       const rankInfo = studentReport.subjectRanks.get(bucket.subjectId);
       return {
         subject: bucket.subject,
         subjectId: bucket.subjectId,
         categoryScores: bucket.categoryScores,
-        totalScore: Math.round(bucket.totalScore * 100) / 100,
+        totalScore: Math.round(totalScore * 100) / 100,
+        studentMarksOnDefault: Math.round(studentMarksOnDefault * 100) / 100,
         totalMax,
-        defaultCourseMarks:
-          (bucket as { defaultCourseMarks?: number }).defaultCourseMarks ?? defaultCourseMarks,
+        defaultCourseMarks: totalMax,
         percentage: pct,
         marksEntered,
         courseComplete,
@@ -964,7 +1089,17 @@ export class GradingEngineService {
       coreMap
     );
 
-    const overallScore = Math.round(studentReport.overallScore * 100) / 100;
+    const overallFromSubjects = percentageFromTotalMarks(
+      subjects.map((s) => ({
+        totalScore: s.totalScore,
+        totalMax: s.totalMax ?? 0,
+        marksEntered: s.marksEntered,
+      }))
+    );
+    let overallScore =
+      overallFromSubjects > 0 || subjects.some((s) => s.marksEntered)
+        ? overallFromSubjects
+        : Math.round(studentReport.overallScore * 100) / 100;
     const overallGrade = this.matchGradeScale(overallScore, gradingScale);
 
     const growth = await this.buildGrowthFromAssessments(organizationId, studentId, classId);
@@ -1036,9 +1171,39 @@ export class GradingEngineService {
         }
       : null;
 
-    const reportRef = `RC-${String(academicYear).replace(/\s/g, '')}-${String(student.studentUid || student.id).slice(-8)}`;
+    const reportRef = beginningOnly
+      ? `BTR-${String(academicYear).replace(/\s/g, '')}-${String(student.studentUid || student.id).slice(-8)}`
+      : midTermOnly
+      ? `MTR-${String(academicYear).replace(/\s/g, '')}-${String(student.studentUid || student.id).slice(-8)}`
+      : `RC-${String(academicYear).replace(/\s/g, '')}-${String(student.studentUid || student.id).slice(-8)}`;
+
+    const studentMarkAssessments = assessments.filter((a) =>
+      a.marks.some((m) => m.studentId === studentId && m.markStatus === 'PRESENT')
+    );
+    const slotKey = (a: { subjectId: string; componentId: string | null }) =>
+      `${a.subjectId}:${a.componentId ?? 'na'}`;
+    const assessmentsTotal = new Set(assessments.map(slotKey)).size;
+    const assessmentsCompleted = new Set(studentMarkAssessments.map(slotKey)).size;
+
+    const stageSubjects = (midTermOnly || beginningOnly)
+      ? subjects.map((s) => {
+          const g =
+            s.marksEntered && s.percentage > 0
+              ? this.matchGradeScale(s.percentage, gradingScale)
+              : null;
+          return {
+            ...s,
+            grade: g?.grade ?? null,
+            gradeDescription: g?.description ?? null,
+            rank: null,
+            classSize: null,
+          };
+        })
+      : subjects;
+    const midTermSubjects = stageSubjects;
 
     return {
+      reportKind: beginningOnly ? 'beginning' : midTermOnly ? 'midterm' : 'standard',
       student: {
         id: student.id,
         firstName: student.firstName,
@@ -1050,14 +1215,20 @@ export class GradingEngineService {
       class: cls,
       academicYear,
       term: term ?? null,
-      subjects,
+      subjects: midTermSubjects,
       componentOrder,
       overallScore: Math.round(overallScore * 100) / 100,
-      overallGrade: overallGrade?.grade ?? null,
-      overallGradeDescription: overallGrade?.description ?? null,
-      position: studentReport.overallRank,
+      overallGrade: (midTermOnly || beginningOnly)
+        ? this.matchGradeScale(overallScore, gradingScale)?.grade ?? null
+        : overallGrade?.grade ?? null,
+      overallGradeDescription: (midTermOnly || beginningOnly)
+        ? this.matchGradeScale(overallScore, gradingScale)?.description ?? null
+        : overallGrade?.description ?? null,
+      position: studentReport.overallRank || null,
       classSize: studentReport.overallClassSize,
-      growth,
+      growth: (midTermOnly || beginningOnly)
+        ? { termAverages: [], subjectGrowth: {}, overallGrowth: 0, trend: 'STABLE' }
+        : growth,
       summary: {
         totalMarks,
         totalMax,
@@ -1072,6 +1243,20 @@ export class GradingEngineService {
       improvementCourses,
       insights,
       gradingLegend,
+      midTermSummary: (midTermOnly || beginningOnly)
+        ? {
+            catQuizAverage: Math.round(overallScore * 100) / 100,
+            assessmentsCompleted,
+            assessmentsTotal,
+            subjectsAssessed: withScores.length,
+            subjectsTotal: subjects.length,
+            position: studentReport.overallRank || null,
+            classSize: studentReport.overallClassSize,
+            strongestSubject: strongCourses[0] ?? null,
+            improvementSubject: improvementCourses[0] ?? null,
+            stageLabel: beginningOnly ? 'Beginning Term' : 'Mid-Term',
+          }
+        : undefined,
       attendance: { available: false, message: 'Attendance summary will appear when synced from your attendance module.' },
       discipline: {
         record: 'Not recorded',
@@ -1088,6 +1273,7 @@ export class GradingEngineService {
             components: templateComponents.map((c) => ({
               name: c.name,
               weightPercentage: c.weightPercentage,
+              maxMark: c.maxMark,
               code: c.code,
             })),
           }
@@ -1106,9 +1292,22 @@ export class GradingEngineService {
       components: Map<string, ComponentAccumulator>;
     },
     defaultCourseMarks: number,
-    templateComponents: Array<{ name: string; weightPercentage: number }>
+    templateComponents: Array<{ name: string; weightPercentage: number }>,
+    stageOnly?: boolean
   ) {
-    return buildSubjectScoresFromComponents(acc.components, defaultCourseMarks, templateComponents);
+    const built = buildSubjectScoresFromComponents(acc.components, defaultCourseMarks, templateComponents);
+    if (stageOnly && built.hasComponentMarks) {
+      const allEntries = [...acc.components.values()].flatMap((c) => c.entries ?? []);
+      if (allEntries.length) {
+        const pooled = poolMarksOnCourseDefault(allEntries, defaultCourseMarks);
+        built.totalScore = pooled.totalScore;
+        built.totalMax = pooled.totalMax;
+        built.percentage = pooled.percentage;
+        built.studentMarksOnDefault = pooled.totalScore;
+        built.courseComplete = true;
+      }
+    }
+    return built;
   }
 
   private async mergeTimetableCoursesIntoSubjects(
@@ -1133,39 +1332,22 @@ export class GradingEngineService {
         academicYear,
         term: term ?? undefined,
       });
-      const classLabel = [cls.name, cls.stream].filter(Boolean).join(' ').trim();
-      const n = normClassLabel(classLabel);
-      const tt = catalog.find((t) => {
-        if (t.classId && t.classId === cls.id) return true;
-        if (normClassLabel(t.className) === n) return true;
-        if (t.level && normClassLabel(t.level) === normClassLabel(cls.name)) return true;
-        if (t.section && normClassLabel(`${t.level} ${t.section}`) === n) return true;
-        return false;
-      });
-      if (!tt?.courses?.length) return;
+      const classRow = findTimetableClassRow(catalog, cls);
+      if (!classRow) return;
 
-      for (const course of tt.courses) {
-        const subName = String(course.subjectName ?? '').trim();
-        if (!subName) continue;
-        const normSub = normClassLabel(subName);
-        let found = false;
-        for (const bucket of merged.values()) {
-          if (normClassLabel(bucket.subject) === normSub) {
-            found = true;
-            break;
-          }
-        }
-        if (found) continue;
-        const code = String(course.courseCode ?? '').trim() || normSub.replace(/\s+/g, '-');
-        merged.set(`tt:${code}`, {
+      reconcileReportCardCourses(merged, classRow.courses ?? [], (course) => {
+        const code =
+          String(course.courseCode ?? '').trim() ||
+          normSubjectKey(course.subjectName).replace(/\s+/g, '-');
+        return {
           subjectId: `tt:${code}`,
-          subject: subName,
+          subject: course.subjectName.trim(),
           categoryScores: {},
           totalScore: 0,
           totalMax: 0,
           percentage: 0,
-        });
-      }
+        };
+      });
     } catch (err) {
       console.warn('[report-card] Timetable Config Class courses not merged:', err);
     }
@@ -1173,15 +1355,17 @@ export class GradingEngineService {
 
   /** Standard competition ranking: tied scores share rank; next rank skips (1,1,3). */
   private rankWithTies<T>(items: T[], score: (item: T) => number): Map<T, number> {
-    const sorted = [...items].sort((a, b) => score(b) - score(a));
+    const rankScore = (item: T) => Math.round(score(item) * 100) / 100;
+    const sorted = [...items].sort((a, b) => rankScore(b) - rankScore(a));
     const ranks = new Map<T, number>();
     let index = 0;
     let lastScore: number | null = null;
     let lastRank = 0;
+    const sameScore = (a: number, b: number) => a === b;
     for (const item of sorted) {
       index += 1;
-      const s = score(item);
-      if (lastScore === null || s !== lastScore) {
+      const s = rankScore(item);
+      if (lastScore === null || !sameScore(s, lastScore)) {
         lastRank = index;
         lastScore = s;
       }
@@ -1236,6 +1420,16 @@ export class GradingEngineService {
     }
 
     const classLabel = [classHint?.name, classHint?.stream].filter(Boolean).join(' ') || classHint?.category || null;
+    const categoryLevel = String(classHint?.category ?? '')
+      .trim()
+      .toUpperCase();
+    if (categoryLevel) {
+      const byCategory = await prisma.gradingScale.findMany({
+        where: { organizationId, academicLevel: categoryLevel as any },
+        orderBy: { sortOrder: 'asc' },
+      });
+      if (byCategory.length) return byCategory;
+    }
     for (const level of this.gradingLevelsToTry(templateLevel, classLabel)) {
       const scoped = await prisma.gradingScale.findMany({
         where: { organizationId, academicLevel: level as any },
@@ -1277,9 +1471,17 @@ export class GradingEngineService {
     opts?: {
       defaultCourseMarks: number;
       subjectDefaultMarks?: Map<string, number>;
-      templateComponents: Array<{ name: string; weightPercentage: number; sortOrder: number; code?: string }>;
+      templateComponents: Array<{
+        name: string;
+        weightPercentage: number;
+        maxMark?: number;
+        sortOrder: number;
+        code?: string;
+      }>;
+      stageOnly?: boolean;
     }
   ) {
+    const stageOnly = Boolean(opts?.stageOnly);
     const defaultCourseMarks = Math.max(1, opts?.defaultCourseMarks ?? 100);
     const subjectDefaultMarks = opts?.subjectDefaultMarks ?? new Map<string, number>();
     const templateComponents = opts?.templateComponents ?? [];
@@ -1296,7 +1498,12 @@ export class GradingEngineService {
     for (const assessment of assessments) {
       const rawCompName = assessment.component?.name || assessment.title || 'Assessment';
       const compName = resolveToTemplateComponentName(rawCompName, templateComponents);
-      const weightRaw = Number(assessment.component?.weightPercentage ?? 0);
+      const templateComp = templateComponents.find(
+        (c) => normalizeComponentKey(c.name) === normalizeComponentKey(compName)
+      );
+      const weightRaw = Number(
+        templateComp?.weightPercentage ?? assessment.component?.weightPercentage ?? 0
+      );
 
       for (const mark of assessment.marks) {
         if (mark.markStatus !== 'PRESENT' || mark.score == null) continue;
@@ -1321,7 +1528,14 @@ export class GradingEngineService {
           studentSubjects.set(assessment.subjectId, subjectAcc);
         }
 
-        accumulateAssessmentMark(subjectAcc.components, compName, weightRaw, score, maxMark);
+        accumulateAssessmentMark(
+          subjectAcc.components,
+          compName,
+          weightRaw,
+          score,
+          maxMark,
+          assessment.title
+        );
       }
     }
 
@@ -1396,8 +1610,8 @@ export class GradingEngineService {
         if (!acc) continue;
 
         const subjectDcm = subjectDefaultMarks.get(subjectId) ?? defaultCourseMarks;
-        const built = this.buildNormalizedSubjectScores(acc, subjectDcm, templateComponents);
-        if (built.hasComponentMarks && built.courseComplete) {
+        const built = this.buildNormalizedSubjectScores(acc, subjectDcm, templateComponents, stageOnly);
+        if (built.hasComponentMarks && (built.courseComplete || stageOnly)) {
           pctMap.set(subjectId, built.percentage);
         }
         subjectRows.push({
@@ -1411,10 +1625,13 @@ export class GradingEngineService {
       subjectPctByStudent.set(sid, pctMap);
 
       const marked = subjectRows.filter((r) => r.hasComponentMarks);
-      const overallScore =
-        marked.length > 0
-          ? (marked.reduce((s, r) => s + r.totalScore, 0) / marked.reduce((s, r) => s + r.totalMax, 0)) * 100
-          : 0;
+      const overallScore = percentageFromTotalMarks(
+        marked.map((subject) => ({
+          totalScore: subject.totalScore,
+          totalMax: subject.totalMax,
+          hasComponentMarks: subject.hasComponentMarks,
+        }))
+      );
 
       reports.set(sid, {
         subjects: subjectRows,
@@ -1444,14 +1661,15 @@ export class GradingEngineService {
       }
     }
 
-    const overallEligible = [...reports.entries()].map(([sid, rep]) => ({ sid, score: rep.overallScore }));
+    const minCovered = Math.max(1, Math.ceil(subjectIds.length * RANK_MIN_SUBJECT_COVERAGE));
+    const overallEligible = [...reports.entries()]
+      .filter(([, rep]) => rep.subjects.filter((s) => s.hasComponentMarks).length >= minCovered)
+      .map(([sid, rep]) => ({ sid, score: rep.overallScore }));
     const overallRankMap = this.rankWithTies(overallEligible, (r) => r.score);
-    for (const entry of overallEligible) {
-      const rep = reports.get(entry.sid);
-      if (rep) {
-        rep.overallRank = overallRankMap.get(entry) ?? 1;
-        rep.overallClassSize = overallEligible.length || 1;
-      }
+    for (const [sid, rep] of reports) {
+      const entry = overallEligible.find((e) => e.sid === sid);
+      rep.overallRank = entry ? overallRankMap.get(entry) ?? 1 : 0;
+      rep.overallClassSize = overallEligible.length || 1;
     }
 
     return reports;
@@ -1858,8 +2076,11 @@ export class GradingEngineService {
     organizationId: string,
     classId: string,
     academicYear: string,
-    term?: string
+    term?: string,
+    reportKind: 'standard' | 'midterm' | 'beginning' = 'standard'
   ) {
+    const midTermOnly = reportKind === 'midterm';
+    const beginningOnly = reportKind === 'beginning';
     const cls = await resolveAcademicClass(organizationId, { classId });
     if (!cls) throw new AppError(404, 'Class not found');
 
@@ -1871,7 +2092,7 @@ export class GradingEngineService {
     };
     if (term) assessmentWhere.term = term;
 
-    const assessments = await prisma.assessment.findMany({
+    let assessments = await prisma.assessment.findMany({
       where: assessmentWhere,
       include: {
         subject: true,
@@ -1899,18 +2120,38 @@ export class GradingEngineService {
         })
       : null;
     const defaultCourseMarks = Math.max(1, Number(templateMeta?.defaultCourseMarks ?? 100));
-    const templateComponents =
+    let templateComponents =
       templateMeta?.components.map((c) => ({
         name: c.name,
         weightPercentage: Number(c.weightPercentage ?? 0),
+        maxMark: Number(c.maxMark ?? 0),
         sortOrder: c.sortOrder,
         code: c.code,
+        reportingStage: c.reportingStage,
       })) ?? [];
 
+    if (midTermOnly || beginningOnly) {
+      assessments = filterAssessmentsByReportingStage(assessments as any, { midTermOnly, beginningOnly }, isLegacyContinuousForMidTerm) as any;
+      templateComponents = filterTemplateComponentsForStage(templateComponents, midTermOnly ? 'MID_TERM' : 'BEGINNING_TERM');
+    }
+
+    if (!assessments.length) {
+      return { summaries: [] as Array<Record<string, unknown>>, generatedAt: new Date().toISOString() };
+    }
+
+    const { subjectDefaultMarks } = await resolveSubjectDefaults(
+      organizationId,
+      cls.id,
+      academicYear,
+      term ?? assessments[0]?.term,
+      cls,
+      assessments
+    );
     const classReports = this.buildClassSubjectReportsFromAssessments(assessments, {
       defaultCourseMarks,
-      subjectDefaultMarks: new Map(),
+      subjectDefaultMarks,
       templateComponents,
+      stageOnly: midTermOnly || beginningOnly,
     });
 
     const gradingScale = await this.resolveGradingScaleForOrg(organizationId, assessments, {
@@ -1925,14 +2166,14 @@ export class GradingEngineService {
       const gradeEntry = this.matchGradeScale(avg, gradingScale);
       const hasMarks = report.subjects.some((s) => s.hasComponentMarks);
       const g = (gradeEntry?.grade ?? '').toUpperCase();
-      let result: 'PASS' | 'FAIL' | '—' = '—';
-      if (hasMarks && avg > 0) {
+      let result: 'PASS' | 'FAIL' | 'Pending' = 'Pending';
+      if (hasMarks && avg > 0 && !midTermOnly && !beginningOnly) {
         result = g === 'F' || g === 'E' || avg < 50 ? 'FAIL' : 'PASS';
       }
       return {
         studentId,
         average: avg,
-        position: report.overallRank,
+        position: report.overallRank || null,
         classSize: report.overallClassSize,
         overallGrade: gradeEntry?.grade ?? null,
         result,
@@ -1942,6 +2183,230 @@ export class GradingEngineService {
     });
 
     return { summaries, generatedAt };
+  }
+
+  /**
+   * Parent portal: per-course scores using the same engine as report cards,
+   * plus raw teacher-entered marks from TichaPortal assessments.
+   */
+  async getParentCoursePerformance(
+    organizationId: string,
+    input: {
+      studentId: string;
+      classId: string;
+      academicYear: string;
+      term?: string;
+      subject?: string;
+    }
+  ) {
+    const { studentId, classId, academicYear, term, subject } = input;
+    const cls = await resolveAcademicClass(organizationId, { classId });
+    if (!cls) throw new AppError(404, 'Class not found');
+    const student = await ensureAcademicStudent(organizationId, { studentId });
+
+    const assessmentWhere: {
+      organizationId: string;
+      classId: string;
+      academicYear: string;
+      status: { not: 'DRAFT' };
+      term?: string;
+    } = {
+      organizationId,
+      classId,
+      academicYear,
+      status: { not: 'DRAFT' },
+    };
+    const termTrim = term?.trim() ?? '';
+    if (termTrim) assessmentWhere.term = termTrim;
+
+    const loadTeacherMarkRows = async (whereAssessment: typeof assessmentWhere) =>
+      prisma.assessmentMark.findMany({
+        where: {
+          organizationId,
+          studentId: student.id,
+          markStatus: 'PRESENT',
+          score: { not: null },
+          assessment: whereAssessment,
+        },
+        include: {
+          assessment: { include: { subject: true, component: true } },
+        },
+        orderBy: [{ assessment: { assessmentDate: 'desc' } }, { assessment: { title: 'asc' } }],
+      });
+
+    let teacherMarkRows = await loadTeacherMarkRows(assessmentWhere);
+    if (!teacherMarkRows.length && termTrim) {
+      const { term: _t, ...withoutTerm } = assessmentWhere;
+      teacherMarkRows = await loadTeacherMarkRows(withoutTerm);
+    }
+
+    const teacherMarks = teacherMarkRows.map((m) => {
+      const a = m.assessment;
+      const maxMark = Number(m.maxMark ?? a.maxMark ?? 0);
+      const score = Number(m.score);
+      return {
+        id: m.id,
+        assessmentId: a.id,
+        title: a.title,
+        componentName: a.component?.name?.trim() ?? null,
+        subjectId: a.subjectId,
+        subjectName: a.subject.name,
+        score,
+        maxMark,
+        percentage: maxMark > 0 ? Math.round((score / maxMark) * 1000) / 10 : 0,
+        date: a.assessmentDate?.toISOString() ?? null,
+        assessmentStatus: a.status,
+        code: a.assessmentCode,
+      };
+    });
+
+    const countMarks = async (whereAssessment: typeof assessmentWhere) =>
+      prisma.assessment.count({
+        where: {
+          ...whereAssessment,
+          marks: { some: { studentId: student.id, markStatus: 'PRESENT' } },
+        },
+      });
+    let hasCalcMarks = await countMarks(assessmentWhere);
+    if (hasCalcMarks === 0 && termTrim) {
+      const { term: _t, ...withoutTerm } = assessmentWhere;
+      hasCalcMarks = await countMarks(withoutTerm);
+    }
+
+    type ReportSubjectSlice = {
+      subjectId: string;
+      subject: string;
+      categoryScores: Record<string, unknown>;
+      totalScore: number;
+      totalMax?: number;
+      defaultCourseMarks?: number;
+      percentage: number;
+      marksEntered?: boolean;
+      courseComplete?: boolean;
+      missingComponents?: string[];
+      grade: string | null;
+      gradeDescription: string | null;
+      rank: number | null;
+      classSize: number | null;
+    };
+    let reportSubjects: ReportSubjectSlice[] = [];
+    let assessmentTemplate: {
+      id: string;
+      name: string;
+      defaultCourseMarks: number;
+      components: Array<{ name: string; weightPercentage: number; maxMark?: number; code?: string }>;
+    } | null = null;
+    let componentOrder: string[] = [];
+    let resolvedTerm: string | null = term?.trim() ?? null;
+
+    if (hasCalcMarks > 0) {
+      try {
+        const built = await this.buildReportFromAssessmentMarks(
+          organizationId,
+          student.id,
+          classId,
+          academicYear,
+          termTrim || undefined,
+          student,
+          cls,
+          { midTermOnly: false }
+        );
+        reportSubjects = built.subjects as ReportSubjectSlice[];
+        assessmentTemplate = built.assessmentTemplate;
+        componentOrder = built.componentOrder ?? [];
+        resolvedTerm = built.term;
+      } catch (err) {
+        console.warn(
+          '[parent-course-performance] report calc skipped:',
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    const normSub = (s: string) => s.trim().toLowerCase();
+    const subjectFilter = subject?.trim();
+
+    let courses = reportSubjects.map((s) => ({
+      subjectId: s.subjectId,
+      subjectName: s.subject,
+      defaultCourseMarks: s.defaultCourseMarks ?? s.totalMax,
+      totalScore: s.totalScore,
+      totalMax: s.totalMax,
+      percentage: s.percentage,
+      grade: s.grade,
+      gradeDescription: s.gradeDescription,
+      marksEntered: Boolean(s.marksEntered),
+      courseComplete: Boolean(s.courseComplete),
+      missingComponents: s.missingComponents ?? [],
+      categoryScores: s.categoryScores,
+      rank: s.rank,
+      classSize: s.classSize,
+      teacherMarks: teacherMarks.filter((m) => m.subjectId === s.subjectId),
+    }));
+
+    const seenIds = new Set(courses.map((c) => c.subjectId));
+    for (const m of teacherMarks) {
+      if (seenIds.has(m.subjectId)) continue;
+      seenIds.add(m.subjectId);
+      const fallbackDefault = assessmentTemplate?.defaultCourseMarks ?? 100;
+      courses.push({
+        subjectId: m.subjectId,
+        subjectName: m.subjectName,
+        defaultCourseMarks: fallbackDefault,
+        totalScore: 0,
+        totalMax: fallbackDefault,
+        percentage: 0,
+        grade: null,
+        gradeDescription: null,
+        marksEntered: true,
+        courseComplete: false,
+        missingComponents: [],
+        categoryScores: {},
+        rank: null,
+        classSize: null,
+        teacherMarks: teacherMarks.filter((t) => t.subjectId === m.subjectId),
+      });
+    }
+
+    courses.sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+
+    if (subjectFilter) {
+      courses = courses.filter(
+        (c) => normSub(c.subjectName) === normSub(subjectFilter) || c.subjectId === subjectFilter
+      );
+      if (!courses.length) {
+        const tm = teacherMarks.filter((m) => normSub(m.subjectName) === normSub(subjectFilter));
+        if (tm.length) {
+          const fallbackDefault = assessmentTemplate?.defaultCourseMarks ?? 100;
+          courses.push({
+            subjectId: tm[0].subjectId,
+            subjectName: tm[0].subjectName,
+            defaultCourseMarks: fallbackDefault,
+            totalScore: 0,
+            totalMax: fallbackDefault,
+            percentage: 0,
+            grade: null,
+            gradeDescription: null,
+            marksEntered: true,
+            courseComplete: false,
+            missingComponents: [],
+            categoryScores: {},
+            rank: null,
+            classSize: null,
+            teacherMarks: tm,
+          });
+        }
+      }
+    }
+
+    return {
+      filters: { academicYear, term: resolvedTerm },
+      assessmentTemplate,
+      componentOrder,
+      courses,
+      calcAvailable: reportSubjects.length > 0,
+      marksCount: teacherMarks.length,
+    };
   }
 }
 

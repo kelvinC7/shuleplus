@@ -1,0 +1,112 @@
+﻿name: Build Director Console APK
+
+on:
+  push:
+    branches:
+      - main
+      - director-console
+    paths:
+      - '.github/workflows/build-director-console-apk.yml'
+      - 'director-console/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-director-console-apk:
+    name: Build Director Console APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install dependencies and build web app
+        working-directory: director-console
+        run: |
+          npm install
+          npm run build
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Generate app icons
+        working-directory: director-console
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#13213D' --iconBackgroundColorDark '#13213D' --splashBackgroundColor '#13213D' --splashBackgroundColorDark '#13213D'
+
+      - name: Prepare Android version and signing
+        id: signing
+        working-directory: director-console/android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          KEYSTORE_B64: ${{ secrets.DIRECTOR_KEYSTORE_BASE64 || secrets.DIRECTOR_CONSOLE_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${BUILD_NUMBER}/" app/build.gradle
+          mkdir -p "$GITHUB_WORKSPACE/apk-out"
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 --decode > app/release.keystore
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and stage APK
+        working-directory: director-console/android
+        env:
+          SIGNING_AVAILABLE: ${{ steps.signing.outputs.available }}
+          KS_PASS: ${{ secrets.DIRECTOR_KEYSTORE_PASSWORD || secrets.DIRECTOR_CONSOLE_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DIRECTOR_KEY_ALIAS || secrets.DIRECTOR_CONSOLE_KEY_ALIAS || secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.DIRECTOR_KEY_PASSWORD || secrets.DIRECTOR_CONSOLE_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+        run: |
+          if [ "$SIGNING_AVAILABLE" = "true" ]; then
+            ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
+              -Pandroid.injected.signing.store.password="$KS_PASS" \
+              -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$KEY_PASS"
+            cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/apk-out/DirectorConsole-release.apk"
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/apk-out/DirectorConsole-debug.apk"
+          fi
+
+      - name: Release APK on GitHub
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: director-console-build-${{ github.run_number }}
+          name: "Director Console App (Build #${{ github.run_number }})"
+          body: |
+            Automated APK build for Director Console.
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Run: #${{ github.run_number }}
+          files: apk-out/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: DirectorConsole-apk-${{ github.run_number }}
+          path: apk-out/*.apk
+          if-no-files-found: error
+          retention-days: 1

@@ -70,6 +70,8 @@ bash scripts/redeploy-module.sh "${CHANGED_SCHOOLUNIFORMMIS:-false}" SchoolUnifo
 bash scripts/redeploy-module.sh "${CHANGED_LIBRARY:-false}" Library library-api library-web
 bash scripts/redeploy-module.sh "${CHANGED_STUDENTMANAGEMENT:-false}" StudentManagement student-management-api student-management-web
 bash scripts/redeploy-module.sh "${CHANGED_MINIWEBSITE:-false}" MiniWebsite mini-website-api mini-website-web
+bash scripts/redeploy-module.sh "${CHANGED_INTERNALCHAT:-false}" InternalChat chat-api chat-web
+bash scripts/redeploy-module.sh "${CHANGED_SHULETRIP:-false}" ShuleTrip shule-trip-api shule-trip-web
 
 if [ "${CHANGED_WEBPAGEBABYEYI:-false}" = "true" ]; then
   bash scripts/deploy-babyeyi-rw.sh

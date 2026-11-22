@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Director's Console",
+  "short_name": "Director",
+  "description": "ShulePlus Director's Console for school oversight and management.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#13213D",
+  "theme_color": "#13213D",
+  "lang": "en",
+  "icons": [
+    { "src": "/yellow-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/yellow-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

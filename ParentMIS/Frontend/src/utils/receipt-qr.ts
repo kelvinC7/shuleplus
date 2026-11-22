@@ -1,5 +1,5 @@
 export function feesPortalOrigin() {
-  return (process.env.NEXT_PUBLIC_FEES_PORTAL_URL ?? 'http://localhost:3015').replace(/\/$/, '');
+  return (process.env.NEXT_PUBLIC_FEES_PORTAL_URL ?? 'https://fees.shuleplus.rw').replace(/\/$/, '');
 }
 
 export function receiptPublicUrl(receiptNumber: string, stored?: string | null) {

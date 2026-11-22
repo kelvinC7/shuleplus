@@ -1,22 +1,30 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LogoutIcon from '@mui/icons-material/Logout';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import GradingOutlinedIcon from '@mui/icons-material/GradingOutlined';
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
+import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
 import { useAuth } from '../context/AuthContext';
 import useChatUnread from '../hooks/useChatUnread';
-import {
-  LayoutDashboard, Users, BookOpen, Calendar, CalendarDays, ClipboardCheck,
-  Wallet, MessageSquare, ClipboardList, LogOut, GraduationCap, ChevronDown,
-  DollarSign, Shield, ListChecks, UserCircle, ShoppingCart, ScanLine, Building2,
-  BarChart2, Award, Brain, FileText, Target, TrendingUp, AlertTriangle,
-  NotebookPen, PieChart, Radio, Lightbulb, Search,
-} from 'lucide-react';
-import {
-  resolveTeacherPhotoUrl,
-  teacherDisplayName,
-  teacherInitials,
-} from '../utils/teacherDisplay';
-
-const GOLD = '#FEBF10';
-const NAVY = '#000435';
+import { brand } from '../theme/theme';
+import { scrollSx } from '../theme/sx';
 
 function pathIsActive(location, path) {
   if (!path) return false;
@@ -25,171 +33,161 @@ function pathIsActive(location, path) {
   return false;
 }
 
-const NavItem = ({ icon: Icon, name, path, exact, onClose, badgeCount = 0 }) => (
-  <NavLink
-    to={path}
-    end={exact}
-    onClick={onClose}
-    className={({ isActive }) =>
-      `relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-[13px] font-medium tracking-tight border border-transparent
-      ${
-        isActive
-          ? 'bg-white/[0.12] text-[#FEBF10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] border-white/10'
-          : 'text-white/72 hover:bg-white/[0.06] hover:text-white'
-      }`
-    }
-  >
-    {({ isActive }) => (
-      <>
-        <Icon
-          size={18}
-          strokeWidth={1.75}
-          className={isActive ? 'text-[#FEBF10] shrink-0' : 'text-white/45 shrink-0'}
-        />
-        <span className="truncate flex-1">{name}</span>
-        {badgeCount > 0 && (
-          <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-md bg-[#FEBF10]/90 text-[#0B1530] font-medium shrink-0">
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </span>
-        )}
-      </>
-    )}
-  </NavLink>
-);
+function NavRow({ to, end, icon: Icon, label, badge, onClose, active }) {
+  return (
+    <Box
+      component={NavLink}
+      to={to}
+      end={end}
+      onClick={onClose}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        width: '100%',
+        minHeight: 40,
+        px: 2,
+        py: 0.75,
+        borderRadius: 0,
+        textDecoration: 'none',
+        color: active ? brand.navy : 'rgba(255,255,255,0.72)',
+        bgcolor: active ? brand.primary : 'transparent',
+        border: '1px solid transparent',
+        fontSize: 13,
+        fontWeight: active ? 700 : 500,
+        '&:hover': {
+          bgcolor: active ? brand.primary : 'rgba(255,255,255,0.06)',
+          color: active ? brand.navy : '#fff',
+        },
+      }}
+    >
+      {Icon ? <Icon sx={{ fontSize: 20, opacity: 1, flexShrink: 0 }} /> : null}
+      <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {label}
+      </Box>
+      {badge > 0 ? (
+        <Box
+          component="span"
+          sx={{
+            minWidth: 20,
+            height: 18,
+            px: 0.6,
+            borderRadius: 0,
+            fontSize: 10,
+            fontWeight: 800,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: brand.primary,
+            color: brand.navy,
+          }}
+        >
+          {badge > 99 ? '99+' : badge}
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
 
-const SubNavLink = ({ name, path, icon: SubIcon, onClose, end, badgeCount = 0 }) => (
-  <NavLink
-    to={path}
-    end={end}
-    onClick={onClose}
-    className={({ isActive }) =>
-      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-all
-      ${isActive ? 'text-[#FEBF10] bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.05]'}`
-    }
-  >
-    {({ isActive }) => (
-      <>
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${isActive ? 'bg-[#FEBF10]' : 'bg-white/30'}`}
-          aria-hidden
-        />
-        <span className="truncate flex-1">{name}</span>
-        {badgeCount > 0 && (
-          <span className="text-[9px] leading-none px-1.5 py-0.5 rounded-md bg-[#FEBF10]/90 text-[#0B1530] font-medium shrink-0">
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </span>
-        )}
-      </>
-    )}
-  </NavLink>
-);
-
-const ExpandableNavItem = ({ icon: Icon, name, subItems, onClose, defaultOpen = false }) => {
-  const location = useLocation();
-  const isAnyActive = subItems.some((s) => pathIsActive(location, s.path));
-  const [open, setOpen] = useState(defaultOpen || isAnyActive);
-
-  useEffect(() => {
-    if (isAnyActive) setOpen(true);
-  }, [isAnyActive]);
+function NavGroup({ icon: Icon, name, subItems, onClose, location }) {
+  const hasActive = subItems.some((s) => pathIsActive(location, s.path));
+  const [open, setOpen] = useState(hasActive);
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13px] font-medium tracking-tight border border-transparent
-          ${
-            isAnyActive
-              ? 'bg-white/[0.12] text-[#FEBF10] border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-              : 'text-white/72 hover:bg-white/[0.06] hover:text-white'
-          }`}
+    <Box sx={{ mb: 0.25 }}>
+      <Button
+        fullWidth
+        onClick={() => setOpen((v) => !v)}
+        sx={{
+          justifyContent: 'flex-start',
+          color: hasActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)',
+          bgcolor: 'transparent',
+          px: 2,
+          py: 0.75,
+          minHeight: 36,
+          borderRadius: 0,
+          fontSize: 11,
+          fontWeight: hasActive ? 700 : 600,
+          letterSpacing: '0.02em',
+          textTransform: 'none',
+          gap: 1.5,
+          '& .MuiSvgIcon-root': { color: hasActive ? brand.primary : 'inherit' },
+          '&:hover': {
+            bgcolor: 'rgba(255,255,255,0.04)',
+            color: hasActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.75)',
+          },
+        }}
       >
-        <Icon
-          size={18}
-          strokeWidth={1.75}
-          className={isAnyActive ? 'text-[#FEBF10] shrink-0' : 'text-white/45 shrink-0'}
+        {Icon ? <Icon sx={{ fontSize: 20, opacity: 1 }} /> : null}
+        <Box component="span" sx={{ flex: 1, textAlign: 'left' }}>
+          {name}
+        </Box>
+        <ExpandMoreIcon
+          sx={{
+            fontSize: 16,
+            transform: open ? 'none' : 'rotate(-90deg)',
+            transition: 'transform 0.2s',
+            opacity: 0.6,
+          }}
         />
-        <span className="flex-1 text-left truncate">{name}</span>
-        <ChevronDown
-          size={16}
-          strokeWidth={2}
-          className={`transition-transform duration-300 text-white/40 shrink-0 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div className="ml-2 mt-1 space-y-0.5 border-l border-white/15 pl-3">
-          {subItems.map((sub) => (
-            <SubNavLink
-              key={sub.path}
-              name={sub.name}
-              path={sub.path}
-              icon={sub.icon}
-              end={sub.end}
+      </Button>
+      <Collapse in={open}>
+        <Box sx={{ pl: 1.5, py: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+          {subItems.map((s) => (
+            <NavRow
+              key={s.path}
+              to={s.path}
+              label={s.name}
               onClose={onClose}
-              badgeCount={sub.badgeCount || 0}
+              active={pathIsActive(location, s.path)}
             />
           ))}
-        </div>
-      )}
-    </div>
+        </Box>
+      </Collapse>
+    </Box>
   );
-};
+}
 
-const SectionLabel = ({ label }) => (
-  <p className="text-[10px] font-medium tracking-[0.08em] uppercase text-white/38 px-3 pt-4 pb-1">
-    {label}
-  </p>
-);
-
-const Sidebar = ({ onClose }) => {
+export default function Sidebar({ onClose }) {
   const location = useLocation();
-  const { teacher, logout } = useAuth();
-  const unreadCount = useChatUnread();
-  const [photoError, setPhotoError] = useState(false);
-  const [menuQuery, setMenuQuery] = useState('');
-
-  const teacherPhoto = resolveTeacherPhotoUrl(teacher?.photo);
-  const teacherName = teacherDisplayName(teacher);
-  const teacherInitial = teacherInitials(teacher);
-
-  useEffect(() => {
-    setPhotoError(false);
-  }, [teacher?.photo]);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const unreadCount = useChatUnread() ?? 0;
 
   const navSections = useMemo(
     () => [
       {
-        label: 'Academic',
+        label: 'Classroom',
         items: [
           {
             type: 'group',
-            icon: GraduationCap,
+            icon: MenuBookOutlinedIcon,
             name: 'Teaching',
             subItems: [
               { name: 'Students', path: '/students' },
               { name: 'My Teaching', path: '/my-teaching' },
               { name: 'My Courses', path: '/my-courses' },
+              { name: 'Class Attendance', path: '/period-attendance' },
+              { name: 'My Attendance', path: '/my-attendance' },
+              { name: 'Students Attendance', path: '/class-students-attendance' },
               { name: 'Homework', path: '/homework' },
               { name: 'Timetable', path: '/timetable' },
               { name: 'Examinations', path: '/examinations' },
+              { name: 'Examination Lists', path: '/examination-lists' },
             ],
           },
           {
             type: 'group',
-            icon: BarChart2,
+            icon: GradingOutlinedIcon,
             name: 'Marks & Assessments',
             subItems: [
               { name: 'Assessments', path: '/assessments/schedule' },
-              { name: 'Courses & Marks', path: '/assessments' },
               { name: 'Marks hub', path: '/marks' },
-              { name: 'Record marks', path: '/marks/record-marks' },
             ],
           },
           {
             type: 'group',
-            icon: NotebookPen,
+            icon: AutoStoriesOutlinedIcon,
             name: 'Lesson planning',
             subItems: [
               { name: 'Generate lesson plan', path: '/lesson-planning/generate' },
@@ -200,23 +198,18 @@ const Sidebar = ({ onClose }) => {
           },
           {
             type: 'group',
-            icon: ClipboardCheck,
-            name: 'Attendance',
-            subItems: [
-              { name: 'Period attendance', path: '/attendance' },
-              { name: 'Classroom QR scan', path: '/class-room-scan' },
-              { name: 'Round roll call', path: '/round-roll-call' },
-              { name: 'My attendance', path: '/teacher-attendance' },
-            ],
+            icon: QrCodeScannerOutlinedIcon,
+            name: 'Classroom scan',
+            subItems: [{ name: 'Scan to enter', path: '/class-room-scan' }],
           },
         ],
       },
       {
-        label: 'School Services & Tools',
+        label: 'Services',
         items: [
           {
             type: 'group',
-            icon: Building2,
+            icon: BusinessOutlinedIcon,
             name: 'School Services & Tools',
             subItems: [
               { name: 'Ticha Avance', path: '/shule-avance' },
@@ -229,171 +222,127 @@ const Sidebar = ({ onClose }) => {
           },
           {
             type: 'link',
-            icon: MessageSquare,
+            icon: ChatOutlinedIcon,
             name: 'Parent messages',
             path: '/parent-messages',
+            badge: unreadCount,
           },
         ],
       },
       {
         label: 'Account',
-        items: [{ type: 'link', icon: UserCircle, name: 'My Profile', path: '/profile' }],
+        items: [{ type: 'link', icon: GridViewRoundedIcon, name: 'Console', path: '/console' },
+          { type: 'link', icon: PersonOutlineIcon, name: 'My Profile', path: '/profile' }],
       },
     ],
     [unreadCount]
   );
 
-  const filteredSections = useMemo(() => {
-    const q = menuQuery.trim().toLowerCase();
-    if (!q) return navSections;
-    return navSections
-      .map((section) => {
-        const items = section.items
-          .map((item) => {
-            if (item.type === 'link') {
-              return item.name.toLowerCase().includes(q) ? item : null;
-            }
-            const labelMatch = item.name.toLowerCase().includes(q);
-            const subItems = item.subItems.filter(
-              (s) => labelMatch || s.name.toLowerCase().includes(q)
-            );
-            if (!subItems.length) return null;
-            return { ...item, subItems };
-          })
-          .filter(Boolean);
-        if (!items.length) return null;
-        return { ...section, items };
-      })
-      .filter(Boolean);
-  }, [menuQuery, navSections]);
-
-  const dashboardActive = pathIsActive(location, '/');
+  const handleLogout = () => {
+    logout?.();
+    navigate('/login');
+    onClose?.();
+  };
 
   return (
-    <div
-      className="flex flex-col min-h-0 h-full w-full min-w-0 border-r border-white/[0.06] shadow-sm font-sans"
-      style={{ background: NAVY, colorScheme: 'dark', fontFamily: "'Montserrat', sans-serif" }}
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: 0,
+        width: '100%',
+        bgcolor: brand.navy,
+        color: '#fff',
+      }}
     >
-      <div className="p-4 pb-3 shrink-0 border-b border-white/[0.06]">
-        <NavLink to="/" onClick={onClose} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FEBF10]/70">
-          <img
-            src="/logo_white.png"
-            alt="Shule+"
-            className="h-9 w-auto max-w-[200px] object-contain object-left"
-          />
-          <p className="mt-2 text-[10px] font-medium tracking-[0.14em] uppercase text-[#FEBF10]">
-            Teacher portal
-          </p>
-        </NavLink>
-      </div>
+      <Box sx={{ p: 2, pb: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            component={NavLink}
+            to="/"
+            onClick={onClose}
+            sx={{ flex: 1, minWidth: 0, display: 'block', textDecoration: 'none' }}
+          >
+            <Box
+              component="img"
+              src="/logo_white.png"
+              alt="Shule+"
+              sx={{ height: 32, width: 'auto', maxWidth: 170, objectFit: 'contain', objectPosition: 'left' }}
+            />
+          </Box>
+          {onClose ? (
+            <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.55)', display: { lg: 'none' } }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          ) : null}
+        </Box>
 
-      <div className="px-3 pt-3 shrink-0">
-        <div className="relative">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={menuQuery}
-            onChange={(e) => setMenuQuery(e.target.value)}
-            placeholder="Search menu…"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.06] py-2 pl-9 pr-3 text-[12px] font-medium text-white placeholder:text-white/35 focus:outline-none focus:border-white/20 focus:bg-white/[0.08]"
-            aria-label="Search menu"
-          />
-        </div>
-      </div>
+      </Box>
 
-      <nav
-        className="flex-1 min-h-0 px-3 py-3 overflow-y-auto overflow-x-hidden overscroll-y-contain space-y-1 pr-1 custom-scrollbar"
-        aria-label="Teacher navigation"
-      >
-        <NavLink
+      <Box sx={{ ...scrollSx, flex: 1, px: 0, pt: 0, pb: 1.5 }}>
+        <NavRow
           to="/"
           end
-          onClick={onClose}
-          className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-[13px] font-medium tracking-tight border border-transparent
-            ${
-              dashboardActive
-                ? 'bg-white/[0.12] text-[#FEBF10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] border-white/10'
-                : 'text-white/72 hover:bg-white/[0.06] hover:text-white'
-            }`}
-        >
-          <LayoutDashboard
-            size={18}
-            strokeWidth={1.75}
-            className={dashboardActive ? 'text-[#FEBF10] shrink-0' : 'text-white/45 shrink-0'}
-          />
-          <span className="truncate">Dashboard</span>
-        </NavLink>
+          icon={DashboardOutlinedIcon}
+          label="Dashboard"
+          onClose={onClose}
+          active={pathIsActive(location, '/') || location.pathname === '/dashboard'}
+        />
 
-        {filteredSections.length === 0 ? (
-          <p className="px-3 py-4 text-[12px] text-white/45">No menu items match your search.</p>
-        ) : (
-          filteredSections.map((section) => (
-            <div key={section.label}>
-              <SectionLabel label={section.label} />
+        {navSections.map((section) => (
+          <Box key={section.label} sx={{ mt: 2 }}>
+            <Typography sx={{ px: 2, pb: 0.75, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>
+              {section.label}
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
               {section.items.map((item) =>
                 item.type === 'link' ? (
-                  <NavItem
+                  <NavRow
                     key={item.path}
+                    to={item.path}
                     icon={item.icon}
-                    name={item.name}
-                    path={item.path}
+                    label={item.name}
+                    badge={item.badge}
                     onClose={onClose}
+                    active={pathIsActive(location, item.path)}
                   />
                 ) : (
-                  <ExpandableNavItem
+                  <NavGroup
                     key={item.name}
                     icon={item.icon}
                     name={item.name}
                     subItems={item.subItems}
                     onClose={onClose}
-                    defaultOpen={!!menuQuery.trim()}
+                    location={location}
                   />
                 )
               )}
-            </div>
-          ))
-        )}
-      </nav>
+            </Box>
+          </Box>
+        ))}
+      </Box>
 
-      <div className="p-4 pt-2 shrink-0 border-t border-white/[0.06]">
-        <div className="rounded-2xl bg-white/[0.06] ring-1 ring-white/10 p-3 flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 ring-1 ring-white/10 bg-white/10"
-            style={teacherPhoto && !photoError ? undefined : { background: `linear-gradient(135deg,${GOLD},#f59e0b)` }}
-          >
-            {teacherPhoto && !photoError ? (
-              <img
-                src={teacherPhoto}
-                alt={teacherName}
-                className="w-full h-full object-cover"
-                onError={() => setPhotoError(true)}
-              />
-            ) : (
-              <span className="text-xs font-medium text-[#0b1530]">{teacherInitial}</span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-white truncate">{teacherName}</p>
-            <p className="text-[10px] text-white/45 truncate font-medium">
-              {teacher?.email || 'Teacher account'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="p-2 rounded-xl text-white/45 hover:text-red-300 hover:bg-white/5 transition-colors"
-            aria-label="Log out"
-          >
-            <LogOut size={18} strokeWidth={1.75} />
-          </button>
-        </div>
-      </div>
-    </div>
+      <Box sx={{ p: 1.5, borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <Button
+          fullWidth
+          onClick={handleLogout}
+          startIcon={<LogoutIcon />}
+          sx={{
+            minHeight: 36,
+            justifyContent: 'center',
+            color: 'rgba(254,226,226,0.85)',
+            bgcolor: 'transparent',
+            border: 'none',
+            borderRadius: 0,
+            fontSize: 12,
+            fontWeight: 600,
+            '&:hover': { bgcolor: 'rgba(239,68,68,0.12)', color: '#fff' },
+          }}
+        >
+          Sign out
+        </Button>
+      </Box>
+    </Box>
   );
-};
-
-export default Sidebar;
+}

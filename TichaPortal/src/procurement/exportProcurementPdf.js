@@ -1,7 +1,7 @@
 import { amountInWordsRWF, fmtNum } from './amountInWords';
 import { API_BASE } from './procurementApi';
 
-const NAVY = [0, 4, 53];
+const NAVY = [19, 33, 61];
 const AMBER = [245, 158, 11];
 const WHITE = [255, 255, 255];
 const MUTED = [107, 114, 128];

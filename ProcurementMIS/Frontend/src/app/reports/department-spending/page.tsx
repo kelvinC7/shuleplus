@@ -73,7 +73,7 @@ export default function DepartmentSpendingPage() {
   return (
     <MainLayout>
       <PlatformPageLayout
-        subtitle="Department Spending — which departments are consuming your procurement budget?"
+        subtitle="Department Spending: which departments are consuming your procurement budget?"
       >
         <ReportFilterBar
           filters={filters}

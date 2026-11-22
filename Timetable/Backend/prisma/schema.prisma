@@ -122,6 +122,7 @@ model TimetableCourseConfig {
   customWindowEnd     String?        @map("custom_window_end")
   schedulingRules     Json           @default("{}") @map("scheduling_rules")
   isCore              Boolean        @default(true) @map("is_core")
+  defaultCourseMarks  Decimal?       @map("default_course_marks")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
 

@@ -183,6 +183,7 @@ model Class {
   headTeacherName    String?  @map("head_teacher_name")
   headTeacherEmail   String?  @map("head_teacher_email")
   headTeacherSource  String?  @map("head_teacher_source")
+  headTeacherCanEditStudents Boolean @default(false) @map("head_teacher_can_edit_students")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

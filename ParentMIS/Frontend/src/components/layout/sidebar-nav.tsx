@@ -1,38 +1,47 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { PM_SIDEBAR } from '@/config/pm-sidebar';
+import { PM_SIDEBAR, type PmSidebarConfig } from '@/config/pm-sidebar';
+import { useAuth } from '@/contexts/auth-context';
+import { filteredPmSidebar } from '@/lib/portal-features';
+import { isPmNavHrefActive } from '@/lib/pm-nav-active';
 import { cn } from '@/lib/utils';
 
-function isActive(href: string, pathname: string, basePath: string) {
+function isActive(href: string, pathname: string, basePath: string, tabParam: string | null) {
+  if (href.includes('?tab=')) return isPmNavHrefActive(href, pathname, tabParam);
   if (href === basePath) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function sectionHasActive(
-  section: (typeof PM_SIDEBAR)['sections'][0],
+  section: PmSidebarConfig['sections'][0],
   pathname: string,
-  basePath: string
+  basePath: string,
+  tabParam: string | null
 ) {
-  return section.items.some((item) => isActive(item.href, pathname, basePath));
+  return section.items.some((item) => isActive(item.href, pathname, basePath, tabParam));
 }
 
 export function SidebarNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const { portalFeatures } = useAuth();
+  const sidebar = filteredPmSidebar(portalFeatures);
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const next: Record<string, boolean> = {};
-    for (const section of PM_SIDEBAR.sections) {
-      if (sectionHasActive(section, pathname, PM_SIDEBAR.basePath)) {
+    for (const section of sidebar.sections) {
+      if (sectionHasActive(section, pathname, sidebar.basePath, tabParam)) {
         next[section.id] = true;
       }
     }
     setOpen((prev) => ({ ...prev, ...next }));
-  }, [pathname]);
+  }, [pathname, tabParam, sidebar.sections, sidebar.basePath]);
 
   function toggle(id: string) {
     setOpen((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -40,8 +49,8 @@ export function SidebarNav() {
 
   return (
     <nav className="hr-sidebar-scroll flex-1 overflow-y-auto overscroll-contain px-3 py-4">
-      {PM_SIDEBAR.standalone?.map((item) => {
-        const active = isActive(item.href, pathname, PM_SIDEBAR.basePath);
+      {sidebar.standalone?.map((item) => {
+        const active = isActive(item.href, pathname, sidebar.basePath, tabParam);
         const Icon = item.icon;
         return (
           <Link
@@ -50,20 +59,20 @@ export function SidebarNav() {
             className={cn(
               'mb-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition',
               active
-                ? 'bg-primary text-navy shadow-md shadow-primary/20'
+                ? 'bg-[rgba(245,166,35,0.15)] text-[var(--yo-amber)]'
                 : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
             )}
           >
-            <Icon size={18} className={active ? 'text-navy' : 'text-white/45'} />
+            <Icon size={18} className={active ? 'text-[var(--yo-amber)]' : 'text-white/45'} />
             {item.label}
           </Link>
         );
       })}
 
       <div className="space-y-1">
-        {PM_SIDEBAR.sections.map((section) => {
+        {sidebar.sections.map((section) => {
           const expanded = open[section.id] ?? false;
-          const activeInSection = sectionHasActive(section, pathname, PM_SIDEBAR.basePath);
+          const activeInSection = sectionHasActive(section, pathname, sidebar.basePath, tabParam);
           const SectionIcon = section.icon;
 
           return (
@@ -103,7 +112,7 @@ export function SidebarNav() {
                 <ul className="overflow-hidden">
                   <div className="ml-3 space-y-0.5 border-l border-white/10 py-1 pl-2">
                     {section.items.map((item) => {
-                      const active = isActive(item.href, pathname, PM_SIDEBAR.basePath);
+                      const active = isActive(item.href, pathname, PM_SIDEBAR.basePath, tabParam);
                       const Icon = item.icon;
                       return (
                         <li key={item.href}>
@@ -112,11 +121,11 @@ export function SidebarNav() {
                             className={cn(
                               'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12px] font-medium transition',
                               active
-                                ? 'bg-primary text-navy shadow-sm'
+                                ? 'bg-[rgba(245,166,35,0.15)] text-[var(--yo-amber)]'
                                 : 'text-white/60 hover:bg-white/[0.06] hover:text-white'
                             )}
                           >
-                            <Icon size={16} className={active ? 'text-navy' : 'text-white/35'} />
+                            <Icon size={16} className={active ? 'text-[var(--yo-amber)]' : 'text-white/35'} />
                             {item.label}
                           </Link>
                         </li>

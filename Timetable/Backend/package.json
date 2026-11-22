@@ -5,12 +5,14 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "predev": "prisma generate",
     "build": "tsc",
     "start": "node dist/server.js",
     "setup:env": "node -e \"require('fs').copyFileSync('.env.example','.env')\"",
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy && prisma generate",
     "prisma:studio": "prisma studio",
     "seed:class-courses": "tsx prisma/seed-class-courses.ts",
     "migrate:staff-ids": "tsx scripts/migrate-teacher-staff-codes.ts"

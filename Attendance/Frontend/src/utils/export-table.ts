@@ -1,5 +1,6 @@
 import type { AttendanceRecord } from '@/services/attendance-api';
 import { formatAttendanceTime, formatDurationMins } from '@/utils/format-attendance-time';
+import type { AttendancePdfMeta } from '@/utils/export-attendance-pdf';
 
 export function attendanceRowsToCsv(rows: AttendanceRecord[], reportMeta?: string) {
   const generated = new Date().toISOString();
@@ -92,7 +93,15 @@ export function downloadCsv(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-export function printReportTable(title: string, subtitle: string) {
+export function printReportTable(
+  title: string,
+  subtitle: string,
+  attendanceDateLabel?: string,
+  branding?: Pick<
+    AttendancePdfMeta,
+    'schoolName' | 'logoUrl' | 'schoolInfoLines' | 'organizationCode'
+  >
+) {
   const root = document.getElementById('report-print-root');
   if (!root) {
     window.print();
@@ -103,17 +112,39 @@ export function printReportTable(title: string, subtitle: string) {
     window.print();
     return;
   }
+  const schoolTitle = branding?.schoolName ?? title;
+  const logoBlock = branding?.logoUrl
+    ? `<img src="${escapeHtml(branding.logoUrl)}" alt="" style="width:52px;height:52px;border-radius:12px;object-fit:contain" crossorigin="anonymous" />`
+    : `<div style="width:52px;height:52px;border-radius:12px;background:#000435;color:#FCB038;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px">${escapeHtml(schoolTitle.slice(0, 1))}</div>`;
+  const infoLines = (branding?.schoolInfoLines ?? [])
+    .map((line) => `<p style="margin:2px 0 0;font-size:10px;color:#475569">${escapeHtml(line)}</p>`)
+    .join('');
+  const dateBanner = attendanceDateLabel
+    ? `<div style="margin:0 0 16px;padding:12px 16px;border-radius:12px;background:#000435;color:#fff">
+        <p style="margin:0;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#FCB038;font-weight:800">Report period / date</p>
+        <p style="margin:4px 0 0;font-size:16px;font-weight:800">${escapeHtml(attendanceDateLabel)}</p>
+      </div>`
+    : '';
   w.document.write(`
-    <!DOCTYPE html><html><head><title>${title}</title>
+    <!DOCTYPE html><html><head><title>${escapeHtml(title)}</title>
     <style>
       body { font-family: system-ui, sans-serif; padding: 24px; color: #000435; }
-      h1 { font-size: 18px; margin: 0 0 4px; }
+      h1 { font-size: 18px; margin: 8px 0 0; }
       p { font-size: 12px; color: #64748b; margin: 0 0 16px; }
       table { width: 100%; border-collapse: collapse; font-size: 11px; }
       th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
       th { background: #f8fafc; font-weight: 600; }
     </style></head><body>
-    <h1>${title}</h1><p>${subtitle}</p>
+    <div style="display:flex;gap:16px;align-items:flex-start;border-bottom:3px solid #FCB038;padding-bottom:14px;margin-bottom:16px">
+      ${logoBlock}
+      <div>
+        <p style="margin:0;font-size:15px;font-weight:800;color:#000435">${escapeHtml(schoolTitle)}</p>
+        ${infoLines}
+        <h1>${escapeHtml(title)}</h1>
+        <p style="margin:4px 0 0">${escapeHtml(subtitle)}</p>
+      </div>
+    </div>
+    ${dateBanner}
     ${root.innerHTML}
     </body></html>`);
   w.document.close();

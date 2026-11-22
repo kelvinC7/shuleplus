@@ -120,7 +120,7 @@ export async function apiLookup(req: Request, res: Response, next: NextFunction)
           currentAcademicYear = opts.currentAcademicYear ?? null;
           currentTerm = opts.currentTerm ?? null;
         } else if (Array.isArray(opts)) {
-          // Legacy shape: flat array of { academicYear, terms } — keep it working
+          // Legacy shape: flat array of { academicYear, terms } - keep it working
           circulars = opts;
         }
         if (Array.isArray(circulars)) {

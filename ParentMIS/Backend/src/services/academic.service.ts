@@ -1,10 +1,17 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
-import { resolveActiveStudent } from './parent-context.service';
+import { resolveActiveStudent, resolveParentContext } from './parent-context.service';
 import { academicsApi, StudentAcademics, MarkRecord } from './academics-api';
-import { academicModuleApi, ParentMarkRecord, ParentScheduleItem } from './academic-module-api';
+import {
+  academicModuleApi,
+  ParentCoursePerformancePayload,
+  ParentMarkRecord,
+  ParentScheduleItem,
+} from './academic-module-api';
 import type { StudentSelector } from '../utils/student-param';
 import { resolveSchoolAcademicPeriod } from './iam-api';
+import { academicTermsEqual, academicYearsEqual } from '../utils/academic-match';
+import { feesApi } from './fees-api';
 
 export interface ParentMarksFilters {
   academicYear: string;
@@ -48,13 +55,68 @@ export interface ParentAcademicsResponse {
     currentAcademicYear: string | null;
     currentTerm: string | null;
   };
+  /** Pay-to-view state for the Marks tab (mirrors report-card fee access). */
+  marksLocked?: boolean;
+  marksAccessMessage?: string | null;
+  marksBalance?: number;
+  marksPaymentStatus?: string;
   /** Raw SM exam mark rows before merge (internal). */
   smMarkRecords?: MarkRecord[];
   smYears?: string[];
   smTermsByYear?: Record<string, string[]>;
 }
 
+function studentDisplayName(student: { firstName: string; lastName: string }) {
+  return [student.firstName, student.lastName].filter(Boolean).join(' ').trim();
+}
+
+function academicStudentCodes(student: { id: string; shuleCode: string }) {
+  return [...new Set([student.id, student.shuleCode].map((c) => c?.trim()).filter(Boolean))];
+}
+
+function academicModuleOpts(
+  student: { id: string; shuleCode: string; firstName: string; lastName: string; className: string | null },
+  query?: { academicYear?: string; term?: string; subject?: string }
+) {
+  return {
+    academicYear: query?.academicYear,
+    term: query?.term,
+    className: student.className || undefined,
+    studentName: studentDisplayName(student),
+    studentId: student.id,
+    subject: query?.subject,
+  };
+}
+
 export class AcademicService {
+  private async schoolOrganizationId(
+    organizationId: string,
+    parentId: string,
+    requestedStudentId?: StudentSelector
+  ) {
+    const ctx = await resolveParentContext(organizationId, parentId, requestedStudentId);
+    return ctx.organizationId;
+  }
+
+  private async fetchAcademicModuleForStudent(
+    schoolOrg: string,
+    student: { id: string; shuleCode: string; firstName: string; lastName: string; className: string | null },
+    query?: { academicYear?: string; term?: string }
+  ) {
+    const opts = academicModuleOpts(student, query);
+    const codes = academicStudentCodes(student);
+    let lastError: Error | null = null;
+    for (const code of codes) {
+      try {
+        return await academicModuleApi.getParentAcademics(schoolOrg, code, opts);
+      } catch (error) {
+        lastError = error as Error;
+      }
+    }
+    if (lastError) throw lastError;
+    return null;
+  }
+
   async list(
     organizationId: string,
     parentId: string,
@@ -71,39 +133,80 @@ export class AcademicService {
       throw error;
     }
 
-    let sm: StudentAcademics | null = null;
-    try {
-      sm = await academicsApi.getStudentAcademics(organizationId, student.shuleCode);
-    } catch (error) {
-      console.warn(
-        `[academic] Student Management module unreachable (${(error as Error).message}); falling back to local data`
-      );
-    }
-
-    let modulePayload = null;
-    if (academicModuleApi.enabled()) {
+    const smPromise = (async () => {
       try {
-        modulePayload = await academicModuleApi.getParentAcademics(
-          student.organizationId || organizationId,
-          student.shuleCode,
-          query?.academicYear,
-          query?.term,
-          student.className || undefined
+        return await academicsApi.getStudentAcademics(organizationId, student.shuleCode);
+      } catch (error) {
+        console.warn(
+          `[academic] Student Management module unreachable (${(error as Error).message}); falling back to local data`
         );
+        return null;
+      }
+    })();
+
+    const modulePromise = (async () => {
+      if (!academicModuleApi.enabled()) return null;
+      try {
+        const schoolOrg = await this.schoolOrganizationId(organizationId, parentId, requestedStudentId);
+        return await this.fetchAcademicModuleForStudent(schoolOrg, student, query);
       } catch (error) {
         console.warn(`[academic] Academic module unreachable (${(error as Error).message})`);
+        return null;
       }
-    }
+    })();
 
+    const [sm, modulePayload, schoolPeriod] = await Promise.all([
+      smPromise,
+      modulePromise,
+      resolveSchoolAcademicPeriod(organizationId, query).catch(() => undefined),
+    ]);
+
+    let result: ParentAcademicsResponse;
     if (!sm && !modulePayload) {
       const local = await this.fallbackLocal(organizationId, student.id);
-      const schoolPeriod = await resolveSchoolAcademicPeriod(organizationId, query);
-      return this.mergePayloads(local, null, query, schoolPeriod);
+      result = this.mergePayloads(local, null, query, schoolPeriod);
+    } else {
+      const smMapped = sm ? this.mapRemote(sm) : this.emptyResponse();
+      result = this.mergePayloads(smMapped, modulePayload, query, schoolPeriod);
     }
+    return await this.applyMarksFeeLock(organizationId, parentId, requestedStudentId, student, result);
+  }
 
-    const smMapped = sm ? this.mapRemote(sm) : this.emptyResponse();
-    const schoolPeriod = await resolveSchoolAcademicPeriod(organizationId, query);
-    return this.mergePayloads(smMapped, modulePayload, query, schoolPeriod);
+  /** Hide individual marks for terms whose report is pay-to-view and not yet paid. Fail open on upstream errors. */
+  private async applyMarksFeeLock(
+    organizationId: string,
+    parentId: string,
+    requestedStudentId: StudentSelector | undefined,
+    student: { id: string; shuleCode: string; className: string | null },
+    result: ParentAcademicsResponse
+  ): Promise<ParentAcademicsResponse> {
+    const academicYear = result.filters?.academicYear;
+    const term = result.filters?.term;
+    if (!academicYear || !term || !result.publishedMarks?.length) return result;
+    try {
+      const org = await this.schoolOrganizationId(organizationId, parentId, requestedStudentId);
+      const access = await feesApi.getReportCardAccess(org, {
+        studentId: student.id,
+        studentCode: student.shuleCode,
+        className: student.className || undefined,
+        academicYear,
+        term,
+      });
+      if (access.allowed === false) {
+        return {
+          ...result,
+          publishedMarks: [],
+          marksLocked: true,
+          marksAccessMessage:
+            access.message || 'Pay to view marks for this term. See the Reports tab for details.',
+          marksBalance: access.balance,
+          marksPaymentStatus: access.paymentStatus,
+        };
+      }
+    } catch (error) {
+      console.warn(`[academic] marks fee-access check unavailable: ${(error as Error).message}`);
+    }
+    return result;
   }
 
   private emptyResponse(): ParentAcademicsResponse {
@@ -175,24 +278,35 @@ export class AcademicService {
         : schoolPeriod?.term || modulePayload?.filters.term || termOptions[0] || '';
 
     const inPeriod = (year: string, t: string) =>
-      (!academicYear || year === academicYear) && (!term || t === term);
+      academicYearsEqual(year, academicYear) && academicTermsEqual(t, term);
 
-    const smMarks: ParentMarkRecord[] = (sm.smMarkRecords ?? []).map((m) => ({
-          id: m.id,
-          title: m.title,
-          subject: m.subject,
-          type: m.type,
-          score: m.score,
-          maxScore: m.maxScore,
-          percentage: m.percentage,
-          grade: m.grade,
-          date: m.date,
-          term: m.term,
-          academicYear: m.academicYear,
-          status: m.status,
-        }));
+    const isParentVisibleMarkStatus = (status?: string | null) => {
+      const s = String(status ?? '').toUpperCase();
+      // Only show marks that have been academically approved/published to parents.
+      // Defensive filter: upstream modules may include submitted/reviewed records.
+      return ['APPROVED', 'LOCKED', 'PUBLISHED', 'FINALIZED', 'RELEASED', 'COMPLETED', 'IN_PROGRESS'].includes(s);
+    };
 
-    const moduleMarks = modulePayload?.publishedMarks ?? [];
+    const smMarks: ParentMarkRecord[] = (sm.smMarkRecords ?? [])
+      .filter((m) => isParentVisibleMarkStatus((m as any).status))
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        subject: m.subject,
+        type: m.type,
+        score: m.score,
+        maxScore: m.maxScore,
+        percentage: m.percentage,
+        grade: m.grade,
+        date: m.date,
+        term: m.term,
+        academicYear: m.academicYear,
+        status: m.status,
+      }));
+
+    const moduleMarks = (modulePayload?.publishedMarks ?? []).filter((m) =>
+      isParentVisibleMarkStatus(m.status)
+    );
     const publishedMarks = [...moduleMarks, ...smMarks]
       .filter((m) => inPeriod(m.academicYear, m.term))
       .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
@@ -292,7 +406,7 @@ export class AcademicService {
   }
 
   private async fallbackLocal(organizationId: string, studentId: string): Promise<ParentAcademicsResponse> {
-    const [terms, student] = await Promise.all([
+    const [terms, student, upcomingExams] = await Promise.all([
       prisma.term.findMany({
         where: { organizationId },
         include: {
@@ -304,6 +418,11 @@ export class AcademicService {
         orderBy: { createdAt: 'desc' },
       }),
       prisma.student.findUnique({ where: { id: studentId } }),
+      prisma.exam.findMany({
+        where: { studentId, date: { gte: new Date() } },
+        orderBy: { date: 'asc' },
+        take: 8,
+      }),
     ]);
 
     if (!student) throw new AppError(404, 'Student profile not found');
@@ -332,12 +451,6 @@ export class AcademicService {
       };
     });
 
-    const upcomingExams = await prisma.exam.findMany({
-      where: { studentId, date: { gte: new Date() } },
-      orderBy: { date: 'asc' },
-      take: 8,
-    });
-
     return {
       student: {
         id: student.id,
@@ -355,6 +468,99 @@ export class AcademicService {
       publishedMarks: [],
       schedule: [],
       filters: { academicYear: '', term: '', years: [], terms: [] },
+    };
+  }
+
+  async getCoursePerformance(
+    organizationId: string,
+    parentId: string,
+    requestedStudentId: StudentSelector | undefined,
+    query: { academicYear?: string; term?: string; subject?: string }
+  ): Promise<ParentCoursePerformancePayload> {
+    const student = await resolveActiveStudent(organizationId, parentId, requestedStudentId);
+    const org = await this.schoolOrganizationId(organizationId, parentId, requestedStudentId);
+    const perfOpts = academicModuleOpts(student, query);
+
+    if (academicModuleApi.enabled()) {
+      let lastErr: string | null = null;
+      for (const code of academicStudentCodes(student)) {
+        try {
+          return await academicModuleApi.getParentCoursePerformance(org, code, perfOpts);
+        } catch (error) {
+          lastErr = (error as Error).message;
+        }
+      }
+      if (lastErr) {
+        console.warn(
+          `[academic] course-performance via Academic module failed (${lastErr}); using marks feed`
+        );
+      }
+    }
+
+    const bundle = await this.list(organizationId, parentId, requestedStudentId, query);
+    return this.coursePerformanceFromMarksBundle(bundle, student.id, query.subject);
+  }
+
+  private coursePerformanceFromMarksBundle(
+    bundle: ParentAcademicsResponse,
+    studentId: string,
+    subjectFilter?: string
+  ): ParentCoursePerformancePayload {
+    const norm = (s: string) => s.trim().toLowerCase();
+    const bySubject = new Map<string, ParentMarkRecord[]>();
+    for (const m of bundle.publishedMarks) {
+      if (!bySubject.has(m.subject)) bySubject.set(m.subject, []);
+      bySubject.get(m.subject)!.push(m);
+    }
+
+    let courses = [...bySubject.entries()].map(([subjectName, marks]) => ({
+      subjectId: subjectName,
+      subjectName,
+      defaultCourseMarks: 100,
+      totalScore: 0,
+      totalMax: 100,
+      percentage: 0,
+      grade: marks[0]?.grade ?? null,
+      gradeDescription: null,
+      marksEntered: marks.length > 0,
+      courseComplete: false,
+      missingComponents: [] as string[],
+      categoryScores: {},
+      rank: null,
+      classSize: null,
+      teacherMarks: marks.map((m) => ({
+        id: m.id,
+        assessmentId: m.assessmentId ?? m.id,
+        title: m.title,
+        componentName: m.type,
+        subjectId: subjectName,
+        subjectName: m.subject,
+        score: m.score,
+        maxMark: m.maxScore,
+        percentage: m.percentage ?? 0,
+        date: m.date,
+        assessmentStatus: m.status,
+        code: null,
+      })),
+    }));
+
+    if (subjectFilter?.trim()) {
+      courses = courses.filter((c) => norm(c.subjectName) === norm(subjectFilter));
+    }
+
+    return {
+      student: {
+        id: studentId || bundle.student.id,
+        fullName: bundle.student.fullName,
+        className: bundle.student.className,
+      },
+      filters: {
+        academicYear: bundle.filters.academicYear,
+        term: bundle.filters.term,
+      },
+      assessmentTemplate: null,
+      componentOrder: [],
+      courses,
     };
   }
 }

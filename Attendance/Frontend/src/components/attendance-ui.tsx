@@ -257,6 +257,38 @@ export function FilterBar({ children }: { children: ReactNode }) {
 
 export const filterSelectClass = 'input !w-auto min-w-[120px] !py-2 text-xs sm:text-sm';
 
+/** Labeled dropdown — matches Organization Admin → Users & Access filter styling. */
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  className?: string;
+}) {
+  return (
+    <label className={`block min-w-[140px] flex-1 space-y-1 sm:max-w-[220px] ${className ?? ''}`}>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input h-10 w-full !min-w-0 rounded-full !py-2 text-sm"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function PersonAvatar({
   name,
   photoUrl,

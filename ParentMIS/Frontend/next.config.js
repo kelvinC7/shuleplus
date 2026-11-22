@@ -3,7 +3,9 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Fix monorepo module/CSS resolution — prevents Next from using wrong workspace root
+  output: 'export',
+  images: { unoptimized: true },
+  // Fix monorepo module/CSS resolution – prevents Next from using wrong workspace root
   outputFileTracingRoot: path.join(__dirname, '../../'),
 };
 

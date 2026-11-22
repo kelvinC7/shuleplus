@@ -54,6 +54,21 @@ router.post('/service/sector/batch-dashboard-summary', requireServiceAuth, (req,
 router.get('/service/rfid-lookup', requireServiceAuth, (req, res, next) =>
   serviceController.lookupRfidOwner(req, res, next)
 );
+router.get('/service/class-teacher/students', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.classTeacherStudents(req, res, next)
+);
+router.put('/service/class-teacher/students/:studentId', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.classTeacherUpdateStudent(req, res, next)
+);
+router.get('/service/class-teacher/parents/search', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.classTeacherSearchParents(req, res, next)
+);
+router.post('/service/class-teacher/parents', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.classTeacherCreateParent(req, res, next)
+);
+router.put('/service/class-teacher/students/:studentId/parents/:parentId', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.classTeacherUpdateParent(req, res, next)
+);
 router.put('/service/students/:studentId/identity', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.updateStudentIdentity(req, res, next)
 );
@@ -62,6 +77,9 @@ router.post('/service/students/photos/apply', requireServiceAuth, requireService
 );
 router.patch('/service/students/:studentId/status', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.updateStudentStatus(req, res, next)
+);
+router.get('/service/parents/lookup-by-phone', requireServiceAuth, (req, res, next) =>
+  serviceController.lookupParentsByPhone(req, res, next)
 );
 router.get('/service/parents', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.listParents(req, res, next)

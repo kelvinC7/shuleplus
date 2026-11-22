@@ -36,6 +36,9 @@ export function createApp() {
         if (shuleplusOrigin.test(origin)) {
           return callback(null, origin);
         }
+        if (/^(capacitor:\/\/localhost|ionic:\/\/localhost|https?:\/\/localhost(:\d+)?)$/.test(origin)) {
+          return callback(null, origin);
+        }
         if (
           env.NODE_ENV === 'development' &&
           /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)

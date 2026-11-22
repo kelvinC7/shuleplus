@@ -96,7 +96,7 @@ export default function LandingPage() {
         {/* CTA Button - Well proportioned */}
         <Button
           component={Link}
-          to="/chat"
+          to="/sms"
           variant="contained"
           sx={{
             px: { xs: 4, sm: 6, md: 8 },

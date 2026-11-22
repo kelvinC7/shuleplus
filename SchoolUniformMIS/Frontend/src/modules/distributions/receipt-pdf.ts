@@ -83,7 +83,7 @@ function drawDetailRow(
   doc.text(label, margin + 2, y);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...NAVY);
-  const lines = doc.splitTextToSize(value || "—", contentW * 0.62);
+  const lines = doc.splitTextToSize(value || "", contentW * 0.62);
   doc.text(lines, margin + contentW * 0.32, y);
   return y + Math.max(4.5, lines.length * 4);
 }
@@ -176,7 +176,7 @@ export async function buildReceiptPdf(receipt: ReceiptData): Promise<jsPDF> {
   y += 6;
 
   const studentName =
-    `${receipt.student.firstName} ${receipt.student.lastName}`.trim() || "—";
+    `${receipt.student.firstName} ${receipt.student.lastName}`.trim() || "Student";
   const shuleCode = resolveShuleCode(receipt.student);
 
   y = drawDetailRow(doc, y, "Student", studentName, margin, contentW);
@@ -347,7 +347,7 @@ export async function printReceiptPdf(receipt: ReceiptData): Promise<void> {
   const blobUrl = doc.output("bloburl");
   const printWin = window.open(blobUrl, "_blank", "noopener,noreferrer");
   if (!printWin) {
-    URL.revokeObjectURL(blobUrl);
+    URL.revokeObjectURL(blobUrl.toString());
     throw new Error("Print window blocked");
   }
 

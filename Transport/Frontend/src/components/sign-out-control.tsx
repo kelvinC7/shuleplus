@@ -14,14 +14,14 @@ export function SignOutControl({ onLogout, variant = 'header', className = '' }:
       <button
         type="button"
         onClick={onLogout}
-        className={`group flex w-full items-center gap-3 rounded-2xl border border-danger/25 bg-danger/10 px-4 py-3 text-left transition hover:border-danger/40 hover:bg-danger hover:text-white ${className}`}
+        className={`group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-white/10 ${className}`}
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/15 text-danger transition group-hover:bg-white/20 group-hover:text-white">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-primary transition group-hover:bg-primary/20">
           <LogOut size={18} />
         </span>
         <span>
-          <span className="block text-sm font-semibold">Sign out</span>
-          <span className="block text-[11px] text-danger/80 group-hover:text-white/80">End your session securely</span>
+          <span className="block text-sm font-semibold text-white">Sign out</span>
+          <span className="block text-[11px] text-white/60 group-hover:text-white/80">End your session securely</span>
         </span>
       </button>
     );

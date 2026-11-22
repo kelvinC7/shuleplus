@@ -13,6 +13,38 @@ export type ChildTransport = {
   liveState: string | null;
 };
 
+export async function getParentTransportPortal(
+  organizationId: string,
+  studentCode: string
+): Promise<Record<string, unknown> | null> {
+  if (isModuleDown('transport')) return null;
+  try {
+    const url = new URL(`${env.TRANSPORT_API_URL}/service/parent-portal`);
+    url.searchParams.set('organizationId', organizationId);
+    url.searchParams.set('studentCode', studentCode);
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-service-key': env.SERVICE_API_KEY,
+        'x-source-service': 'parentmis',
+        'x-organization-id': organizationId,
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.warn(`[transport] parent-portal HTTP ${res.status} org=${organizationId} code=${studentCode} ${detail.slice(0, 200)}`);
+      return null;
+    }
+    const json = (await res.json()) as { data?: Record<string, unknown> };
+    markModuleUp('transport');
+    return json.data ?? null;
+  } catch (err) {
+    markModuleDown('transport', err);
+    return null;
+  }
+}
+
 export async function getChildTransport(
   organizationId: string,
   studentCode: string

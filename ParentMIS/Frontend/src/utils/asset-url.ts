@@ -6,8 +6,8 @@ export function resolvePublicAssetUrl(url: string | null | undefined): string {
     return trimmed;
   }
   const iamApi =
-    process.env.NEXT_PUBLIC_IAM_API_URL?.replace(/\/$/, '') ?? 'http://localhost:3001/api/v1';
-  const origin = iamApi.replace(/\/api\/v1\/?$/, '') || 'http://localhost:3001';
+    process.env.NEXT_PUBLIC_IAM_API_URL?.replace(/\/$/, '') ?? 'https://shuleplus.rw/api/v1';
+  const origin = iamApi.replace(/\/api\/v1\/?$/, '') || 'https://shuleplus.rw';
   return trimmed.startsWith('/') ? `${origin}${trimmed}` : `${origin}/${trimmed}`;
 }
 

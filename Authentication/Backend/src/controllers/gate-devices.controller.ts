@@ -83,4 +83,40 @@ export const gateDevicesController = {
       next(e);
     }
   },
+
+  async listDeviceSchools(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.params.organizationId ?? '');
+      const deviceId = String(req.params.deviceId ?? '');
+      const data = await gateDevicesService.listDeviceSchools(organizationId, deviceId);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async linkDeviceSchool(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.params.organizationId ?? '');
+      const deviceId = String(req.params.deviceId ?? '');
+      const body = (req.body ?? {}) as { targetOrganizationId?: string; schoolId?: string };
+      const targetOrganizationId = String(body.targetOrganizationId ?? body.schoolId ?? '').trim();
+      const data = await gateDevicesService.linkDeviceSchool(organizationId, deviceId, targetOrganizationId);
+      res.status(201).json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async unlinkDeviceSchool(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.params.organizationId ?? '');
+      const deviceId = String(req.params.deviceId ?? '');
+      const schoolId = String(req.params.schoolId ?? '');
+      const data = await gateDevicesService.unlinkDeviceSchool(organizationId, deviceId, schoolId);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
 };

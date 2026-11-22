@@ -21,7 +21,6 @@ interface PlatformSidebarProps {
   onClose: () => void;
   orgName: string;
   moduleLabel: string;
-  moduleTagline?: string;
   sections?: NavSection[];
   onLogout?: () => void;
 }
@@ -31,7 +30,6 @@ export function PlatformSidebar({
   onClose,
   orgName,
   moduleLabel,
-  moduleTagline = "manage smarter",
   sections = NAV_SECTIONS,
   onLogout,
 }: PlatformSidebarProps) {
@@ -85,9 +83,6 @@ export function PlatformSidebar({
               priority
             />
           </Link>
-          <p className="mt-1.5 text-[11px] font-medium tracking-wide text-white/45">
-            {moduleTagline}
-          </p>
           <p className="mt-2 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/90">
             {orgName}
           </p>
@@ -176,11 +171,8 @@ export function PlatformSidebar({
           {onLogout ? (
             <SignOutControl variant="sidebar" onLogout={onLogout} />
           ) : (
-            <div className="rounded-2xl bg-white/[0.06] p-3 sm:p-4">
+            <div className="rounded-2xl bg-white/[0.06] px-3 py-2.5 sm:px-4">
               <p className="text-xs font-semibold text-white">{moduleLabel}</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-white/50">
-                Shule+ operations module
-              </p>
             </div>
           )}
         </div>

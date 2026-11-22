@@ -1,7 +1,45 @@
 import { Fragment, useMemo, useRef, type ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 import ReportQrCode from '@/components/ReportQrCode';
+import ReportSchoolHeader from '@/components/reports/ReportSchoolHeader';
 import type { ReportCardDataV2 } from '@/types';
+
+import { NOT_RECORDED, resolveReportVerifyUrl } from '@/components/reports/report-cards-utils';
+import { REPORT_A4_WIDTH_PX as A4_WIDTH_PX } from '@/lib/report-a4';
+import { useAcademicSettings } from '@/contexts/academic-settings-context';
+import { getStoredReportFooterSettings } from '@/services/api';
+
+const NAVY = '#000435';
+const AMBER = '#FCB038';
+
+function defaultDisplay(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(n) || n <= 0) return NOT_RECORDED;
+  return String(Math.round(n * 10) / 10);
+}
+
+function classStreamLabel(report: ReportCardDataV2) {
+  const name = report.class?.name?.trim();
+  const stream = report.class?.stream?.trim();
+  if (name && stream) return `${name} · ${stream}`;
+  return name || NOT_RECORDED;
+}
+
+function SectionTitle({ children, centered }: { children: ReactNode; centered?: boolean }) {
+  return (
+    <Typography
+      sx={{
+        fontSize: '0.6875rem',
+        fontWeight: 800,
+        color: NAVY,
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        textAlign: centered ? 'center' : 'left',
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '';
@@ -33,7 +71,7 @@ function TermBarChart({ points, currentTerm }: { points: Array<{ label: string; 
           const current = isCurrentTerm(p.label, currentTerm);
           return (
             <Box key={p.label} sx={{ textAlign: 'center', width: barW + 16 }}>
-              <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, color: '#000435', mb: 0.25 }}>{p.value}%</Typography>
+              <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, color: '#000435', mb: 0.25 }}>{p.value.toFixed(2)}%</Typography>
               <Box
                 sx={{
                   height: barH,
@@ -69,42 +107,21 @@ function TermBarChart({ points, currentTerm }: { points: Array<{ label: string; 
 
 type ReportSubject = ReportCardDataV2['subjects'][number];
 
-function groupSubjectsByCore(subjects: ReportSubject[]) {
-  const core = subjects.filter((s) => s.isCore !== false);
-  const nonCore = subjects.filter((s) => s.isCore === false);
-  return { core, nonCore };
-}
-
-function SectionHeaderRow({ label, colSpan }: { label: string; colSpan: number }) {
-  return (
-    <tr className="section-header-row">
-      <td
-        colSpan={colSpan}
-        style={{
-          padding: '9px 14px',
-          background: '#FCB038',
-          color: '#000435',
-          fontWeight: 800,
-          fontSize: '0.6875rem',
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          borderTop: '3px solid #000435',
-          borderBottom: '1px solid #e2a020',
-        }}
-      >
-        {label}
-      </td>
-    </tr>
-  );
-}
-
 type TermCell = { marks: string; grade: string; hasMarks: boolean; percentage: number };
 
 function formatMarkFraction(score: number, max: number): string {
-  if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return '—';
+  if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return NOT_RECORDED;
   const rounded = Math.round(score * 10) / 10;
   const scoreText = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  return `${scoreText}/${max}`;
+  return scoreText;
+}
+
+function formatMarkRatio(score: number, max: number): string {
+  const formattedScore = formatMarkFraction(score, max);
+  const formattedMax = formatMarkFraction(max, max);
+  return formattedScore === NOT_RECORDED || formattedMax === NOT_RECORDED
+    ? NOT_RECORDED
+    : `${formattedScore}/${formattedMax}`;
 }
 
 function parseReportTermColumns(report: ReportCardDataV2): string[] {
@@ -121,7 +138,7 @@ function getSubjectTermCell(
   termColumns: string[],
   useTermResults: boolean
 ): TermCell {
-  const empty: TermCell = { marks: '—', grade: '—', hasMarks: false, percentage: 0 };
+  const empty: TermCell = { marks: NOT_RECORDED, grade: NOT_RECORDED, hasMarks: false, percentage: 0 };
 
   if (useTermResults) {
     const tr = subject.termResults?.find((r) => normTerm(r.term) === normTerm(termLabel));
@@ -129,7 +146,7 @@ function getSubjectTermCell(
     const max = tr.totalMax ?? subject.defaultCourseMarks ?? 100;
     return {
       marks: formatMarkFraction(tr.totalScore, max),
-      grade: tr.grade ?? '—',
+      grade: tr.grade ?? NOT_RECORDED,
       hasMarks: true,
       percentage: tr.percentage,
     };
@@ -140,7 +157,7 @@ function getSubjectTermCell(
   const max = subject.totalMax ?? subject.defaultCourseMarks ?? 100;
   return {
     marks: formatMarkFraction(subject.totalScore, max),
-    grade: subject.grade ?? '—',
+    grade: subject.grade ?? NOT_RECORDED,
     hasMarks: true,
     percentage: subject.percentage,
   };
@@ -171,48 +188,45 @@ function resolveComponentColumns(report: ReportCardDataV2): Array<{ name: string
   return [];
 }
 
-function componentHeaderLabel(name: string, weight: number) {
-  const w = weight > 0 ? ` ${Math.round(weight)}%` : '';
-  return `${name.toUpperCase()}${w}`;
+function gradeFromLegend(
+  pct: number,
+  legend: Array<{ grade: string; minPercentage: number; maxPercentage: number }>
+): string | null {
+  if (!legend.length || !Number.isFinite(pct) || pct <= 0) return null;
+  const p = Math.round(pct * 100) / 100;
+  const sorted = [...legend].sort((a, b) => b.minPercentage - a.minPercentage);
+  for (const g of sorted) {
+    if (p + 0.001 >= g.minPercentage && p - 0.001 <= g.maxPercentage) return g.grade;
+  }
+  const lowest = sorted[sorted.length - 1];
+  if (lowest && p >= lowest.minPercentage) return lowest.grade;
+  return null;
 }
 
-/** Component column max = course DEFAULT × weight (e.g. 40 × 50% → out of 20). */
-function componentHeaderHint(weight: number) {
-  if (weight <= 0) return 'Scaled to course total';
-  return `Up to ${Math.round(weight)}% of DEFAULT`;
+function formatConvertedMark(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return NOT_RECORDED;
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+/** Template component cap (e.g. Quiz out of 50 when weight is 50%). */
 function componentCellDisplay(
   subject: ReportSubject,
   compName: string,
-): { text: string; sub?: string; title?: string; hasData: boolean } {
+): { text: string; hasData: boolean } {
   const cs = subject.categoryScores[compName];
-  if (!cs || !subject.marksEntered) return { text: '/', hasData: false };
-  const norm = cs.normalizedScore;
-  const max = cs.normalizedMax;
-  const raw = cs.rawMarksDisplay?.trim();
-  const showRaw =
-    raw &&
-    cs.maxMark != null &&
-    cs.normalizedMax != null &&
-    Math.abs(Number(cs.maxMark) - Number(cs.normalizedMax)) > 0.05;
+  const recorded =
+    cs?.marksRecorded === true ||
+    (cs?.marksRecorded === undefined && Boolean(cs && subject.marksEntered));
+  if (!recorded) return { text: NOT_RECORDED, hasData: false };
+  const score = cs!.normalizedScore ?? cs!.contribution ?? 0;
+  if (!Number.isFinite(Number(score))) return { text: NOT_RECORDED, hasData: false };
+  return { text: formatConvertedMark(Number(score)), hasData: true };
+}
 
-  if (norm != null && max != null && max > 0) {
-    const text = formatMarkFraction(norm, max);
-    return {
-      text,
-      sub: showRaw ? raw : undefined,
-      title: showRaw
-        ? `Entered ${raw}; shown on course scale as ${text} (component max ${max})`
-        : `Component max ${max} = DEFAULT × component weight`,
-      hasData: true,
-    };
-  }
-  if (cs.marksDisplay?.trim()) {
-    return { text: cs.marksDisplay, sub: showRaw ? raw : undefined, hasData: true };
-  }
-  if (cs.percentage > 0) return { text: `${Math.round(cs.percentage * 10) / 10}%`, hasData: true };
-  return { text: '/', hasData: false };
+function displayMetric(value: string | number | null | undefined, fallback = NOT_RECORDED): string {
+  if (value == null || value === '' || value === NOT_RECORDED) return fallback;
+  return String(value);
 }
 
 function subjectDefaultMarks(subject: ReportSubject, report: ReportCardDataV2): string {
@@ -221,8 +235,44 @@ function subjectDefaultMarks(subject: ReportSubject, report: ReportCardDataV2): 
     subject.totalMax ??
     report.assessmentTemplate?.defaultCourseMarks ??
     null;
-  if (v == null || !Number.isFinite(Number(v))) return '—';
-  return String(Math.round(Number(v)));
+  return defaultDisplay(v != null ? Number(v) : null);
+}
+
+/** All TichaPortal marks pooled and converted to course DEFAULT. */
+function subjectStudentMarks(subject: ReportSubject): string {
+  if (!subject.marksEntered) return NOT_RECORDED;
+  const raw = subject.studentMarksOnDefault ?? subject.totalScore;
+  const score = Number(raw);
+  if (!Number.isFinite(score) || score < 0) return NOT_RECORDED;
+  return formatConvertedMark(score);
+}
+
+function getSubjectTotalAmounts(
+  subject: ReportSubject,
+  termColumns: string[],
+  useTermResults: boolean
+): { score: number; max: number; grade: string } | null {
+  if (termColumns.length === 1) {
+    const cell = getSubjectTermCell(subject, termColumns[0], termColumns, useTermResults);
+    if (!cell.hasMarks) return null;
+    const termResult = subject.termResults?.find((r) => normTerm(r.term) === normTerm(termColumns[0]));
+    const score = useTermResults ? termResult?.totalScore ?? subject.totalScore : subject.totalScore;
+    const max = useTermResults
+      ? termResult?.totalMax ?? subject.defaultCourseMarks ?? subject.totalMax ?? 100
+      : subject.totalMax ?? subject.defaultCourseMarks ?? 100;
+    return { score, max, grade: cell.grade };
+  }
+  const cells = termColumns
+    .map((t) => getSubjectTermCell(subject, t, termColumns, useTermResults))
+    .filter((c) => c.hasMarks);
+  if (!cells.length) return null;
+  const avg = cells.reduce((s, c) => s + c.percentage, 0) / cells.length;
+  const max = subject.defaultCourseMarks ?? subject.totalMax ?? 100;
+  return {
+    score: (avg / 100) * max,
+    max,
+    grade: subject.grade ?? cells[cells.length - 1].grade,
+  };
 }
 
 function getSubjectTotalCell(
@@ -230,73 +280,28 @@ function getSubjectTotalCell(
   termColumns: string[],
   useTermResults: boolean
 ): { marks: string; grade: string } {
-  if (termColumns.length === 1) {
-    const cell = getSubjectTermCell(subject, termColumns[0], termColumns, useTermResults);
-    return { marks: cell.marks, grade: cell.grade };
-  }
-  const cells = termColumns
-    .map((t) => getSubjectTermCell(subject, t, termColumns, useTermResults))
-    .filter((c) => c.hasMarks);
-  if (!cells.length) return { marks: '—', grade: '—' };
-  if (cells.length === 1) return { marks: cells[0].marks, grade: cells[0].grade };
-  const avg = cells.reduce((s, c) => s + c.percentage, 0) / cells.length;
-  return {
-    marks: `${Math.round(avg * 10) / 10}%`,
-    grade: subject.grade ?? cells[cells.length - 1].grade,
-  };
+  const total = getSubjectTotalAmounts(subject, termColumns, useTermResults);
+  return total
+    ? { marks: formatMarkRatio(total.score, total.max), grade: total.grade }
+    : { marks: NOT_RECORDED, grade: NOT_RECORDED };
 }
 
-function CourseList({
-  title,
-  items,
-  variant,
-}: {
-  title: string;
-  items: Array<{ subject: string; percentage: number; grade?: string | null }>;
-  variant: 'strong' | 'improve';
-}) {
+function OverviewStatCard({ label, value }: { label: string; value: string }) {
   return (
     <Box
       sx={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 140,
-        p: 1.5,
-        borderRadius: '8px',
+        textAlign: 'center',
+        px: 0.75,
+        py: 1,
+        bgcolor: '#f8fafc',
+        borderRadius: 1,
         border: '1px solid #e2e8f0',
-        bgcolor: '#fafbfc',
       }}
     >
-      <Typography sx={{ fontSize: '0.5625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 1 }}>
-        {title}
+      <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+        {label}
       </Typography>
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {items.length ? (
-          items.map((c) => (
-            <Box key={c.subject}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.35 }}>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f172a' }}>{c.subject}</Typography>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#000435' }}>
-                  {c.percentage}%{c.grade ? ` · ${c.grade}` : ''}
-                </Typography>
-              </Box>
-              <Box sx={{ height: 5, borderRadius: 3, bgcolor: '#e2e8f0', overflow: 'hidden' }}>
-                <Box
-                  sx={{
-                    width: `${Math.min(100, c.percentage)}%`,
-                    height: '100%',
-                    bgcolor: variant === 'strong' ? '#000435' : '#FCB038',
-                    borderRadius: 3,
-                  }}
-                />
-              </Box>
-            </Box>
-          ))
-        ) : (
-          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 1 }}>—</Typography>
-        )}
-      </Box>
+      <Typography sx={{ fontSize: '0.875rem', fontWeight: 800, color: NAVY, mt: 0.25 }}>{value}</Typography>
     </Box>
   );
 }
@@ -319,7 +324,7 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     (report.student as { admissionNumber?: string | null })?.admissionNumber ||
     (report.student as { studentCode?: string | null })?.studentCode ||
     report.student?.studentUid ||
-    '—';
+    NOT_RECORDED;
   const termColumns = useMemo(() => parseReportTermColumns(report), [report]);
   const isSingleTermReport = termColumns.length === 1;
   const useTermResults = useMemo(
@@ -329,22 +334,49 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     [report.subjects, termColumns.length]
   );
   const componentColumns = useMemo(() => resolveComponentColumns(report), [report]);
-  const tableColSpan = isSingleTermReport
-    ? 3 + componentColumns.length + 4
-    : 2 + termColumns.length * 2 + 2;
-
-  const coursesWithMarks = useMemo(
-    () => report.subjects.filter((s) => s.marksEntered).length,
-    [report.subjects]
-  );
-
   const termPoints = useMemo(() => {
     const avgs = report.growth?.termAverages ?? [];
-    return avgs.map((t) => ({ label: t.period, value: Math.round(t.averagePercentage * 10) / 10 }));
+    return avgs
+      .filter((t) => (t.subjectCount ?? 0) > 0 && Number.isFinite(t.averagePercentage))
+      .map((t) => ({ label: t.period, value: t.averagePercentage }));
   }, [report.growth]);
 
-  const strong = report.strongCourses ?? [];
-  const improve = report.improvementCourses ?? [];
+  const termAverageBars = useMemo(() => {
+    if (termPoints.length > 0) return termPoints;
+    if (report.overallScore > 0) {
+      const label = (report.term ?? 'Term').trim() || 'Term';
+      return [{ label, value: report.overallScore }];
+    }
+    return [];
+  }, [termPoints, report.overallScore, report.term]);
+
+  const sortedSubjects = useMemo(() => {
+    const list = [...report.subjects];
+    list.sort((a, b) => {
+      const ac = a.isCore !== false;
+      const bc = b.isCore !== false;
+      if (ac !== bc) return ac ? -1 : 1;
+      return a.subject.localeCompare(b.subject);
+    });
+    return list;
+  }, [report.subjects]);
+
+  const coreSubjects = useMemo(
+    () => sortedSubjects.filter((s) => s.isCore !== false),
+    [sortedSubjects],
+  );
+  const nonCoreSubjects = useMemo(
+    () => sortedSubjects.filter((s) => s.isCore === false),
+    [sortedSubjects],
+  );
+
+  const singleTermColCount = useMemo(
+    () => 2 + 1 + componentColumns.length + 2,
+    [componentColumns.length],
+  );
+
+  const positionDisplay =
+    report.position && report.classSize ? `${report.position}/${report.classSize}` : NOT_RECORDED;
 
   const gradingLegend = useMemo(() => {
     const rows = report.gradingLegend ?? [];
@@ -356,21 +388,36 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     });
   }, [report.gradingLegend]);
 
-  const enteredSubjects = useMemo(() => report.subjects.filter((s) => s.marksEntered), [report.subjects]);
-  const totalMarks =
-    report.summary?.totalMarks ?? enteredSubjects.reduce((s, x) => s + x.totalScore, 0);
-  const totalMax =
-    report.summary?.totalMax ?? enteredSubjects.reduce((s, x) => s + (x.totalMax ?? 0), 0);
   const reportDate = fmtDate(report.meta?.generatedAt);
-  const verifyUrl = report.meta?.verifyUrl || '';
-  const contactParts = [school?.phone, school?.email, school?.website].filter(Boolean);
+  const verifyUrl = resolveReportVerifyUrl(report);
+  const { settings } = useAcademicSettings();
+  const footerSettings = settings?.reportFooter ?? getStoredReportFooterSettings() ?? {
+    mode: 'head_teacher',
+    roleLabel: 'Head Teacher',
+    selectedUserName: 'Head Teacher',
+  };
+  const footerRoleLabel = footerSettings.mode === 'head_teacher' ? 'Head Teacher' : (footerSettings.roleLabel || 'Head Teacher');
+  const footerName = footerSettings.selectedUserName?.trim() || (footerSettings.mode === 'head_teacher' ? 'Head Teacher' : 'Authorized Signatory');
   const classTeacherComment = report.comments?.classTeacher?.trim();
   const headTeacherComment = report.comments?.headTeacher?.trim();
-  const overallGradeDisplay = report.overallGrade || '—';
-  const { core: coreSubjects, nonCore: nonCoreSubjects } = useMemo(
-    () => groupSubjectsByCore(report.subjects),
-    [report.subjects]
-  );
+  const overallGradeDisplay =
+    report.overallGrade?.trim() ||
+    gradeFromLegend(report.overallScore, gradingLegend) ||
+    NOT_RECORDED;
+
+  const profileCells = useMemo(() => {
+    const cells: Array<{ label: string; value: string }> = [
+      { label: 'Student ID', value: studentIdLabel },
+      { label: 'Class', value: classStreamLabel(report) },
+      { label: 'Gender', value: displayMetric(report.student?.gender) },
+    ];
+    const dob = fmtDate(report.student?.dateOfBirth);
+    if (dob) cells.push({ label: 'Date of birth', value: dob });
+    cells.push({ label: 'Term', value: displayMetric(report.term) });
+    return cells;
+  }, [report, studentIdLabel]);
+
+  const photoUrl = (report.student as { photoUrl?: string | null })?.photoUrl;
 
   function renderTermPairCells(subject: ReportSubject, termLabel: string) {
     const cell = getSubjectTermCell(subject, termLabel, termColumns, useTermResults);
@@ -386,314 +433,263 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     );
   }
 
-  function renderSubjectRow(s: ReportSubject, rowNum: number) {
+  function subjectGradeDisplay(s: ReportSubject): string {
+    if (!s.marksEntered) return NOT_RECORDED;
+    if (s.grade?.trim()) return s.grade.trim();
+    const fromLegend = gradeFromLegend(s.percentage, gradingLegend);
+    return fromLegend ?? NOT_RECORDED;
+  }
+
+  function renderTemplateComponentCells(s: ReportSubject) {
+    return componentColumns.map((col) => {
+      const cell = componentCellDisplay(s, col.name);
+      return (
+        <td
+          key={`${s.subjectId}-${col.name}`}
+          style={{
+            textAlign: 'center',
+            fontWeight: cell.hasData ? 800 : 400,
+            color: cell.hasData ? NAVY : '#94a3b8',
+          }}
+        >
+          {cell.text}
+        </td>
+      );
+    });
+  }
+
+  function renderSectionHeader(label: string) {
+    return (
+      <tr key={label} className="section-row">
+        <td colSpan={singleTermColCount}>{label}</td>
+      </tr>
+    );
+  }
+
+  function renderSubjectRow(s: ReportSubject) {
     if (isSingleTermReport) {
-      const max = s.totalMax ?? s.defaultCourseMarks ?? 100;
-      const provisional = s.marksEntered && s.courseComplete === false;
-      const courseResult = s.marksEntered ? formatMarkFraction(s.totalScore, max) : '—';
-      const pct = s.marksEntered
-        ? `${Math.round(s.percentage * 10) / 10}%${provisional ? '*' : ''}`
-        : '—';
-      const pos =
-        s.rank != null && s.classSize != null ? `${s.rank}/${s.classSize}` : provisional ? '—' : '—';
-      const courseResultTitle = provisional
-        ? `Provisional total (sum of entered components). Pending: ${(s.missingComponents ?? []).join(', ') || 'components'}`
-        : 'Sum of converted component scores on course scale';
+      const gradeCell = subjectGradeDisplay(s);
+      const total = getSubjectTotalCell(s, termColumns, useTermResults);
       return (
         <tr key={s.subjectId} className="course-row">
-          <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', width: 36 }}>{rowNum}</td>
           <td className="course-col">{s.subject}</td>
-          <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>{subjectDefaultMarks(s, report)}</td>
-          {componentColumns.map((col) => {
-            const cell = componentCellDisplay(s, col.name);
-            return (
-              <td
-                key={col.name}
-                title={cell.title}
-                style={{
-                  textAlign: 'center',
-                  fontWeight: cell.hasData ? 600 : 400,
-                  color: cell.hasData ? '#0f172a' : '#cbd5e1',
-                  lineHeight: 1.25,
-                }}
-              >
-                {cell.text}
-                {cell.sub ? (
-                  <div style={{ fontSize: '0.5625rem', fontWeight: 500, color: '#94a3b8', marginTop: 2 }}>
-                    {cell.sub}
-                  </div>
-                ) : null}
-              </td>
-            );
-          })}
-          <td
-            title={courseResultTitle}
-            style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? '#000435' : '#94a3b8' }}
-          >
-            {courseResult}
-            {provisional ? (
-              <div style={{ fontSize: '0.5625rem', fontWeight: 600, color: '#d97706' }}>Partial</div>
-            ) : null}
+          <td style={{ textAlign: 'center', fontWeight: 700, color: '#475569' }}>{subjectDefaultMarks(s, report)}</td>
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>
+            {subjectStudentMarks(s)}
           </td>
-          <td
-            title={provisional ? 'Based on entered components only; not final until all template components are recorded' : undefined}
-            style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? '#000435' : '#94a3b8' }}
-          >
-            {pct}
-          </td>
-          <td style={{ textAlign: 'center', fontWeight: 600, color: s.marksEntered ? '#334155' : '#94a3b8' }}>{pos}</td>
-          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? '#000435' : '#94a3b8' }}>
-            {s.grade ?? '—'}
-          </td>
+          {renderTemplateComponentCells(s)}
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>{total.marks}</td>
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>{gradeCell}</td>
         </tr>
       );
     }
     const total = getSubjectTotalCell(s, termColumns, useTermResults);
     return (
       <tr key={s.subjectId} className="course-row">
-        <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', width: 40 }}>{rowNum}</td>
         <td className="course-col">{s.subject}</td>
         {termColumns.map((termLabel) => renderTermPairCells(s, termLabel))}
-        <td style={{ textAlign: 'center', fontWeight: 700, color: total.marks !== '—' ? '#0f172a' : '#94a3b8' }}>{total.marks}</td>
-        <td style={{ textAlign: 'center', fontWeight: 800, color: total.grade !== '—' ? '#000435' : '#94a3b8' }}>{total.grade}</td>
+        <td style={{ textAlign: 'center', fontWeight: 800, color: total.marks !== NOT_RECORDED ? NAVY : '#94a3b8' }}>{total.marks}</td>
+        <td style={{ textAlign: 'center', fontWeight: 800, color: total.grade !== NOT_RECORDED ? NAVY : '#94a3b8' }}>{total.grade}</td>
       </tr>
     );
   }
 
-  function renderSubjectSections() {
-    const blocks: ReactNode[] = [];
-    let rowNum = 0;
-    const pushSection = (header: string, items: ReportSubject[], headerKey: string) => {
-      if (!items.length) return;
-      blocks.push(<SectionHeaderRow key={headerKey} label={header} colSpan={tableColSpan} />);
-      items.forEach((s) => {
-        rowNum += 1;
-        blocks.push(renderSubjectRow(s, rowNum));
-      });
-    };
-    pushSection('CORE SUBJECTS', coreSubjects, 'core-h');
-    pushSection('NON-CORE SUBJECTS', nonCoreSubjects, 'noncore-h');
-    if (!coreSubjects.length && !nonCoreSubjects.length) {
-      report.subjects.forEach((s) => {
-        rowNum += 1;
-        blocks.push(renderSubjectRow(s, rowNum));
-      });
-    }
-    return blocks;
-  }
+  const overallAverageDisplay = report.subjects.some((s) => s.marksEntered)
+    ? `${report.overallScore.toFixed(2)}%`
+    : NOT_RECORDED;
+  const subjectTotals = report.subjects
+    .map((subject) => getSubjectTotalAmounts(subject, termColumns, useTermResults))
+    .filter((total): total is { score: number; max: number; grade: string } => total != null);
+  const overallMarksDisplay = formatMarkRatio(
+    subjectTotals.reduce((sum, total) => sum + total.score, 0),
+    subjectTotals.reduce((sum, total) => sum + total.max, 0)
+  );
 
   return (
-    <Box
-      ref={rootRef}
-      className="modern-report-card report-a4-document"
-      sx={{
-        width: '100%',
-        maxWidth: 794,
-        mx: 'auto',
-        bgcolor: '#fff',
-        color: '#0f172a',
-        fontFamily: "'Montserrat', system-ui, sans-serif",
-        boxShadow: { xs: 'none', md: '0 8px 40px rgba(0,4,53,0.08)' },
-        border: { xs: 'none', md: '1px solid #e2e8f0' },
-        borderRadius: { xs: 0, md: '4px' },
-        overflow: 'hidden',
-      }}
-    >
-      <Box sx={{ px: { xs: 2, md: 3 }, pt: 2.5, pb: 2, borderBottom: '3px solid #000435' }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-          {school?.logoUrl ? (
-            <Box component="img" src={school.logoUrl} alt="" sx={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
-          ) : null}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontSize: { xs: '1rem', md: '1.125rem' }, fontWeight: 800, color: '#000435', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-              {school?.name || 'School'}
-            </Typography>
-            {school?.motto ? (
-              <Typography sx={{ fontSize: '0.6875rem', color: '#64748b', fontStyle: 'italic', mt: 0.25 }}>{school.motto}</Typography>
-            ) : null}
-            {school?.address ? <Typography sx={{ fontSize: '0.6875rem', color: '#475569', mt: 0.75 }}>{school.address}</Typography> : null}
-            {contactParts.length ? (
-              <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2, fontSize: '0.625rem', color: '#64748b' }}>
-                {contactParts.map((line) => (
-                  <Box component="li" key={line} sx={{ mb: 0.15 }}>
-                    {line}
-                  </Box>
-                ))}
-              </Box>
-            ) : null}
-          </Box>
-        </Box>
-        <Box
-          sx={{
-            mt: 2,
-            pt: 1.5,
-            borderTop: '1px solid #e2e8f0',
-            textAlign: 'center',
-          }}
-        >
-          <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.14em', color: '#000435' }}>
-            STUDENT ACADEMIC REPORT
-          </Typography>
-          <Typography sx={{ fontSize: '0.75rem', color: '#475569', mt: 0.5 }}>
-            Academic year {report.academicYear}
-            {report.term ? `  ·  ${report.term}` : ''}
-          </Typography>
-          {reportDate ? (
-            <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8', mt: 0.25 }}>Generated {reportDate}</Typography>
-          ) : null}
-        </Box>
-      </Box>
-
+    <Box sx={{ width: '100%', maxWidth: A4_WIDTH_PX, mx: 'auto', p: { xs: 0, md: 1 }, '@media print': { p: 0 } }}>
       <Box
+        ref={rootRef}
+        data-report-verify-url={verifyUrl || undefined}
+        className="modern-report-card midterm-report-card report-a4-document report-a4-babyeyi-frame"
         sx={{
-          px: { xs: 2, md: 3 },
-          py: 2,
-          bgcolor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          width: '100%',
+          maxWidth: A4_WIDTH_PX,
+          mx: 'auto',
+          boxSizing: 'border-box',
+          bgcolor: '#fff',
+          color: '#0f172a',
+          fontFamily: "'Montserrat', system-ui, sans-serif",
+          border: '2px solid #000000',
+          borderRadius: '14px',
+          p: '3px',
+          boxShadow: { xs: 'none', md: '0 2px 12px rgba(0, 4, 53, 0.06)' },
+          '@media print': { boxShadow: 'none' },
         }}
       >
         <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: '88px 1fr' },
-            gap: 2,
-            alignItems: 'start',
-          }}
+          className="report-a4-babyeyi-frame-inner"
+          sx={{ border: `1.5px solid ${AMBER}`, borderRadius: '11px', boxSizing: 'border-box', overflow: 'hidden' }}
         >
-          {(report.student as { photoUrl?: string })?.photoUrl ? (
+          <ReportSchoolHeader
+            compact
+            school={school}
+            reportTitle="STUDENT ACADEMIC REPORT"
+            reportSubtitle={`${report.academicYear}${report.term ? ` · ${report.term}` : ''}`}
+          />
+
+          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderBottom: '1px solid #e2e8f0' }}>
             <Box
-              component="img"
-              src={(report.student as { photoUrl?: string }).photoUrl!}
-              alt=""
-              sx={{ width: 88, height: 104, objectFit: 'cover', borderRadius: '6px', border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
-            />
-          ) : (
-            <Box sx={{ width: 88, height: 104, borderRadius: '6px', bgcolor: '#e2e8f0', display: { xs: 'none', sm: 'block' } }} />
-          )}
-          <Box sx={{ overflowX: 'auto' }}>
-            <Typography sx={{ fontSize: '1.0625rem', fontWeight: 800, color: '#000435', mb: 1 }}>{studentName}</Typography>
-            <Box
-              component="table"
               sx={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '0.75rem',
-                '& th, & td': {
-                  border: '1px solid #e2e8f0',
-                  px: 1.25,
-                  py: 0.75,
-                  textAlign: 'left',
-                },
-                '& th': {
-                  bgcolor: '#fff',
-                  color: '#64748b',
-                  fontWeight: 700,
-                  width: '32%',
-                  fontSize: '0.6875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                },
-                '& td': { bgcolor: '#fff', color: '#0f172a', fontWeight: 600 },
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' },
+                gap: 2,
+                alignItems: 'stretch',
               }}
             >
-              <tbody>
-                <tr>
-                  <th scope="row">Student code</th>
-                  <td>{studentIdLabel}</td>
-                  <th scope="row">Class</th>
-                  <td>{report.class?.name || '—'}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Stream</th>
-                  <td>{report.class?.stream || '—'}</td>
-                  <th scope="row">Gender</th>
-                  <td>{report.student?.gender || '—'}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Date of birth</th>
-                  <td>{fmtDate(report.student?.dateOfBirth) || '—'}</td>
-                  <th scope="row">Academic year</th>
-                  <td>{report.academicYear}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Term</th>
-                  <td colSpan={3}>{report.term || '—'}</td>
-                </tr>
-              </tbody>
+              <Box
+                sx={{
+                  width: 92,
+                  alignSelf: 'stretch',
+                  minHeight: 104,
+                  position: 'relative',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  border: '1px solid #cbd5e1',
+                  bgcolor: '#e2e8f0',
+                  mx: { xs: 'auto', sm: 0 },
+                }}
+              >
+                {photoUrl ? (
+                  <Box component="img" src={photoUrl} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: NAVY,
+                      fontWeight: 800,
+                      fontSize: '1.25rem',
+                    }}
+                  >
+                    {studentName
+                      .split(/\s+/)
+                      .map((w) => w[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </Box>
+                )}
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Learner
+                </Typography>
+                <Typography sx={{ fontWeight: 800, fontSize: '1.125rem', color: NAVY, lineHeight: 1.25, mt: 0.25 }}>
+                  {studentName}
+                </Typography>
+                <Box
+                  component="table"
+                  sx={{
+                    width: '100%',
+                    mt: 0.75,
+                    borderCollapse: 'collapse',
+                    fontSize: '0.6875rem',
+                    '& td': { py: 0.45, verticalAlign: 'top' },
+                    '& td:first-of-type': { color: '#64748b', fontWeight: 700, width: '38%', pr: 1, whiteSpace: 'nowrap' },
+                    '& td:last-of-type': { fontWeight: 600, color: NAVY },
+                  }}
+                >
+                  <tbody>
+                    {profileCells.map((cell) => (
+                      <tr key={cell.label}>
+                        <td>{cell.label}</td>
+                        <td>{cell.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Box>
+              </Box>
             </Box>
           </Box>
-        </Box>
-        {(report.student as { parentGuardian?: string })?.parentGuardian ? (
-          <Typography sx={{ fontSize: '0.75rem', color: '#475569', mt: 1.5 }}>
-            <Box component="span" sx={{ color: '#94a3b8', fontWeight: 700, mr: 0.5 }}>Guardian</Box>
-            {(report.student as { parentGuardian?: string }).parentGuardian}
-          </Typography>
-        ) : null}
-      </Box>
 
-      <Box sx={{ px: { xs: 1, md: 2 }, py: 2 }}>
-        <Box sx={{ overflowX: 'auto' }}>
+      <Box sx={{ px: { xs: 1.5, md: 2.5 }, py: 1.25 }}>
+        <SectionTitle centered>Subject performance</SectionTitle>
+        <Box sx={{ overflowX: 'auto', mt: 1 }}>
           <Box
             component="table"
             sx={{
               width: '100%',
-              minWidth: isSingleTermReport ? 720 : 560,
+              minWidth: isSingleTermReport ? 560 : 560,
               borderCollapse: 'collapse',
               fontSize: '0.75rem',
               '& th': {
-                bgcolor: '#000435',
-                color: '#fff',
+                bgcolor: '#f8fafc',
+                color: NAVY,
+                py: 0.65,
+                px: 1,
                 fontWeight: 700,
                 fontSize: '0.625rem',
+                letterSpacing: '0.05em',
                 textTransform: 'uppercase',
-                py: 0.85,
-                px: 0.75,
-                borderBottom: '1px solid rgba(255,255,255,0.12)',
+                borderBottom: '1px solid #e2e8f0',
               },
-              '& td': { py: 0.65, px: 0.75, borderBottom: '1px solid #eef2f6' },
-              '& tbody tr.course-row:nth-of-type(even) td': { bgcolor: '#f8fafc' },
-              '& tbody tr.section-header-row td': { bgcolor: '#FCB038 !important', borderBottom: '1px solid #e2a020' },
-              '& .course-col': {
-                textAlign: 'left',
-                fontWeight: 700,
-                color: '#000435',
-                minWidth: 140,
+              '& td': { py: 0.45, px: 1, borderBottom: '1px solid #eef2f6' },
+              '& tfoot td': {
+                py: 0.55,
+                px: 1,
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                bgcolor: '#f8fafc',
+                color: '#0f172a',
+                borderTop: '1px solid #cbd5e1',
+                borderBottom: 'none',
               },
-              '& .term-group': { borderLeft: '1px solid rgba(255,255,255,0.15)' },
+              '& .course-col': { textAlign: 'left', fontWeight: 700, color: NAVY, minWidth: 120 },
+              '& .section-row td': {
+                bgcolor: '#f1f5f9',
+                color: NAVY,
+                fontWeight: 800,
+                fontSize: '0.625rem',
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #cbd5e1',
+                py: 0.55,
+              },
             }}
           >
             <thead>
               {isSingleTermReport ? (
                 <>
                   <tr>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', width: 36 }}>
-                      #
-                    </th>
                     <th className="course-col" rowSpan={2} style={{ textAlign: 'left', verticalAlign: 'middle' }}>
-                      Course
+                      Subject
+                    </th>
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 52, verticalAlign: 'middle' }}>
+                      Default
                     </th>
                     <th
                       rowSpan={2}
-                      title="Course total marks from catalog (sum of component columns equals this when all are entered)"
-                      style={{ textAlign: 'center', verticalAlign: 'middle', width: 56 }}
+                      style={{ textAlign: 'center', width: 88, verticalAlign: 'middle' }}
+                      title="All quiz/CAT/exam marks from TichaPortal converted to course DEFAULT"
                     >
-                      Default
+                      Student marks
                     </th>
                     {componentColumns.length > 0 ? (
-                      <th colSpan={componentColumns.length} style={{ textAlign: 'center', background: '#0f172a' }}>
-                        Assessment components
+                      <th
+                        colSpan={componentColumns.length}
+                        style={{ textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}
+                        title="Marks on each template component cap (weight %)"
+                      >
+                        Component marks
                       </th>
                     ) : null}
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', minWidth: 72 }}>
-                      Course result
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 64, verticalAlign: 'middle' }}>
+                      Total marks
                     </th>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', width: 64 }}>
-                      Total %
-                    </th>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', width: 64 }}>
-                      Position
-                    </th>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', width: 52 }}>
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 52, verticalAlign: 'middle' }}>
                       Grade
                     </th>
                   </tr>
@@ -701,262 +697,195 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
                     {componentColumns.map((col) => (
                       <th
                         key={col.name}
-                        title={componentHeaderHint(col.weight)}
-                        style={{
-                          textAlign: 'center',
-                          fontSize: '0.5625rem',
-                          fontWeight: 700,
-                          background: '#0f172a',
-                          letterSpacing: '0.04em',
-                          lineHeight: 1.25,
-                        }}
+                        style={{ textAlign: 'center', fontSize: '0.5625rem' }}
+                        title={`${col.name} on component maximum`}
                       >
-                        {componentHeaderLabel(col.name, col.weight)}
-                        <div style={{ fontSize: '0.5rem', fontWeight: 500, opacity: 0.75, marginTop: 2 }}>
-                          {componentHeaderHint(col.weight)}
-                        </div>
+                        {col.name}
                       </th>
                     ))}
                   </tr>
                 </>
               ) : (
-                <>
-                  <tr>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle', width: 40 }}>
-                      #
-                    </th>
-                    <th className="course-col" rowSpan={2} style={{ textAlign: 'left', verticalAlign: 'middle' }}>
-                      Course
-                    </th>
-                    {termColumns.map((term) => (
-                      <th key={term} colSpan={2} className="term-group" style={{ textAlign: 'center' }}>
-                        {term}
-                      </th>
-                    ))}
-                    <th colSpan={2} style={{ textAlign: 'center', background: '#1e293b' }}>
-                      Total
-                    </th>
-                  </tr>
-                  <tr>
-                    {termColumns.map((term) => (
-                      <Fragment key={`${term}-sub`}>
-                        <th style={{ textAlign: 'center', fontSize: '0.5625rem', fontWeight: 600 }}>Marks</th>
-                        <th style={{ textAlign: 'center', fontSize: '0.5625rem', fontWeight: 600 }}>Grade</th>
-                      </Fragment>
-                    ))}
-                    <th style={{ textAlign: 'center', fontSize: '0.5625rem', fontWeight: 600, background: '#1e293b' }}>Marks</th>
-                    <th style={{ textAlign: 'center', fontSize: '0.5625rem', fontWeight: 600, background: '#1e293b' }}>Grade</th>
-                  </tr>
-                </>
+                <tr>
+                  <th className="course-col" style={{ textAlign: 'left' }}>
+                    Subject
+                  </th>
+                  {termColumns.map((term) => (
+                    <Fragment key={term}>
+                      <th style={{ textAlign: 'center' }}>{term}</th>
+                      <th style={{ textAlign: 'center', width: 52 }}>Gr</th>
+                    </Fragment>
+                  ))}
+                  <th style={{ textAlign: 'center', width: 72 }}>Total marks</th>
+                  <th style={{ textAlign: 'center', width: 56 }}>Grade</th>
+                </tr>
               )}
             </thead>
             <tbody>
-              {renderSubjectSections()}
-              <tr className="overall-row">
+              {isSingleTermReport ? (
+                <>
+                  {coreSubjects.length ? renderSectionHeader('CORE COURSES') : null}
+                  {coreSubjects.map((s) => renderSubjectRow(s))}
+                  {nonCoreSubjects.length ? renderSectionHeader('NON-CORE COURSES') : null}
+                  {nonCoreSubjects.map((s) => renderSubjectRow(s))}
+                  {!coreSubjects.length && !nonCoreSubjects.length
+                    ? sortedSubjects.map((s) => renderSubjectRow(s))
+                    : null}
+                </>
+              ) : (
+                sortedSubjects.map((s) => renderSubjectRow(s))
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
                 {isSingleTermReport ? (
                   <>
-                    <td colSpan={3} style={{ fontWeight: 800, background: '#000435', color: '#fff' }}>
-                      Overall
-                    </td>
+                    <td style={{ textAlign: 'left' }}>Total</td>
+                    <td style={{ textAlign: 'center' }}>—</td>
+                    <td style={{ textAlign: 'center', color: '#94a3b8' }}>—</td>
                     {componentColumns.map((col) => (
-                      <td key={col.name} style={{ textAlign: 'center', background: '#000435', color: '#64748b' }}>
-                        /
+                      <td key={`foot-${col.name}`} style={{ textAlign: 'center', color: '#94a3b8' }}>
+                        —
                       </td>
                     ))}
-                    <td style={{ textAlign: 'center', fontWeight: 800, background: '#000435', color: '#fff' }}>
-                      {totalMax ? formatMarkFraction(totalMarks, totalMax) : '—'}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 800, background: '#000435', color: '#fff' }}>
-                      {Math.round(report.overallScore * 10) / 10}%
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700, background: '#000435', color: '#fff' }}>
-                      {report.position}/{report.classSize}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 800, background: '#FCB038', color: '#000435' }}>
-                      {overallGradeDisplay}
-                    </td>
+                    <td style={{ textAlign: 'center' }}>{overallMarksDisplay}</td>
+                    <td style={{ textAlign: 'center' }}>{overallGradeDisplay}</td>
                   </>
                 ) : (
                   <>
-                    <td colSpan={2} style={{ fontWeight: 800, background: '#000435', color: '#fff' }}>
-                      Overall
-                    </td>
+                    <td style={{ textAlign: 'left' }}>Total</td>
                     {termColumns.map((term) => (
-                      <Fragment key={`${term}-overall`}>
-                        <td style={{ textAlign: 'center', background: '#000435', color: '#fff' }}>—</td>
-                        <td style={{ textAlign: 'center', background: '#000435', color: '#fff' }}>—</td>
+                      <Fragment key={`${term}-foot`}>
+                        <td style={{ textAlign: 'center', color: '#94a3b8' }}>—</td>
+                        <td style={{ textAlign: 'center', color: '#94a3b8' }}>—</td>
                       </Fragment>
                     ))}
-                    <td style={{ textAlign: 'center', fontWeight: 800, background: '#000435', color: '#fff' }}>
-                      {totalMax ? formatMarkFraction(totalMarks, totalMax) : `${report.overallScore}%`}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 800, background: '#FCB038', color: '#000435' }}>
-                      {overallGradeDisplay}
-                    </td>
+                    <td style={{ textAlign: 'center' }}>{overallMarksDisplay}</td>
+                    <td style={{ textAlign: 'center' }}>{overallGradeDisplay}</td>
                   </>
                 )}
               </tr>
-            </tbody>
+            </tfoot>
           </Box>
         </Box>
-      </Box>
-
-      {gradingLegend.length > 0 && (
-        <Box
-          sx={{
-            px: { xs: 2, md: 3 },
-            pb: 1.5,
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            gap: { xs: 1, sm: 2 },
-          }}
-        >
-          {gradingLegend.map((g) => (
-            <Typography key={g.grade} sx={{ fontSize: '0.5625rem', color: '#64748b' }}>
-              <Box component="span" sx={{ fontWeight: 800, color: '#334155' }}>
-                {g.grade}
-              </Box>{' '}
-              {g.minPercentage}–{g.maxPercentage}%
-            </Typography>
-          ))}
-        </Box>
-      )}
-
-      <Box sx={{ px: { xs: 2, md: 3 }, pb: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' }, gap: 1 }}>
-          {[
-            { l: 'Position', v: `${report.position}/${report.classSize}`, accent: '#000435' },
-            { l: 'Average', v: `${report.overallScore}%`, accent: '#FCB038' },
-            { l: 'Total', v: totalMax ? formatMarkFraction(totalMarks, totalMax) : '—', accent: '#000435' },
-            { l: 'Attendance', v: report.attendance?.rate != null ? `${report.attendance.rate}%` : '—', accent: '#000435' },
-            { l: 'Courses', v: `${coursesWithMarks}/${report.subjects.length}`, accent: '#000435' },
-            { l: 'Grade', v: overallGradeDisplay, accent: '#FCB038' },
-          ].map((k) => (
-            <Box key={k.l} sx={{ textAlign: 'center', px: 1, py: 0.75, bgcolor: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-              <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{k.l}</Typography>
-              <Typography sx={{ fontSize: '0.9375rem', fontWeight: 800, color: k.accent ?? '#000435' }}>{k.v}</Typography>
-            </Box>
-          ))}
-        </Box>
-      </Box>
-
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderTop: '1px solid #e2e8f0', bgcolor: '#fafbfc' }}>
-        <Typography sx={{ fontSize: '0.625rem', fontWeight: 800, color: '#000435', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
-          Term performance
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr' },
-            gap: 2,
-            alignItems: 'stretch',
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column', bgcolor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', p: 2 }}>
-            {termPoints.length ? (
-              <>
-                <TermBarChart points={termPoints} currentTerm={report.term} />
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${Math.min(termPoints.length, 3)}, 1fr)`,
-                    gap: 1,
-                    mt: 2,
-                  }}
-                >
-                  {termPoints.map((t) => {
-                    const current = isCurrentTerm(t.label, report.term);
-                    return (
-                      <Box
-                        key={t.label}
-                        sx={{
-                          textAlign: 'center',
-                          py: 1,
-                          px: 0.5,
-                          borderRadius: '6px',
-                          border: current ? '2px solid #FCB038' : '1px solid #e2e8f0',
-                          bgcolor: current ? 'rgba(252,176,56,0.08)' : '#fff',
-                        }}
-                      >
-                        <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8' }}>{t.label}</Typography>
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#000435' }}>{t.value}%</Typography>
-                        {current ? (
-                          <Typography sx={{ fontSize: '0.5rem', fontWeight: 700, color: '#c87800' }}>Current</Typography>
-                        ) : null}
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </>
-            ) : (
-              <Typography sx={{ fontSize: '0.8125rem', color: '#94a3b8', py: 2, textAlign: 'center' }}>
-                Term trend appears when marks exist for more than one term.
+        {gradingLegend.length > 0 ? (
+          <Box sx={{ mt: 1, px: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {gradingLegend.slice(0, 12).map((g) => (
+              <Typography key={g.grade} sx={{ fontSize: '0.5625rem', color: '#64748b' }}>
+                <Box component="span" sx={{ fontWeight: 800, color: NAVY }}>
+                  {g.grade}
+                </Box>{' '}
+                {g.minPercentage}–{g.maxPercentage}%
               </Typography>
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: { md: 220 } }}>
-            <CourseList title="Performed well" items={strong} variant="strong" />
-            <CourseList title="Needs improvement" items={improve} variant="improve" />
-          </Box>
-        </Box>
-      </Box>
-
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderTop: '1px solid #e2e8f0' }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, alignItems: 'stretch' }}>
-          <Box sx={{ border: '1px solid #e2e8f0', borderRadius: '8px', p: 2, minHeight: 160, display: 'flex', flexDirection: 'column' }}>
-            <Typography sx={{ fontSize: '0.5625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>Class teacher</Typography>
-            <Typography sx={{ fontSize: '0.8125rem', lineHeight: 1.55, color: '#334155', flex: 1, minHeight: 72 }}>
-              {classTeacherComment || ' '}
-            </Typography>
-            <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid #e2e8f0' }}>
-              <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>Signature</Typography>
-            </Box>
-          </Box>
-          <Box sx={{ border: '1px solid #e2e8f0', borderRadius: '8px', p: 2, minHeight: 160, display: 'flex', flexDirection: 'column' }}>
-            <Typography sx={{ fontSize: '0.5625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>Head teacher</Typography>
-            <Typography sx={{ fontSize: '0.8125rem', lineHeight: 1.55, color: '#334155', flex: 1, minHeight: 72 }}>
-              {headTeacherComment || ' '}
-            </Typography>
-            <Box sx={{ mt: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, borderTop: '1px solid #e2e8f0', pt: 1 }}>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>Signature</Typography>
-                {school?.signatureUrl ? (
-                  <Box component="img" src={school.signatureUrl} alt="" sx={{ maxHeight: 40, maxWidth: 120, objectFit: 'contain', mt: 0.5 }} />
-                ) : null}
-              </Box>
-              {school?.stampUrl ? (
-                <Box component="img" src={school.stampUrl} alt="" sx={{ maxHeight: 48, maxWidth: 48, objectFit: 'contain', opacity: 0.9 }} />
-              ) : null}
-            </Box>
-          </Box>
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          px: { xs: 2, md: 3 },
-          py: 1.5,
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-        }}
-      >
-        <Typography sx={{ fontSize: '0.625rem', color: '#64748b' }}>Parent / guardian · signature · date</Typography>
-        {verifyUrl ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ReportQrCode value={verifyUrl} size={64} />
-            <Typography sx={{ fontSize: '0.5rem', color: '#94a3b8', maxWidth: 80 }}>Scan to verify</Typography>
+            ))}
           </Box>
         ) : null}
       </Box>
 
-      <Box sx={{ px: 3, py: 1.25, bgcolor: '#000435', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>Generated by Shule+</Typography>
-        <Typography sx={{ fontSize: '0.5625rem', color: 'rgba(255,255,255,0.65)' }}>{reportDate}</Typography>
+      <Box className="report-section-overview" sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+        <SectionTitle>Academic performance overview</SectionTitle>
+        <Box
+          className="report-overview-grid"
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+            gap: 1.5,
+            mt: 1,
+            alignItems: 'stretch',
+          }}
+        >
+          <Box className="report-overview-stats" sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, alignContent: 'start' }}>
+            <OverviewStatCard label="Class position" value={positionDisplay} />
+            <OverviewStatCard label="Percentage" value={overallAverageDisplay} />
+          </Box>
+          <Box
+            className="report-overview-chart"
+            sx={{
+              bgcolor: '#f8fafc',
+              borderRadius: 1,
+              border: '1px solid #e2e8f0',
+              p: 1.5,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 140,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '0.5625rem',
+                fontWeight: 800,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                mb: 1,
+                textAlign: 'center',
+              }}
+            >
+              Percentage marks
+            </Typography>
+            {termAverageBars.length ? (
+              <TermBarChart points={termAverageBars} currentTerm={report.term} />
+            ) : (
+              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', py: 1 }}>{NOT_RECORDED}</Typography>
+            )}
+          </Box>
+        </Box>
+      </Box>
+
+      <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+        <Box className="report-teacher-signatures" sx={{ mt: 1.25 }}>
+          <Box sx={{ border: '1px solid #94a3b8', borderRadius: 0.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid #94a3b8', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Class Teacher's Comment</Box>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.75rem', color: '#334155' }}>{classTeacherComment || '\u00A0'}</Box>
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid #94a3b8', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Class teacher's signature</Box>
+              <Box sx={{ px: 1, py: 0.75 }} />
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Parent's Signature</Box>
+              <Box sx={{ px: 1, py: 0.75 }} />
+            </Box>
+          </Box>
+          {headTeacherComment ? (
+            <Box sx={{ mt: 1, fontSize: '0.6875rem', color: '#334155' }}>
+              <Box component="span" sx={{ fontWeight: 800, color: NAVY }}>Head teacher comment: </Box>{headTeacherComment}
+            </Box>
+          ) : null}
+        </Box>
+</Box>
+
+              <Box
+          className="report-section-verify"
+          sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}
+        >
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' }, alignItems: 'center', gap: 2 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '0.625rem', fontWeight: 800, color: NAVY }}>{footerRoleLabel} Signature &amp; Stamp</Typography>
+              <Box sx={{ minHeight: 40, borderBottom: '1px solid #94a3b8', mt: 0.5, maxWidth: 320, mx: 'auto' }} />
+              <Typography sx={{ fontSize: '0.5625rem', color: '#000435', fontWeight: 700, mt: 0.5 }}>{footerName}</Typography>
+              {reportDate ? (
+                <Typography sx={{ fontSize: '0.5625rem', color: '#94a3b8', mt: 0.5 }}>Issued on {reportDate}</Typography>
+              ) : null}
+            </Box>
+            {verifyUrl ? (
+              <Box
+                className="report-qr-block"
+                data-verify-url={verifyUrl}
+                sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
+              >
+                <ReportQrCode value={verifyUrl} size={68} />
+                <Typography sx={{ fontSize: '0.5625rem', fontWeight: 600, color: NAVY }}>Scan to verify</Typography>
+              </Box>
+            ) : null}
+          </Box>
+        </Box>
+
+      <Box sx={{ py: 0.65, textAlign: 'center', borderTop: '1px solid #e2e8f0' }}>
+        <Typography sx={{ fontSize: '0.5625rem', color: '#94a3b8', fontWeight: 600 }}>Shule+ · Term report</Typography>
+      </Box>
+        </Box>
       </Box>
     </Box>
   );

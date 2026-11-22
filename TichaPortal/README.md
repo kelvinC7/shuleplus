@@ -73,3 +73,12 @@ curl http://localhost:4000/api/health
 ## Linked modules
 
 The BFF reads URLs from `backend/.env` (see `backend/src/lib/env.js`). Teacher features call Timetable, Student Management, Academic, HR, Payroll, etc. through this layer — **not** the legacy TeacherPortal app on :3009.
+
+## PWA
+
+- `public/manifest.webmanifest` + `public/icons/*` — install metadata and icons.
+- `public/sw.js` — app-shell caching + Web Push. API calls are never cached. Bump `VERSION` to force a cache refresh.
+- `src/utils/pwa.js` — install detection (iOS / Android / desktop), snooze logic, SW registration.
+- `src/components/PwaPrompts.jsx` — install dialog (with iOS Add-to-Home-Screen guide) and "new version" banner.
+- Re-open the dialog from anywhere (e.g. a sidebar "Install app" item): `window.dispatchEvent(new Event('ticha:open-install-guide'))`.
+- The service worker only registers in production builds: test with `npm run build && npm run preview`. Needs HTTPS (or localhost).

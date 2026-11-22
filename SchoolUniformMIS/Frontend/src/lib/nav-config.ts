@@ -40,15 +40,6 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    id: "products",
-    title: "Products",
-    icon: Shirt,
-    items: [
-      { href: "/products", label: "Uniform Items", icon: Shirt },
-      { href: "/packages", label: "Packages", icon: Package },
-    ],
-  },
-  {
     id: "fabric",
     title: "Fabric",
     icon: Layers,
@@ -70,7 +61,10 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "inventory",
     title: "Inventory",
     icon: Warehouse,
-    items: [{ href: "/stock", label: "Stock", icon: Warehouse }],
+    items: [
+      { href: "/stock", label: "Stock", icon: Warehouse },
+      { href: "/products", label: "Uniform Items", icon: Shirt },
+    ],
   },
   {
     id: "students",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { CalendarDays, FileSpreadsheet, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PlatformPageLayout } from "@/components/platform-page-layout";
 import {
@@ -9,12 +9,17 @@ import {
   type PlatformTableColumn,
 } from "@/components/platform-data-table";
 import {
+  DateRangeFilter,
   ListFilterBar,
+  ListKpiStrip,
   ListToolbar,
   StatusBadge,
+  inDateRange,
   timeAgo,
 } from "@/components/list-ui";
+import { useAuth } from "@/contexts/auth-context";
 import { usePagedRows } from "@/hooks/use-paged-rows";
+import { exportToExcel, exportToPdf } from "@/lib/export-utils";
 import { uniformApi } from "@/services/uniform-api";
 import type {
   PaymentStatus,
@@ -35,13 +40,70 @@ function paymentLabel(status: PaymentStatus) {
   return "Pending";
 }
 
+function money(n: number) {
+  return `${Math.round(n).toLocaleString("en-RW")} RWF`;
+}
+
+function startOfWeekMonday(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfWeekSunday(d: Date) {
+  const start = startOfWeekMonday(d);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function toISODate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function weekLabelForDate(dateStr: string) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  const start = startOfWeekMonday(d);
+  const end = endOfWeekSunday(d);
+  return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+}
+
+function inSpecificDate(iso: string | null | undefined, dateStr: string) {
+  if (!dateStr) return true;
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return toISODate(d) === dateStr;
+}
+
 export function SalesView() {
+  const { user, summary } = useAuth();
+  const orgName =
+    (summary as { organizationName?: string } | null)?.organizationName ??
+    "ShulePlus Uniforms";
+
   const [rows, setRows] = useState<UniformSale[]>([]);
   const [stock, setStock] = useState<StockBalance[]>([]);
   const [students, setStudents] = useState<UniformStudent[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [specificDate, setSpecificDate] = useState("");
+  const [weekDate, setWeekDate] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<"pdf" | "excel" | "week" | null>(
+    null,
+  );
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     customerType: "WALK_IN",
@@ -106,10 +168,19 @@ export function SalesView() {
     }
   }
 
+  const effectiveFrom = weekDate
+    ? toISODate(startOfWeekMonday(new Date(`${weekDate}T00:00:00`)))
+    : dateFrom;
+  const effectiveTo = weekDate
+    ? toISODate(endOfWeekSunday(new Date(`${weekDate}T00:00:00`)))
+    : dateTo;
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (statusFilter && r.paymentStatus !== statusFilter) return false;
+      if (!inSpecificDate(r.createdAt, specificDate)) return false;
+      if (!inDateRange(r.createdAt, effectiveFrom, effectiveTo)) return false;
       if (!term) return true;
       const customer =
         r.customerName ||
@@ -118,7 +189,20 @@ export function SalesView() {
           : r.customerType);
       return `${r.invoiceNumber} ${customer}`.toLowerCase().includes(term);
     });
-  }, [rows, search, statusFilter]);
+  }, [rows, search, statusFilter, specificDate, effectiveFrom, effectiveTo]);
+
+  const totals = useMemo(() => {
+    let totalAmount = 0;
+    let paidSales = 0;
+    let pendingSales = 0;
+    for (const r of filtered) {
+      totalAmount += Number(r.total) || 0;
+      if (r.paymentStatus === "PAID") paidSales += 1;
+      if (r.paymentStatus === "PENDING" || r.paymentStatus === "PARTIAL")
+        pendingSales += 1;
+    }
+    return { count: filtered.length, totalAmount, paidSales, pendingSales };
+  }, [filtered]);
 
   const { page, pageSize, totalPages, pageRows, setPage, setPageSize } =
     usePagedRows(filtered);
@@ -146,11 +230,18 @@ export function SalesView() {
       ),
     },
     {
+      key: "items",
+      header: "Items",
+      render: (r) => (
+        <span className="tabular-nums text-muted">{r.lines?.length ?? 0}</span>
+      ),
+    },
+    {
       key: "total",
       header: "Total",
       render: (r) => (
         <span className="font-semibold tabular-nums text-navy">
-          {Number(r.total).toLocaleString()} RWF
+          {money(Number(r.total))}
         </span>
       ),
     },
@@ -166,25 +257,183 @@ export function SalesView() {
     {
       key: "date",
       header: "Date",
-      render: (r) => <span className="text-muted">{timeAgo(r.createdAt)}</span>,
+      render: (r) => (
+        <div className="text-xs">
+          <p className="font-medium text-navy">
+            {new Date(r.createdAt).toLocaleDateString()}
+          </p>
+          <p className="text-muted">{timeAgo(r.createdAt)}</p>
+        </div>
+      ),
     },
   ];
+
+  function periodLabel() {
+    if (specificDate)
+      return `Date: ${new Date(`${specificDate}T00:00:00`).toLocaleDateString()}`;
+    if (weekDate) return `Week report: ${weekLabelForDate(weekDate)}`;
+    if (effectiveFrom || effectiveTo)
+      return `Period: ${effectiveFrom || "…"} to ${effectiveTo || "…"}`;
+    return "All dates";
+  }
+
+  function exportRowsData() {
+    return filtered.map((r) => ({
+      invoice: r.invoiceNumber,
+      date: new Date(r.createdAt).toLocaleString(),
+      customer:
+        r.customerName ||
+        (r.student
+          ? `${r.student.firstName} ${r.student.lastName}`
+          : r.customerType),
+      items: r.lines?.length ?? 0,
+      total: Math.round(Number(r.total) || 0),
+      status: paymentLabel(r.paymentStatus),
+    }));
+  }
+
+  const exportColumns = [
+    { header: "Invoice", accessor: "invoice" },
+    { header: "Date", accessor: "date" },
+    { header: "Customer", accessor: "customer" },
+    { header: "Items", accessor: "items" },
+    { header: "Total (RWF)", accessor: "total" },
+    { header: "Payment Status", accessor: "status" },
+  ];
+
+  const exportTotals = {
+    invoice: "TOTAL",
+    date: "",
+    customer: `${totals.count} sale(s)`,
+    items: filtered.reduce((s, r) => s + (r.lines?.length ?? 0), 0),
+    total: Math.round(totals.totalAmount),
+    status: "",
+  };
+
+  const exportSummary = [
+    { label: "Sales", value: String(totals.count) },
+    { label: "Total Amount", value: money(totals.totalAmount) },
+    { label: "Paid", value: String(totals.paidSales) },
+    { label: "Pending/Partial", value: String(totals.pendingSales) },
+  ];
+
+  async function handlePdf(weekMode = false) {
+    setExporting(weekMode ? "week" : "pdf");
+    try {
+      await exportToPdf({
+        title: weekMode ? "Sales Week Report" : "Sales Report",
+        subtitle: `${periodLabel()} · Uniform sales and payment summary`,
+        organizationName: orgName,
+        userName: user?.email || undefined,
+        columns: exportColumns,
+        data: exportRowsData(),
+        totals: exportTotals,
+        summary: exportSummary,
+        fileName: `${orgName}_${weekMode ? "sales_week_report" : "sales_report"}`,
+        orientation: "landscape",
+      });
+      toast.success(weekMode ? "Week report PDF exported" : "PDF exported");
+    } catch {
+      toast.error("PDF export failed");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  function handleExcel() {
+    setExporting("excel");
+    try {
+      exportToExcel({
+        title: "Sales Report",
+        subtitle: periodLabel(),
+        organizationName: orgName,
+        userName: user?.email || undefined,
+        columns: exportColumns,
+        data: exportRowsData(),
+        totals: exportTotals,
+        fileName: `${orgName}_sales_report`,
+      });
+      toast.success("Excel exported");
+    } catch {
+      toast.error("Excel export failed");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   return (
     <PlatformPageLayout
       title="Sales"
-      subtitle="Record walk-in and student sales with optional payments."
+      subtitle="Record, filter, and report walk-in and student uniform sales with modern exports."
       actions={
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => setOpen(true)}
-        >
-          <Plus className="h-4 w-4" /> New sale
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={!!exporting || filtered.length === 0}
+            onClick={() => void handlePdf(false)}
+          >
+            <FileText size={15} />
+            {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={!!exporting || filtered.length === 0 || !weekDate}
+            onClick={() => void handlePdf(true)}
+            title={
+              weekDate
+                ? `Week report: ${weekLabelForDate(weekDate)}`
+                : "Select a week date first"
+            }
+          >
+            <CalendarDays size={15} />
+            {exporting === "week" ? "Exporting…" : "Week Report"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={!!exporting || filtered.length === 0}
+            onClick={handleExcel}
+          >
+            <FileSpreadsheet size={15} />
+            {exporting === "excel" ? "Exporting…" : "Export Excel"}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setOpen(true)}
+          >
+            <Plus className="h-4 w-4" /> New sale
+          </button>
+        </div>
       }
     >
       <div className="space-y-4">
+        <ListKpiStrip
+          items={[
+            { label: "Sales", value: totals.count, hint: periodLabel() },
+            {
+              label: "Total Amount",
+              value: money(totals.totalAmount),
+              hint: "Filtered sales value",
+              tone: "text-navy",
+            },
+            {
+              label: "Paid",
+              value: totals.paidSales,
+              hint: "Fully paid sales",
+              tone: "text-emerald-700",
+            },
+            {
+              label: "Pending/Partial",
+              value: totals.pendingSales,
+              hint: "Need follow-up",
+              tone: "text-amber-700",
+            },
+          ]}
+        />
+
         <ListFilterBar
           search={search}
           onSearchChange={setSearch}
@@ -201,19 +450,77 @@ export function SalesView() {
                 { value: "PENDING", label: "Pending" },
               ],
             },
+            {
+              key: "date",
+              label: "Specific Date",
+              type: "date",
+              value: specificDate,
+              onChange: (v) => {
+                setSpecificDate(v);
+                if (v) {
+                  setWeekDate("");
+                  setDateFrom("");
+                  setDateTo("");
+                }
+              },
+            },
+            {
+              key: "week",
+              label: "Week (pick any day)",
+              type: "date",
+              value: weekDate,
+              onChange: (v) => {
+                setWeekDate(v);
+                if (v) {
+                  setSpecificDate("");
+                }
+              },
+            },
           ]}
           onReset={() => {
             setSearch("");
             setStatusFilter("");
+            setSpecificDate("");
+            setWeekDate("");
+            setDateFrom("");
+            setDateTo("");
           }}
         />
+
+        <div className="rounded-xl border border-border bg-white p-3 shadow-soft sm:p-4">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Date Range Filter
+          </p>
+          <DateRangeFilter
+            from={effectiveFrom}
+            to={effectiveTo}
+            onFromChange={(v) => {
+              setWeekDate("");
+              setDateFrom(v);
+            }}
+            onToChange={(v) => {
+              setWeekDate("");
+              setDateTo(v);
+            }}
+            onClear={() => {
+              setDateFrom("");
+              setDateTo("");
+              setWeekDate("");
+            }}
+          />
+          {weekDate ? (
+            <p className="mt-2 text-xs font-medium text-navy">
+              Week selected: {weekLabelForDate(weekDate)}
+            </p>
+          ) : null}
+        </div>
 
         <PlatformDataTable
           columns={columns}
           data={pageRows}
           rowKey={(r) => r.id}
           loading={loading}
-          emptyMessage="No sales yet"
+          emptyMessage="No sales found for the selected filters"
           emptyAction={
             <button
               type="button"
@@ -231,7 +538,7 @@ export function SalesView() {
           onPageSizeChange={setPageSize}
           toolbar={
             <ListToolbar
-              resultLabel={`${filtered.length} sale${filtered.length === 1 ? "" : "s"} found`}
+              resultLabel={`${filtered.length} sale${filtered.length === 1 ? "" : "s"} found · ${periodLabel()}`}
               pageSize={pageSize}
               onPageSizeChange={setPageSize}
             />

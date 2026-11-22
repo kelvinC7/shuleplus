@@ -39,6 +39,15 @@ export const env = {
     process.env.SERVICE_API_KEY ??
     process.env.PLATFORM_SERVICE_KEY ??
     'dev-service-key',
+  /** IAM embedded notification hub (same as Attendance parent SMS). */
+  NOTIFICATION_SERVICE_URL: (process.env.NOTIFICATION_SERVICE_URL ?? '').trim(),
+  /** Must match IAM MODULE_PROVISIONING_KEY when calling POST …/notifications/sms */
+  NOTIFICATION_SERVICE_API_KEY: (
+    process.env.NOTIFICATION_SERVICE_API_KEY ??
+    process.env.SERVICE_API_KEY ??
+    process.env.PLATFORM_SERVICE_KEY ??
+    ''
+  ).trim(),
   /** IAM for the org member directory (service-to-service, internal endpoints). */
   IAM_API_URL: process.env.IAM_API_URL ?? 'http://localhost:3001/api/v1',
   /** HR module backend URL — used to fetch teachers for the chat member directory. */

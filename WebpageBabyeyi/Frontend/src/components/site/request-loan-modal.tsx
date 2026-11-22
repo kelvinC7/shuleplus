@@ -1248,8 +1248,8 @@ export function RequestLoanModal({ school, open, onClose, initialStudent }: Requ
               <div className="px-4">
                 <SummaryRow label={t.student} value={student.fullName} />
                 <SummaryRow label={t.school} value={student.schoolName} />
-                <SummaryRow label={t.classField} value={student.classLabel ?? student.className ?? '—'} />
-                <SummaryRow label={t.studentCode} value={student.studentCode || '—'} />
+                <SummaryRow label={t.classField} value={student.classLabel ?? student.className ?? '-'} />
+                <SummaryRow label={t.studentCode} value={student.studentCode || '-'} />
               </div>
             </div>
 

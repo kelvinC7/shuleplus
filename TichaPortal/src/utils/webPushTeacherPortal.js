@@ -1,4 +1,4 @@
-import { kazi } from "../services/kaziApi";
+import api from "../services/api";
 
 export function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -41,7 +41,7 @@ export async function subscribeTeacherPortalPush() {
   if (!isWebPushEnvironmentSupported()) {
     throw new Error("This browser does not support Web Push.");
   }
-  const res = await kazi.get("/api/employee/push/vapid-key");
+  const res = await api.get("/teacher-portal/push/vapid-key");
   if (!res.data?.success || !res.data?.publicKey) {
     throw new Error(res.data?.message || "Web Push is not enabled on the server.");
   }
@@ -60,7 +60,7 @@ export async function subscribeTeacherPortalPush() {
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(res.data.publicKey),
   });
-  await kazi.post("/api/employee/push/subscribe", sub.toJSON());
+  await api.post("/teacher-portal/push/subscribe", sub.toJSON());
   return sub;
 }
 
@@ -71,7 +71,7 @@ export async function unsubscribeTeacherPortalPush() {
   if (!sub) return;
   const json = sub.toJSON();
   try {
-    await kazi.post("/api/employee/push/unsubscribe", { endpoint: json.endpoint });
+    await api.post("/teacher-portal/push/unsubscribe", { endpoint: json.endpoint });
   } finally {
     await sub.unsubscribe();
   }

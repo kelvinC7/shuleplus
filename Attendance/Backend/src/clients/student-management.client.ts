@@ -149,9 +149,9 @@ export async function fetchStudentManagementDashboardSummary(
   }
 }
 
-export async function fetchStudentsList(
+async function fetchStudentsPage(
   organizationId: string,
-  opts?: { search?: string; className?: string; status?: string }
+  opts?: { search?: string; className?: string; status?: string; page?: number; limit?: number }
 ): Promise<SmStudent[]> {
   const urlBase = baseUrl();
   if (!urlBase) return [];
@@ -162,6 +162,8 @@ export async function fetchStudentsList(
   });
   if (opts?.search) qs.set("search", opts.search);
   if (opts?.className) qs.set("className", opts.className);
+  if (opts?.page) qs.set("page", String(opts.page));
+  if (opts?.limit) qs.set("limit", String(opts.limit));
 
   try {
     const res = await fetch(`${urlBase}/service/students?${qs}`, {
@@ -178,6 +180,56 @@ export async function fetchStudentsList(
   } catch {
     return [];
   }
+}
+
+export async function fetchStudentsList(
+  organizationId: string,
+  opts?: { search?: string; className?: string; status?: string }
+): Promise<SmStudent[]> {
+  return fetchAllStudentsList(organizationId, opts);
+}
+
+/**
+ * Records roster: avoid loading the full school on every page view.
+ * Without class/search filter, rely on RFID cards + same-day taps only.
+ */
+export async function fetchStudentsForAttendanceRoster(
+  organizationId: string,
+  opts?: { search?: string; className?: string }
+): Promise<SmStudent[]> {
+  const hasFilter = Boolean(opts?.search?.trim() || opts?.className?.trim());
+  if (!hasFilter) return [];
+
+  const limit = 500;
+  const maxPages = opts?.search?.trim() ? 4 : 12;
+  const merged = new Map<string, SmStudent>();
+  for (let page = 1; page <= maxPages; page += 1) {
+    const batch = await fetchStudentsPage(organizationId, {
+      search: opts?.search,
+      className: opts?.className,
+      status: "ACTIVE",
+      page,
+      limit,
+    });
+    for (const row of batch) merged.set(row.id, row);
+    if (batch.length < limit) break;
+  }
+  return [...merged.values()];
+}
+
+/** Load all ACTIVE students (paginated) so roster counts match Student Management. */
+export async function fetchAllStudentsList(
+  organizationId: string,
+  opts?: { search?: string; className?: string; status?: string }
+): Promise<SmStudent[]> {
+  const limit = 500;
+  const merged = new Map<string, SmStudent>();
+  for (let page = 1; page <= 80; page += 1) {
+    const batch = await fetchStudentsPage(organizationId, { ...opts, page, limit });
+    for (const row of batch) merged.set(row.id, row);
+    if (batch.length < limit) break;
+  }
+  return [...merged.values()];
 }
 
 export async function fetchStudentByIdentity(

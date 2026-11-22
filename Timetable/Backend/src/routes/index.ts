@@ -35,6 +35,12 @@ router.post('/tenant/create', requireServiceAuth, (req, res, next) =>
 );
 
 /** Teacher Portal service-to-service — no JWT module license required */
+router.get('/internal/timetable', requireServiceAuth, (req, res, next) =>
+  internalSmartController.listTimetable(req, res, next)
+);
+router.get('/internal/lesson-sessions', requireServiceAuth, (req, res, next) =>
+  internalSmartController.listLessonSessions(req, res, next)
+);
 router.get('/internal/teacher/today', requireServiceAuth, (req, res, next) =>
   internalSmartController.teacherToday(req, res, next)
 );
@@ -82,6 +88,15 @@ router.get('/internal/parent/student-week', requireServiceAuth, (req, res, next)
 );
 router.get('/internal/class/teachers', requireServiceAuth, (req, res, next) =>
   internalSmartController.classTeachers(req, res, next)
+);
+router.get('/internal/classrooms', requireServiceAuth, (req, res, next) =>
+  internalSmartController.classrooms(req, res, next)
+);
+router.delete('/internal/classes', requireServiceAuth, (req, res, next) =>
+  internalSmartController.purgeClass(req, res, next)
+);
+router.post('/internal/classes/purge', requireServiceAuth, (req, res, next) =>
+  internalSmartController.purgeClass(req, res, next)
 );
 router.post('/internal/lessons/start', requireServiceAuth, (req, res, next) =>
   internalSmartController.startLesson(req, res, next)

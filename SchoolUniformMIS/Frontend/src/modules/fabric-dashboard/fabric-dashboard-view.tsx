@@ -282,7 +282,7 @@ export function FabricDashboardView() {
               data={(data?.purchases ?? []).slice(0, 8)}
               rowKey={(p) => p.id}
               loading={false}
-              emptyMessage="No purchases yet — start with Stock In"
+              emptyMessage="No purchases yet. Start with Stock In"
             />
           </div>
         </div>

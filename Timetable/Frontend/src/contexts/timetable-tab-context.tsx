@@ -11,7 +11,7 @@ interface TimetableTabContextValue {
 }
 
 const TimetableTabContext = createContext<TimetableTabContextValue>({
-  tab: 'teachers',
+  tab: 'class-timetable',
   tabParam: null,
 });
 

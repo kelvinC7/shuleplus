@@ -1,6 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { describeAfroBulkConfig } from '../clients/afrobulk-sms.client';
+import { internalChatClient } from '../clients/internal-chat.client';
+import { listSchoolSmsAccessForSuperAdmin } from '../services/school-sms-access.service';
 import { sendSmsDetailed, normalizePhoneNumber } from '../utils/sms';
+import { AppError } from '../middleware/error.middleware';
+
+function chatUpstreamError(e: unknown): AppError {
+  const message = e instanceof Error ? e.message : 'ShuleChat API unavailable';
+  return new AppError(502, message);
+}
 
 export const smsBulkController = {
   async status(_req: Request, res: Response) {
@@ -70,6 +78,78 @@ export const smsBulkController = {
       });
     } catch (e) {
       next(e);
+    }
+  },
+
+  async schoolSmsAccess(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const { rows, chatApiOk, chatError } = await listSchoolSmsAccessForSuperAdmin();
+      res.json({
+        success: true,
+        data: rows,
+        meta: { chatApiOk, chatError: chatApiOk ? undefined : chatError },
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async parentPurchaseStats(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await internalChatClient.parentPurchaseStats();
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async listParentPurchases(req: Request, res: Response, next: NextFunction) {
+    try {
+      const bucket = typeof req.query.bucket === 'string' ? req.query.bucket : undefined;
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      const organizationId =
+        typeof req.query.organizationId === 'string' ? req.query.organizationId : undefined;
+      const data = await internalChatClient.listParentPurchases({ bucket, search, organizationId });
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async activateParentPurchase(req: Request, res: Response, next: NextFunction) {
+    try {
+      const purchaseId = String(req.params.purchaseId);
+      const adminId = (req as Request & { user?: { sub?: string } }).user?.sub;
+      const data = await internalChatClient.activateParentPurchase(purchaseId, adminId);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async rejectParentPurchase(req: Request, res: Response, next: NextFunction) {
+    try {
+      const purchaseId = String(req.params.purchaseId);
+      const { reason } = req.body as { reason?: string };
+      if (!reason || reason.trim().length < 3) {
+        res.status(400).json({ success: false, message: 'Rejection reason is required' });
+        return;
+      }
+      const adminId = (req as Request & { user?: { sub?: string } }).user?.sub;
+      const data = await internalChatClient.rejectParentPurchase(purchaseId, reason.trim(), adminId);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async updateSchoolSmsAccess(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.params.organizationId);
+      const data = await internalChatClient.updateSchoolSmsSettings(organizationId, req.body);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(chatUpstreamError(e));
     }
   },
 

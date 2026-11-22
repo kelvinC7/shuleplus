@@ -1,37 +1,45 @@
 import { useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Loader2 } from 'lucide-react';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
-const PIE_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'];
+const NAVY = brand.navy;
+const PIE_COLORS = ['#22c55e', '#3b82f6', brand.primary, '#13213D', '#ef4444'];
+
+const chartPaperSx = { borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 };
 
 export default function PerformanceReports() {
   const [params, setParams] = useState({});
   const { loading, error, monthlyProgress, gradeDistribution, passRateTrend, kpis, filters, selected } =
     useTeacherMarksAnalytics(params);
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Performance Reports</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Pass rate {kpis.pass_rate != null ? `${kpis.pass_rate}%` : '-'} · Avg {kpis.average_percent != null ? `${kpis.average_percent}%` : '-'}
-          </p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Performance Reports</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>
+            Pass rate {kpis.pass_rate != null ? `${kpis.pass_rate}%` : '-'} - Avg {kpis.average_percent != null ? `${kpis.average_percent}%` : '-'}
+          </Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <h3 className="font-semibold mb-4" style={{ color: NAVY }}>Monthly progress</h3>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
+        <Paper variant="outlined" sx={chartPaperSx}>
+          <Typography sx={{ fontWeight: 600, color: NAVY, mb: 2 }}>Monthly progress</Typography>
           {monthlyProgress.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No data</p>
+            <Typography sx={{ py: 4, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>No data</Typography>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={monthlyProgress}>
@@ -39,16 +47,16 @@ export default function PerformanceReports() {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Line type="monotone" dataKey="average" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="average" stroke={brand.primary} strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </Paper>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <h3 className="font-semibold mb-4" style={{ color: NAVY }}>Grade distribution</h3>
+        <Paper variant="outlined" sx={chartPaperSx}>
+          <Typography sx={{ fontWeight: 600, color: NAVY, mb: 2 }}>Grade distribution</Typography>
           {gradeDistribution.every((g) => !g.count) ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No distribution data</p>
+            <Typography sx={{ py: 4, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>No distribution data</Typography>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
@@ -61,12 +69,12 @@ export default function PerformanceReports() {
               </PieChart>
             </ResponsiveContainer>
           )}
-        </div>
-      </div>
+        </Paper>
+      </Box>
 
       {passRateTrend.length > 0 && (
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <h3 className="font-semibold mb-4" style={{ color: NAVY }}>Pass rate by period</h3>
+        <Paper variant="outlined" sx={chartPaperSx}>
+          <Typography sx={{ fontWeight: 600, color: NAVY, mb: 2 }}>Pass rate by period</Typography>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={passRateTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -76,8 +84,8 @@ export default function PerformanceReports() {
               <Line type="monotone" dataKey="rate" stroke={NAVY} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }

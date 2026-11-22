@@ -1,3 +1,4 @@
+import { Prisma } from '../generated/prisma-client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { resolveActiveStudent, resolveParentContext } from './parent-context.service';
@@ -326,7 +327,10 @@ export class TeacherChatService {
     return this.getThread(organizationId, null, thread.id, 'TEACHER');
   }
 
-  private teacherIdFilter(teacherUserId: string, extraIds?: string[]) {
+  private teacherIdFilter(
+    teacherUserId: string,
+    extraIds?: string[]
+  ): Prisma.TeacherChatThreadWhereInput {
     const ids = [...new Set([teacherUserId, ...(extraIds ?? [])].filter(Boolean))];
     return ids.length <= 1 ? { teacherUserId: ids[0] } : { teacherUserId: { in: ids } };
   }
@@ -338,26 +342,30 @@ export class TeacherChatService {
     alternateTeacherUserIds: string[] = [],
     teacherEmail?: string | null,
     teacherName?: string | null
-  ) {
-    const identityOr: Array<Record<string, unknown>> = [this.teacherIdFilter(teacherUserId, alternateTeacherUserIds)];
+  ): Prisma.TeacherChatThreadWhereInput {
+    const identityOr: Prisma.TeacherChatThreadWhereInput[] = [
+      this.teacherIdFilter(teacherUserId, alternateTeacherUserIds),
+    ];
 
     const email = teacherEmail?.trim();
     if (email) {
-      identityOr.push({ teacherEmail: { equals: email, mode: 'insensitive' } });
+      identityOr.push({ teacherEmail: { equals: email, mode: Prisma.QueryMode.insensitive } });
     }
 
     const name = teacherName?.trim();
     if (name && name.length >= 4) {
-      identityOr.push({ teacherName: { equals: name, mode: 'insensitive' } });
+      identityOr.push({ teacherName: { equals: name, mode: Prisma.QueryMode.insensitive } });
     }
 
-    const orgScoped = {
+    const orgScoped: Prisma.TeacherChatThreadWhereInput = {
       AND: [{ organizationId }, { OR: identityOr }],
     };
 
     // Parent threads often use the student org id; JWT org can differ in dev — email is IAM-verified.
     if (email) {
-      return { OR: [orgScoped, { teacherEmail: { equals: email, mode: 'insensitive' } }] };
+      return {
+        OR: [orgScoped, { teacherEmail: { equals: email, mode: Prisma.QueryMode.insensitive } }],
+      };
     }
 
     return orgScoped;
@@ -373,14 +381,16 @@ export class TeacherChatService {
   ) {
     return prisma.teacherChatThread.findFirst({
       where: {
-        id: threadId,
-        ...this.teacherInboxWhere(
-          organizationId,
-          teacherUserId,
-          alternateTeacherUserIds,
-          teacherEmail,
-          teacherName
-        ),
+        AND: [
+          { id: threadId },
+          this.teacherInboxWhere(
+            organizationId,
+            teacherUserId,
+            alternateTeacherUserIds,
+            teacherEmail,
+            teacherName
+          ),
+        ],
       },
     });
   }
@@ -393,7 +403,7 @@ export class TeacherChatService {
     teacherEmail?: string | null,
     teacherName?: string | null
   ) {
-    const inboxWhere = this.teacherInboxWhere(
+    const inboxWhere: any = this.teacherInboxWhere(
       organizationId,
       teacherUserId,
       alternateTeacherUserIds,
@@ -417,7 +427,13 @@ export class TeacherChatService {
       },
       _count: { _all: true },
     });
-    const unreadByThread = new Map(unreadCounts.map((r) => [r.threadId, r._count._all]));
+    const unreadByThread = new Map(
+      unreadCounts.map((r) => {
+        const n =
+          typeof r._count === 'object' && r._count && '_all' in r._count ? (r._count as any)._all ?? 0 : 0;
+        return [r.threadId, n] as const;
+      })
+    );
     return threads.map((t) => ({
       id: t.id,
       studentId: t.studentId,
@@ -426,7 +442,7 @@ export class TeacherChatService {
       parentId: t.parentId,
       lastMessageAt: t.lastMessageAt.toISOString(),
       unreadFromParent: unreadByThread.get(t.id) ?? 0,
-      lastMessage: t.messages[0]
+      lastMessage: t.messages?.[0]
         ? {
             body: t.messages[0].body,
             senderRole: t.messages[0].senderRole,

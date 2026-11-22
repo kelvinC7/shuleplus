@@ -284,7 +284,10 @@ export class OrganizationAdminService {
       });
     }
 
-    if (assignments.some((a) => a.slug === 'teacher-portal') && !user.position) {
+    const isTeacherModule = assignments.some(
+      (a) => a.slug === 'teacher-portal' || a.slug === 'ticha-portal'
+    );
+    if (isTeacherModule && !user.position) {
       await prisma.user.update({
         where: { id: user.id },
         data: { position: 'Teacher' },
@@ -298,7 +301,7 @@ export class OrganizationAdminService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone,
-      position: assignments.some((a) => a.slug === 'teacher-portal') ? user.position || 'Teacher' : user.position,
+      position: isTeacherModule ? user.position || 'Teacher' : user.position,
       department: user.department,
       employeeId: user.employeeId,
       avatarUrl: user.avatarUrl,
@@ -372,7 +375,10 @@ export class OrganizationAdminService {
       });
     });
 
-    if (assignments.some((a) => a.slug === 'teacher-portal') && !user.position) {
+    const isTeacherModule = assignments.some(
+      (a) => a.slug === 'teacher-portal' || a.slug === 'ticha-portal'
+    );
+    if (isTeacherModule && !user.position) {
       await prisma.user.update({
         where: { id: userId },
         data: { position: 'Teacher' },
@@ -386,9 +392,7 @@ export class OrganizationAdminService {
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone,
-      position: assignments.some((a) => a.slug === 'teacher-portal')
-        ? user.position || 'Teacher'
-        : user.position,
+      position: isTeacherModule ? user.position || 'Teacher' : user.position,
       department: user.department,
       employeeId: user.employeeId,
       avatarUrl: user.avatarUrl,

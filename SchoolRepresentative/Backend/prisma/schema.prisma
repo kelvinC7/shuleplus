@@ -1,0 +1,149 @@
+// Director Console - console-owned data.
+// Live school records (students, staff, fees, attendance, academics)
+// are aggregated from IAM in real time; this database persists the
+// decision layer: approvals, decisions, tasks, broadcasts,
+// notifications, incidents and the audit trail.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ApprovalItem {
+  id             String     @id @default(uuid())
+  organizationId String? // null = group-wide request
+  reference      String     @unique // e.g. PO-214, CI-018
+  category       String // CIRCULAR | PROCUREMENT | LEAVE | KAZI_ADVANCE | TRIP | BUDGET | EXPENDITURE
+  title          String
+  requester      String
+  requesterRole  String?
+  amount         Float?
+  currency       String     @default("RWF")
+  description    String
+  dueDate        DateTime?
+  priority       String     @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  workflowSteps  String     @default("[]") // JSON [{name, status}]
+  attachments    String     @default("[]") // JSON [{name, kind}]
+  status         String     @default("PENDING") // PENDING | APPROVED | REJECTED | CHANGES_REQUESTED
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  decisions      Decision[]
+}
+
+model Decision {
+  id            String       @id @default(uuid())
+  approvalId    String
+  approval      ApprovalItem @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  action        String // APPROVED | REJECTED | CHANGES_REQUESTED
+  reason        String? // required for REJECTED
+  comment       String?
+  decidedBy     String
+  decidedByName String
+  createdAt     DateTime     @default(now())
+}
+
+model TaskItem {
+  id             String    @id @default(uuid())
+  organizationId String?
+  title          String
+  description    String?
+  owner          String
+  ownerRole      String?
+  priority       String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  category       String    @default("OPERATIONS")
+  dueDate        DateTime?
+  status         String    @default("OPEN") // OPEN | IN_PROGRESS | COMPLETED
+  progress       Int       @default(0) // 0-100
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Meeting {
+  id             String   @id @default(uuid())
+  organizationId String?
+  title          String
+  description    String?
+  agenda         String   @default("[]") // JSON string[]
+  location       String?
+  meetingDate    DateTime
+  startTime      String?
+  endTime        String?
+  participants   String   @default("[]") // JSON string[]
+  status         String   @default("SCHEDULED") // SCHEDULED | COMPLETED | CANCELLED
+  createdBy      String?
+  createdByName  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Broadcast {
+  id             String    @id @default(uuid())
+  organizationId String?
+  audience       String
+  channels       String    @default("[]") // JSON ["app","sms","email"]
+  subject        String
+  message        String
+  recipientCount Int       @default(0)
+  smsCost        Float     @default(0)
+  status         String    @default("SENT") // SENT | SCHEDULED
+  scheduledFor   DateTime?
+  sentBy         String
+  sentByName     String
+  createdAt      DateTime  @default(now())
+}
+
+model NotificationItem {
+  id             String   @id @default(uuid())
+  category       String // SECURITY | FINANCE | ACADEMIC | STAFF | APPROVAL | SYSTEM
+  title          String
+  body           String
+  severity       String   @default("info") // info | warning | urgent
+  organizationId String?
+  link           String?
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model AuditEvent {
+  id             String   @id @default(uuid())
+  actorId        String
+  actorName      String
+  action         String // APPROVAL_DECIDED | COVER_ASSIGNED | BROADCAST_SENT | TASK_UPDATED | INCIDENT_...
+  module         String
+  targetType     String
+  targetId       String
+  summary        String
+  organizationId String?
+  meta           String   @default("{}") // JSON extra context
+  createdAt      DateTime @default(now())
+}
+
+model Incident {
+  id             String    @id @default(uuid())
+  organizationId String?
+  type           String // SECURITY | SAFETY | MAINTENANCE | TRANSPORT | CAMERA
+  title          String
+  description    String
+  priority       String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  status         String    @default("OPEN") // OPEN | INVESTIGATING | RESOLVED
+  assignedTo     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model CoverAssignment {
+  id             String   @id @default(uuid())
+  organizationId String?
+  classId        String
+  subject        String
+  period         String
+  absentTeacher  String
+  coverTeacher   String
+  createdBy      String
+  createdByName  String
+  createdAt      DateTime @default(now())
+}

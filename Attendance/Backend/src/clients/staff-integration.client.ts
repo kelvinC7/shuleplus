@@ -80,6 +80,56 @@ function addStaff(map: Map<string, StaffMember>, entry: StaffMember) {
   if (!map.has(entry.id)) map.set(entry.id, entry);
 }
 
+function findStaffMatch(map: Map<string, StaffMember>, entry: StaffMember): StaffMember | undefined {
+  const email = normalizeEmail(entry.email);
+  if (email) {
+    for (const existing of map.values()) {
+      if (normalizeEmail(existing.email) === email) return existing;
+    }
+  }
+  const emp = entry.employeeNumber?.trim().toLowerCase();
+  if (emp) {
+    for (const existing of map.values()) {
+      if (existing.employeeNumber?.trim().toLowerCase() === emp) return existing;
+    }
+  }
+  const teacherId = entry.teacherUserId?.trim();
+  if (teacherId) {
+    for (const existing of map.values()) {
+      if (existing.id === teacherId || existing.teacherUserId === teacherId) return existing;
+    }
+  }
+  if (map.has(entry.id)) return map.get(entry.id);
+  return undefined;
+}
+
+function enrichStaff(base: StaffMember, overlay: StaffMember): StaffMember {
+  return {
+    ...base,
+    rfidUid: base.rfidUid ?? overlay.rfidUid ?? null,
+    photoUrl: base.photoUrl ?? overlay.photoUrl ?? null,
+    phone: base.phone ?? overlay.phone ?? null,
+    department: base.department ?? overlay.department ?? null,
+    position: base.position ?? overlay.position ?? null,
+    employeeNumber: base.employeeNumber ?? overlay.employeeNumber ?? null,
+    email: base.email ?? overlay.email ?? null,
+  };
+}
+
+/** When IAM Users & Access roster is available, it is canonical; HR/Timetable only enrich matches. */
+function mergeStaffCanonicalIam(
+  iamUsers: StaffMember[],
+  overlays: StaffMember[]
+): StaffMember[] {
+  const map = new Map<string, StaffMember>();
+  for (const row of iamUsers) map.set(row.id, row);
+  for (const overlay of overlays) {
+    const match = findStaffMatch(map, overlay);
+    if (match) map.set(match.id, enrichStaff(match, overlay));
+  }
+  return [...map.values()].sort((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
 export function isHrEnabled() {
   return Boolean(env.HR_API_URL);
 }
@@ -241,14 +291,23 @@ export async function fetchOrganizationStaffWithMeta(
     source: "teacher" as const,
   }));
 
-  const map = new Map<string, StaffMember>();
-  mergeStaffRows(map, hrStaff, timetableStaff, iamUsers, teachingStaff);
+  const iamReachable = iamUsersRes.ok && iamUsers.length > 0;
+  const rows = iamReachable
+    ? mergeStaffCanonicalIam(iamUsers, [...hrStaff, ...timetableStaff, ...teachingStaff])
+    : (() => {
+        const map = new Map<string, StaffMember>();
+        mergeStaffRows(map, hrStaff, timetableStaff, iamUsers, teachingStaff);
+        return [...map.values()].sort((a, b) => a.fullName.localeCompare(b.fullName));
+      })();
 
   return {
-    rows: [...map.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    rows,
     sources: {
       hr: { reachable: hrRes.ok, count: hrStaff.length },
-      iam: { reachable: iamUsersRes.ok || teachingRes.ok, count: iamUsers.length + teachingStaff.length },
+      iam: {
+        reachable: iamUsersRes.ok || teachingRes.ok,
+        count: iamReachable ? iamUsers.length : iamUsers.length + teachingStaff.length,
+      },
       timetable: { reachable: timetableRes.ok, count: timetableStaff.length },
     },
   };
@@ -277,7 +336,23 @@ export function isStaffIntegrationEnabled() {
   return Boolean(env.HR_API_URL || env.TIMETABLE_API_URL || env.IAM_API_URL);
 }
 
-type RfidStaffHit = {
+/** HR department catalog (same source as Organization Admin → Manage departments). */
+export async function fetchOrganizationDepartments(organizationId: string): Promise<string[]> {
+  if (!isHrEnabled()) return [];
+  const rows = await serviceFetch<Array<{ name?: string | null }>>(
+    `${hrBase()}/departments/for-sync?organizationId=${encodeURIComponent(organizationId)}`,
+    organizationId
+  );
+  if (!rows?.length) return [];
+  const names = new Set<string>();
+  for (const row of rows) {
+    const name = row.name?.trim();
+    if (name) names.add(name);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+export type RfidStaffHit = {
   organizationId: string;
   id: string;
   name: string;
@@ -289,9 +364,11 @@ type RfidStaffHit = {
   position?: string | null;
   photoUrl?: string | null;
   teacherUserId?: string | null;
+  iamUserId?: string | null;
+  employeeNumber?: string | null;
 };
 
-async function lookupStaffByRfidGlobally(rfidUid: string): Promise<RfidStaffHit | null> {
+export async function lookupStaffByRfidGlobally(rfidUid: string): Promise<RfidStaffHit | null> {
   const normalized = normalizeUid(rfidUid);
   if (!normalized) return null;
 
@@ -313,6 +390,12 @@ async function lookupStaffByRfidGlobally(rfidUid: string): Promise<RfidStaffHit 
 
   for (const row of [hr, timetable, iam]) {
     if (!row?.id || !row.organizationId) continue;
+    const anyRow = row as LookupRow & {
+      email?: string | null;
+      employeeNumber?: string | null;
+      teacherUserId?: string | null;
+      iamUserId?: string | null;
+    };
     return {
       organizationId: row.organizationId,
       id: row.id,
@@ -320,21 +403,62 @@ async function lookupStaffByRfidGlobally(rfidUid: string): Promise<RfidStaffHit 
       code: row.code,
       source: row.source ?? "hr",
       rfidUid: normalizeUid(row.rfidUid) ?? normalized,
+      email: anyRow.email ?? null,
+      employeeNumber: anyRow.employeeNumber ?? anyRow.code ?? null,
+      teacherUserId: anyRow.teacherUserId ?? null,
+      iamUserId: anyRow.iamUserId ?? (row.source === "iam" ? row.id : null),
     };
   }
   return null;
 }
 
+export async function fetchStaffApprovedLeaveToday(
+  organizationId: string,
+  employeeId: string,
+  dateIso: string
+): Promise<{ active: boolean; leaveType?: string } | null> {
+  if (!employeeId || !dateIso) return null;
+  const qs = new URLSearchParams({
+    organizationId,
+    employeeId,
+    date: dateIso.slice(0, 10),
+  });
+  const data = await serviceFetch<{ active: boolean; leave?: { leaveType?: string } }>(
+    `${hrBase()}/internal/leave/active?${qs}`,
+    organizationId
+  );
+  if (!data) return null;
+  return { active: Boolean(data.active), leaveType: data.leave?.leaveType };
+}
+
 export async function fetchStaffByRfidUid(
   organizationId: string,
-  rfidUid: string
+  rfidUid: string,
+  opts?: { allowAssignedOrg?: boolean }
 ): Promise<StaffMember | null> {
   const normalized = normalizeUid(rfidUid);
   if (!normalized) return null;
 
   const hit = await lookupStaffByRfidGlobally(normalized);
-  if (!hit || hit.organizationId !== organizationId) {
+  if (!hit) return null;
+  if (!opts?.allowAssignedOrg && hit.organizationId !== organizationId) {
     return null;
+  }
+  if (opts?.allowAssignedOrg && hit.organizationId !== organizationId) {
+    // Identity found globally; caller must ensure this org is an allowed/assigned target.
+    // Return a minimal staff member so org-scoped processing can proceed.
+    return {
+      id: hit.id,
+      fullName: hit.name,
+      email: hit.email ?? null,
+      phone: hit.phone ?? null,
+      position: hit.source === "timetable" ? "Teacher" : "Staff",
+      employeeNumber: hit.employeeNumber ?? hit.code ?? hit.id,
+      photoUrl: hit.photoUrl ?? null,
+      rfidUid: normalized,
+      source: hit.source,
+      teacherUserId: hit.teacherUserId ?? (hit.source === "iam" ? hit.id : null),
+    };
   }
 
   const orgQs = `organizationId=${encodeURIComponent(organizationId)}`;

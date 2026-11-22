@@ -13,6 +13,13 @@ enum TenantStatus {
   SUSPENDED
 }
 
+enum ParentAttendanceReportKind {
+  ABSENT
+  LATE
+
+  @@map("parent_attendance_report_kind")
+}
+
 enum AttendanceStatus {
   PRESENT
   ABSENT
@@ -101,7 +108,10 @@ model ParentAccount {
   messages    Message[]
   orders      StoreOrder[]
   notifications Notification[]
+  deviceTokens DeviceToken[]
   communicationPreference ParentCommunicationPreference?
+  transportChangeRequests TransportChangeRequest[]
+  transportIssueReports   TransportIssueReport[]
 
   @@unique([organizationId, phone])
   @@index([organizationId])
@@ -166,6 +176,7 @@ model Student {
   tenant      Tenant                @relation(fields: [organizationId], references: [organizationId])
   parents     ParentStudentLink[]
   attendance  AttendanceRecord[]
+  parentAttendanceReports ParentAttendanceReport[]
   grades      Grade[]
   exams       Exam[]
   feeStatements FeeStatement[]
@@ -178,6 +189,8 @@ model Student {
   leaveRequests LeaveRequest[]
   orders      StoreOrder[]
   timetable   TimetableSlot[]
+  transportChangeRequests TransportChangeRequest[]
+  transportIssueReports   TransportIssueReport[]
 
   @@index([organizationId])
   @@map("students")
@@ -284,6 +297,24 @@ model AttendanceRecord {
   @@unique([studentId, date])
   @@index([organizationId])
   @@map("attendance_records")
+}
+
+model ParentAttendanceReport {
+  id             String                     @id @default(uuid())
+  organizationId String                     @map("organization_id")
+  studentId      String                     @map("student_id")
+  parentId       String                     @map("parent_id")
+  reportDate     DateTime                   @map("report_date")
+  kind           ParentAttendanceReportKind
+  reason         String
+  detail         String?
+  createdAt      DateTime                   @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([organizationId, reportDate])
+  @@index([studentId, reportDate])
+  @@map("parent_attendance_reports")
 }
 
 model FeeStatement {
@@ -619,14 +650,39 @@ model Notification {
   priority       String   @default("NORMAL")
   link           String?
   isRead         Boolean  @default(false) @map("is_read")
+  externalEventId String? @map("external_event_id")
+  smsStatus      String?  @map("sms_status")
+  pushStatus     String?  @map("push_status")
+  language       String?  @default("rw")
   createdAt      DateTime @default(now()) @map("created_at")
 
   parent ParentAccount @relation(fields: [parentId], references: [id])
 
   @@index([parentId, isRead])
   @@index([studentId])
-  @@index([organizationId])
+  @@index([organizationId, sourceModule])
+  @@unique([organizationId, externalEventId])
   @@map("notifications")
+}
+
+model DeviceToken {
+  id             String   @id @default(uuid())
+  organizationId  String   @map("organization_id")
+  parentId       String   @map("parent_id")
+  token          String
+  platform       String   @default("WEB")
+  userAgent      String?  @map("user_agent")
+  appVersion     String?  @map("app_version")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  lastSeenAt     DateTime @updatedAt @map("last_seen_at")
+
+  parent ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, parentId, token])
+  @@index([parentId, platform, isActive])
+  @@index([organizationId, isActive])
+  @@map("device_tokens")
 }
 
 model ParentCommunicationPreference {
@@ -638,6 +694,8 @@ model ParentCommunicationPreference {
   scholarshipNotifications Json     @default("{\"sms\":false,\"email\":true,\"push\":true,\"inApp\":true}") @map("scholarship_notifications")
   pushEnabled              Boolean  @default(true) @map("push_enabled")
   webPushToken             String?  @map("web_push_token")
+  transportNotifications   Json     @default("{\"sms\":true,\"push\":true,\"inApp\":true}") @map("transport_notifications")
+  preferredLanguage        String   @default("rw") @map("preferred_language")
   updatedAt                DateTime @updatedAt @map("updated_at")
 
   parent ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
@@ -698,6 +756,61 @@ model Report {
   @@map("reports")
 }
 
+enum TransportChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TransportIssueStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+model TransportChangeRequest {
+  id              String                       @id @default(uuid())
+  organizationId  String                       @map("organization_id")
+  parentId        String                       @map("parent_id")
+  studentId       String                       @map("student_id")
+  requestType     String                       @map("request_type")
+  reason          String
+  effectiveFrom   DateTime?                    @map("effective_from") @db.Date
+  effectiveTo     DateTime?                    @map("effective_to") @db.Date
+  status          TransportChangeRequestStatus @default(PENDING)
+  schoolResponse  String?                      @map("school_response")
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+
+  parent  ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, studentId, status])
+  @@map("transport_change_requests")
+}
+
+model TransportIssueReport {
+  id             String               @id @default(uuid())
+  organizationId String               @map("organization_id")
+  parentId       String               @map("parent_id")
+  studentId      String               @map("student_id")
+  issueType      String               @map("issue_type")
+  details        String
+  status         TransportIssueStatus @default(OPEN)
+  schoolNote     String?              @map("school_note")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  parent  ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([studentId])
+  @@map("transport_issue_reports")
+}
+
 model Setting {
   id             String   @id @default(uuid())
   organizationId String   @map("organization_id")
@@ -751,4 +864,36 @@ model TeacherChatMessage {
 
   @@index([threadId, createdAt])
   @@map("teacher_chat_messages")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model PaymentTransaction {
+  id             String        @id @default(uuid())
+  organizationId String        @map("organization_id")
+  parentId       String        @map("parent_id")
+  studentId      String?       @map("student_id")
+  purpose        String        @default("SHULEKIT")
+  customerRef    String        @unique @map("customer_ref")
+  reference      String        @unique
+  amount         Float         @default(0)
+  currency       String        @default("RWF")
+  phone          String
+  status         PaymentStatus @default(PENDING)
+  gatewayStatus  String?       @map("gateway_status")
+  gatewayTid     String?       @map("gateway_tid")
+  authKey        String?       @map("auth_key")
+  description    String?
+  metadata       Json?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([parentId])
+  @@index([status])
+  @@map("payment_transactions")
 }

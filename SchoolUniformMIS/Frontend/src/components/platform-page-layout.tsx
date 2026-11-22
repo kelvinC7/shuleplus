@@ -20,9 +20,9 @@ export function PlatformPageLayout({
   const showHeader = Boolean(title || subtitle || actions);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {showHeader ? (
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             {title ? (
               <h2 className="text-xl font-bold tracking-tight text-navy sm:text-2xl">
@@ -30,7 +30,9 @@ export function PlatformPageLayout({
               </h2>
             ) : null}
             {subtitle ? (
-              <p className="mt-1 text-sm text-muted">{subtitle}</p>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+                {subtitle}
+              </p>
             ) : null}
           </div>
           {actions ? (
@@ -42,11 +44,11 @@ export function PlatformPageLayout({
       ) : null}
 
       {kpis && kpis.length > 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {kpis.map((kpi) => (
             <div
               key={kpi.label}
-              className="rounded-md border border-border bg-white px-4 py-3 shadow-soft"
+              className="rounded-xl border border-border bg-white px-4 py-3 shadow-soft"
             >
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
                 {kpi.label}

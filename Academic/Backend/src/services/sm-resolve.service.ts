@@ -1,6 +1,8 @@
 import { prisma } from '../config/database';
 import { smListClasses, smListStudents, smListSubjects } from '../clients/student-management.client';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function normalize(s: string) {
   return String(s ?? '')
     .trim()
@@ -154,7 +156,36 @@ export async function ensureAcademicStudent(
   input: { studentId: string; studentCode?: string; fullName?: string; gender?: string | null }
 ) {
   const byId = await prisma.student.findFirst({ where: { id: input.studentId, organizationId } });
-  if (byId) return byId;
+  if (byId) {
+    const code = input.studentCode?.trim();
+    let smStudent: { studentCode?: string; fullName?: string; gender?: string | null } | null = null;
+    if (code || input.studentId) {
+      const smRows = (await smListStudents(organizationId, {
+        search: code || input.studentId,
+        status: 'ACTIVE',
+      }).catch(() => [])) as Array<{ id: string; studentCode?: string; fullName?: string; gender?: string | null }>;
+      smStudent =
+        smRows.find((s) => s.id === input.studentId) ||
+        smRows.find((s) => s.studentCode === code) ||
+        null;
+    }
+    const properUid = smStudent?.studentCode || code;
+    const uidLooksLikeUuid = UUID_RE.test(byId.studentUid);
+    if (properUid && uidLooksLikeUuid && properUid !== byId.studentUid) {
+      const names = splitName(smStudent?.fullName || input.fullName || `${byId.firstName} ${byId.lastName}`);
+      return prisma.student.update({
+        where: { id: byId.id },
+        data: {
+          studentUid: properUid,
+          studentCode: properUid,
+          firstName: names.firstName,
+          lastName: names.lastName,
+          gender: asGender(smStudent?.gender ?? input.gender) ?? byId.gender,
+        },
+      });
+    }
+    return byId;
+  }
 
   const code = input.studentCode?.trim();
   if (code) {

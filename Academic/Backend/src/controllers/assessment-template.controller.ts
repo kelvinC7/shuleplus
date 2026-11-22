@@ -10,6 +10,8 @@ const componentSchema = z.object({
   weightPercentage: z.number().min(0).max(100).optional(),
   isRequired: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  assessmentCategory: z.enum(['BEGINNING_TEST', 'CAT_CONTINUOUS', 'MIDTERM_TEST', 'END_OF_TERM_EXAM']).nullable().optional(),
+  reportingStage: z.enum(['UNASSIGNED', 'BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL']).optional(),
 });
 
 const createTemplateSchema = z.object({
@@ -48,6 +50,8 @@ const syncComponentsSchema = z.object({
         required: z.boolean().optional(),
         isActive: z.boolean().optional(),
         maxMark: z.number().min(0).optional(),
+        assessmentCategory: z.enum(['BEGINNING_TEST', 'CAT_CONTINUOUS', 'MIDTERM_TEST', 'END_OF_TERM_EXAM']).nullable().optional(),
+        reportingStage: z.enum(['UNASSIGNED', 'BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL']).optional(),
       })
     )
     .min(1),
@@ -63,6 +67,8 @@ const addComponentSchema = z.object({
   description: z.string().optional(),
   weightPercentage: z.number().min(0).max(100).optional(),
   sortOrder: z.number().int().optional(),
+  assessmentCategory: z.enum(['BEGINNING_TEST', 'CAT_CONTINUOUS', 'MIDTERM_TEST', 'END_OF_TERM_EXAM']).nullable().optional(),
+  reportingStage: z.enum(['UNASSIGNED', 'BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL']).optional(),
 });
 
 const updateComponentSchema = z.object({
@@ -74,6 +80,8 @@ const updateComponentSchema = z.object({
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
   required: z.boolean().optional(),
+  assessmentCategory: z.enum(['BEGINNING_TEST', 'CAT_CONTINUOUS', 'MIDTERM_TEST', 'END_OF_TERM_EXAM']).nullable().optional(),
+  reportingStage: z.enum(['UNASSIGNED', 'BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL']).optional(),
 });
 
 const assignClassSchema = z.object({

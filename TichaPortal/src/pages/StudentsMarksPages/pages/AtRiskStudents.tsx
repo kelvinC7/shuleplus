@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
-const AMBER = '#f59e0b';
+const NAVY = brand.navy;
 
 export default function AtRiskStudents() {
   const [params, setParams] = useState({});
@@ -13,58 +19,73 @@ export default function AtRiskStudents() {
   const critical = atRiskStudents.filter((s) => s.risk === 'Critical');
   const high = atRiskStudents.filter((s) => s.risk === 'High');
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
+
+  const cards = [
+    { label: 'Critical', value: critical.length, color: '#B91C1C', bg: 'rgba(254,226,226,0.5)', border: '#FECACA' },
+    { label: 'High', value: high.length, color: NAVY, bg: 'rgba(243,245,250,0.5)', border: '#CBD5E8' },
+    { label: 'Total', value: atRiskStudents.length, color: NAVY, bg: 'rgba(255,251,235,0.5)', border: '#FDE68A' },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>At-Risk Students</h1>
-          <p className="text-gray-500 text-sm mt-1">Students below 50% in your classes</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>At-Risk Students</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Students below 50% in your classes</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4">
-          <p className="text-[10px] font-bold uppercase text-red-600">Critical</p>
-          <p className="text-3xl font-black text-red-700">{critical.length}</p>
-        </div>
-        <div className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
-          <p className="text-[10px] font-bold uppercase text-orange-600">High</p>
-          <p className="text-3xl font-black text-orange-700">{high.length}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-          <p className="text-[10px] font-bold uppercase text-amber-700">Total</p>
-          <p className="text-3xl font-black" style={{ color: NAVY }}>{atRiskStudents.length}</p>
-        </div>
-      </div>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2 }}>
+        {cards.map((card) => (
+          <Paper key={card.label} variant="outlined" sx={{ borderRadius: 3, borderColor: card.border, bgcolor: card.bg, p: 2 }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: card.color }}>{card.label}</Typography>
+            <Typography sx={{ fontSize: 30, fontWeight: 900, color: card.color }}>{card.value}</Typography>
+          </Paper>
+        ))}
+      </Box>
 
       {atRiskStudents.length === 0 ? (
-        <div className="text-center py-16 rounded-xl bg-white border border-gray-200">
-          <AlertTriangle className="mx-auto text-amber-500 mb-3" size={28} />
-          <p className="font-semibold" style={{ color: NAVY }}>No at-risk students</p>
-          <p className="text-sm text-gray-500 mt-1">All students are at or above the pass threshold.</p>
-        </div>
+        <Paper variant="outlined" sx={{ py: 8, textAlign: 'center', borderRadius: 2, borderColor: '#E5E7EB' }}>
+          <WarningAmberIcon sx={{ fontSize: 28, color: '#F59E0B', mb: 1.5 }} />
+          <Typography sx={{ fontWeight: 600, color: NAVY }}>No at-risk students</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>All students are at or above the pass threshold.</Typography>
+        </Paper>
       ) : (
-        <div className="space-y-3">
-          {atRiskStudents.map((s) => (
-            <div key={s.student_id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold" style={{ color: NAVY }}>{s.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.class} · {s.reason}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-black text-red-600">{s.average}%</span>
-                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
-                  s.risk === 'Critical' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'
-                }`}>{s.risk}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <Stack spacing={1.5}>
+          {atRiskStudents.map((s) => {
+            const criticalRow = s.risk === 'Critical';
+            return (
+              <Paper key={s.student_id} variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: NAVY }}>{s.name}</Typography>
+                  <Typography sx={{ mt: 0.25, fontSize: 12, color: '#6B7280' }}>{s.class} - {s.reason}</Typography>
+                </Box>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Typography sx={{ fontSize: 18, fontWeight: 900, color: '#DC2626' }}>{s.average}%</Typography>
+                  <Box
+                    component="span"
+                    sx={{
+                      borderRadius: 999,
+                      px: 1,
+                      py: 0.5,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      bgcolor: criticalRow ? '#FEE2E2' : '#E3E9F5',
+                      color: criticalRow ? '#991B1B' : NAVY,
+                    }}
+                  >
+                    {s.risk}
+                  </Box>
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 }

@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { prisma } from '../config/database';
 import { AppError } from './error.middleware';
 import { syncParentFromStudentManagement } from '../services/sm-parent-sync.service';
+import { shouldSkipStudentManagementSync } from '../services/parent-portal-mode.service';
 
 export interface JwtPayload {
   sub: string;
@@ -70,13 +71,17 @@ function verifyAccessToken(token: string): JwtPayload {
 
 export async function authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : queryToken;
+  if (!token) {
     return next(new AppError(401, 'Authentication required'));
   }
 
   let payload: JwtPayload;
   try {
-    payload = verifyAccessToken(authHeader.slice(7));
+    payload = verifyAccessToken(token);
   } catch {
     return next(new AppError(401, 'Invalid or expired access token. Sign in again from Parent Login.'));
   }
@@ -86,7 +91,7 @@ export async function authenticate(req: AuthenticatedRequest, _res: Response, ne
       payload.roles?.includes('parent') ||
       payload.modules?.some((m) => ['parent-mis', 'parentmis', 'parent-portal'].includes(m));
 
-    if (isParent && payload.organizationId) {
+    if (isParent && payload.organizationId && !(await shouldSkipStudentManagementSync(payload))) {
       try {
         payload = await syncParentFromStudentManagement(payload);
       } catch (err) {

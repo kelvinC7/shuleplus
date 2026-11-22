@@ -3,14 +3,17 @@
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarRange,
   ClipboardList,
   FileDown,
   Wand2,
   Users,
+  UsersRound,
   BookOpen,
   Clock,
   Grid3X3,
   AlertTriangle,
+  BarChart3,
   Radio,
   QrCode,
   History,
@@ -18,7 +21,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { TimetableTab } from '@/types';
+import type { TimetablePrimaryTab, TimetableTab } from '@/types';
 
 export interface TimetableNavItem {
   href: string;
@@ -88,13 +91,48 @@ export interface TimetablePlanningNavItem {
 }
 
 export const TIMETABLE_TABS: { id: TimetableTab; label: string; icon: LucideIcon; description: string }[] = [
+  {
+    id: 'class-timetable',
+    label: 'Class Timetable',
+    icon: CalendarRange,
+    description: 'Weekly class & stream timetable with A4 print',
+  },
+  {
+    id: 'teacher-workload',
+    label: 'Teacher Workload',
+    icon: UsersRound,
+    description: 'Scheduled periods, classes and subjects per teacher',
+  },
+  {
+    id: 'overview',
+    label: 'Timetable Overview',
+    icon: BarChart3,
+    description: 'Coverage, completion and distribution at a glance',
+  },
   { id: 'teachers', label: 'Teachers', icon: Users, description: 'Limits & availability' },
   { id: 'courses', label: 'Courses', icon: BookOpen, description: 'Subject scheduling rules' },
   { id: 'schedule', label: 'Time Settings', icon: Clock, description: 'School day, periods, breaks and daily schedule for the generator' },
   { id: 'generator', label: 'Generator', icon: Wand2, description: 'Generate & apply' },
-  { id: 'timetable', label: 'Timetable', icon: Grid3X3, description: 'Drag & drop grid' },
+  { id: 'timetable', label: 'Timetable Editor', icon: Grid3X3, description: 'Drag & drop grid' },
   { id: 'conflicts', label: 'Conflict Center', icon: AlertTriangle, description: 'Scan & auto-fix' },
 ];
+
+export const TIMETABLE_PRIMARY_TABS = TIMETABLE_TABS.filter((tab) =>
+  (['class-timetable', 'teacher-workload', 'overview'] as TimetablePrimaryTab[]).includes(
+    tab.id as TimetablePrimaryTab
+  )
+);
+
+/** The three working timetable views shown in their own sidebar group. */
+export const TIMETABLE_VIEW_NAV: TimetablePlanningNavItem[] = TIMETABLE_PRIMARY_TABS.map(
+  (tab) => ({
+    tabId: tab.id,
+    href: `/timetable?tab=${tab.id}`,
+    label: tab.label,
+    description: tab.description,
+    icon: tab.icon,
+  })
+);
 
 export const TIMETABLE_PLANNING_NAV: TimetablePlanningNavItem[] = [
   {
@@ -133,7 +171,7 @@ export const TIMETABLE_PLANNING_NAV: TimetablePlanningNavItem[] = [
   {
     tabId: 'timetable',
     href: '/timetable?tab=timetable',
-    label: 'Timetable',
+    label: 'Timetable Editor',
     description: 'Drag & drop grid',
     icon: Grid3X3,
   },
@@ -172,6 +210,12 @@ export const TIMETABLE_NAV_SECTIONS: TimetableNavSection[] = [
     items: [],
   },
   {
+    id: 'views',
+    title: 'Timetable',
+    icon: CalendarRange,
+    items: [],
+  },
+  {
     id: 'operations',
     title: 'Live Operations',
     icon: Radio,
@@ -199,11 +243,17 @@ export function isTimetableSetupPath(pathname: string) {
   return pathname === '/timetable';
 }
 
+/** True when the current route is one of the three primary timetable views. */
+export function primaryTimetableViewActive(pathname: string, tabParam: string | null) {
+  if (!isTimetableSetupPath(pathname)) return false;
+  return TIMETABLE_PRIMARY_TABS.some((tab) => tab.id === activeTimetableTab(tabParam));
+}
+
 export function activeTimetableTab(tabParam: string | null): TimetableTab {
   if (tabParam && TIMETABLE_TABS.some((t) => t.id === tabParam)) {
     return tabParam as TimetableTab;
   }
-  return 'teachers';
+  return 'class-timetable';
 }
 
 export function isTimetableTabActive(pathname: string, tabParam: string | null, tabId: TimetableTab) {

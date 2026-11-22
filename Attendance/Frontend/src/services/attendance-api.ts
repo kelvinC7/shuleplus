@@ -9,6 +9,25 @@ export const attendanceApi = {
     api.get<ApiEnvelope<LiveMonitorData>>('/live-monitor', { params }),
 
   settingsGet: () => api.get<ApiEnvelope<AttendanceSettings>>('/settings'),
+  organizationProfile: () =>
+    api.get<
+      ApiEnvelope<{
+        organizationId: string;
+        organizationCode: string | null;
+        schoolName: string;
+        email: string | null;
+        phone: string | null;
+        poBox: string | null;
+        website: string | null;
+        address: string | null;
+        province: string | null;
+        district: string | null;
+        sector: string | null;
+        logoUrl: string | null;
+        principalName: string | null;
+        schoolMotto: string | null;
+      }>
+    >('/organization/profile'),
   settingsPut: (body: Partial<AttendanceSettings>) =>
     api.put<ApiEnvelope<AttendanceSettings>>('/settings', body),
 
@@ -72,8 +91,27 @@ export const attendanceApi = {
         missingCheckout: number;
         absent: number;
         total: number;
+        assigned?: number;
+        tapped?: number;
+        notTapped?: number;
       }>
     >('/attendance/summary', { params }),
+  attendanceClassTotals: (params?: AttendanceFilterParams & Record<string, string | number | undefined>) =>
+    api.get<
+      ApiEnvelope<{
+        classes: Array<{
+          className: string;
+          assigned: number;
+          tapped: number;
+          notTapped: number;
+          late: number;
+          missingCheckout: number;
+          present: number;
+        }>;
+        totals: { assigned: number; tapped: number; notTapped: number; late: number; missingCheckout: number };
+        period?: { from?: string; to?: string; date?: string };
+      }>
+    >('/attendance/class-totals', { params }),
   attendanceFilterOptions: () =>
     api.get<
       ApiEnvelope<{
@@ -83,6 +121,88 @@ export const attendanceApi = {
         sources?: { studentManagement?: boolean; hrIam?: boolean };
       }>
     >('/attendance/filter-options'),
+  staffRoster: (
+    params?: AttendanceFilterParams & {
+      status?: string;
+      department?: string;
+      staffRole?: string;
+      sortBy?: string;
+      sortDir?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) =>
+    api.get<
+      ApiEnvelope<
+        PagedResult<AttendanceRecord> & {
+          summary?: { present: number; late: number; missingCheckout: number; absent: number; total: number };
+          lessonDate?: string;
+        }
+      >
+    >('/attendance/staff-roster', { params }),
+  studentRoster: (
+    params?: AttendanceFilterParams & {
+      status?: string;
+      className?: string;
+      sortBy?: string;
+      sortDir?: string;
+      page?: number;
+      limit?: number;
+    }
+  ) =>
+    api.get<
+      ApiEnvelope<
+        PagedResult<AttendanceRecord> & {
+          summary?: { present: number; late: number; missingCheckout: number; absent: number; total: number };
+          lessonDate?: string;
+        }
+      >
+    >('/attendance/student-roster', { params }),
+  staffCardAccess: (params?: {
+    department?: string;
+    staffRole?: string;
+    q?: string;
+    assigned?: 'all' | 'yes' | 'no';
+    page?: number;
+    limit?: number;
+  }) =>
+    api.get<
+      ApiEnvelope<
+        PagedResult<{
+          staffId: string;
+          fullName: string;
+          employeeNumber: string | null;
+          department: string | null;
+          role: string | null;
+          email: string | null;
+          cardAssigned: boolean;
+          cardNumber: string | null;
+          cardStatus: string | null;
+          source: string;
+        }> & { summary?: { total: number; assigned: number; notAssigned: number } }
+      >
+    >('/attendance/staff-card-access', { params }),
+  studentCardAccess: (params?: {
+    className?: string;
+    q?: string;
+    assigned?: 'all' | 'yes' | 'no';
+    page?: number;
+    limit?: number;
+  }) =>
+    api.get<
+      ApiEnvelope<
+        PagedResult<{
+          studentId: string;
+          fullName: string;
+          studentCode: string | null;
+          className: string | null;
+          cardAssigned: boolean;
+          cardNumber: string | null;
+          cardStatus: string | null;
+          source: string;
+        }> & { summary?: { total: number; assigned: number; notAssigned: number } }
+      >
+    >('/attendance/student-card-access', { params }),
   attendanceDetail: (id: string) =>
     api.get<
       ApiEnvelope<{
@@ -95,6 +215,15 @@ export const attendanceApi = {
   analytics: (params?: AttendanceFilterParams & { personType?: string }) =>
     api.get<ApiEnvelope<AnalyticsData>>('/analytics', { params }),
   notifyAbsent: () => api.post<ApiEnvelope<{ notified: number }>>('/attendance/notify-absent'),
+  applyAbsenceDeductions: (body: {
+    date: string;
+    students: Array<{
+      studentId?: string;
+      studentCode?: string;
+      studentName: string;
+      className?: string;
+    }>;
+  }) => api.post<ApiEnvelope<AttendanceDeductionResult>>('/attendance/apply-absence-deductions', body),
 
   notifications: () => api.get<ApiEnvelope<ParentNotification[]>>('/notifications'),
 
@@ -231,6 +360,7 @@ export interface AttendanceSettings {
   schoolStarts: string;
   lateStarts: string;
   schoolEnds: string;
+  exitOpensAt?: string | null;
   maxExitTime: string;
   weekendStart: string;
   attendanceClosingTime: string;
@@ -288,8 +418,21 @@ export interface AttendanceDisplayFields {
   expectedDeparture: string;
 }
 
+export interface AttendanceDeductionResult {
+  event: 'ABSENCE' | 'LATE';
+  date: string;
+  enabled: boolean;
+  points: number;
+  applied: number;
+  skipped: number;
+  total: number;
+  markId?: string | null;
+  markName?: string | null;
+}
+
 export interface AttendanceRecord {
   id: string;
+  studentId?: string | null;
   studentName: string;
   studentCode?: string | null;
   className?: string | null;

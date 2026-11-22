@@ -1,9 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  User, Upload, Lock, Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, Mail, Building2,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Avatar from '@mui/material/Avatar';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useAuth } from '../context/AuthContext';
-import TeacherOrangeHero from '../components/TeacherOrangeHero';
 import {
   resolveTeacherPhotoUrl,
   teacherDisplayName,
@@ -15,6 +28,32 @@ import {
   tpApiError,
   uploadTeacherPhoto,
 } from '../services/teacherPortalApi';
+import { brand } from '../theme/theme';
+
+const fieldLabelSx = {
+  mb: 0.75,
+  display: 'block',
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.12em',
+  color: brand.muted,
+};
+
+function MessageLine({ msg }) {
+  if (!msg) return null;
+  const ok = msg.type === 'ok';
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1 }}>
+      {ok ? (
+        <CheckCircleOutlineIcon sx={{ fontSize: 14, color: '#059669' }} />
+      ) : (
+        <WarningAmberIcon sx={{ fontSize: 14, color: '#DC2626' }} />
+      )}
+      <Typography sx={{ fontSize: 12, fontWeight: 600, color: ok ? '#059669' : '#DC2626' }}>{msg.text}</Typography>
+    </Stack>
+  );
+}
 
 export default function TeacherProfile() {
   const { teacher, updateTeacher } = useAuth();
@@ -39,6 +78,7 @@ export default function TeacherProfile() {
   const displaySrc = photoPreview || photoUrl;
   const initials = teacherInitials(teacher);
   const displayName = teacherDisplayName(teacher);
+  const schoolName = teacher?.school?.name || teacher?.school_name || 'Your school';
 
   useEffect(() => {
     let cancelled = false;
@@ -53,11 +93,14 @@ export default function TeacherProfile() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [updateTeacher]);
 
-  useEffect(() => () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-  }, [photoPreview]);
+  useEffect(
+    () => () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    },
+    [photoPreview]
+  );
 
   const handlePhotoUpload = async () => {
     if (!photoFile) return;
@@ -124,225 +167,199 @@ export default function TeacherProfile() {
     }
   };
 
+  const passwordFields = [
+    {
+      label: 'Current password',
+      value: currentPassword,
+      setValue: setCurrentPassword,
+      show: showCurrentPw,
+      toggle: () => setShowCurrentPw((v) => !v),
+      autoComplete: 'current-password',
+    },
+    {
+      label: 'New password',
+      value: newPassword,
+      setValue: setNewPassword,
+      show: showNewPw,
+      toggle: () => setShowNewPw((v) => !v),
+      autoComplete: 'new-password',
+    },
+    {
+      label: 'Confirm new password',
+      value: confirmPassword,
+      setValue: setConfirmPassword,
+      show: showConfirmPw,
+      toggle: () => setShowConfirmPw((v) => !v),
+      autoComplete: 'new-password',
+    },
+  ];
+
   return (
-    <div className="animate-in fade-in duration-500 bg-re-bg min-h-screen">
-      <TeacherOrangeHero
-        title="My profile"
-        subtitle="Update your photo and account password"
-        badgeLabel="Account settings"
-      />
+    <Box sx={{ minHeight: '100%', pb: 4 }}>
+      <Box
+        component="section"
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          bgcolor: brand.navy,
+          color: '#fff',
+          px: 2.5,
+          pt: 2.5,
+          pb: 3,
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            right: -60,
+            top: -70,
+            width: 200,
+            height: 200,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(245,166,35,0.2), transparent 65%)',
+            pointerEvents: 'none',
+          },
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ position: 'relative', zIndex: 1 }}>
+          <Avatar
+            src={displaySrc || undefined}
+            sx={{ width: 64, height: 64, bgcolor: brand.primary, color: brand.navy, fontWeight: 700, fontSize: 20 }}
+          >
+            {initials}
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontWeight: 800, color: '#fff', fontSize: 18, letterSpacing: '-0.01em' }}>
+              {displayName}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>
+              {teacher?.subject || 'Teacher'}
+              {teacher?.staff_id ? ` · ${teacher.staff_id}` : ''}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+              {schoolName}
+            </Typography>
+          </Box>
+        </Stack>
+      </Box>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 pb-16 relative z-10 space-y-5">
-        {forceChange && (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
-            <p className="font-medium">
-              Your school requires a new password before you continue. Set a strong password below.
-            </p>
-          </div>
-        )}
+      <Box sx={{ pt: 2, px: { xs: 1.5, sm: 2 }, maxWidth: 640, mx: 'auto' }}>
+        {forceChange ? (
+          <Alert
+            severity="warning"
+            icon={<WarningAmberIcon />}
+            sx={{ mb: 2, borderRadius: 1, '& .MuiAlert-message': { fontWeight: 500 } }}
+          >
+            Your school requires a new password before you continue. Set a strong password below.
+          </Alert>
+        ) : null}
 
-        {/* Account summary */}
-        <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden border border-black/5 bg-re-bg flex items-center justify-center shrink-0">
-              {displaySrc ? (
-                <img src={displaySrc} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span
-                  className="text-lg font-bold text-white w-full h-full flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg,#FF8C00,#FF5E00)' }}
-                >
-                  {initials}
-                </span>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-bold text-re-text truncate">
-                {displayName}
-              </p>
-              <p className="text-xs text-re-text-muted flex items-center gap-1.5 mt-1 truncate">
-                <Mail size={12} className="shrink-0 opacity-50" />
-                {teacher?.email || '-'}
-              </p>
-              <p className="text-xs text-re-text-muted flex items-center gap-1.5 mt-0.5 truncate">
-                <Building2 size={12} className="shrink-0 opacity-50" />
-                {teacher?.school?.name || teacher?.school_name || 'Your school'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Profile photo */}
-        <div className="rounded-2xl border border-black/5 bg-white p-5 sm:p-6 shadow-sm">
-          <h2 className="text-xs font-bold text-re-text uppercase tracking-widest mb-4 flex items-center gap-2">
-            <User size={14} className="text-re-orange" />
-            Profile photo
-          </h2>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            <div className="relative h-28 w-28 shrink-0 rounded-full border-4 border-re-orange/30 overflow-hidden bg-re-bg shadow-inner mx-auto sm:mx-0">
-              {displaySrc ? (
-                <img src={displaySrc} alt="Profile" className="h-full w-full object-cover" />
-              ) : (
-                <div
-                  className="flex h-full w-full items-center justify-center text-xl font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg,#FF8C00,#FF5E00)' }}
-                >
-                  {initials}
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0 space-y-3">
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target?.files?.[0];
-                  if (!file) return;
-                  if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
-                    setPhotoMsg({ type: 'err', text: 'Use JPEG, PNG, or WebP only.' });
-                    return;
-                  }
-                  if (file.size > 5 * 1024 * 1024) {
-                    setPhotoMsg({ type: 'err', text: 'Image must be under 5MB.' });
-                    return;
-                  }
-                  setPhotoFile(file);
-                  setPhotoPreview((prev) => {
-                    if (prev) URL.revokeObjectURL(prev);
-                    return URL.createObjectURL(file);
-                  });
-                  setPhotoMsg(null);
-                }}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-re-bg px-4 py-2.5 text-xs font-bold text-re-text hover:border-re-orange/30 hover:bg-white transition-colors"
-                >
-                  <Upload size={14} />
-                  Choose image
-                </button>
-                {photoFile && (
-                  <button
-                    type="button"
-                    disabled={photoSaving}
-                    onClick={handlePhotoUpload}
-                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-re-glow disabled:opacity-60"
-                    style={{ background: 'linear-gradient(135deg,#FF8C00,#FF5E00)' }}
-                  >
-                    {photoSaving ? <Loader2 size={14} className="animate-spin" /> : null}
-                    {photoSaving ? 'Uploading…' : 'Save photo'}
-                  </button>
-                )}
-              </div>
-              <p className="text-[11px] text-re-text-muted leading-relaxed">
-                This photo appears in the top bar and sidebar across the teacher portal.
-              </p>
-              {photoMsg && (
-                <p className={`text-xs font-semibold flex items-center gap-1.5 ${photoMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {photoMsg.type === 'ok' ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                  {photoMsg.text}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Change password */}
-        <div className="rounded-2xl border border-black/5 bg-white p-5 sm:p-6 shadow-sm">
-          <h2 className="text-xs font-bold text-re-text uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Lock size={14} className="text-re-orange" />
-            Change password
-          </h2>
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-re-text-muted uppercase tracking-widest mb-1.5">
-                Current password
-              </label>
-                <div className="relative">
-                  <input
-                    type={showCurrentPw ? 'text' : 'password'}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-black/10 bg-re-bg/50 px-4 pr-11 text-sm text-re-text outline-none focus:border-re-orange/40 focus:ring-2 focus:ring-re-orange/10"
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPw((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-re-text-muted hover:text-re-orange"
-                    aria-label={showCurrentPw ? 'Hide password' : 'Show password'}
-                  >
-                    {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-            <div>
-              <label className="block text-[10px] font-bold text-re-text-muted uppercase tracking-widest mb-1.5">
-                New password
-              </label>
-              <div className="relative">
-                <input
-                  type={showNewPw ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full h-11 rounded-xl border border-black/10 bg-re-bg/50 px-4 pr-11 text-sm text-re-text outline-none focus:border-re-orange/40 focus:ring-2 focus:ring-re-orange/10"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPw((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-re-text-muted hover:text-re-orange"
-                  aria-label={showNewPw ? 'Hide password' : 'Show password'}
-                >
-                  {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-re-text-muted uppercase tracking-widest mb-1.5">
-                Confirm new password
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPw ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-11 rounded-xl border border-black/10 bg-re-bg/50 px-4 pr-11 text-sm text-re-text outline-none focus:border-re-orange/40 focus:ring-2 focus:ring-re-orange/10"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPw((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-re-text-muted hover:text-re-orange"
-                  aria-label={showConfirmPw ? 'Hide password' : 'Show password'}
-                >
-                  {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            {pwMsg && (
-              <p className={`text-xs font-semibold flex items-center gap-1.5 ${pwMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>
-                {pwMsg.type === 'ok' ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                {pwMsg.text}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={pwSaving}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl text-sm font-bold text-white disabled:opacity-60 shadow-re-glow"
-              style={{ background: 'linear-gradient(135deg,#FF8C00,#FF5E00)' }}
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy, mb: 1 }}>Profile photo</Typography>
+        <Paper elevation={0} sx={{ p: 2, mb: 2.5, border: `1px solid ${brand.border}`, borderRadius: 1 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Avatar
+              src={displaySrc || undefined}
+              variant="rounded"
+              sx={{ width: 64, height: 64, borderRadius: 1, bgcolor: brand.navy, color: '#fff', fontWeight: 700, fontSize: 20 }}
             >
-              {pwSaving ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+              {initials}
+            </Avatar>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography noWrap sx={{ fontSize: 15, fontWeight: 700, color: brand.navy }}>
+                {displayName}
+              </Typography>
+              <Typography noWrap sx={{ fontSize: 12, color: brand.muted }}>
+                {teacher?.email || '—'}
+              </Typography>
+              <Typography noWrap sx={{ fontSize: 12, color: brand.muted }}>
+                {schoolName}
+              </Typography>
+            </Box>
+          </Stack>
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (photoPreview) URL.revokeObjectURL(photoPreview);
+              setPhotoFile(file);
+              setPhotoPreview(URL.createObjectURL(file));
+              setPhotoMsg(null);
+            }}
+          />
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FileUploadOutlinedIcon />}
+              onClick={() => photoInputRef.current?.click()}
+              sx={{ textTransform: 'none', fontWeight: 600, flex: 1, borderColor: brand.border, color: brand.navy }}
+            >
+              Choose photo
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={!photoFile || photoSaving}
+              onClick={() => void handlePhotoUpload()}
+              startIcon={photoSaving ? <CircularProgress size={16} color="inherit" /> : null}
+              sx={{ textTransform: 'none', fontWeight: 700, flex: 1 }}
+            >
+              {photoSaving ? 'Saving…' : 'Save photo'}
+            </Button>
+          </Stack>
+          <MessageLine msg={photoMsg} />
+        </Paper>
+
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy, mb: 1 }}>Password</Typography>
+        <Paper
+          component="form"
+          onSubmit={handlePasswordChange}
+          elevation={0}
+          sx={{ p: 2, border: `1px solid ${brand.border}`, borderRadius: 1 }}
+        >
+          <Stack spacing={1.75}>
+            {passwordFields.map((field) => (
+              <Box key={field.label}>
+                <Typography component="label" sx={fieldLabelSx}>
+                  {field.label}
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type={field.show ? 'text' : 'password'}
+                  value={field.value}
+                  onChange={(e) => field.setValue(e.target.value)}
+                  autoComplete={field.autoComplete}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton onClick={field.toggle} edge="end" size="small" aria-label="Toggle visibility">
+                          {field.show ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+            ))}
+            <MessageLine msg={pwMsg} />
+            <Button
+              type="submit"
+              fullWidth
+              disabled={pwSaving}
+              variant="contained"
+              color="secondary"
+              startIcon={pwSaving ? <CircularProgress size={16} color="inherit" /> : <LockOutlinedIcon />}
+              sx={{ mt: 0.5, py: 1.25, fontWeight: 700, textTransform: 'none' }}
+            >
               {pwSaving ? 'Updating…' : 'Update password'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+            </Button>
+          </Stack>
+        </Paper>
+      </Box>
+    </Box>
   );
 }

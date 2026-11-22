@@ -502,36 +502,49 @@ export async function staffRankings(organizationId: string, query?: PeriodQuery)
 }
 
 export async function studentsClassPerformance(organizationId: string, query?: PeopleQuery) {
-  const overview = await studentsOverview(organizationId, { ...query, page: 1, limit: 500 });
-  const byClass = new Map<
-    string,
-    { className: string; studentCount: number; rateSum: number; presentSum: number; expectedSum: number }
-  >();
-  for (const row of overview.rows) {
-    const className = row.className?.trim() || "Unassigned";
-    const bucket = byClass.get(className) ?? {
-      className,
-      studentCount: 0,
-      rateSum: 0,
-      presentSum: 0,
-      expectedSum: 0,
-    };
-    bucket.studentCount += 1;
-    bucket.rateSum += row.performance?.rate ?? 0;
-    bucket.presentSum += row.performance?.presentDays ?? 0;
-    bucket.expectedSum += row.performance?.expectedDays ?? 0;
-    byClass.set(className, bucket);
+  try {
+    const academic = await fetchAcademicContext(organizationId);
+    const period = resolvePeriod(query, academic);
+    const isSingleDay = period.from === period.to;
+    const records = await listAttendance(organizationId, {
+      ...(isSingleDay ? { date: period.from } : { from: period.from, to: period.to }),
+      q: query?.q,
+      className: query?.className,
+      personType: "STUDENT",
+    });
+    const studentRecords = records.filter((r) => !r.level?.startsWith("STAFF:"));
+    const byClass = new Map<string, { className: string; people: Set<string>; presentDays: Set<string>; totalEvents: number }>();
+    for (const r of studentRecords) {
+      const className = (r.className || "Unassigned").trim() || "Unassigned";
+      const bucket = byClass.get(className) ?? { className, people: new Set<string>(), presentDays: new Set<string>(), totalEvents: 0 };
+      const personKey = String(r.studentId || r.studentCode || r.cardNumber || r.studentName || r.id).toLowerCase();
+      if (personKey) bucket.people.add(personKey);
+      const day = r.lessonDate ? new Date(r.lessonDate).toISOString().slice(0, 10) : "";
+      if (isPresentStatus(r.status)) {
+        if (day) bucket.presentDays.add(`${personKey}|${day}`); else bucket.presentDays.add(`${personKey}|${r.id}`);
+      }
+      bucket.totalEvents += 1;
+      byClass.set(className, bucket);
+    }
+    const daysInPeriod = Math.max(1, countWeekdays(period.from, period.to) || (isSingleDay ? 1 : 1));
+    const classes = [...byClass.values()]
+      .map((c) => {
+        const expectedDays = c.people.size * daysInPeriod;
+        const presentDays = c.presentDays.size;
+        const avgRate = expectedDays > 0 ? Math.round((presentDays / expectedDays) * 100) : 0;
+        return {
+          className: c.className,
+          studentCount: c.people.size,
+          avgRate,
+          presentDays,
+          expectedDays,
+        };
+      })
+      .sort((a, b) => b.avgRate - a.avgRate || a.className.localeCompare(b.className));
+    return { period, classes };
+  } catch {
+    return { period: { from: query?.from || todayIso(), to: query?.to || query?.from || todayIso(), label: query?.term || query?.academicYear || "Selected period" }, classes: [] };
   }
-  const classes = [...byClass.values()]
-    .map((c) => ({
-      className: c.className,
-      studentCount: c.studentCount,
-      avgRate: c.studentCount ? Math.round(c.rateSum / c.studentCount) : 0,
-      presentDays: c.presentSum,
-      expectedDays: c.expectedSum,
-    }))
-    .sort((a, b) => b.avgRate - a.avgRate);
-  return { period: overview.period, classes };
 }
 
 export async function studentsInClassPerformance(

@@ -9,6 +9,7 @@ import {
 import { settingsController } from '../controllers/settings.controller';
 import { permissionController } from '../controllers/permission.controller';
 import { gateController } from '../controllers/gate.controller';
+import { rollCallController } from '../controllers/roll-call.controller';
 import {
   authenticate,
   requireModuleLicense,
@@ -97,6 +98,14 @@ protectedRouter.post('/gate/permissions/:permissionId/checkout', (req, res, next
 protectedRouter.post('/gate/permissions/:permissionId/checkin', (req, res, next) => gateController.checkin(req, res, next));
 protectedRouter.post('/gate/emergency-exit', (req, res, next) => gateController.emergencyExit(req, res, next));
 
+// Round roll call (moved from TichaPortal)
+protectedRouter.get('/roll-call/classes', (req, res, next) => integrationController.classes(req, res, next));
+protectedRouter.get('/roll-call/roster', (req, res, next) => rollCallController.roster(req, res, next));
+protectedRouter.get('/roll-call/sessions', (req, res, next) => rollCallController.sessions(req, res, next));
+protectedRouter.get('/roll-call/history', (req, res, next) => rollCallController.history(req, res, next));
+protectedRouter.get('/roll-call/sessions/:sessionId', (req, res, next) => rollCallController.session(req, res, next));
+protectedRouter.post('/roll-call', (req, res, next) => rollCallController.save(req, res, next));
+
 router.get('/service/discipline/cases', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   disciplineCaseController.listService(req, res, next)
 );
@@ -105,12 +114,35 @@ router.post('/service/discipline/cases', requireServiceAuth, requireServiceTenan
   disciplineCaseController.createService(req, res, next)
 );
 
+router.get('/service/discipline/profile', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  disciplineCaseController.profileService(req, res, next)
+);
+
 router.get('/service/discipline/marks', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   disciplineMarkController.listService(req, res, next)
 );
 
+router.get('/service/discipline/auto-absence/enabled', requireServiceAuth, (req, res, next) =>
+  settingsController.listAutoAbsenceEnabled(req, res, next)
+);
+
+router.post('/service/discipline/auto-absence/mark-run', requireServiceAuth, (req, res, next) =>
+  settingsController.markAutoAbsenceRun(req, res, next)
+);
+
+router.post(
+  '/service/discipline/attendance-event',
+  requireServiceAuth,
+  requireServiceTenant,
+  (req, res, next) => settingsController.applyAttendanceEvent(req, res, next)
+);
+
 router.get('/service/permissions', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   permissionController.listService(req, res, next)
+);
+
+router.post('/service/gate/rfid-permission-exit', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  gateController.rfidPermissionExit(req, res, next)
 );
 
 router.use(protectedRouter);

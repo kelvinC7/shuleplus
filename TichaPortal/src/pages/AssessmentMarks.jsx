@@ -1,9 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import {
-  ArrowLeft, ChevronDown, Download, Loader2, Lock,
-  Save, Search, Send, Clock,
-} from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Menu from '@mui/material/Menu';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DownloadIcon from '@mui/icons-material/Download';
+import SaveIcon from '@mui/icons-material/Save';
+import SendIcon from '@mui/icons-material/Send';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import {
   enterAssessmentMarks,
   fetchAssessment,
@@ -19,7 +38,6 @@ import { submitAssessmentMarks, fetchAssessmentActivity, fetchMyCorrectionReques
 import RequestEditModal from './coursesMarks/RequestEditModal.jsx';
 import { useTpToast } from '../components/TpToast.jsx';
 import {
-  UI_STATUS,
   assessmentMaxMark,
   canEditMarks,
   gradeFromScale,
@@ -30,38 +48,50 @@ import {
 } from './coursesMarks/statusUtils.js';
 import { buildPerformanceStats, collectScoredRows } from '../utils/assessmentPerformance.js';
 import AssessmentPerformancePanel from './AssessmentPerformancePanel.jsx';
+import { brand } from '../theme/theme';
+
+const BANNER_SX = {
+  submitted: { bgcolor: '#FFFBEB', color: '#78350F', border: '1px solid #FDE68A' },
+  locked: { bgcolor: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' },
+  edit_pending: { bgcolor: '#FEFCE8', color: '#713F12', border: '1px solid #FEF08A' },
+};
 
 function StatusBanner({ status, correction }) {
   const ui = correction?.status === 'PENDING' ? 'edit_pending' : correction?.status === 'REJECTED' ? 'locked' : null;
   const key = ui || (String(status || 'DRAFT').toUpperCase() === 'SUBMITTED' ? 'submitted' : isLockedStatus(status) ? 'locked' : 'draft');
-  const cfg = UI_STATUS[key] || UI_STATUS.draft;
 
   if (key === 'draft') return null;
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 flex items-start gap-3 ${cfg.color}`}>
-      <Lock size={18} className="shrink-0 mt-0.5" />
-      <div className="text-sm">
-        {correction?.status === 'PENDING' && (
+    <Box sx={{ ...BANNER_SX[key], borderRadius: 2, px: 2, py: 1.5, display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+      <LockOutlinedIcon sx={{ fontSize: 18, mt: 0.25, flexShrink: 0 }} />
+      <Box>
+        {correction?.status === 'PENDING' ? (
           <>
-            <p className="font-semibold">Edit request pending</p>
-            <p className="text-xs mt-0.5 opacity-80">Your request is waiting for Academic review.</p>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Edit request pending</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, opacity: 0.8 }}>
+              Your request is waiting for Academic review.
+            </Typography>
           </>
-        )}
-        {correction?.status === 'REJECTED' && (
+        ) : null}
+        {correction?.status === 'REJECTED' ? (
           <>
-            <p className="font-semibold">Edit request rejected</p>
-            <p className="text-xs mt-0.5 opacity-80">{correction.reviewNotes || 'Contact your marks administrator.'}</p>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Edit request rejected</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, opacity: 0.8 }}>
+              {correction.reviewNotes || 'Contact your marks administrator.'}
+            </Typography>
           </>
-        )}
-        {!correction && isLockedStatus(status) && (
+        ) : null}
+        {!correction && isLockedStatus(status) ? (
           <>
-            <p className="font-semibold">These marks have been submitted</p>
-            <p className="text-xs mt-0.5 opacity-80">Direct editing is blocked. Use Request Edit if a correction is needed.</p>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>These marks have been submitted</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, opacity: 0.8 }}>
+              Direct editing is blocked. Use Request Edit if a correction is needed.
+            </Typography>
           </>
-        )}
-      </div>
-    </div>
+        ) : null}
+      </Box>
+    </Box>
   );
 }
 
@@ -74,8 +104,7 @@ export default function AssessmentMarks() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [downloadOpen, setDownloadOpen] = useState(false);
-  const downloadMenuRef = useRef(null);
+  const [downloadAnchor, setDownloadAnchor] = useState(null);
   const [pdfScoreMode, setPdfScoreMode] = useState('entered');
   const [courseDefaultTotal, setCourseDefaultTotal] = useState(null);
   const [gradingScale, setGradingScale] = useState([]);
@@ -131,7 +160,21 @@ export default function AssessmentMarks() {
           studentList = [];
         }
       }
-      setStudents(Array.isArray(studentList) ? studentList : []);
+      // Always show the marks roster in ascending alphabetical order (A–Z).
+      const sortedStudents = (Array.isArray(studentList) ? studentList : []).sort((x, y) => {
+        const nameOrder = String(x.fullName || x.name || '').localeCompare(
+          String(y.fullName || y.name || ''),
+          undefined,
+          { sensitivity: 'base', numeric: true },
+        );
+        if (nameOrder) return nameOrder;
+        return String(x.studentCode || x.adm || '').localeCompare(
+          String(y.studentCode || y.adm || ''),
+          undefined,
+          { sensitivity: 'base', numeric: true },
+        );
+      });
+      setStudents(sortedStudents);
 
       const next = {};
       for (const m of existingList) {
@@ -171,25 +214,9 @@ export default function AssessmentMarks() {
     }
   }, [id]);
 
-  useEffect(() => { void load(); }, [load]);
-
   useEffect(() => {
-    if (!downloadOpen) return undefined;
-    function onPointerDown(e) {
-      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target)) {
-        setDownloadOpen(false);
-      }
-    }
-    function onKeyDown(e) {
-      if (e.key === 'Escape') setDownloadOpen(false);
-    }
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [downloadOpen]);
+    void load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -249,8 +276,7 @@ export default function AssessmentMarks() {
   function assertMarksValid() {
     if (!markIssues.length) return true;
     const first = markIssues[0];
-    const extra =
-      markIssues.length > 1 ? ` (${markIssues.length} students have scores to fix)` : '';
+    const extra = markIssues.length > 1 ? ` (${markIssues.length} students have scores to fix)` : '';
     toast.error(`${first.studentName}: ${first.message}${extra}`);
     return false;
   }
@@ -313,7 +339,7 @@ export default function AssessmentMarks() {
         courseDefaultMax: courseDefaultTotal,
       });
       toast.success('Marks sheet downloaded');
-      setDownloadOpen(false);
+      setDownloadAnchor(null);
     } catch (err) {
       toast.error(tpApiError(err, 'Could not generate PDF'));
     } finally {
@@ -343,7 +369,9 @@ export default function AssessmentMarks() {
     saveTimer.current = setTimeout(() => {
       enterAssessmentMarks(id, buildMarksPayload()).then(() => setLastSaved(new Date())).catch(() => {});
     }, 8000);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
   }, [entries, editable, id, loading, students, markIssues.length]);
 
   function focusRow(idx) {
@@ -352,9 +380,10 @@ export default function AssessmentMarks() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-sm text-[#000435]/50">
-        <Loader2 className="h-5 w-5 animate-spin" /> Loading marks workspace…
-      </div>
+      <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ py: 10 }}>
+        <CircularProgress size={20} sx={{ color: brand.navy }} />
+        <Typography sx={{ fontSize: 13, color: 'rgba(19,33,61,0.5)' }}>Loading marks workspace…</Typography>
+      </Stack>
     );
   }
 
@@ -367,333 +396,467 @@ export default function AssessmentMarks() {
       : assessment?.status;
 
   return (
-    <div className="tp-page space-y-5 pb-12">
-      <div className="relative z-10 overflow-visible rounded-2xl border border-slate-200/80 bg-gradient-to-br from-[#000435] via-[#000435] to-[#1a1f5c] text-white shadow-lg">
-        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
-          <div className="min-w-0">
-            <Link
-              to="/assessments/schedule"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-white/70 transition hover:text-white"
-            >
-              <ArrowLeft size={14} /> Back to assessments
-            </Link>
-            <h1 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
+    <Box sx={{ display: 'flex', flexDirection: 'column', pb: 6 }}>
+      {/* Sticky tabs — full width, square */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 22,
+          bgcolor: '#fff',
+          borderBottom: '1px solid rgba(19,33,61,0.08)',
+          display: 'flex',
+        }}
+      >
+        {[
+          { id: 'marks', label: 'Marks' },
+          { id: 'performance', label: 'Performance' },
+          { id: 'activity', label: 'Activity' },
+        ].map((t) => (
+          <Button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            sx={{
+              flex: 1,
+              borderRadius: 0,
+              py: 1.15,
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+              borderBottom: tab === t.id ? `2px solid ${brand.navy}` : '2px solid transparent',
+              color: tab === t.id ? brand.navy : 'rgba(19,33,61,0.45)',
+              bgcolor: tab === t.id ? 'rgba(19,33,61,0.03)' : 'transparent',
+              textTransform: 'none',
+              minWidth: 0,
+              '&:hover': { color: brand.navy, bgcolor: 'rgba(19,33,61,0.04)' },
+            }}
+          >
+            {t.label}
+          </Button>
+        ))}
+      </Box>
+
+      {/* Sticky plain search under tabs (marks only) */}
+      {tab === 'marks' ? (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 40,
+            zIndex: 20,
+            bgcolor: '#fff',
+            borderBottom: '1px solid rgba(19,33,61,0.08)',
+            px: 1.5,
+            py: 0.5,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <SearchIcon sx={{ fontSize: 16, color: 'rgba(19,33,61,0.3)', mr: 1, flexShrink: 0 }} />
+          <Box
+            component="input"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search student…"
+            sx={{
+              width: '100%',
+              border: 'none',
+              outline: 'none',
+              bgcolor: 'transparent',
+              py: 0.75,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              color: brand.navy,
+              '&::placeholder': { color: 'rgba(19,33,61,0.35)', fontWeight: 500 },
+            }}
+          />
+        </Box>
+      ) : null}
+
+      <Stack spacing={2} sx={{ p: { xs: 1.25, md: 2, lg: 2.5 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'flex-start' }} justifyContent="space-between" spacing={1.5}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: brand.navy }}>
               {assessment?.subject?.name || 'Course'}
-              <span className="text-white/60"> · </span>
+              <Box component="span" sx={{ color: 'rgba(19,33,61,0.35)' }}>{' · '}</Box>
               {classLabel || 'Class'}
-            </h1>
-            <p className="mt-1 text-sm text-white/65">
-              {componentLabel} · Max {maxMark} marks
-              {assessment?.assessmentCode ? (
-                <span className="ml-2 font-mono text-xs text-[#FCB038]">{assessment.assessmentCode}</span>
-              ) : null}
-            </p>
-            <span className="mt-3 inline-flex rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90">
-              {statusTone}
-            </span>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {editable && (
+            </Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, color: 'rgba(19,33,61,0.45)' }}>
+              {componentLabel} · Max {maxMark}
+              {assessment?.assessmentCode ? ` · ${assessment.assessmentCode}` : ''}
+              {' · '}{statusTone}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
+            {editable ? (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="outlined"
+                  size="small"
                   disabled={saving}
                   onClick={() => void handleSaveDraft()}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-white/15"
+                  startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 600, flex: { xs: 1, sm: 'unset' } }}
                 >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   Save draft
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
                   disabled={submitting || stats.entered === 0}
                   onClick={() => void handleSubmit()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#FCB038] px-4 py-2 text-xs font-bold text-[#000435] hover:bg-[#ffd080]"
+                  startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 700, flex: { xs: 1, sm: 'unset' } }}
                 >
-                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   Submit marks
-                </button>
+                </Button>
               </>
-            )}
-            <div className="relative" ref={downloadMenuRef}>
-              <div className="inline-flex overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-white/40">
-                <button
-                  type="button"
-                  disabled={!students.length || downloading}
-                  onClick={() => void handleDownloadPdf(pdfScoreMode)}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-[#000435] hover:bg-[#FCB038] disabled:opacity-50"
-                >
-                  {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  Download PDF
-                </button>
-                <button
-                  type="button"
-                  disabled={!students.length}
-                  aria-expanded={downloadOpen}
-                  aria-haspopup="listbox"
-                  onClick={() => setDownloadOpen((o) => !o)}
-                  className="inline-flex items-center border-l border-slate-200/80 px-2.5 py-2 text-[#000435] hover:bg-[#FCB038] disabled:opacity-50"
-                >
-                  <ChevronDown size={16} className={`transition-transform ${downloadOpen ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-              {downloadOpen && (
-                <div
-                  role="dialog"
-                  aria-label="PDF score format"
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(calc(100vw-2rem),18rem)] origin-top-right rounded-xl border border-slate-200 bg-white p-3 text-[#000435] shadow-2xl ring-1 ring-black/5"
-                >
-                  <label htmlFor="pdf-score-format" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            ) : null}
+
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Button
+                variant="contained"
+                size="small"
+                fullWidth
+                disabled={!students.length || downloading}
+                onClick={(e) => setDownloadAnchor(e.currentTarget)}
+                startIcon={downloading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
+                endIcon={<ExpandMoreIcon />}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: brand.navy,
+                  color: '#fff',
+                  '&:hover': { bgcolor: '#1B2D52' },
+                }}
+              >
+                PDF
+              </Button>
+              <Menu
+                anchorEl={downloadAnchor}
+                open={Boolean(downloadAnchor)}
+                onClose={() => setDownloadAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                PaperProps={{ sx: { mt: 0.5, width: 288, p: 1.5, borderRadius: 2 } }}
+              >
+                <Box sx={{ px: 0.5, py: 0.5 }}>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>
                     Score format
-                  </label>
-                  <select
-                    id="pdf-score-format"
+                  </Typography>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
                     value={pdfScoreMode}
                     onChange={(e) => setPdfScoreMode(e.target.value)}
-                    className="mt-1.5 w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-[#000435] shadow-inner focus:border-[#FCB038] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FCB038]/35"
+                    sx={{ mt: 1 }}
                   >
-                    <option value="entered">As entered (out of {maxMark})</option>
-                    <option value="converted" disabled={!courseDefaultTotal}>
+                    <MenuItem value="entered">As entered (out of {maxMark})</MenuItem>
+                    <MenuItem value="converted" disabled={!courseDefaultTotal}>
                       {courseDefaultTotal
                         ? `Converted (out of ${courseDefaultTotal})`
                         : 'Converted (set total in Academic Courses)'}
-                    </option>
-                  </select>
-                  <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                    </MenuItem>
+                  </TextField>
+                  <Typography sx={{ mt: 1, fontSize: 11, lineHeight: 1.4, color: brand.muted }}>
                     {pdfScoreMode === 'entered'
                       ? `PDF lists students highest to lowest with score / ${maxMark}, %, and grade.`
                       : courseDefaultTotal
                         ? `PDF lists students highest to lowest with course score / ${courseDefaultTotal} (quiz marks shown under each row).`
                         : 'Ask Academic to set the course total under Courses → Course catalog.'}
-                  </p>
-                  <button
-                    type="button"
+                  </Typography>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
                     disabled={downloading}
                     onClick={() => void handleDownloadPdf(pdfScoreMode)}
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#000435] py-2 text-xs font-bold text-white hover:bg-[#000435]/90 disabled:opacity-50"
+                    startIcon={downloading ? <CircularProgress size={14} color="inherit" /> : <DownloadIcon />}
+                    sx={{ mt: 1.5, fontWeight: 700 }}
                   >
-                    {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                     Download now
-                  </button>
-                </div>
-              )}
-            </div>
-            {locked && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setEditOpen(true)}
-                  className="rounded-xl border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-xs font-semibold text-amber-100"
-                >
-                  Request edit
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+                  </Button>
+                </Box>
+              </Menu>
+            </Box>
 
-      <StatusBanner status={assessment?.status} correction={assessment?.correction_request} />
-
-      {markIssues.length > 0 && editable && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-          <p className="font-semibold">Some scores are outside the allowed range</p>
-          <p className="mt-1 text-xs leading-relaxed text-red-800/90">
-            This assessment is marked out of <strong>{maxMark}</strong>. Adjust highlighted scores before saving or submitting.
-            {markIssues.length === 1
-              ? ` ${markIssues[0].studentName}: ${markIssues[0].message}`
-              : ` ${markIssues.length} students need corrections.`}
-          </p>
-        </div>
-      )}
-
-      {lastSaved && editable && (
-        <p className="flex items-center gap-1 text-[11px] text-slate-400">
-          <Clock size={12} /> Auto-saved {lastSaved.toLocaleTimeString()}
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: 'Students', value: stats.totalStudents },
-          { label: 'Entered', value: stats.entered },
-          { label: 'Missing', value: stats.missing, warn: stats.missing > 0 },
-          { label: 'Average', value: stats.average != null ? `${stats.average}/${maxMark}` : '-' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className={`rounded-xl border px-4 py-3 ${s.warn ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-white shadow-sm'}`}
-          >
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{s.label}</p>
-            <p className="mt-0.5 text-xl font-bold tabular-nums text-[#000435]">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="tp-card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
-            {[
-              { id: 'marks', label: 'Marks' },
-              { id: 'performance', label: 'Performance' },
-              { id: 'activity', label: 'Activity' },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                  tab === t.id ? 'bg-white text-[#000435] shadow-sm' : 'text-slate-500'
-                }`}
+            {locked ? (
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => setEditOpen(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  flex: 1,
+                  bgcolor: brand.primary,
+                  color: brand.navy,
+                  '&:hover': { bgcolor: brand.primaryStrong },
+                }}
               >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {tab === 'marks' ? (
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search student…"
-                className="tp-input h-10 w-full pl-10 text-sm"
-              />
-            </div>
-          ) : null}
-        </div>
+                Request edit
+              </Button>
+            ) : null}
+          </Stack>
+        </Stack>
+
+        <StatusBanner status={assessment?.status} correction={assessment?.correction_request} />
+
+        {markIssues.length > 0 && editable ? (
+          <Alert severity="error" sx={{ borderRadius: 1.5 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Some scores are outside the allowed range</Typography>
+            <Typography sx={{ mt: 0.5, fontSize: 12, lineHeight: 1.5 }}>
+              This assessment is marked out of <strong>{maxMark}</strong>. Adjust highlighted scores before saving or submitting.
+              {markIssues.length === 1
+                ? ` ${markIssues[0].studentName}: ${markIssues[0].message}`
+                : ` ${markIssues.length} students need corrections.`}
+            </Typography>
+          </Alert>
+        ) : null}
+
+        {lastSaved && editable ? (
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: '#94A3B8' }}>
+            <AccessTimeIcon sx={{ fontSize: 12 }} />
+            <Typography sx={{ fontSize: 11 }}>Auto-saved {lastSaved.toLocaleTimeString()}</Typography>
+          </Stack>
+        ) : null}
 
         {tab === 'performance' ? (
-          <AssessmentPerformancePanel performance={performance} maxMark={maxMark} />
-        ) : tab === 'marks' ? (
-          students.length === 0 ? (
-            <div className="px-6 py-14 text-center">
-              <p className="text-sm font-medium text-[#000435]">No students loaded for this class</p>
-              <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">
-                Check that Student Management has active students in {classLabel || 'this class'} for {assessment?.academicYear || 'this year'}.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    {['#', 'Student', 'Score', 'Grade', 'Status'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filtered.map((s, idx) => {
-                    const e = entries[s.id] || {};
-                    const scoreNum = parseMarkScore(e.score);
-                    const scoreError =
-                      scoreNum != null ? markScoreValidationError(scoreNum, maxMark) : null;
-                    const invalid = Boolean(scoreError);
-                    const grade = invalid ? null : gradeFromScale(scoreNum, maxMark, gradingScale);
-                    const missing =
-                      e.markStatus === 'PRESENT' && (e.score === '' || e.score == null) && !invalid;
-                    return (
-                      <tr key={s.id} className="transition hover:bg-[#FCB038]/[0.06]">
-                        <td className="px-4 py-2.5 text-slate-400">{idx + 1}</td>
-                        <td className="px-4 py-2.5">
-                          <p className="font-semibold text-[#000435]">{s.fullName}</p>
-                          <p className="text-[10px] text-slate-400">{s.studentCode}</p>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {editable ? (
-                            <div>
-                              <input
-                                ref={(el) => {
-                                  inputRefs.current[idx] = el;
-                                }}
-                                type="number"
-                                min={0}
-                                max={maxMark}
-                                step="any"
-                                value={e.score ?? ''}
-                                onChange={(ev) => updateEntry(s.id, { score: ev.target.value })}
-                                aria-invalid={invalid}
-                                aria-describedby={invalid ? `score-error-${s.id}` : undefined}
-                                onKeyDown={(ev) => {
-                                  if (ev.key === 'ArrowDown') {
-                                    ev.preventDefault();
-                                    focusRow(idx + 1);
-                                  }
-                                  if (ev.key === 'ArrowUp') {
-                                    ev.preventDefault();
-                                    focusRow(idx - 1);
-                                  }
-                                  if (ev.key === 'Enter') {
-                                    ev.preventDefault();
-                                    focusRow(idx + 1);
-                                  }
-                                }}
-                                className={`h-10 w-24 rounded-xl border text-center font-semibold tabular-nums ${
-                                  invalid
-                                    ? 'border-red-400 bg-red-50 ring-2 ring-red-200/80'
-                                    : 'border-slate-200 focus:border-[#FCB038] focus:outline-none focus:ring-2 focus:ring-[#FCB038]/25'
-                                }`}
-                              />
-                              {invalid && scoreError ? (
-                                <p
-                                  id={`score-error-${s.id}`}
-                                  className="mt-1 max-w-[11rem] text-[10px] font-medium leading-snug text-red-700"
-                                >
-                                  {scoreError}
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <span className="font-bold tabular-nums text-[#000435]">
-                              {scoreNum ?? '-'} / {maxMark}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="inline-flex min-w-[2rem] justify-center rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-bold text-[#000435]">
-                            {grade || '-'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {invalid ? (
-                            <span className="text-xs font-medium text-red-700">Fix score</span>
-                          ) : missing ? (
-                            <span className="text-xs font-medium text-amber-700">Missing</span>
-                          ) : scoreNum != null ? (
-                            <span className="text-xs font-medium text-emerald-700">Done</span>
-                          ) : (
-                            <span className="text-xs text-slate-400">{e.markStatus}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
+          <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(19,33,61,0.08)', overflow: 'hidden' }}>
+            <AssessmentPerformancePanel performance={performance} maxMark={maxMark} />
+          </Paper>
+        ) : tab === 'activity' ? (
+          <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(19,33,61,0.08)', p: 2.5 }}>
+            <Stack spacing={1.5}>
+              {activity.length === 0 ? (
+                <Typography sx={{ fontSize: 13, color: brand.muted }}>No activity recorded yet.</Typography>
+              ) : (
+                activity.map((ev, i) => (
+                  <Stack
+                    key={i}
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ pb: 1.5, borderBottom: i < activity.length - 1 ? `1px solid ${brand.border}` : 'none' }}
+                  >
+                    <Box sx={{ mt: 1, width: 8, height: 8, borderRadius: '50%', bgcolor: brand.primary, flexShrink: 0 }} />
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, color: brand.navy, fontSize: 13.5 }}>{ev.label}</Typography>
+                      {ev.detail ? (
+                        <Typography sx={{ mt: 0.25, fontSize: 12, color: brand.muted }}>{ev.detail}</Typography>
+                      ) : null}
+                      <Typography sx={{ mt: 0.5, fontSize: 10, color: '#94A3B8' }}>
+                        {ev.at ? new Date(ev.at).toLocaleString() : ''}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))
+              )}
+            </Stack>
+          </Paper>
         ) : (
-          <div className="space-y-3 p-5">
-            {activity.length === 0 ? (
-              <p className="text-sm text-slate-500">No activity recorded yet.</p>
-            ) : (
-              activity.map((ev, i) => (
-                <div key={i} className="flex gap-3 border-b border-slate-100 pb-3 text-sm last:border-0">
-                  <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FCB038]" />
-                  <div>
-                    <p className="font-semibold text-[#000435]">{ev.label}</p>
-                    {ev.detail && <p className="mt-0.5 text-xs text-slate-500">{ev.detail}</p>}
-                    <p className="mt-1 text-[10px] text-slate-400">{ev.at ? new Date(ev.at).toLocaleString() : ''}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <>
+            {/* Stats live under Marks tab only */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: 1.25 }}>
+              {[
+                { label: 'Students', value: stats.totalStudents },
+                { label: 'Entered', value: stats.entered },
+                { label: 'Missing', value: stats.missing },
+                { label: 'Average', value: stats.average != null ? `${stats.average}/${maxMark}` : '-' },
+              ].map((s) => (
+                <Box
+                  key={s.label}
+                  sx={{
+                    px: 1.75,
+                    py: 1.5,
+                    minHeight: 84,
+                    borderRadius: 0,
+                    bgcolor: brand.navy,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 2px 10px -4px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.72)' }}>
+                    {s.label}
+                  </Typography>
+                  <Typography sx={{ mt: 0.75, fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#fff', lineHeight: 1 }}>
+                    {s.value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Paper
+              component="section"
+              elevation={0}
+              sx={{ borderRadius: 2, border: '1px solid rgba(19,33,61,0.08)', bgcolor: '#fff', overflow: 'hidden' }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.5 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>Students</Typography>
+                <Box
+                  component="span"
+                  sx={{
+                    ml: 'auto',
+                    borderRadius: 999,
+                    bgcolor: '#F1F5F9',
+                    px: 1,
+                    py: 0.25,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: '#64748B',
+                  }}
+                >
+                  {filtered.length}
+                </Box>
+              </Stack>
+
+              {students.length === 0 ? (
+                <Box sx={{ px: 3, py: 6, textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 500, color: brand.navy }}>
+                    No students loaded for this class
+                  </Typography>
+                  <Typography sx={{ mx: 'auto', mt: 0.5, maxWidth: 384, fontSize: 12, color: brand.muted }}>
+                    Check that Student Management has active students in {classLabel || 'this class'} for{' '}
+                    {assessment?.academicYear || 'this year'}.
+                  </Typography>
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table size="small" sx={{ width: '100%', tableLayout: 'auto' }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, pl: { xs: 1.5, sm: 2 }, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8', bgcolor: '#F8F9FC', borderBottom: '1px solid rgba(19,33,61,0.08)', width: 36 }}>
+                          #
+                        </TableCell>
+                        <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8', bgcolor: '#F8F9FC', borderBottom: '1px solid rgba(19,33,61,0.08)' }}>
+                          Student
+                        </TableCell>
+                        <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8', bgcolor: '#F8F9FC', borderBottom: '1px solid rgba(19,33,61,0.08)', whiteSpace: 'nowrap' }}>
+                          Score/{maxMark}
+                        </TableCell>
+                        <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8', bgcolor: '#F8F9FC', borderBottom: '1px solid rgba(19,33,61,0.08)' }}>
+                          Grade
+                        </TableCell>
+                        <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, pr: { xs: 1.5, sm: 2 }, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8', bgcolor: '#F8F9FC', borderBottom: '1px solid rgba(19,33,61,0.08)' }}>
+                          Status
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filtered.map((s, idx) => {
+                        const e = entries[s.id] || {};
+                        const scoreNum = parseMarkScore(e.score);
+                        const scoreError = scoreNum != null ? markScoreValidationError(scoreNum, maxMark) : null;
+                        const invalid = Boolean(scoreError);
+                        const grade = invalid ? null : gradeFromScale(scoreNum, maxMark, gradingScale);
+                        const missing = e.markStatus === 'PRESENT' && (e.score === '' || e.score == null) && !invalid;
+                        return (
+                          <TableRow
+                            key={s.id}
+                            hover
+                            sx={{
+                              bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                              '&:last-child td': { borderBottom: 0 },
+                            }}
+                          >
+                            <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, pl: { xs: 1.5, sm: 2 }, fontSize: 12, color: '#94A3B8', fontWeight: 600, borderBottom: '1px solid rgba(19,33,61,0.05)' }}>
+                              {idx + 1}
+                            </TableCell>
+                            <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, borderBottom: '1px solid rgba(19,33,61,0.05)', maxWidth: 0, width: '100%' }}>
+                              <Typography noWrap sx={{ fontWeight: 600, color: brand.navy, fontSize: { xs: 12, sm: 13 } }}>{s.fullName}</Typography>
+                              <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>{s.studentCode}</Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 0.75, px: { xs: 1, sm: 1.5 }, borderBottom: '1px solid rgba(19,33,61,0.05)' }}>
+                              {editable ? (
+                                <Box>
+                                  <TextField
+                                    inputRef={(el) => {
+                                      inputRefs.current[idx] = el;
+                                    }}
+                                    type="number"
+                                    size="small"
+                                    value={e.score ?? ''}
+                                    onChange={(ev) => updateEntry(s.id, { score: ev.target.value })}
+                                    error={invalid}
+                                    onKeyDown={(ev) => {
+                                      if (ev.key === 'ArrowDown' || ev.key === 'Enter') {
+                                        ev.preventDefault();
+                                        focusRow(idx + 1);
+                                      }
+                                      if (ev.key === 'ArrowUp') {
+                                        ev.preventDefault();
+                                        focusRow(idx - 1);
+                                      }
+                                    }}
+                                    inputProps={{ min: 0, max: maxMark, step: 'any', 'aria-invalid': invalid }}
+                                    sx={{
+                                      width: 88,
+                                      '& .MuiOutlinedInput-input': {
+                                        textAlign: 'center',
+                                        fontWeight: 600,
+                                        fontVariantNumeric: 'tabular-nums',
+                                        py: 0.75,
+                                        fontSize: 13,
+                                      },
+                                    }}
+                                  />
+                                  {invalid && scoreError ? (
+                                    <Typography sx={{ mt: 0.35, maxWidth: 160, fontSize: 10, fontWeight: 500, lineHeight: 1.3, color: '#B91C1C' }}>
+                                      {scoreError}
+                                    </Typography>
+                                  ) : null}
+                                </Box>
+                              ) : (
+                                <Typography sx={{ fontWeight: 700, fontSize: 13, fontVariantNumeric: 'tabular-nums', color: brand.navy }}>
+                                  {scoreNum ?? '-'}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, borderBottom: '1px solid rgba(19,33,61,0.05)' }}>
+                              <Box
+                                sx={{
+                                  display: 'inline-flex',
+                                  minWidth: 28,
+                                  justifyContent: 'center',
+                                  borderRadius: 1,
+                                  bgcolor: '#F1F5F9',
+                                  px: 0.75,
+                                  py: 0.2,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: brand.navy,
+                                }}
+                              >
+                                {grade || '-'}
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ py: 0.85, px: { xs: 1, sm: 1.5 }, pr: { xs: 1.5, sm: 2 }, borderBottom: '1px solid rgba(19,33,61,0.05)' }}>
+                              {invalid ? (
+                                <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#B91C1C' }}>Fix score</Typography>
+                              ) : missing ? (
+                                <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#B45309' }}>Missing</Typography>
+                              ) : scoreNum != null ? (
+                                <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#047857' }}>Done</Typography>
+                              ) : (
+                                <Typography sx={{ fontSize: 12, color: '#94A3B8' }}>{e.markStatus}</Typography>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </>
         )}
-      </div>
+      </Stack>
 
       <RequestEditModal
         open={editOpen}
@@ -709,6 +872,6 @@ export default function AssessmentMarks() {
         }}
         onSuccess={load}
       />
-    </div>
+    </Box>
   );
 }

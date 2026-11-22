@@ -78,18 +78,20 @@ export function DisciplineSidebar({ open, onClose, orgName, onLogout }: Discipli
               const panelId = `discipline-nav-${section.id}`;
 
               return (
-                <li key={section.id} className="rounded-2xl">
+                <li key={section.id} className="mb-1 rounded-2xl">
                   <button
                     type="button"
                     id={`${panelId}-trigger`}
                     aria-expanded={isOpen}
                     aria-controls={panelId}
                     onClick={() => toggleSection(section.id)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition sm:gap-3 sm:px-3 ${
-                      sectionActive ? 'bg-white/[0.08] text-white' : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
+                    className={`group flex w-full items-center gap-2.5 rounded-2xl border px-2.5 py-2.5 text-left transition-all duration-200 sm:gap-3 sm:px-3 ${
+                      sectionActive
+                        ? 'border-[#fcb038]/30 bg-gradient-to-r from-[#fcb038]/20 via-[#fcb038]/5 to-transparent text-white shadow-[0_8px_20px_rgba(0,0,0,0.18)]'
+                        : 'border-transparent text-white/70 hover:border-white/10 hover:bg-white/[0.05] hover:text-white'
                     }`}
                   >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${sectionActive ? 'bg-[#fcb038]/20 text-[#fcb038]' : 'bg-white/[0.06] text-white/50'}`}>
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${sectionActive ? 'bg-[#fcb038]/20 text-[#fcb038] shadow-[0_4px_12px_rgba(252,176,56,0.2)]' : 'bg-white/[0.06] text-white/50 group-hover:bg-white/10'}`}>
                       <SectionIcon size={18} strokeWidth={1.75} />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -106,7 +108,11 @@ export function DisciplineSidebar({ open, onClose, orgName, onLogout }: Discipli
                     role="region"
                     aria-labelledby={`${panelId}-trigger`}
                     hidden={!isOpen}
-                    className={isOpen ? 'mt-1 ml-4 space-y-0.5 border-l border-white/10 pb-1 pl-3' : undefined}
+                    className={
+                      isOpen
+                        ? 'mt-2 ml-2 space-y-1 rounded-2xl border border-white/10 bg-white/[0.05] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-sm'
+                        : undefined
+                    }
                   >
                     {isOpen
                       ? section.items.map((item) => (

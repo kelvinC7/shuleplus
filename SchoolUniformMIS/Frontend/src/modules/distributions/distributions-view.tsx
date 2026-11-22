@@ -66,7 +66,7 @@ function statusLabel(r: DistributionReceipt) {
   return "Pending";
 }
 
-function shuleCodenf(s?: UniformStudent | null) {
+function shuleCode(s?: UniformStudent | null) {
   if (!s) return "";
   const meta = s.profileMeta as
     { shuleCode?: string; studentCode?: string } | null | undefined;
@@ -93,7 +93,7 @@ export function DistributionsView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
-  const [wizardnpen, setWizardnpen] = useState(false);
+  const [wizardOpen, setWizardnpen] = useState(false);
   const [selected, setSelected] = useState<DistributionReceipt | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
@@ -125,7 +125,7 @@ export function DistributionsView() {
       if (!inDateRange(r.issuedAt, dateFrom, dateTo)) return false;
       if (!term) return true;
       const student = `${r.student?.firstName ?? ""} ${r.student?.lastName ?? ""}`;
-      const code = shuleCodenf(r.student);
+      const code = shuleCode(r.student);
       return `${r.receiptNumber} ${student} ${r.student?.className ?? ""} ${code}`
         .toLowerCase()
         .includes(term);
@@ -236,7 +236,7 @@ export function DistributionsView() {
               {r.student ? `${r.student.firstName} ${r.student.lastName}` : ""}
             </p>
             <p className="truncate text-[11px] text-muted">
-              {shuleCodenf(r.student)}
+              {shuleCode(r.student)}
             </p>
           </div>
         </div>
@@ -355,7 +355,7 @@ export function DistributionsView() {
   return (
     <PlatformPageLayout
       title="Sells"
-      subtitle="One receipt per student sale — items nest under each sell."
+      subtitle="One receipt per student sale. Items nest under each sell."
       actions={
         <button
           type="button"
@@ -424,9 +424,9 @@ export function DistributionsView() {
         />
       </div>
 
-      {wizardnpen ? (
+      {wizardOpen ? (
         <DistributionWizard
-          open={wizardnpen}
+          open={wizardOpen}
           onClose={() => setWizardnpen(false)}
           onIssued={() => void load()}
           students={students}
@@ -504,7 +504,7 @@ function DistributionDetailDrawer({
                   {student?.className ?? ""}
                 </span>
                 <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-muted">
-                  {shuleCodenf(student)}
+                  {shuleCode(student)}
                 </span>
               </div>
             </div>

@@ -67,22 +67,28 @@ For each template component name (in template `sortOrder`, or discovered from as
 | Symbol | Formula |
 |--------|---------|
 | **weight** | Template `weightPercentage` if &gt; 0; else component weight; else `100 / number of components` |
-| **normalizedMax** | `DEFAULT × weight / 100` → e.g. DEFAULT 40, QUIZ 50% → **20** |
-| **avgPct** | If any marks in component: `pctSum / pctCount` (average % across quizzes in that component) |
-| **normalizedScore** | `avgPct / 100 × normalizedMax` |
-| **subject totalScore** | Sum of `normalizedScore` over all components that have marks |
+| **weightedMax** | `DEFAULT × weight / 100` → contribution cap toward course total (e.g. 20 when DEFAULT 40, QUIZ 50%) |
+| **displayMax** | Template **`maxMark`** when set, else **weight % as marks** (50% → **50** on report, same as Assessment Templates UI) |
+| **Per assessment** | Shown in breakdown: `(score / maxMark) × DEFAULT` per quiz |
+| **consolidatedOnDefault** | **Sum raw, then convert:** `(Σscore / ΣmaxMark) × DEFAULT` (e.g. 45/50 + 60/70 → 105/120 → **35/40**) |
+| **avgPct** | `(consolidatedOnDefault / DEFAULT) × 100` (drives contribution) |
+| **contribution** | `avgPct / 100 × weightedMax` (weight slice on DEFAULT, e.g. **16** of **20** when DEFAULT 40, QUIZ 50%) |
+| **Report Quiz/Exam cell** | Same as **consolidatedOnDefault** — teacher raw → **(Σscore/Σmax)×DEFAULT** (e.g. **89/100** on DEFAULT **40** → **35.6**; never above **DEFAULT**) |
+| **subject totalScore** | Sum of `contribution` over components that have marks |
 | **subject totalMax** | `DEFAULT` |
-| **subject percentage** | `(totalScore / DEFAULT) × 100` if any component has marks, else 0 |
+| **subject percentage** | If **courseComplete**: `(totalScore / DEFAULT) × 100`. If partial: `(totalScore / enteredWeightedMax) × 100` where `enteredWeightedMax` is the sum of weight slices for components with marks only |
+| **marksRecorded** | Per component: at least one **PRESENT** mark (including **score 0**). Missing component → UI **N/A**; recorded zero → **0** |
 
 **Report columns:**
 
 | UI column | Meaning |
 |-----------|---------|
 | **DEFAULT** | Course total marks (catalog) |
-| **QUIZ 50%** / **EXAM 50%** | Shows **normalizedScore / normalizedMax** (scaled to course), not necessarily the teacher’s quiz max (e.g. 25) |
-| **rawMarksDisplay** (API) | e.g. `20/40` entered, or `% average (2 assessments)` — UI may show this under the scaled cell |
+| **Student marks** | **studentMarksOnDefault** — all assessments pooled: **(Σscore/Σmax)×DEFAULT** (shown as e.g. **32/40**) |
+| **Component marks** (Quiz / Exam) | **normalizedScore / normalizedMax** on template component cap (e.g. **40/50**) |
+| **rawMarksDisplay** (API) | e.g. `105/120 → 35/40` when several quizzes share a component |
 | **Course result** | `totalScore / DEFAULT` |
-| **Total %** | Subject `percentage` |
+| **Total marks** | Subject `totalScore / totalMax` (the report table no longer has a separate percentage column) |
 | **Grade** | Letter from grading scale applied to subject `percentage` |
 | **Position** | Class rank for that **subject** when **courseComplete** (all weighted template components have marks) — see §5 |
 | **courseComplete** | `false` if any template component (weight &gt; 0) has no marks — grade/rank withheld; UI shows **Partial** |
@@ -104,8 +110,10 @@ For each template component name (in template `sortOrder`, or discovered from as
 For each student in the class (among students with at least one mark):
 
 ```text
-overallScore = ( Σ totalScore over subjects with marks ) / ( Σ DEFAULT over those subjects ) × 100
+overallScore = Σ subjectTotalScore / Σ subjectTotalMax × 100
 ```
+
+The same total-marks calculation is used by the report table, bulk class summaries, and opened report cards. Beginning-term and mid-term marks are pooled on each subject DEFAULT before this percentage is calculated. Term reports sum weighted component contributions on the course scale (normally 100). Calculation and ranking retain two decimal places; display formatting may show fewer decimals.
 
 This is **not** the simple average of subject percentages unless every subject has the same DEFAULT and all subjects have marks.
 
@@ -176,13 +184,17 @@ Sorted by **subject percentage** (performance), not alphabetical and not core-fi
 
 ## 7. Multiple quizzes in one component
 
-If two assessments map to the same component (e.g. two QUIZ entries):
+If several TichaPortal assessments map to the same component (e.g. Quiz1, Quiz2):
 
-- **Percentage** for the component = **average** of each assessment’s `(score/maxMark)×100`.
-- **normalizedScore** uses that average.
-- **rawMarksDisplay** = `"XX% average (2 assessments)"` when `pctCount > 1`.
+- Add **raw** scores and max marks: e.g. **45/50** and **60/70** → **105/120**.
+- **consolidatedOnDefault** = `(105 / 120) × DEFAULT` → **35** when DEFAULT is **40**.
+- **avgPct** and report column scaling use that pooled mark on DEFAULT (not an average of per-quiz conversions).
 
-Teachers should use consistent max marks per component type where possible; mismatched maxes still average **percentages**, not raw points.
+### Mid-term report total
+
+Mid-term **course total** (CAT column) uses the same pool over **all** continuous assessments for the subject (every quiz/CAT entered), on that subject’s **DEFAULT** from Timetable Config Class — not the weighted component sum used on full term reports.
+
+Beginning-term reports use the same pooled-total rule, restricted to assessments classified as Beginning Term. Both beginning and mid-term report tables show marks and grades without a subject percentage column; the overall percentage is total marks divided by total DEFAULT marks.
 
 ---
 
@@ -244,4 +256,4 @@ subjectPct       = sum(normalizedScore) / DEFAULT × 100
 overallPct       = sum(subjectTotalScore) / sum(subjectDEFAULT) × 100   (subjects with marks only)
 ```
 
-**Display order:** core subjects → alphabetical; **rank order:** by percentage (ties share rank).
+**Display order:** core subjects → alphabetical; **rank order:** by percentage (ties share rank). The class list and opened report use the same per-subject defaults and ranking inputs so a student’s class position is consistent in both places.

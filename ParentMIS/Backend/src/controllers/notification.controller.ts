@@ -43,6 +43,17 @@ const attendanceEventSchema = z
     message: 'studentCode or studentId is required',
   });
 
+const canteenEventSchema = z.object({
+  organizationId: z.string().min(1),
+  studentCode: z.string().min(1),
+  studentId: z.string().optional(),
+  studentName: z.string().optional(),
+  saleId: z.string().min(1),
+  amount: z.number().nonnegative(),
+  balanceAfter: z.number().nonnegative().optional(),
+  items: z.array(z.object({ name: z.string().min(1), quantity: z.number().positive() })).default([]),
+});
+
 export class NotificationController {
   async ingestDisciplineEvent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -74,11 +85,96 @@ export class NotificationController {
     }
   }
 
+  async ingestCanteenEvent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const event = canteenEventSchema.parse(req.body);
+      const result = await notificationService.ingestCanteenEvent(event);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async ingestTransportEvent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const event = attendanceEventSchema.parse(req.body);
+      const result = await notificationService.ingestTransportEvent(event);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async ingestExamEvent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const event = feeEventSchema.parse(req.body);
       const result = await notificationService.ingestExamEvent(event);
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async ingestAcademicEvent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const schema = z.object({
+        organizationId: z.string().min(1),
+        eventType: z.string().min(1),
+        studentCode: z.string().optional(),
+        studentId: z.string().optional(),
+        studentName: z.string().optional(),
+        title: z.string().optional(),
+        body: z.string().optional(),
+        priority: z.string().optional(),
+        link: z.string().optional(),
+        externalEventId: z.string().optional(),
+        reportKind: z.string().optional(),
+        accessPolicy: z.string().optional(),
+        academicYear: z.string().optional(),
+        term: z.string().optional(),
+        publicationId: z.string().optional(),
+        batchId: z.string().optional(),
+        notifyInApp: z.boolean().optional(),
+        notifyPush: z.boolean().optional(),
+      }).refine((v) => Boolean(v.studentCode || v.studentId), { message: 'studentCode or studentId is required' });
+      const event = schema.parse(req.body);
+      const result = await notificationService.ingestAcademicEvent(event);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async registerDeviceToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const schema = z.object({
+        token: z.string().min(1),
+        platform: z.enum(['WEB', 'ANDROID', 'IOS']).default('WEB'),
+        appVersion: z.string().optional().nullable(),
+        userAgent: z.string().optional().nullable(),
+      });
+      const body = schema.parse(req.body);
+      const data = await notificationService.registerDeviceToken(
+        req.organizationRef!,
+        req.user!.sub,
+        body
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async unregisterDeviceToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const schema = z.object({ token: z.string().min(1) });
+      const body = schema.parse(req.body);
+      const data = await notificationService.unregisterDeviceToken(
+        req.organizationRef!,
+        req.user!.sub,
+        body.token
+      );
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

@@ -363,6 +363,10 @@ async function main() {
     data: [
       { organizationId: ORG_ID, studentId: studentKevin.id, date: daysFromNow(-12), type: 'MERIT', description: 'Helped organize the class library and volunteered for peer tutoring.', points: 10, status: 'RECORDED' },
       { organizationId: ORG_ID, studentId: studentKevin.id, date: daysFromNow(-25), type: 'MERIT', description: 'Won the inter-house Mathematics quiz.', points: 15, status: 'RECORDED' },
+      { organizationId: ORG_ID, studentId: studentKevin.id, date: daysFromNow(-4), type: 'CONDUCT_NOTE', description: 'Arrived 10 minutes late to evening study prep session.', points: -2, status: 'RESOLVED' },
+      { organizationId: ORG_ID, studentId: studentEmely.id, date: daysFromNow(-8), type: 'MERIT', description: 'Selected Best Junior Debater representing Senior 1 in the inter-house tournament.', points: 12, status: 'RECORDED' },
+      { organizationId: ORG_ID, studentId: studentEmely.id, date: daysFromNow(-18), type: 'MERIT', description: 'Coordinated the school compound tree nursery watering initiative.', points: 8, status: 'RECORDED' },
+      { organizationId: ORG_ID, studentId: studentEmely.id, date: daysFromNow(-3), type: 'CONDUCT_NOTE', description: 'Uniform inspection: wearing incorrect sports socks during morning lineup.', points: -2, status: 'RESOLVED' },
     ],
   });
 

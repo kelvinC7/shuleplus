@@ -60,7 +60,6 @@ export function EditAssessmentTemplatePanel({
   const [template, setTemplate] = useState<ApiAssessmentTemplate | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [defaultCourseMarks, setDefaultCourseMarks] = useState('40');
   const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState<'save' | 'approve' | 'reject' | null>(null);
   const [confirmAction, setConfirmAction] = useState<'approve' | 'reject' | null>(null);
@@ -69,7 +68,6 @@ export function EditAssessmentTemplatePanel({
     setTemplate(data);
     setName(data.name ?? '');
     setDescription(data.description ?? '');
-    setDefaultCourseMarks(String(data.defaultCourseMarks ?? 40));
   }, []);
 
   const load = useCallback(async () => {
@@ -101,12 +99,10 @@ export function EditAssessmentTemplatePanel({
     if (!templateId || (!isDraft && !isActive)) return;
     setBusy('save');
     try {
-      const dcm = parseFloat(defaultCourseMarks);
       const updated = await updateAssessmentTemplate(templateId, {
         ...(canEditMeta
           ? { name: name.trim(), description: description.trim() || undefined }
           : {}),
-        defaultCourseMarks: Number.isNaN(dcm) || dcm <= 0 ? 40 : dcm,
       });
       const merged = { ...template!, ...updated };
       syncForm(merged);
@@ -262,18 +258,10 @@ export function EditAssessmentTemplatePanel({
               disabled={!canEditMeta}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
             />
-            <TextField
-              label="Default course marks"
-              value={defaultCourseMarks}
-              onChange={(e) => setDefaultCourseMarks(e.target.value)}
-              fullWidth
-              size="small"
-              type="number"
-              disabled={!canEditComponents}
-              helperText="Normalized course total is calculated out of this value for every course using this template."
-              slotProps={{ htmlInput: { min: 1, max: 1000 } }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
-            />
+            <Typography sx={{ fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>
+              Course total marks for reports are configured in <strong>Timetable → Config Class</strong> for each
+              course (not on this template).
+            </Typography>
             {!embedded && (
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 1.5 }}>
                 <Meta label="Education level" value={educationLevelLabel(template.academicLevel)} />

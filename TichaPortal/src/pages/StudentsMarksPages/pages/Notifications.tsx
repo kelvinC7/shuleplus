@@ -1,48 +1,65 @@
 import { useState } from 'react';
-import { Bell, Loader2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
 
 export default function Notifications() {
   const [params, setParams] = useState({});
   const { loading, error, alerts, filters, selected } = useTeacherMarksAnalytics(params);
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Notifications</h1>
-          <p className="text-gray-500 text-sm mt-1">Alerts from marks and at-risk students</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'flex-start' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Notifications</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Alerts from marks and at-risk students</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="space-y-3">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className={`flex items-start gap-3 p-4 rounded-xl border ${
-              alert.type === 'warning' ? 'bg-amber-50 border-amber-100' : 'bg-blue-50 border-blue-100'
-            }`}
-          >
-            <Bell size={18} className={alert.type === 'warning' ? 'text-amber-600' : 'text-blue-600'} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">{alert.message}</p>
-              <p className="text-xs text-gray-500 mt-1">{alert.date}</p>
-            </div>
-          </div>
-        ))}
+      <Stack spacing={1.5}>
+        {alerts.map((alert) => {
+          const warning = alert.type === 'warning';
+          return (
+            <Paper
+              key={alert.id}
+              variant="outlined"
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1.5,
+                p: 2,
+                borderRadius: 2,
+                bgcolor: warning ? '#FFFBEB' : '#EFF6FF',
+                borderColor: warning ? '#FDE68A' : '#BFDBFE',
+              }}
+            >
+              <NotificationsIcon sx={{ fontSize: 18, color: warning ? '#D97706' : '#2563EB' }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 500, color: '#1F2937' }}>{alert.message}</Typography>
+                <Typography sx={{ mt: 0.5, fontSize: 12, color: '#6B7280' }}>{alert.date}</Typography>
+              </Box>
+            </Paper>
+          );
+        })}
         {!alerts.length && (
-          <p className="text-sm text-gray-400 text-center py-12 rounded-xl border border-dashed border-gray-200">
+          <Box sx={{ py: 6, textAlign: 'center', borderRadius: 2, border: '1px dashed #E5E7EB', fontSize: 14, color: '#9CA3AF' }}>
             No alerts - all caught up.
-          </p>
+          </Box>
         )}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

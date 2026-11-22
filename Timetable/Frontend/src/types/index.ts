@@ -1,4 +1,7 @@
+export type TimetablePrimaryTab = 'class-timetable' | 'teacher-workload' | 'overview';
+
 export type TimetableTab =
+  | TimetablePrimaryTab
   | 'teachers'
   | 'courses'
   | 'schedule'
@@ -191,6 +194,8 @@ export interface CourseConfig {
   schedulingRules?: CourseSchedulingRules | Record<string, unknown>;
   /** When false, course is treated as non-core on report cards. Default true. */
   isCore?: boolean;
+  /** Report card total marks for this course (Academic DEFAULT column). */
+  defaultCourseMarks?: number | null;
 }
 
 export interface SchoolSchedule {

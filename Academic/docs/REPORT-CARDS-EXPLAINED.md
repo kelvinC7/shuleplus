@@ -24,7 +24,7 @@ Grouped: Subject=Math, Component=QUIZ
         ↓
 Converted to course scale using DEFAULT=40 and QUIZ weight 50%
         ↓
-Report shows QUIZ column, course result, %, grade, class position
+Report shows component marks, total marks, grade, and class position; the overall percentage is calculated from total marks
 ```
 
 ---

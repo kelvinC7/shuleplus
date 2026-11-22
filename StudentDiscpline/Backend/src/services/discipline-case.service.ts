@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { disciplineMarkService } from './discipline-mark.service';
 import { parentNotificationService } from './parent-notification.service';
 import { computeScoreAfter, signedPoints, studentBalanceService } from './student-balance.service';
+import { parseCalendarDateInput } from '../utils/calendar-date';
 
 function nextCaseNumber(existing: string[]) {
   const year = new Date().getFullYear();
@@ -173,7 +174,7 @@ export const disciplineCaseService = {
         category: mark?.category ?? input.category ?? 'Conduct',
         severity: input.severity ?? (Math.abs(appliedPoints) >= 8 ? 'High' : Math.abs(appliedPoints) >= 4 ? 'Medium' : 'Low'),
         status: input.status ?? 'Open',
-        incidentDate: input.incidentDate ? new Date(input.incidentDate) : new Date(),
+        incidentDate: parseCalendarDateInput(input.incidentDate),
         incidentTime: input.incidentTime,
         location: input.location,
         description: input.description,

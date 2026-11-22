@@ -24,5 +24,9 @@ ON "report_card_publications"("organization_id", "class_id", "academic_year", "t
 CREATE INDEX IF NOT EXISTS "report_card_publications_organization_id_academic_year_term_published_at_idx"
 ON "report_card_publications"("organization_id", "academic_year", "term", "published_at");
 
-ALTER TABLE "report_card_publications" ADD CONSTRAINT "report_card_publications_organization_id_fkey"
-FOREIGN KEY ("organization_id") REFERENCES "tenants"("organization_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "report_card_publications" ADD CONSTRAINT "report_card_publications_organization_id_fkey"
+  FOREIGN KEY ("organization_id") REFERENCES "tenants"("organization_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

@@ -1,8 +1,23 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Drawer from '@mui/material/Drawer';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import ButtonBase from '@mui/material/ButtonBase';
+import CircularProgress from '@mui/material/CircularProgress';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import StorefrontRoundedIcon from '@mui/icons-material/StorefrontRounded';
+import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import ShoppingBagRoundedIcon from '@mui/icons-material/ShoppingBagRounded';
+import KeyboardArrowRightRoundedIcon from '@mui/icons-material/KeyboardArrowRightRounded';
 import api from '../services/api';
 import {
   Package, Loader2, ArrowLeft, AlertCircle, CheckCircle2, ShoppingBag,
-  ChevronRight, X, MapPin, Home, Truck, CreditCard, Banknote,
+  ChevronRight, MapPin, Home, Truck, CreditCard, Banknote,
   ChevronDown, Check, ArrowRight, Smartphone, Building2, Star,
   Shield, Clock, TrendingUp, Calendar, Users, Store, Navigation,
   Search, Loader, ChevronUp, Info
@@ -46,121 +61,106 @@ function ModalShell({
   children,
   title,
   subtitle,
+  summary,
   footer,
-  /** Optional control shown left of the title on small screens (e.g. Back). */
   headerLeading,
   headerActions,
-  /** Hide bottom footer bar below `lg` - use when Back + Continue live in the header on mobile. */
   suppressFooterOnMobile,
 }) {
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  if (!open) return null;
-
-  /**
-   * Mobile Safari: do NOT use h-[100dvh] - it often exceeds the *visible* viewport when browser chrome
-   * is shown, clipping the sticky footer (Continue) below the fold. Cap with min(svh,dvh) and let height
-   * shrink to content on short steps so header + body + footer stay on screen.
-   */
-  const panelCls = footer
-    ? 'relative w-full max-w-lg flex flex-col min-h-0 h-auto max-h-[min(88svh,100dvh)] sm:max-h-[min(92vh,880px)] bg-white rounded-[24px] shadow-2xl overflow-hidden mx-auto'
-    : 'relative w-full max-w-lg flex flex-col min-h-0 max-h-[min(90svh,100dvh)] sm:max-h-[90vh] bg-white rounded-[24px] shadow-2xl overflow-hidden mx-auto';
-
   return (
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))]"
-      style={{ fontFamily: PAGE_FONT_FAMILY }}
+    <Drawer
+      anchor="bottom"
+      open={Boolean(open)}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          width: '100%',
+          maxWidth: 520,
+          mx: 'auto',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          bgcolor: '#fff',
+          borderTopLeftRadius: 3,
+          borderTopRightRadius: 3,
+        },
+      }}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 z-0 bg-[#000435]/90 backdrop-blur-md" onClick={onClose} />
-
-      {/* Modal */}
-      <div
-        className={`${panelCls} z-10`}
-        style={{ animation: 'modalSlide 0.35s cubic-bezier(.22,1,.36,1) both' }}
+      <Box
+        sx={{
+          flexShrink: 0,
+          background: 'linear-gradient(145deg,#0E1F35,#1B3354)',
+          px: { xs: 2, sm: 3 },
+          pt: { xs: 'max(0.75rem, env(safe-area-inset-top))', sm: 3 },
+          pb: 2,
+        }}
       >
-
-        {/* Header */}
-        <div
-          className="flex-shrink-0 px-4 sm:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-6 pb-3 sm:pb-4 border-b border-slate-100"
-          style={{ background: 'linear-gradient(135deg, #000435 0%, #001080 100%)' }}
-        >
-          {/* Title + controls: stacked on mobile with a wide action strip (44px+ targets); lg+ title left / actions right */}
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-400/95 mb-1 leading-snug">
-                {subtitle}
-              </p>
-              <h2 className="text-[17px] sm:text-xl font-black text-white leading-snug break-words">
-                {title}
-              </h2>
-            </div>
-
-            <div
-              className={`flex items-stretch gap-2 w-full lg:w-auto lg:flex-shrink-0 lg:justify-end ${
-                headerLeading || headerActions ? '' : 'justify-end'
-              }`}
+        <Box sx={{ width: 40, height: 4, borderRadius: 999, bgcolor: 'rgba(255,255,255,0.2)', mx: 'auto', mb: 2, display: { sm: 'none' } }} />
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.6, color: 'rgba(251,191,36,0.9)' }}>
+              {subtitle}
+            </Typography>
+            <Typography sx={{ mt: 0.25, fontSize: { xs: 18, sm: 20 }, fontWeight: 900, color: '#fff', lineHeight: 1.25 }}>
+              {title}
+            </Typography>
+          </Box>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
+            {headerLeading}
+            {headerActions}
+            <IconButton
+              onClick={onClose}
+              aria-label="Close"
+              sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' } }}
             >
-              {(headerLeading || headerActions) && headerLeading ? (
-                <div className="shrink-0 [&_button]:min-h-[44px] [&_button]:min-w-[44px] [&_button]:rounded-xl">
-                  {headerLeading}
-                </div>
-              ) : null}
-              {(headerLeading || headerActions) && headerActions ? (
-                <div className="flex-1 min-w-0 lg:flex-initial lg:max-w-none [&_button]:min-h-[44px] max-lg:[&_button]:w-full max-lg:[&_button]:justify-center max-lg:[&_button]:text-[13px] max-lg:[&_button]:font-black max-lg:[&_button]:shadow-lg">
-                  {headerActions}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-11 w-11 shrink-0 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center text-white hover:bg-white/25 transition-all active:scale-[0.98] shadow-sm lg:h-9 lg:w-9 lg:bg-white/10 lg:border-white/15 lg:hover:bg-white/20"
-                aria-label="Close"
-              >
-                <X size={18} strokeWidth={2} />
-              </button>
-            </div>
-          </div>
-        </div>
+              <CloseRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Stack>
+        </Stack>
+        {summary ? (
+          <Box sx={{ mt: 1.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)', bgcolor: 'rgba(255,255,255,0.05)', px: 2, py: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, flexShrink: 0, borderRadius: 2, bgcolor: 'rgba(245,166,35,0.15)', color: 'rgba(251,191,36,0.95)' }}>
+                <ShoppingBagRoundedIcon sx={{ fontSize: 17 }} />
+              </Box>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography noWrap sx={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{summary.label}</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>{summary.caption}</Typography>
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: 'rgba(251,191,36,0.95)' }}>{summary.value}</Typography>
+            </Stack>
+          </Box>
+        ) : null}
+      </Box>
 
-        {/* Scrollable body - extra bottom padding when footer is hidden on mobile */}
-        <div
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] pb-6 max-sm:pb-10 ${
-            suppressFooterOnMobile ? 'max-lg:pb-[max(1.5rem,env(safe-area-inset-bottom))]' : ''
-          }`}
+      <Box sx={{ minHeight: 0, flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', px: { xs: 2, sm: 3 }, py: 2.5 }}>
+        {children}
+      </Box>
+
+      {footer ? (
+        <Box
+          sx={{
+            flexShrink: 0,
+            bgcolor: '#fff',
+            borderTop: '1px solid #E2E8F0',
+            px: { xs: 2, sm: 3 },
+            pt: 1.5,
+            pb: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+            display: suppressFooterOnMobile ? { xs: 'none', lg: 'block' } : 'block',
+          }}
         >
-          {children}
-        </div>
-
-        {footer && (
-          <div
-            className={`flex-shrink-0 bg-white border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.06)] pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] pt-0.5 ${
-              suppressFooterOnMobile ? 'hidden lg:block' : ''
-            }`}
-          >
-            {footer}
-          </div>
-        )}
-      </div>
-
-      <style>{`
-        @keyframes modalSlide {
-          from { opacity: 0; transform: translateY(40px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes stepFade {
-          from { opacity: 0; transform: translateX(20px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        .step-animate { animation: stepFade 0.3s cubic-bezier(.22,1,.36,1) both; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spin-it { animation: spin 1s linear infinite; }
-      `}</style>
-    </div>
+          {footer}
+        </Box>
+      ) : null}
+    </Drawer>
   );
 }
 
@@ -169,17 +169,20 @@ function ModalShell({
 ───────────────────────────────────────────── */
 function StepDots({ total, current }) {
   return (
-    <div className="flex items-center gap-2 justify-center py-2 sm:py-3 px-2">
+    <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75} sx={{ py: 1.5 }}>
       {Array.from({ length: total }).map((_, i) => (
-        <div key={i} className={`rounded-full transition-all duration-300 ${
-          i === current - 1
-            ? 'w-6 h-2 bg-[#000435]'
-            : i < current - 1
-              ? 'w-2 h-2 bg-amber-400'
-              : 'w-2 h-2 bg-slate-200'
-        }`} />
+        <Box
+          key={i}
+          sx={{
+            height: 8,
+            width: i === current - 1 ? 24 : 8,
+            borderRadius: 99,
+            bgcolor: i === current - 1 ? '#13213D' : i < current - 1 ? '#F5A623' : '#E2E8F0',
+            transition: 'width .25s, background-color .25s',
+          }}
+        />
       ))}
-    </div>
+    </Stack>
   );
 }
 
@@ -193,104 +196,118 @@ function NavBtns({
   nextDisabled = false,
   nextLoading = false,
   backLabel = 'Back',
-  /** Primary action shown in ModalShell header on small screens - hide duplicate here so it stays above the app bottom nav. */
   hidePrimaryOnMobile = false,
-  /** Back shown in header on mobile - hide duplicate in footer below `lg`. */
   hideBackOnMobile = false,
 }) {
   return (
-    <div className="flex items-center gap-3 px-4 sm:px-6 py-4 sm:py-5 bg-white">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className={`items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-xl border-2 border-slate-200
-          text-slate-600 font-bold text-sm hover:border-slate-300 hover:bg-slate-50 transition-all flex
-          ${hideBackOnMobile ? 'hidden lg:flex' : ''}
-          ${hidePrimaryOnMobile && !hideBackOnMobile ? 'flex-1 min-[1024px]:flex-none' : ''}
-          `}
-        >
-          <ArrowLeft size={15} /> {backLabel}
-        </button>
-      )}
-      <button
-        type="button"
+    <Stack direction="row" spacing={1.25}>
+      <Button
+        onClick={onBack}
+        sx={{
+          display: hideBackOnMobile ? { xs: 'none', lg: 'inline-flex' } : 'inline-flex',
+          minWidth: 96,
+          borderRadius: 2,
+          border: '1px solid #E2E8F0',
+          color: '#475569',
+          fontSize: 14,
+          fontWeight: 700,
+          textTransform: 'none',
+          '&:hover': { bgcolor: '#F8FAFC' },
+        }}
+      >
+        {backLabel}
+      </Button>
+      <Button
+        fullWidth
         onClick={onNext}
         disabled={nextDisabled || nextLoading}
-        className={`items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm
-        transition-all min-h-[48px] ${hidePrimaryOnMobile ? 'hidden lg:flex flex-1' : 'flex flex-1'}
-        ${nextDisabled || nextLoading
-          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-          : 'bg-[#000435] text-white hover:bg-[#000c70] shadow-lg shadow-[#000435]/20 active:scale-[.98]'
-        }`}
+        startIcon={nextLoading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : null}
+        endIcon={!nextLoading ? <KeyboardArrowRightRoundedIcon sx={{ fontSize: 16 }} /> : null}
+        sx={{
+          display: hidePrimaryOnMobile ? { xs: 'none', lg: 'inline-flex' } : 'inline-flex',
+          minHeight: 48,
+          borderRadius: 2,
+          bgcolor: '#13213D',
+          color: '#fff',
+          fontSize: 14,
+          fontWeight: 800,
+          textTransform: 'none',
+          boxShadow: '0 8px 24px rgba(19,33,61,0.18)',
+          '&:hover': { bgcolor: '#001080' },
+          '&.Mui-disabled': { bgcolor: '#F1F5F9', color: '#94A3B8', boxShadow: 'none' },
+        }}
       >
-        {nextLoading && <Loader2 size={16} className="spin-it" />}
         {nextLabel}
-        {!nextLoading && <ChevronRight size={15} />}
-      </button>
-    </div>
-  );
-}
-
-/** Primary CTA in modal header - hidden on `lg+` where footer NavBtns apply. */
-function MobileHeaderContinue({ onClick, disabled, loading, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled || loading}
-      className="lg:hidden inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 px-4 py-3
-      min-h-[44px] text-[13px] font-black uppercase tracking-wide text-[#000435] shadow-lg shadow-amber-900/25 ring-2 ring-amber-300/70
-      active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
-    >
-      {loading && <Loader2 size={16} className="spin-it shrink-0" />}
-      <span className="truncate leading-tight text-center">{label}</span>
-      {!loading && <ChevronRight size={17} className="shrink-0 opacity-90" strokeWidth={2.5} />}
-    </button>
-  );
-}
-
-/** Back / exit - hidden on `lg+`; step 1 usually closes the modal. */
-function MobileHeaderBack({ onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="lg:hidden flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-white/20 border-2 border-white/40 text-white
-      shadow-md hover:bg-white/28 active:scale-[0.97]"
-      aria-label="Back"
-    >
-      <ArrowLeft size={20} strokeWidth={2.25} />
-    </button>
+      </Button>
+    </Stack>
   );
 }
 
 /* ─────────────────────────────────────────────
    OPTION CARD (radio-style selector)
 ───────────────────────────────────────────── */
-function OptionCard({ selected, onClick, icon: Icon, iconBg, title, description, badge }) {
+function OptionCard({ selected, onClick, icon: Icon, title, description, badge }) {
   return (
-    <button onClick={onClick}
-      className={`w-full flex items-center gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all
-      ${selected
-        ? 'border-[#000435] bg-[#000435]/4 shadow-sm'
-        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-      }`}>
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-        <Icon size={20} className={selected ? 'text-[#000435]' : 'text-slate-500'} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`font-black text-sm ${selected ? 'text-[#000435]' : 'text-slate-700'}`}>{title}</span>
-          {badge && <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{badge}</span>}
-        </div>
-        <p className="text-xs text-slate-500 mt-0.5 leading-snug">{description}</p>
-      </div>
-      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
-        ${selected ? 'border-[#000435] bg-[#000435]' : 'border-slate-300'}`}>
-        {selected && <Check size={11} className="text-white" strokeWidth={3} />}
-      </div>
-    </button>
+    <ButtonBase
+      onClick={onClick}
+      sx={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: { xs: 1.5, sm: 2 },
+        p: 2,
+        borderRadius: 2.5,
+        border: '2px solid',
+        borderColor: selected ? '#13213D' : '#E2E8F0',
+        bgcolor: selected ? 'rgba(19,33,61,0.04)' : '#fff',
+        textAlign: 'left',
+        transition: 'border-color .15s, background-color .15s',
+        '&:hover': { borderColor: selected ? '#13213D' : '#CBD5E1', bgcolor: selected ? 'rgba(19,33,61,0.04)' : '#F8FAFC' },
+      }}
+    >
+      <Box
+        sx={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: selected ? 'rgba(245,166,35,0.15)' : '#F1F5F9',
+          color: selected ? '#13213D' : '#64748B',
+        }}
+      >
+        <Icon sx={{ fontSize: 20 }} />
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={1}>
+          <Typography sx={{ fontSize: 14, fontWeight: 800, color: selected ? '#13213D' : '#334155' }}>{title}</Typography>
+          {badge ? (
+            <Box component="span" sx={{ borderRadius: 1.5, bgcolor: '#FEF3C7', px: 1, py: 0.25, fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, color: '#B45309' }}>
+              {badge}
+            </Box>
+          ) : null}
+        </Stack>
+        <Typography sx={{ mt: 0.25, fontSize: 12, color: '#64748B', lineHeight: 1.4 }}>{description}</Typography>
+      </Box>
+      <Box
+        sx={{
+          width: 20,
+          height: 20,
+          flexShrink: 0,
+          borderRadius: '50%',
+          border: '2px solid',
+          borderColor: selected ? '#13213D' : '#CBD5E1',
+          bgcolor: selected ? '#13213D' : '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {selected ? <CheckRoundedIcon sx={{ fontSize: 14, color: '#fff' }} /> : null}
+      </Box>
+    </ButtonBase>
   );
 }
 
@@ -617,18 +634,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
       onClose={handleClose}
       title={stepTitles[step - 1]}
       subtitle={stepSubtitles[step - 1]}
-      headerLeading={(
-        <MobileHeaderBack
-          onClick={() => {
-            if (step > 1) {
-              setError('');
-              setStep((s) => s - 1);
-            } else {
-              handleClose();
-            }
-          }}
-        />
-      )}
+      summary={{ label: product?.name || 'Deal', caption: `Quantity ${quantity}`, value: formatMoney(principal) }}
       footer={(
         <NavBtns
           hideBackOnMobile
@@ -647,41 +653,27 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
 
       <StepDots total={TOTAL_STEPS} current={step} />
 
-      {/* Product summary pill */}
-      <div className="mx-4 sm:mx-6 mb-2 flex items-center gap-3 p-3 rounded-xl bg-[#000435]/4 border border-[#000435]/10">
-        <div className="w-10 h-10 rounded-xl bg-[#000435] flex items-center justify-center flex-shrink-0">
-          <ShoppingBag size={16} className="text-amber-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-[#000435] truncate">{product?.name}</p>
-          <p className="text-xs font-bold text-amber-600">{formatMoney(principal)}</p>
-        </div>
-      </div>
+      <div className="px-4 sm:px-6 pb-6 pt-3 sm:pt-4" key={step}>
 
-      <div className="px-4 sm:px-6 pb-6 pt-3 sm:pt-4 step-animate" key={step}>
-
-        {/* ── STEP 1: Delivery ── */}
         {step === 1 && (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-500 mb-3 sm:mb-4">How would you like to receive your item?</p>
+          <Stack spacing={1.5}>
+            <Typography sx={{ mb: 0.5, fontSize: 14, color: '#64748B' }}>How would you like to receive your item?</Typography>
             <OptionCard
               selected={delivery === 'agent_station'}
               onClick={() => setDelivery('agent_station')}
-              icon={Store}
-              iconBg={delivery === 'agent_station' ? 'bg-amber-100' : 'bg-slate-100'}
+              icon={StorefrontRoundedIcon}
               title="Pick up at Agent Station"
               description="Collect from a nearby Babyeyi agent. You'll choose your preferred station next."
             />
             <OptionCard
               selected={delivery === 'home'}
               onClick={() => setDelivery('home')}
-              icon={Home}
-              iconBg={delivery === 'home' ? 'bg-blue-100' : 'bg-slate-100'}
+              icon={HomeRoundedIcon}
               title="Deliver at My Home"
               description="We'll deliver to your address. Enter province, district, and any extra location details next."
               badge="Convenient"
             />
-          </div>
+          </Stack>
         )}
 
         {/* ── STEP 2A: Location + agent (same flow as PublicShoesVoucherFlow) ── */}
@@ -700,7 +692,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={locProvince}
                   onChange={(e) => setLocProvince(e.target.value)}
                   disabled={geoPickLoading && !provinces.length}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Choose…</option>
                   {provinces.map((p) => (
@@ -716,7 +708,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={locDistrict}
                   onChange={(e) => setLocDistrict(e.target.value)}
                   disabled={!locProvince || geoPickLoading}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Choose…</option>
                   {pickDistricts.map((d) => (
@@ -732,7 +724,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={locSector}
                   onChange={(e) => setLocSector(e.target.value)}
                   disabled={!locDistrict || geoPickLoading}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Any sector in district</option>
                   {pickSectors.map((s) => (
@@ -743,7 +735,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
             </div>
 
             <div className="flex items-center gap-2.5 px-3.5 h-11 rounded-xl border-2 border-slate-200
-              focus-within:border-[#000435] bg-slate-50 transition-all">
+              focus-within:border-[#13213D] bg-slate-50 transition-all">
               <Search size={15} className="text-slate-400 flex-shrink-0" />
               <input
                 value={agentSearch}
@@ -755,7 +747,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
 
             {agentsLoading && (
               <div className="flex flex-col items-center justify-center py-10 gap-3">
-                <Loader2 size={24} className="text-amber-500 spin-it" />
+                <CircularProgress size={24} sx={{ color: '#F5A623' }} />
                 <p className="text-xs text-slate-400 font-semibold">Loading agents…</p>
               </div>
             )}
@@ -780,13 +772,13 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                     <button key={agent.id} type="button"
                       onClick={() => setSelectedAgent(agent)}
                       className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all
-                      ${sel ? 'border-[#000435] bg-[#000435]/4' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                      ${sel ? 'border-[#13213D] bg-[#13213D]/4' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5
-                        ${sel ? 'bg-[#000435]' : 'bg-slate-100'}`}>
+                        ${sel ? 'bg-[#13213D]' : 'bg-slate-100'}`}>
                         <Users size={15} className={sel ? 'text-amber-400' : 'text-slate-500'} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-black text-sm ${sel ? 'text-[#000435]' : 'text-slate-800'}`}>{label}</p>
+                        <p className={`font-black text-sm ${sel ? 'text-[#13213D]' : 'text-slate-800'}`}>{label}</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {agent.district}{sectorLine ? ` · ${sectorLine}` : ''}
                         </p>
@@ -797,7 +789,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                         )}
                       </div>
                       {sel && (
-                        <div className="w-5 h-5 rounded-full bg-[#000435] flex items-center justify-center flex-shrink-0 mt-1">
+                        <div className="w-5 h-5 rounded-full bg-[#13213D] flex items-center justify-center flex-shrink-0 mt-1">
                           <Check size={11} className="text-white" strokeWidth={3} />
                         </div>
                       )}
@@ -829,7 +821,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={homeProvince}
                   onChange={(e) => setHomeProvince(e.target.value)}
                   disabled={geoShipLoading && !provinces.length}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Choose…</option>
                   {provinces.map((p) => (
@@ -845,7 +837,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={homeDistrict}
                   onChange={(e) => setHomeDistrict(e.target.value)}
                   disabled={!homeProvince || geoShipLoading}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Choose…</option>
                   {shipDistricts.map((d) => (
@@ -861,7 +853,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={homeSector}
                   onChange={(e) => setHomeSector(e.target.value)}
                   disabled={!homeDistrict || geoShipLoading}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 >
                   <option value="">Choose sector…</option>
                   {shipSectors.map((s) => (
@@ -875,7 +867,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
                 Location / landmark <span className="text-slate-400 font-bold normal-case">(optional)</span>
               </label>
-              <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 focus-within:border-[#000435] bg-slate-50 transition-all min-h-[3rem]">
+              <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 focus-within:border-[#13213D] bg-slate-50 transition-all min-h-[3rem]">
                 <MapPin size={15} className="text-slate-400 flex-shrink-0 mt-0.5" />
                 <textarea
                   value={homeLocation}
@@ -896,7 +888,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={homeVillage}
                   onChange={e => setHomeVillage(e.target.value)}
                   placeholder="Village"
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 />
               </div>
               <div>
@@ -907,7 +899,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   value={homeCell}
                   onChange={e => setHomeCell(e.target.value)}
                   placeholder="Cell"
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
                 />
               </div>
             </div>
@@ -920,7 +912,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                 value={homeStreetNumber}
                 onChange={e => setHomeStreetNumber(e.target.value)}
                 placeholder="House / street No."
-                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#000435]"
+                className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 outline-none focus:border-[#13213D]"
               />
             </div>
 
@@ -961,7 +953,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
                 Full Name <span className="text-amber-500">*</span>
               </label>
-              <div className="flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 border-slate-200 focus-within:border-[#000435] bg-slate-50 transition-all">
+              <div className="flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 border-slate-200 focus-within:border-[#13213D] bg-slate-50 transition-all">
                 <Users size={15} className="text-slate-400 flex-shrink-0" />
                 <input
                   value={payerName}
@@ -976,7 +968,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
               <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
                 Phone Number <span className="text-amber-500">*</span>
               </label>
-              <div className="flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 border-slate-200 focus-within:border-[#000435] bg-slate-50 transition-all">
+              <div className="flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 border-slate-200 focus-within:border-[#13213D] bg-slate-50 transition-all">
                 <Smartphone size={15} className="text-slate-400 flex-shrink-0" />
                 <input
                   value={payerPhone}
@@ -995,7 +987,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
               {delivery === 'agent_station' ? (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Store size={14} className="text-[#000435] flex-shrink-0" />
+                    <Store size={14} className="text-[#13213D] flex-shrink-0" />
                     <span className="text-sm font-bold text-slate-700">{selectedAgentLabel || '-'}</span>
                   </div>
                   {pickupLocationLine ? (
@@ -1005,7 +997,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
               ) : (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <Home size={14} className="text-[#000435] flex-shrink-0" />
+                    <Home size={14} className="text-[#13213D] flex-shrink-0" />
                     <span className="text-sm font-bold text-slate-700">Deliver at home</span>
                   </div>
                   {homeGeoLine ? (
@@ -1031,7 +1023,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
 
             {/* Order card */}
             <div className="rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="px-4 py-3 bg-[#000435]">
+              <div className="px-4 py-3 bg-[#13213D]">
                 <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/80">Order Summary</p>
               </div>
               <div className="p-4 space-y-3">
@@ -1079,7 +1071,7 @@ function DirectPayModal({ open, onClose, product, quantity, teacher }) {
                   <span className="text-sm font-black text-slate-800">{payerPhone}</span>
                 </div>
                 <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-100">
-                  <span className="font-black text-[#000435]">Total</span>
+                  <span className="font-black text-[#13213D]">Total</span>
                   <span className="text-xl font-black text-amber-500">{formatMoney(principal)}</span>
                 </div>
               </div>
@@ -1197,18 +1189,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
       onClose={handleClose}
       title={stepTitles[step - 1]}
       subtitle={`Step ${step} of ${TOTAL_STEPS} · Ticha Avance`}
-      headerLeading={(
-        <MobileHeaderBack
-          onClick={() => {
-            if (step > 1) {
-              setError('');
-              setStep((s) => s - 1);
-            } else {
-              handleClose();
-            }
-          }}
-        />
-      )}
+      summary={{ label: product?.name || 'Deal', caption: `Quantity ${quantity}`, value: `Item price: ${formatMoney(principal)}` }}
       footer={(
         <NavBtns
           hideBackOnMobile
@@ -1227,18 +1208,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
 
       <StepDots total={TOTAL_STEPS} current={step} />
 
-      {/* Product pill */}
-      <div className="mx-4 sm:mx-6 mb-2 flex items-center gap-3 p-3 rounded-xl bg-[#000435]/4 border border-[#000435]/10">
-        <div className="w-10 h-10 rounded-xl bg-[#000435] flex items-center justify-center flex-shrink-0">
-          <ShoppingBag size={16} className="text-amber-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-[#000435] truncate">{product?.name}</p>
-          <p className="text-xs font-bold text-amber-600">Item price: {formatMoney(principal)}</p>
-        </div>
-      </div>
-
-      <div className="px-4 sm:px-6 pb-6 pt-3 sm:pt-4 step-animate" key={step}>
+      <div className="px-4 sm:px-6 pb-6 pt-3 sm:pt-4" key={step}>
 
         {blocked && (
           <div className="mb-4 flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
@@ -1264,7 +1234,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
                   <button key={m} onClick={() => setRepayment(m)}
                     className={`py-3 rounded-xl font-black text-sm transition-all border-2 ${
                       repayment === m
-                        ? 'bg-[#000435] text-white border-[#000435] shadow-md'
+                        ? 'bg-[#13213D] text-white border-[#13213D] shadow-md'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300'
                     }`}>
                     {m}mo
@@ -1274,7 +1244,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
             </div>
 
             {/* Quick preview card */}
-            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#000435] to-[#001080] text-white">
+            <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#13213D] to-[#001080] text-white">
               <p className="text-[10px] font-black uppercase tracking-wider text-white/50 mb-3">Preview</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1305,7 +1275,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
 
             {/* Main breakdown card */}
             <div className="rounded-2xl overflow-hidden border border-slate-200">
-              <div className="bg-[#000435] px-4 py-3">
+              <div className="bg-[#13213D] px-4 py-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/80">Payment Breakdown</p>
               </div>
               <div className="divide-y divide-slate-100">
@@ -1314,7 +1284,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
                     <p className="text-sm font-bold text-slate-700">Item Price</p>
                     <p className="text-xs text-slate-400">× {quantity} unit{quantity > 1 ? 's' : ''}</p>
                   </div>
-                  <span className="font-black text-[#000435]">{formatMoney(principal)}</span>
+                  <span className="font-black text-[#13213D]">{formatMoney(principal)}</span>
                 </div>
                 <div className="flex justify-between items-center px-4 py-3.5">
                   <div>
@@ -1325,16 +1295,16 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
                 </div>
                 <div className="flex justify-between items-center px-4 py-3.5 bg-slate-50">
                   <div>
-                    <p className="text-sm font-black text-[#000435]">Total to Repay</p>
+                    <p className="text-sm font-black text-[#13213D]">Total to Repay</p>
                     <p className="text-xs text-slate-400">Over {repayment} months</p>
                   </div>
-                  <span className="font-black text-[#000435] text-lg">{formatMoney(totalRepay)}</span>
+                  <span className="font-black text-[#13213D] text-lg">{formatMoney(totalRepay)}</span>
                 </div>
               </div>
             </div>
 
             {/* Monthly payment highlight */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-[#000435]">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-[#13213D]">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar size={16} />
                 <p className="text-[10px] font-black uppercase tracking-wider">Monthly Deduction from Payroll</p>
@@ -1384,7 +1354,7 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
             <p className="text-sm text-slate-500 mb-2">Review and confirm your Ticha Avance financing request.</p>
 
             <div className="rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="bg-[#000435] px-4 py-3">
+              <div className="bg-[#13213D] px-4 py-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/80">Final Summary</p>
               </div>
               <div className="p-4 space-y-3">
@@ -1402,14 +1372,14 @@ function AvanceModal({ open, onClose, product, quantity, monthlyRatePercent = 3.
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500 font-semibold">Total repayable</span>
-                  <span className="font-black text-[#000435]">{formatMoney(totalRepay)}</span>
+                  <span className="font-black text-[#13213D]">{formatMoney(totalRepay)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500 font-semibold">Duration</span>
                   <span className="font-black text-slate-800">{repayment} months</span>
                 </div>
                 <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-100">
-                  <span className="font-black text-[#000435]">Monthly payment</span>
+                  <span className="font-black text-[#13213D]">Monthly payment</span>
                   <span className="text-2xl font-black text-amber-500">{formatMoney(monthlyPayment)}</span>
                 </div>
               </div>
@@ -1482,26 +1452,23 @@ export default function TichaDealDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f0f2f9] flex flex-col items-center justify-center gap-4"
+      <div className="min-h-screen bg-[#F4F5F8] flex flex-col items-center justify-center gap-4"
         style={{ fontFamily: PAGE_FONT_FAMILY }}>
         <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
-        <p className="text-[#000435]/60 text-[10px] font-black uppercase tracking-widest">Loading Deal…</p>
+        <p className="text-[#13213D]/60 text-[10px] font-black uppercase tracking-widest">Loading Deal…</p>
       </div>
     );
   }
 
   if (error && !product) {
     return (
-      <div className="min-h-screen bg-[#f0f2f9] flex flex-col items-center justify-center p-6 text-center"
+      <div className="min-h-screen bg-[#F4F5F8] flex flex-col items-center justify-center p-6 text-center"
         style={{ fontFamily: PAGE_FONT_FAMILY }}>
         <div className="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mb-4">
           <AlertCircle size={32} />
         </div>
         <p className="text-sm font-bold text-slate-500 mb-6">{error}</p>
-        <button onClick={() => navigate('/ticha-deals')}
-          className="px-6 py-3 rounded-xl bg-[#000435] text-white font-black text-sm shadow-lg">
-          Back to Catalog
-        </button>
+        
       </div>
     );
   }
@@ -1517,16 +1484,13 @@ export default function TichaDealDetails() {
 
   return (
     <>
-      <div className="min-h-screen bg-[#f0f2f9] pb-12" style={{ fontFamily: PAGE_FONT_FAMILY }}>
+      <div className="min-h-screen bg-[#F4F5F8] pb-12" style={{ fontFamily: PAGE_FONT_FAMILY }}>
 
         {/* Top nav */}
         <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
-            <button onClick={() => navigate('/ticha-deals')}
-              className="w-9 h-9 rounded-xl bg-[#000435]/6 flex items-center justify-center text-[#000435] hover:bg-[#000435]/12 transition-all">
-              <ArrowLeft size={18} />
-            </button>
-            <span className="font-black text-[#000435] text-sm truncate flex-1">{product?.name}</span>
+            
+            <span className="font-black text-[#13213D] text-sm truncate flex-1">{product?.name}</span>
             <span className="font-black text-amber-500 text-sm hidden sm:block">{formatMoney(product?.price_rwf)}</span>
           </div>
         </div>
@@ -1557,16 +1521,16 @@ export default function TichaDealDetails() {
                           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 p-2 rounded-full bg-black/10 backdrop-blur-sm">
                             {heroSlots.map((_, i) => (
                               <button key={i} onClick={() => setActiveImageIdx(i)}
-                                className={`rounded-full transition-all ${i === activeImageIdx ? 'w-5 h-1.5 bg-[#000435]' : 'w-1.5 h-1.5 bg-white/60 hover:bg-white'}`} />
+                                className={`rounded-full transition-all ${i === activeImageIdx ? 'w-5 h-1.5 bg-[#13213D]' : 'w-1.5 h-1.5 bg-white/60 hover:bg-white'}`} />
                             ))}
                           </div>
                           {/* Arrows */}
                           <button onClick={() => setActiveImageIdx(p => p > 0 ? p - 1 : heroSlots.length - 1)}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center text-[#000435] opacity-0 group-hover:opacity-100 transition-opacity">
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center text-[#13213D] opacity-0 group-hover:opacity-100 transition-opacity">
                             <ArrowLeft size={16} />
                           </button>
                           <button onClick={() => setActiveImageIdx(p => p < heroSlots.length - 1 ? p + 1 : 0)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center text-[#000435] opacity-0 group-hover:opacity-100 transition-opacity">
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center text-[#13213D] opacity-0 group-hover:opacity-100 transition-opacity">
                             <ChevronRight size={16} />
                           </button>
                         </>
@@ -1579,12 +1543,12 @@ export default function TichaDealDetails() {
                   {/* Badges */}
                   <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
                     {product.category && (
-                      <span className="px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm border border-black/5 text-[10px] font-black text-[#000435] uppercase tracking-wider shadow-sm">
+                      <span className="px-2.5 py-1 rounded-lg bg-white/90 backdrop-blur-sm border border-black/5 text-[10px] font-black text-[#13213D] uppercase tracking-wider shadow-sm">
                         {product.category}
                       </span>
                     )}
                     {product.product_code && (
-                      <span className="px-2.5 py-1 rounded-lg bg-[#000435] text-white text-[10px] font-bold tracking-wider shadow-sm">
+                      <span className="px-2.5 py-1 rounded-lg bg-[#13213D] text-white text-[10px] font-bold tracking-wider shadow-sm">
                         {product.product_code}
                       </span>
                     )}
@@ -1606,7 +1570,7 @@ export default function TichaDealDetails() {
                         <CheckCircle2 size={10} /> Verified
                       </span>
                     </div>
-                    <h3 className="font-black text-[#000435] text-sm">{product.partner_org_name}</h3>
+                    <h3 className="font-black text-[#13213D] text-sm">{product.partner_org_name}</h3>
                     {product.partner_org_login && <p className="text-xs text-slate-400 mt-0.5">@{product.partner_org_login}</p>}
                   </div>
                 </div>
@@ -1614,7 +1578,7 @@ export default function TichaDealDetails() {
 
               {/* Details */}
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-                <h1 className="text-2xl font-black text-[#000435] leading-tight mb-2">
+                <h1 className="text-2xl font-black text-[#13213D] leading-tight mb-2">
                   {product.name}
                 </h1>
                 <p className="text-3xl font-black text-amber-500 mb-6">{formatMoney(product.price_rwf)}</p>
@@ -1630,7 +1594,7 @@ export default function TichaDealDetails() {
               </div>
 
               {/* Avance preview card - mobile only show, desktop in sidebar */}
-              <div className="lg:hidden bg-gradient-to-br from-[#000435] to-[#001080] rounded-2xl p-5 text-white shadow-lg">
+              <div className="lg:hidden bg-gradient-to-br from-[#13213D] to-[#001080] rounded-2xl p-5 text-white shadow-lg">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp size={16} className="text-amber-400" />
                   <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Ticha Avance Option</p>
@@ -1658,7 +1622,7 @@ export default function TichaDealDetails() {
                 {/* Price + Qty */}
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Price</p>
-                  <p className="text-3xl font-black text-[#000435]">
+                  <p className="text-3xl font-black text-[#13213D]">
                     {formatMoney(product.price_rwf)}
                   </p>
                   {quantity > 1 && (
@@ -1678,12 +1642,12 @@ export default function TichaDealDetails() {
                   </div>
                   <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-200 w-fit">
                     <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#000435] font-black text-lg shadow-sm hover:bg-slate-100 active:scale-90 transition-all">
+                      className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#13213D] font-black text-lg shadow-sm hover:bg-slate-100 active:scale-90 transition-all">
                       −
                     </button>
-                    <span className="w-8 text-center text-sm font-black text-[#000435]">{quantity}</span>
+                    <span className="w-8 text-center text-sm font-black text-[#13213D]">{quantity}</span>
                     <button onClick={() => setQuantity(q => product.max_quantity ? Math.min(product.max_quantity, q + 1) : q + 1)}
-                      className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#000435] font-black text-lg shadow-sm hover:bg-slate-100 active:scale-90 transition-all">
+                      className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#13213D] font-black text-lg shadow-sm hover:bg-slate-100 active:scale-90 transition-all">
                       +
                     </button>
                   </div>
@@ -1695,8 +1659,8 @@ export default function TichaDealDetails() {
                 <div className="space-y-3">
                   {/* Direct Pay */}
                   <button onClick={() => setShowDirectPay(true)}
-                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-[#000435] text-white
-                    hover:bg-[#000c70] transition-all shadow-lg shadow-[#000435]/20 active:scale-[.98] group">
+                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-[#13213D] text-white
+                    hover:bg-[#000c70] transition-all shadow-lg shadow-[#13213D]/20 active:scale-[.98] group">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                         <Smartphone size={18} className="text-amber-400" />
@@ -1712,23 +1676,23 @@ export default function TichaDealDetails() {
                   {/* Ticha Avance */}
                   <button onClick={() => setShowAvance(true)}
                     className="w-full flex items-center justify-between px-5 py-4 rounded-2xl
-                    bg-gradient-to-r from-amber-400 to-amber-500 text-[#000435]
+                    bg-gradient-to-r from-amber-400 to-amber-500 text-[#13213D]
                     hover:from-amber-300 hover:to-amber-400 transition-all shadow-lg shadow-amber-400/25 active:scale-[.98] group">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#000435]/10 flex items-center justify-center">
-                        <TrendingUp size={18} className="text-[#000435]" />
+                      <div className="w-9 h-9 rounded-xl bg-[#13213D]/10 flex items-center justify-center">
+                        <TrendingUp size={18} className="text-[#13213D]" />
                       </div>
                       <div className="text-left">
                         <p className="font-black text-sm">Ticha Avance</p>
-                        <p className="text-[11px] text-[#000435]/60">Pay monthly from payroll</p>
+                        <p className="text-[11px] text-[#13213D]/60">Pay monthly from payroll</p>
                       </div>
                     </div>
-                    <ChevronRight size={18} className="text-[#000435]/40 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight size={18} className="text-[#13213D]/40 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
 
                 {/* Avance teaser - desktop only */}
-                <div className="hidden lg:block bg-[#000435]/4 rounded-2xl p-4 border border-[#000435]/8">
+                <div className="hidden lg:block bg-[#13213D]/4 rounded-2xl p-4 border border-[#13213D]/8">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp size={14} className="text-amber-500" />
                     <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Avance Preview</p>
@@ -1740,7 +1704,7 @@ export default function TichaDealDetails() {
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 font-semibold">Interest rate</p>
-                      <p className="text-base font-black text-[#000435]">{monthlyRatePercent}%<span className="text-[10px] text-slate-400 font-bold">/mo</span></p>
+                      <p className="text-base font-black text-[#13213D]">{monthlyRatePercent}%<span className="text-[10px] text-slate-400 font-bold">/mo</span></p>
                     </div>
                   </div>
                 </div>

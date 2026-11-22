@@ -12,6 +12,7 @@ import {
   type NavItem,
 } from '@/lib/nav-config';
 import { useAuth } from '@/contexts/auth-context';
+import { procurementApi } from '@/services/procurement-api';
 import {
   ProcurementSidebarChevron,
   ProcurementSidebarNavLink,
@@ -32,13 +33,35 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
   const navItems = getNavItemsForUser(user?.roles ?? [], moduleAccessLevel);
   const homeHref = '/dashboard';
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      procurementApi.notifications
+        .unreadCount()
+        .then((result) => {
+          if (active) setUnreadNotifications(result.count);
+        })
+        .catch(() => {});
+    };
+
+    refresh();
+    const interval = window.setInterval(refresh, 30_000);
+    window.addEventListener('procurement:notifications-updated', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('procurement:notifications-updated', refresh);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     setOpenGroups((prev) => {
       const next = { ...prev };
       for (const item of navItems) {
-        if (navHasActivePath(item, pathname)) {
-          next[item.label] = true;
+        if (item && navHasActivePath(item, pathname)) {
+          next[item.label ?? ''] = true;
         }
       }
       return next;
@@ -73,9 +96,6 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                 className="h-8 w-auto max-w-[148px] sm:h-9"
                 priority
               />
-              <p className="mt-1.5 text-[11px] font-medium tracking-wide text-white/50">
-                manage smarter
-              </p>
               <p className="mt-2 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[#febf10]">
                 {orgName}
               </p>
@@ -96,14 +116,17 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
           aria-label="Primary"
         >
           <ul className="space-y-1.5">
-            {navItems.map((item) => {
-              if (item.sections) {
-                const groupOpen = openGroups[item.label] ?? false;
+            {(navItems ?? []).filter(Boolean).map((item, idx) => {
+              const itemLabel = item?.label ?? '';
+              const ItemIcon = item?.icon;
+
+              if (item?.sections) {
+                const groupOpen = openGroups[itemLabel] ?? false;
                 const groupActive = navHasActivePath(item, pathname);
-                const panelId = `proc-nav-${item.label.replace(/\s+/g, '-').toLowerCase()}`;
+                const panelId = `proc-nav-${itemLabel.replace(/\s+/g, '-').toLowerCase() || idx}`;
 
                 return (
-                  <li key={item.label} className="rounded-2xl">
+                  <li key={itemLabel || idx} className="rounded-2xl">
                     <button
                       type="button"
                       aria-expanded={groupOpen}
@@ -111,7 +134,7 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                       onClick={() =>
                         setOpenGroups((prev) => ({
                           ...prev,
-                          [item.label]: !prev[item.label],
+                          [itemLabel]: !prev[itemLabel],
                         }))
                       }
                       className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition sm:px-3 ${
@@ -127,10 +150,10 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                             : 'bg-white/[0.06] text-white/50'
                         }`}
                       >
-                        <item.icon size={18} strokeWidth={1.75} />
+                        {ItemIcon ? <ItemIcon size={18} strokeWidth={1.75} /> : null}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
-                        {item.label}
+                        {itemLabel}
                       </span>
                       <ProcurementSidebarChevron open={groupOpen} />
                     </button>
@@ -139,21 +162,23 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                         id={panelId}
                         className="ml-3 mt-1 space-y-3 border-l border-white/10 pb-2 pl-3"
                       >
-                        {item.sections.map((section) => (
-                          <div key={section.label}>
+                        {(item.sections ?? []).filter(Boolean).map((section, sIdx) => (
+                          <div key={section?.label ?? sIdx}>
                             <p className="mb-1 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
-                              {section.label}
+                              {section?.label ?? ''}
                             </p>
                             <div className="space-y-0.5">
-                              {section.items.map((link) => (
-                                <ProcurementSidebarNavLink
-                                  key={link.href}
-                                  href={link.href}
-                                  label={link.label}
-                                  active={isNavActive(pathname, link.href)}
-                                  onNavigate={onClose}
-                                />
-                              ))}
+                              {(section?.items ?? []).filter(Boolean).map((link, lIdx) =>
+                                link?.href ? (
+                                  <ProcurementSidebarNavLink
+                                    key={link.href ?? lIdx}
+                                    href={link.href}
+                                    label={link.label ?? ''}
+                                    active={isNavActive(pathname, link.href)}
+                                    onNavigate={onClose}
+                                  />
+                                ) : null
+                              )}
                             </div>
                           </div>
                         ))}
@@ -163,20 +188,20 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                 );
               }
 
-              if (item.children) {
-                const groupOpen = openGroups[item.label] ?? false;
+              if (item?.children) {
+                const groupOpen = openGroups[itemLabel] ?? false;
                 const groupActive = navHasActivePath(item, pathname);
-                const panelId = `proc-nav-${item.label.replace(/\s+/g, '-').toLowerCase()}`;
+                const panelId = `proc-nav-${itemLabel.replace(/\s+/g, '-').toLowerCase() || idx}`;
 
                 return (
-                  <li key={item.label} className="rounded-2xl">
+                  <li key={itemLabel || idx} className="rounded-2xl">
                     <button
                       type="button"
                       aria-expanded={groupOpen}
                       onClick={() =>
                         setOpenGroups((prev) => ({
                           ...prev,
-                          [item.label]: !prev[item.label],
+                          [itemLabel]: !prev[itemLabel],
                         }))
                       }
                       className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left sm:px-3 ${
@@ -184,37 +209,40 @@ export function ProcurementSidebar({ open, onClose, orgName }: ProcurementSideba
                       }`}
                     >
                       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06]">
-                        <item.icon size={18} strokeWidth={1.75} />
+                        {ItemIcon ? <ItemIcon size={18} strokeWidth={1.75} /> : null}
                       </span>
-                      <span className="flex-1 truncate text-[13px] font-semibold">{item.label}</span>
+                      <span className="flex-1 truncate text-[13px] font-semibold">{itemLabel}</span>
                       <ProcurementSidebarChevron open={groupOpen} />
                     </button>
                     {groupOpen ? (
                       <div className="ml-4 mt-1 space-y-0.5 border-l border-white/10 pl-3">
-                        {item.children.map((child) => (
-                          <ProcurementSidebarNavLink
-                            key={child.href}
-                            href={child.href}
-                            label={child.label}
-                            active={isNavActive(pathname, child.href)}
-                            onNavigate={onClose}
-                          />
-                        ))}
+                        {(item.children ?? []).filter(Boolean).map((child, cIdx) =>
+                          child?.href ? (
+                            <ProcurementSidebarNavLink
+                              key={child.href ?? cIdx}
+                              href={child.href}
+                              label={child.label ?? ''}
+                              active={isNavActive(pathname, child.href)}
+                              onNavigate={onClose}
+                            />
+                          ) : null
+                        )}
                       </div>
                     ) : null}
                   </li>
                 );
               }
 
-              if (!item.href) return null;
+              if (!item?.href) return null;
 
               return (
-                <li key={item.href}>
+                <li key={item.href ?? idx}>
                   <ProcurementSidebarTopLink
                     href={item.href}
-                    label={item.label}
-                    icon={item.icon}
+                    label={itemLabel}
+                    icon={ItemIcon ?? item.icon}
                     active={isNavActive(pathname, item.href)}
+                    badge={item.href === '/notifications' ? unreadNotifications : undefined}
                     onNavigate={onClose}
                   />
                 </li>

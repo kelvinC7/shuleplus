@@ -4,23 +4,21 @@ import { useEffect, useState, useCallback } from 'react';
 import { MainLayout } from '@/layouts/main-layout';
 import { procurementApi } from '@/services/procurement-api';
 import { useAuth } from '@/contexts/auth-context';
-import type { PurchaseRequest, PurchaseRequestItem, PRApproval } from '@/types';
+import type { PurchaseRequest } from '@/types';
 import {
-  Plus, CheckCircle, XCircle, Clock, FileText, Download,
+  Plus, CheckCircle, Clock, FileText, Download, Filter, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import {
-  AddItemButton,
-  FormField,
-  ItemFormCard,
-  ModalStepWizard,
-  SelectField,
-  SummaryPanel,
-  SummaryRow,
-} from '@/components/procurement-form-ui';
 import { SetOrdersDrawer } from '@/components/set-orders-drawer';
 import { PurchaseRequestTableActions } from '@/components/purchase-request-table-actions';
+import {
+  PurchaseRequestFormDrawer,
+  emptyPurchaseRequestForm,
+  type PurchaseRequestFormValues,
+} from '@/components/purchase-request-form-drawer';
+import { PurchaseRequestDetailDrawer } from '@/components/purchase-request-detail-drawer';
+import { PurchaseRequestImportWizard } from '@/components/purchase-request-import-wizard';
 import { OTHER_DEPARTMENT_CODE, type AcademicSettings, defaultAcademicSettings } from '@/lib/academic-settings';
 import { downloadPurchaseRequestPdf } from '@/modules/documents/pr-request-pdf';
 import { PlatformPageLayout } from '@/components/platform-page-layout';
@@ -29,62 +27,31 @@ import {
   DataTableCard,
   DataTableEmpty,
   DataTableHead,
+  DataTableRow,
+  DataTableTd,
   DataTableTh,
   ListFilterBar,
   PageLoading,
   StatusBadge,
+  TablePagination,
+  useTablePagination,
 } from '@/components/list-ui';
-
-const PR_WIZARD_STEPS = [
-  { title: 'Details', description: 'Department, academic period, and request information' },
-  { title: 'Items', description: 'Line items with quantities (no pricing at request stage)' },
-  { title: 'Review', description: 'Confirm details before submitting' },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: 'LOW', label: 'Low' },
-  { value: 'MEDIUM', label: 'Medium' },
-  { value: 'HIGH', label: 'High' },
-  { value: 'URGENT', label: 'Urgent' },
-];
-
-const REQUEST_TYPE_OPTIONS = [
-  { value: 'GOODS', label: 'Goods' },
-  { value: 'SERVICES', label: 'Services' },
-  { value: 'WORKS', label: 'Works' },
-];
-
-const PRIORITY_COLORS: Record<string, string> = {
-  LOW: 'bg-gray-100 text-gray-700',
-  MEDIUM: 'bg-blue-100 text-blue-700',
-  HIGH: 'bg-orange-100 text-orange-700',
-  URGENT: 'bg-red-100 text-red-700',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  DEPARTMENT_HEAD_APPROVED: 'bg-blue-100 text-blue-700',
-  FINANCE_APPROVED: 'bg-indigo-100 text-indigo-700',
-  PROCUREMENT_APPROVED: 'bg-purple-100 text-purple-700',
-  MD_APPROVED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
-  CONVERTED_TO_PO: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-gray-100 text-gray-600',
-};
+import {
+  ReportFilterDrawer,
+  EMPTY_REPORT_FILTERS,
+  countActiveReportFilters,
+  reportFilterParams,
+  reportPeriodMeta,
+  reportPeriodLabel,
+  type ReportFilterValues,
+} from '@/components/report-filter-drawer';
+import { downloadProcurementReport } from '@/modules/documents/report-pdf';
+import { formatPersonName } from '@/utils/person-name';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft', PENDING: 'Pending', DEPARTMENT_HEAD_APPROVED: 'Dept. Head Approved',
   FINANCE_APPROVED: 'Finance Approved', PROCUREMENT_APPROVED: 'Procurement Approved',
   MD_APPROVED: 'Fully Approved', REJECTED: 'Rejected', CONVERTED_TO_PO: 'Converted to PO', CANCELLED: 'Cancelled',
-};
-
-const UNITS = ['EA', 'PCS', 'KG', 'G', 'L', 'ML', 'M', 'Box', 'Carton', 'Pair', 'Set', 'Pack'];
-
-const initialItemState = { itemName: '', description: '', unit: 'EA', quantity: '', categoryId: '', warehouseLocation: '' };
-const initialFormState = {
-  requestType: 'GOODS', departmentId: '', departmentOther: '', purpose: '',
-  priority: 'MEDIUM', neededDate: '', academicYear: '', term: '', items: [{ ...initialItemState }],
 };
 
 export default function PurchaseRequestsPage() {
@@ -97,9 +64,7 @@ export default function PurchaseRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [formStep, setFormStep] = useState(1);
-  const [form, setForm] = useState(initialFormState);
-  const [submitting, setSubmitting] = useState(false);
+  const [formInitial, setFormInitial] = useState<PurchaseRequestFormValues>(emptyPurchaseRequestForm());
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedPR, setSelectedPR] = useState<PurchaseRequest | null>(null);
   const [approvalComment, setApprovalComment] = useState('');
@@ -113,17 +78,21 @@ export default function PurchaseRequestsPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [editItem, setEditItem] = useState<PurchaseRequest | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reportFilters, setReportFilters] = useState<ReportFilterValues>(EMPTY_REPORT_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const params: any = {};
+      const params: any = { ...reportFilterParams(reportFilters) };
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
       if (search) params.search = search;
       const data = await procurementApi.purchaseRequests.list(params);
       setRequests(data);
     } catch {} finally { setLoading(false); }
-  }, [statusFilter, priorityFilter, search]);
+  }, [statusFilter, priorityFilter, search, reportFilters]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -135,75 +104,62 @@ export default function PurchaseRequestsPage() {
   }, []);
 
   const otherDepartmentId = departments.find((d) => d.code === OTHER_DEPARTMENT_CODE)?.id ?? '';
-  const isOtherDepartment = form.departmentId === otherDepartmentId;
-
-  const departmentLabel = (id: string, other?: string | null) => {
-    if (other?.trim()) return other.trim();
-    return departments.find((d) => d.id === id)?.name ?? '—';
-  };
 
   const displayDepartment = (pr: PurchaseRequest) =>
     pr.departmentOther?.trim() || pr.department?.name || '—';
 
-  const resetForm = () => { setForm(initialFormState); setFormStep(1); setEditItem(null); };
+  const resetForm = () => { setEditItem(null); setFormInitial(emptyPurchaseRequestForm()); };
 
-  const addItem = () => setForm(prev => ({
-    ...prev, items: [...prev.items, { ...initialItemState }],
-  }));
+  const handleSave = async (values: PurchaseRequestFormValues, action: 'draft' | 'submit') => {
+    const isOther = values.departmentId === otherDepartmentId;
+    const payload = {
+      requestType: values.requestType,
+      departmentId: values.departmentId,
+      departmentOther: isOther ? values.departmentOther.trim() : undefined,
+      purpose: values.purpose,
+      priority: values.priority,
+      neededDate: values.neededDate,
+      academicYear: values.academicYear || academicSettings.currentAcademicYear || undefined,
+      term: values.term || undefined,
+      status: action === 'draft' ? 'DRAFT' : 'PENDING',
+      departmentHeadId: user?.sub,
+      items: values.items.map((item) => ({
+        itemName: item.itemName,
+        description: item.description,
+        unit: item.unit,
+        quantity: Number(item.quantity),
+        estimatedPrice: 0,
+        categoryId: item.categoryId || undefined,
+        warehouseLocation: item.warehouseLocation || undefined,
+      })),
+    };
 
-  const removeItem = (idx: number) => setForm(prev => ({
-    ...prev, items: prev.items.filter((_, i) => i !== idx),
-  }));
-
-  const updateItem = (idx: number, field: string, value: string) => setForm(prev => ({
-    ...prev, items: prev.items.map((item, i) => i === idx ? { ...item, [field]: value } : item),
-  }));
-
-  const handleSubmit = async () => {
-    if (!form.departmentId) { toast.error('Please select a department'); return; }
-    if (isOtherDepartment && !form.departmentOther.trim()) {
-      toast.error('Please specify the department name'); return;
-    }
-    if (!form.neededDate) { toast.error('Please set needed date'); return; }
-    if (form.items.some(i => !i.itemName || !i.quantity)) {
-      toast.error('Please fill item name and quantity for all items'); return;
-    }
-    setSubmitting(true);
     try {
-      const payload = {
-        ...form,
-        departmentOther: isOtherDepartment ? form.departmentOther.trim() : undefined,
-        academicYear: form.academicYear || academicSettings.currentAcademicYear || undefined,
-        term: form.term || undefined,
-        items: form.items.map((item) => ({
-          ...item,
-          estimatedPrice: 0,
-        })),
-      };
-
       if (editItem) {
         await procurementApi.purchaseRequests.update(editItem.id, payload);
-        toast.success('Purchase request updated');
+        toast.success(action === 'draft' ? 'Draft saved' : 'Purchase request updated');
         setFormOpen(false);
         resetForm();
         load();
+        if (selectedPR?.id === editItem.id) {
+          const updated = await procurementApi.purchaseRequests.getById(editItem.id);
+          setSelectedPR(updated);
+        }
         return;
       }
 
-      const created = await procurementApi.purchaseRequests.create({
-        ...payload,
-        requestedByName: user?.email,
-        departmentHeadId: user?.sub,
-      });
-      toast.success('Purchase request submitted');
+      const created = await procurementApi.purchaseRequests.create(payload);
+      toast.success(action === 'draft' ? 'Draft saved' : 'Purchase request submitted');
       setFormOpen(false);
       resetForm();
       load();
-      setCreatedPR(created);
-      setSuccessOpen(true);
+      if (action === 'submit') {
+        setCreatedPR(created);
+        setSuccessOpen(true);
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create request');
-    } finally { setSubmitting(false); }
+      throw err;
+    }
   };
 
   const handleDownloadPdf = async (pr: PurchaseRequest) => {
@@ -216,6 +172,10 @@ export default function PurchaseRequestsPage() {
       await downloadPurchaseRequestPdf(pr, {
         schoolName: profile?.schoolName ?? 'School',
         logoUrl: profile?.logoUrl,
+        province: profile?.province,
+        district: profile?.district,
+        sector: profile?.sector,
+        website: profile?.website,
         stampUrl: profile?.stampUrl,
         receiptSettings,
       });
@@ -226,12 +186,90 @@ export default function PurchaseRequestsPage() {
     }
   };
 
+  const handleDownloadReport = async (values: ReportFilterValues) => {
+    setReportLoading(true);
+    try {
+      const params: Record<string, string> = { ...reportFilterParams(values) };
+      if (statusFilter !== 'ALL') params.status = statusFilter;
+      if (priorityFilter) params.priority = priorityFilter;
+
+      const [profile, rows] = await Promise.all([
+        procurementApi.settings.getOrgProfile(),
+        procurementApi.purchaseRequests.list(params),
+      ]);
+
+      const meta = [...reportPeriodMeta(values)];
+      if (statusFilter !== 'ALL') {
+        meta.push({ label: 'Status', value: STATUS_LABELS[statusFilter] ?? statusFilter });
+      }
+
+
+      const pending = rows.filter((row) => row.status === 'PENDING').length;
+      const approved = rows.filter((row) =>
+        ['MD_APPROVED', 'CONVERTED_TO_PO'].includes(row.status),
+      ).length;
+
+      await downloadProcurementReport({
+        info: {
+          schoolName: profile?.schoolName ?? 'School',
+          logoUrl: profile?.logoUrl,
+          province: profile?.province,
+          district: profile?.district,
+          sector: profile?.sector,
+          website: profile?.website,
+        },
+        title: 'PURCHASE REQUESTS REPORT',
+        columns: [
+          { header: 'PR Number', dataKey: 'prNumber' },
+          { header: 'Date', dataKey: 'date' },
+          { header: 'Department', dataKey: 'department' },
+          { header: 'Requested By', dataKey: 'requestedBy' },
+          { header: 'Status', dataKey: 'status', align: 'center' },
+          { header: 'Items', dataKey: 'items', align: 'right' },
+        ],
+        rows: rows.map((row) => ({
+          prNumber: row.prNumber,
+          date: new Date(row.createdAt).toLocaleDateString(),
+          department: displayDepartment(row),
+          requestedBy: formatPersonName(row.requestedByName) || '—',
+          status: STATUS_LABELS[row.status] ?? row.status,
+          items: row.items?.length ?? row._count?.items ?? 0,
+        })),
+        meta,
+        summary: [
+          { label: 'Records', value: String(rows.length) },
+          { label: 'Pending', value: String(pending) },
+          { label: 'Approved', value: String(approved) },
+        ],
+        fileBase: 'purchase-requests-report',
+        verification: {
+          period: reportPeriodLabel(values),
+          generatedBy: user?.email ?? 'Procurement MIS User',
+        },
+      });
+    } catch {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const refreshSelected = async (id: string) => {
+    if (selectedPR?.id !== id) return;
+    try {
+      const updated = await procurementApi.purchaseRequests.getById(id);
+      setSelectedPR(updated);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleApprove = async (id: string) => {
     try {
       await procurementApi.purchaseRequests.approve(id, approvalComment);
       toast.success('Request approved');
       setApprovalComment(''); load();
-      if (selectedPR?.id === id) { const updated = await procurementApi.purchaseRequests.getById(id); setSelectedPR(updated); }
+      await refreshSelected(id);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Approval failed');
     }
@@ -243,17 +281,9 @@ export default function PurchaseRequestsPage() {
       await procurementApi.purchaseRequests.reject(rejectTargetId, rejectReason);
       toast.success('Request rejected');
       setShowRejectDialog(false); setRejectReason(''); load();
+      await refreshSelected(rejectTargetId);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Rejection failed');
-    }
-  };
-
-  const handleCancel = async (id: string) => {
-    try {
-      await procurementApi.purchaseRequests.cancel(id);
-      toast.success('Request cancelled'); load();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Cancel failed');
     }
   };
 
@@ -292,13 +322,13 @@ export default function PurchaseRequestsPage() {
     try {
       const detail = await procurementApi.purchaseRequests.getById(pr.id);
       setEditItem(detail);
-      setForm({
+      setFormInitial({
         requestType: detail.requestType,
-        departmentId: detail.departmentId,
+        departmentId: detail.departmentId ?? '',
         departmentOther: detail.departmentOther ?? '',
         purpose: detail.purpose ?? '',
         priority: detail.priority,
-        neededDate: detail.neededDate.slice(0, 10),
+        neededDate: detail.neededDate ? detail.neededDate.slice(0, 10) : '',
         academicYear: detail.academicYear ?? '',
         term: detail.term ?? '',
         items: (detail.items ?? []).map((item) => ({
@@ -310,7 +340,6 @@ export default function PurchaseRequestsPage() {
           warehouseLocation: item.warehouseLocation ?? '',
         })),
       });
-      setFormStep(1);
       setFormOpen(true);
     } catch {
       toast.error('Failed to load request for editing');
@@ -341,14 +370,18 @@ export default function PurchaseRequestsPage() {
   const approvedCount = requests.filter(r => ['MD_APPROVED', 'CONVERTED_TO_PO'].includes(r.status)).length;
 
   const openNewRequest = () => {
-    resetForm();
-    setForm((f) => ({
-      ...f,
+    setEditItem(null);
+    setFormInitial({
+      ...emptyPurchaseRequestForm(),
       academicYear: academicSettings.currentAcademicYear ?? '',
       term: academicSettings.currentTerm ?? '',
-    }));
+    });
     setFormOpen(true);
   };
+
+  const pagination = useTablePagination(requests, {
+    resetKey: `${search}|${statusFilter}|${priorityFilter}|${reportFilters.academicYear}|${reportFilters.term}|${reportFilters.dateFrom}|${reportFilters.dateTo}`,
+  });
 
   if (loading) {
     return (
@@ -363,13 +396,22 @@ export default function PurchaseRequestsPage() {
       <PlatformPageLayout
         subtitle="Manage and track all purchase requests through approval."
         actions={
-          <button
-            type="button"
-            onClick={openNewRequest}
-            className="btn-primary"
-          >
-            <Plus className="h-4 w-4" /> New Request
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="btn-secondary inline-flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" /> Import Excel
+            </button>
+            <button
+              type="button"
+              onClick={openNewRequest}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4" /> New Request
+            </button>
+          </div>
         }
         kpis={[
           {
@@ -432,7 +474,22 @@ export default function PurchaseRequestsPage() {
             setSearch('');
             setStatusFilter('ALL');
             setPriorityFilter('');
+            setReportFilters(EMPTY_REPORT_FILTERS);
           }}
+          actions={
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              className="btn-ghost !rounded-xl inline-flex items-center gap-2 ring-1 ring-slate-200"
+            >
+              <Filter className="h-4 w-4" /> Filter
+              {countActiveReportFilters(reportFilters) > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#fcb038] px-1.5 text-[10px] font-extrabold text-navy">
+                  {countActiveReportFilters(reportFilters)}
+                </span>
+              ) : null}
+            </button>
+          }
         />
 
         {selectedIds.size > 0 ? (
@@ -474,14 +531,12 @@ export default function PurchaseRequestsPage() {
               <DataTableTh className="text-right">Actions</DataTableTh>
             </DataTableHead>
             <tbody>
-              {requests.map((pr) => (
-                <tr
+              {pagination.rows.map((pr) => (
+                <DataTableRow
                   key={pr.id}
-                  className={`border-b border-border/70 transition hover:bg-[#f8fafc] ${
-                    selectedIds.has(pr.id) ? 'bg-[#fcb038]/[0.06]' : ''
-                  }`}
+                  className={selectedIds.has(pr.id) ? 'bg-[#fcb038]/[0.06]' : undefined}
                 >
-                  <td className="px-4 py-3">
+                  <DataTableTd>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(pr.id)}
@@ -489,24 +544,24 @@ export default function PurchaseRequestsPage() {
                       className="h-4 w-4 rounded border-border accent-[#fcb038]"
                       aria-label={`Select ${pr.prNumber}`}
                     />
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-navy">{pr.prNumber}</td>
-                  <td className="px-4 py-3 text-muted">
+                  </DataTableTd>
+                  <DataTableTd className="font-semibold text-navy">{pr.prNumber}</DataTableTd>
+                  <DataTableTd className="text-muted">
                     {new Date(pr.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3">{pr.requestedByName || '—'}</td>
-                  <td className="px-4 py-3 text-muted">{displayDepartment(pr)}</td>
-                  <td className="px-4 py-3 text-center">
+                  </DataTableTd>
+                  <DataTableTd>{formatPersonName(pr.requestedByName) || '—'}</DataTableTd>
+                  <DataTableTd className="text-muted">{displayDepartment(pr)}</DataTableTd>
+                  <DataTableTd className="text-center">
                     <StatusBadge tone={pr.priority === 'URGENT' ? 'danger' : pr.priority === 'HIGH' ? 'warning' : 'info'}>
                       {pr.priority}
                     </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3 text-center">
+                  </DataTableTd>
+                  <DataTableTd className="text-center">
                     <StatusBadge tone={pr.status === 'REJECTED' ? 'danger' : pr.status.includes('APPROVED') ? 'success' : 'neutral'}>
                       {STATUS_LABELS[pr.status] || pr.status}
                     </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3">
+                  </DataTableTd>
+                  <DataTableTd>
                     <PurchaseRequestTableActions
                       pr={pr}
                       isSupervisor={isSupervisor}
@@ -520,177 +575,60 @@ export default function PurchaseRequestsPage() {
                       onDownloadPdf={handleDownloadPdf}
                       onSetOrder={openCreateOrder}
                     />
-                  </td>
-                </tr>
+                  </DataTableTd>
+                </DataTableRow>
               ))}
               {requests.length === 0 ? (
                 <DataTableEmpty colSpan={8} message="No purchase requests found" />
               ) : null}
             </tbody>
           </DataTable>
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </DataTableCard>
       </PlatformPageLayout>
 
-      {/* Multi-step Request Form */}
-      <Dialog open={formOpen} onOpenChange={open => { if (!open) { setFormOpen(false); setTimeout(resetForm, 250); } }}>
-        <DialogContent className="max-h-[95vh] max-w-[calc(100%-1rem)] overflow-y-auto border-0 bg-transparent p-0 shadow-none sm:max-w-4xl">
-          <ModalStepWizard
-            steps={PR_WIZARD_STEPS}
-            currentStep={formStep - 1}
-            onCancel={() => { setFormOpen(false); setTimeout(resetForm, 250); }}
-            onBack={() => setFormStep((s) => Math.max(1, s - 1))}
-            onNext={() => setFormStep((s) => Math.min(3, s + 1))}
-            onSubmit={handleSubmit}
-            isLastStep={formStep === 3}
-            saving={submitting}
-            submitLabel={editItem ? 'Save Changes' : 'Submit Request'}
-          >
-            {formStep === 1 && (
-              <div className="grid gap-5 sm:grid-cols-2">
-                <SelectField
-                  label="Department"
-                  required
-                  value={form.departmentId}
-                  onChange={(value) => setForm({ ...form, departmentId: value, departmentOther: '' })}
-                  options={departments.map((d) => ({ value: d.id, label: d.name }))}
-                  placeholder="Select department"
-                />
-                {isOtherDepartment ? (
-                  <FormField label="Specify Department" required className="sm:col-span-2">
-                    <input
-                      value={form.departmentOther}
-                      onChange={(e) => setForm({ ...form, departmentOther: e.target.value })}
-                      className="input"
-                      placeholder="Enter department name"
-                    />
-                  </FormField>
-                ) : null}
-                <SelectField
-                  label="Academic Year"
-                  value={form.academicYear}
-                  onChange={(value) => setForm({ ...form, academicYear: value })}
-                  options={academicSettings.academicYears.map((y) => ({ value: y, label: y }))}
-                  placeholder="Select academic year"
-                />
-                <SelectField
-                  label="Term (optional)"
-                  value={form.term}
-                  onChange={(value) => setForm({ ...form, term: value })}
-                  options={academicSettings.terms.map((t) => ({ value: t, label: t }))}
-                  placeholder="Optional"
-                />
-                <SelectField
-                  label="Priority"
-                  value={form.priority}
-                  onChange={(value) => setForm({ ...form, priority: value })}
-                  options={PRIORITY_OPTIONS}
-                  placeholder="Select priority"
-                />
-                <FormField label="Needed By" required>
-                  <input
-                    type="date"
-                    value={form.neededDate}
-                    onChange={(e) => setForm({ ...form, neededDate: e.target.value })}
-                    className="input"
-                  />
-                </FormField>
-                <SelectField
-                  label="Request Type"
-                  value={form.requestType}
-                  onChange={(value) => setForm({ ...form, requestType: value })}
-                  options={REQUEST_TYPE_OPTIONS}
-                  placeholder="Select type"
-                />
-                <FormField label="Purpose" className="sm:col-span-2">
-                  <textarea
-                    value={form.purpose}
-                    onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-                    className="input min-h-[90px] resize-y"
-                    rows={3}
-                    placeholder="Why is this needed?"
-                  />
-                </FormField>
-              </div>
-            )}
+      <PurchaseRequestFormDrawer
+        open={formOpen}
+        editing={editItem}
+        initialValues={formInitial}
+        departments={departments}
+        academicSettings={academicSettings}
+        otherDepartmentId={otherDepartmentId}
+        onClose={() => { setFormOpen(false); resetForm(); }}
+        onSave={handleSave}
+      />
 
-            {formStep === 2 && (
-              <div className="space-y-4">
-                {form.items.map((item, idx) => (
-                  <ItemFormCard
-                    key={idx}
-                    index={idx}
-                    canRemove={form.items.length > 1}
-                    onRemove={() => removeItem(idx)}
-                  >
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <FormField label="Item Name" required className="sm:col-span-2">
-                        <input
-                          value={item.itemName}
-                          onChange={(e) => updateItem(idx, 'itemName', e.target.value)}
-                          className="input"
-                          placeholder="Item name"
-                        />
-                      </FormField>
-                      <FormField label="Unit" required>
-                        <select
-                          value={item.unit}
-                          onChange={(e) => updateItem(idx, 'unit', e.target.value)}
-                          className="input"
-                        >
-                          {UNITS.map((u) => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
-                      </FormField>
-                      <FormField label="Quantity" required>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                          className="input"
-                        />
-                      </FormField>
-                      <FormField label="Description" className="sm:col-span-3">
-                        <input
-                          value={item.description}
-                          onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                          className="input"
-                          placeholder="Additional details"
-                        />
-                      </FormField>
-                    </div>
-                  </ItemFormCard>
-                ))}
-                <AddItemButton onClick={addItem} />
-              </div>
-            )}
+      <PurchaseRequestDetailDrawer
+        open={detailOpen}
+        pr={selectedPR}
+        isSupervisor={isSupervisor}
+        currentUserId={user?.sub}
+        pdfLoading={pdfLoading}
+        onClose={() => setDetailOpen(false)}
+        onEdit={(pr) => { setDetailOpen(false); void openEdit(pr); }}
+        onSetOrder={(pr) => { setDetailOpen(false); void openCreateOrder(pr); }}
+        onDownloadPdf={handleDownloadPdf}
+        onApprove={handleApprove}
+        onReject={(id) => { setRejectTargetId(id); setShowRejectDialog(true); }}
+      />
 
-            {formStep === 3 && (
-              <div className="space-y-4">
-                <SummaryPanel title="Request Summary">
-                  <SummaryRow label="Department" value={departmentLabel(form.departmentId, isOtherDepartment ? form.departmentOther : null)} />
-                  <SummaryRow label="Academic Year" value={form.academicYear || '—'} />
-                  <SummaryRow label="Term" value={form.term || '—'} />
-                  <SummaryRow label="Priority" value={form.priority} />
-                  <SummaryRow label="Needed By" value={form.neededDate || '—'} />
-                  <SummaryRow label="Type" value={form.requestType} />
-                  {form.purpose ? <SummaryRow label="Purpose" value={form.purpose} /> : null}
-                </SummaryPanel>
-                <SummaryPanel title={`Items (${form.items.length})`}>
-                  {form.items.map((item, i) => (
-                    <SummaryRow
-                      key={i}
-                      label={`${item.itemName || `Item ${i + 1}`} × ${item.quantity} ${item.unit}`}
-                      value="—"
-                    />
-                  ))}
-                </SummaryPanel>
-              </div>
-            )}
-          </ModalStepWizard>
-        </DialogContent>
-      </Dialog>
+      <PurchaseRequestImportWizard
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { void load(); }}
+        departments={departments}
+        academicSettings={academicSettings}
+        requestedBy={user?.sub}
+      />
 
       <SetOrdersDrawer
         open={poDrawerOpen}
@@ -724,77 +662,6 @@ export default function PurchaseRequestsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedPR?.prNumber} - Purchase Request Details</DialogTitle>
-          </DialogHeader>
-          {selectedPR && (
-            <div className="space-y-4">
-              <div className="grid gap-3 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Status:</span><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[selectedPR.status]}`}>{STATUS_LABELS[selectedPR.status]}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Priority:</span><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_COLORS[selectedPR.priority]}`}>{selectedPR.priority}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Requested By:</span><span>{selectedPR.requestedByName || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Department:</span><span>{displayDepartment(selectedPR)}</span></div>
-                {selectedPR.academicYear ? <div className="flex justify-between"><span className="text-muted-foreground">Academic Year:</span><span>{selectedPR.academicYear}</span></div> : null}
-                {selectedPR.term ? <div className="flex justify-between"><span className="text-muted-foreground">Term:</span><span>{selectedPR.term}</span></div> : null}
-                <div className="flex justify-between"><span className="text-muted-foreground">Needed By:</span><span>{new Date(selectedPR.neededDate).toLocaleDateString()}</span></div>
-                {selectedPR.purpose && <div><span className="text-muted-foreground">Purpose:</span><p className="mt-1">{selectedPR.purpose}</p></div>}
-              </div>
-
-              {selectedPR.items && selectedPR.items.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">Items</h4>
-                  <div className="rounded-lg border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead><tr className="bg-gray-50 border-b">
-                        <th className="text-left px-3 py-2 font-medium">Item</th>
-                        <th className="text-center px-3 py-2 font-medium">Qty</th>
-                        <th className="text-left px-3 py-2 font-medium">Description</th>
-                      </tr></thead>
-                      <tbody>
-                        {selectedPR.items.map(item => (
-                          <tr key={item.id} className="border-b last:border-0">
-                            <td className="px-3 py-2">{item.itemName}</td>
-                            <td className="px-3 py-2 text-center">{item.quantity} {item.unit}</td>
-                            <td className="px-3 py-2 text-muted">{item.description || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {selectedPR.approvals && selectedPR.approvals.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">Approval History</h4>
-                  <div className="space-y-2">
-                    {selectedPR.approvals.map(a => (
-                      <div key={a.id} className="flex items-start gap-3 p-3 rounded-lg border">
-                        <div className={`rounded-full p-1.5 ${a.status === 'APPROVED' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                          {a.status === 'APPROVED' ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{a.stage}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${a.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{a.status}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{a.approverName || a.approverId}</p>
-                          {a.comment && <p className="text-xs mt-1">{a.comment}</p>}
-                          {a.approvedAt && <p className="text-xs text-muted-foreground mt-1">{new Date(a.approvedAt).toLocaleString()}</p>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Reject Dialog */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent className="sm:max-w-md">
@@ -810,6 +677,18 @@ export default function PurchaseRequestsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReportFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter purchase requests"
+        description="Narrow requests by academic period or date, then download a branded PDF report."
+        academicSettings={academicSettings}
+        value={reportFilters}
+        onApply={setReportFilters}
+        onDownload={handleDownloadReport}
+        downloading={reportLoading}
+      />
     </MainLayout>
   );
 }

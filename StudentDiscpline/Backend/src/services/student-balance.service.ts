@@ -68,6 +68,7 @@ export const studentBalanceService = {
         studentId,
         currentScore: scores.startingScore,
         maxScore: scores.maxScore,
+        startingScore: scores.startingScore,
         totalCases: caseCount,
         casesThisTerm: termCount,
         initialized: false,
@@ -79,8 +80,46 @@ export const studentBalanceService = {
       ...balance,
       maxScore,
       currentScore,
+      startingScore: scores.startingScore,
       totalCases: Math.max(balance.totalCases, caseCount),
       casesThisTerm: Math.max(balance.casesThisTerm, termCount),
+      initialized: true,
+    };
+  },
+
+  /**
+   * Profile lookup by the school-issued student code (ShuleCode/admission
+   * number). ParentMIS knows the code, not the Student Management UUID, so this
+   * lets the parent portal show the same score and max score configured in
+   * Student Discipline.
+   */
+  async getProfileByCode(organizationId: string, studentCode: string) {
+    const scores = await orgScores(organizationId);
+    const code = String(studentCode || '').trim();
+    const balance = code
+      ? await prisma.studentDisciplineBalance.findFirst({
+          where: { organizationId, studentCode: code },
+          orderBy: { updatedAt: 'desc' },
+        })
+      : null;
+
+    if (!balance) {
+      return {
+        studentCode: code,
+        currentScore: scores.startingScore,
+        maxScore: scores.maxScore,
+        startingScore: scores.startingScore,
+        totalCases: 0,
+        casesThisTerm: 0,
+        initialized: false,
+      };
+    }
+
+    return {
+      ...balance,
+      currentScore: Math.min(balance.currentScore, scores.maxScore),
+      maxScore: scores.maxScore,
+      startingScore: scores.startingScore,
       initialized: true,
     };
   },

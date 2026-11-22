@@ -1,6 +1,6 @@
 import { Avatar, Badge } from '@mui/material';
 import { Person } from '@mui/icons-material';
-import { ONLINE, OFFLINE } from '@/shared/styles';
+import { ONLINE, OFFLINE, PRIMARY } from '@/shared/styles';
 
 interface AvatarWithStatusProps {
   name: string | null | undefined;
@@ -19,7 +19,7 @@ export function AvatarWithStatus({ avatarUrl, online, size = 40, showStatus = tr
         height: size,
         fontSize: size * 0.42,
         fontWeight: 700,
-        bgcolor: '#001121',
+        bgcolor: PRIMARY,
         color: '#fff',
       }}
     >

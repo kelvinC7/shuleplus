@@ -18,7 +18,7 @@ export default function Loading() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-medium text-sky-700">babyeyi.rw</p>
           <h1 className="mt-2 text-2xl font-semibold text-ink-900">Loading schools directory…</h1>
-          <p className="mt-2 text-sm text-ink-500">Parents convenience — verified listings across Rwanda</p>
+          <p className="mt-2 text-sm text-ink-500">Parents convenience - verified listings across Rwanda</p>
         </div>
 
         <div className="mt-10 grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">

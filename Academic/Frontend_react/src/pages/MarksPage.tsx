@@ -220,7 +220,7 @@ export default function MarksPage() {
           <GradingIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.8125rem', md: '0.9375rem' } }}>Marks Entry</Typography>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {totalStudents > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{ textAlign: 'center' }}>
@@ -352,11 +352,11 @@ export default function MarksPage() {
             </Box>
 
             {/* Header */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: '40px 1fr 120px 160px', gap: 1, mb: 1, px: 1 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '28px minmax(0,1fr) 84px', sm: '40px 1fr 120px 160px' }, gap: 1, mb: 1, px: 1 }}>
               <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8' }}>#</Typography>
               <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8' }}>Student</Typography>
               <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8' }}>Score</Typography>
-              <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8' }}>Remarks</Typography>
+              <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', display: { xs: 'none', sm: 'block' } }}>Remarks</Typography>
             </Box>
 
             {/* Student Rows */}
@@ -372,7 +372,7 @@ export default function MarksPage() {
                 <Box
                   key={student.id}
                   sx={{
-                    display: 'grid', gridTemplateColumns: '40px 1fr 120px 160px', gap: 1, mb: 0.5, p: 1, borderRadius: 1,
+                    display: 'grid', gridTemplateColumns: { xs: '28px minmax(0,1fr) 84px', sm: '40px 1fr 120px 160px' }, gap: 1, mb: 0.5, p: 1, borderRadius: 1,
                     bgcolor: student.dirty ? 'rgba(245,158,11,0.04)' : index % 2 !== 0 ? 'rgba(0,0,0,0.01)' : 'white',
                     border: '1px solid', borderColor: student.dirty ? 'rgba(245,158,11,0.2)' : 'transparent',
                     transition: 'all 0.15s',
@@ -380,13 +380,13 @@ export default function MarksPage() {
                   }}
                 >
                   <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>{index + 1}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
                     <Box sx={{ width: 28, height: 28, borderRadius: '50%', bgcolor: 'rgba(25,118,210,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Typography sx={{ fontSize: '0.625rem', fontWeight: 700, color: '#1976d2' }}>{student.firstName[0]}{student.lastName[0]}</Typography>
                     </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.2 }}>{student.firstName} {student.lastName}</Typography>
-                      <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>{student.studentUid}</Typography>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap sx={{ fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.2 }}>{student.firstName} {student.lastName}</Typography>
+                      <Typography noWrap sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>{student.studentUid}</Typography>
                     </Box>
                   </Box>
                   <TextField
@@ -407,7 +407,7 @@ export default function MarksPage() {
                     placeholder="Optional"
                     disabled={locked}
                     slotProps={{ htmlInput: { style: { fontSize: '0.75rem' } } }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 }, gridColumn: { xs: '2 / -1', sm: 'auto' } }}
                   />
                 </Box>
               );

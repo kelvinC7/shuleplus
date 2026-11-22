@@ -101,10 +101,6 @@ export const reportCardAccessService = {
       const override = overrideByStudent.get(studentId);
       const balance = fee?.balance ?? 0;
       const paid = fee?.paymentStatus === 'PAID';
-      const hasLoan =
-        pol.blockWhenLoanActive &&
-        false; // filled below per student if needed
-
       return {
         studentId,
         studentCode: pub?.studentCode ?? (fee as { studentCode?: string } | null)?.studentCode ?? '',
@@ -116,11 +112,11 @@ export const reportCardAccessService = {
         balance,
         paidAmount: fee?.paidAmount ?? 0,
         totalFees: fee?.totalFees ?? 0,
-        hasActiveLoan: hasLoan,
+        hasActiveLoan: false,
         overrideDecision: override?.decision ?? null,
         exceptionReason: override?.exceptionReason ?? fee?.exceptionReason ?? null,
         exceptionNote: override?.exceptionNote ?? fee?.exceptionNote ?? null,
-        allowed: false as boolean,
+        allowed: false,
         blockReason: null as string | null,
       };
     });
@@ -135,10 +131,12 @@ export const reportCardAccessService = {
       select: { studentId: true, studentCode: true, status: true },
     });
     const loanSet = new Set(loanRows.map((l) => l.studentId));
-    const loanCodeSet = new Set(loanRows.map((l) => l.studentCode.toLowerCase()));
+    const loanCodeSet = new Set(loanRows.map((l) => String(l.studentCode || '').toLowerCase()));
 
     for (const row of rows) {
       row.hasActiveLoan = loanSet.has(row.studentId) || loanCodeSet.has((row.studentCode || '').toLowerCase());
+      const fee = feePreview ? financialRowFromPreview(row.studentId, feePreview.students) : null;
+      const evaluated = Boolean(fee);
 
       if (!row.academicPublished) {
         row.allowed = false;
@@ -164,10 +162,18 @@ export const reportCardAccessService = {
         continue;
       }
 
-      if (pol.requireFeesClearance && row.balance > 0 && row.paymentStatus !== 'PAID') {
-        row.allowed = false;
-        row.blockReason = 'Pay remaining school fees to open student report';
-        continue;
+      if (pol.requireFeesClearance) {
+        // If we cannot evaluate clearance for this student/period, fail closed for safety.
+        if (!evaluated) {
+          row.allowed = false;
+          row.blockReason = 'Fees clearance could not be verified yet. Please contact the school or try again shortly.';
+          continue;
+        }
+        if (row.balance > 0 && row.paymentStatus !== 'PAID') {
+          row.allowed = false;
+          row.blockReason = 'Pay remaining school fees to open student report';
+          continue;
+        }
       }
 
       row.allowed = true;
@@ -253,22 +259,40 @@ export const reportCardAccessService = {
       };
     }
 
-    const className = query.className?.trim() || pub.className || '';
-    const preview =
-      className || pub.className
-        ? await this.preview(organizationId, {
-            academicYear,
-            term,
-            className: className || pub.className || undefined,
-            search: pub.studentCode ?? undefined,
-          })
-        : null;
-    const row = preview?.students.find((s) => s.studentId === pub.studentId);
-    if (!row) {
+    const accessPolicy = String((pub as any).accessPolicy || '').toUpperCase();
+    if (accessPolicy === 'ALL_PARENTS') {
       return {
         published: true,
         allowed: true,
-        message: 'Published; fees clearance not evaluated for this class.',
+        message: null,
+        publication: pub,
+      };
+    }
+
+    const pol = await getOrCreateReportCardAccessPolicy(organizationId);
+    const className = query.className?.trim() || pub.className || '';
+    let preview = null as Awaited<ReturnType<typeof this.preview>> | null;
+    if (className || pub.className) {
+      try {
+        preview = await this.preview(organizationId, {
+          academicYear,
+          term,
+          className: className || pub.className || undefined,
+          search: pub.studentCode ?? studentCode ?? undefined,
+        });
+      } catch {
+        preview = null;
+      }
+    }
+    const row = preview?.students.find((s) => s.studentId === pub.studentId);
+    if (!row) {
+      const blocked = pol.requireFeesClearance || pol.blockWhenLoanActive;
+      return {
+        published: true,
+        allowed: !blocked,
+        message: blocked
+          ? 'Fees clearance could not be verified yet. Please contact the school or try again shortly.'
+          : null,
         publication: pub,
       };
     }

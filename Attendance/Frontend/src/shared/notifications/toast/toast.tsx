@@ -3,9 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ToastOptions, ToastType } from '../types';
 
-interface ToastItem extends Required<Omit<ToastOptions, 'title' | 'action'>> {
+interface ToastItem extends Required<Omit<ToastOptions, 'title' | 'action' | 'placement'>> {
   id: string;
   title?: string;
+  placement: 'top-right' | 'center';
   action?: ToastOptions['action'];
 }
 
@@ -50,6 +51,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         description: options.description ?? '',
         type: options.type ?? 'info',
         duration: options.duration ?? DEFAULT_DURATION,
+        placement: options.placement ?? 'top-right',
         action: options.action,
       },
     ]);
@@ -90,14 +92,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     promise,
   };
 
+  const cornerToasts = toasts.filter((t) => t.placement !== 'center');
+  const centerToasts = toasts.filter((t) => t.placement === 'center');
+
   return (
     <ToastContext.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 sm:right-6 sm:top-6">
-        {toasts.map((t) => (
+        {cornerToasts.map((t) => (
           <ToastCard key={t.id} toast={t} onDismiss={dismiss} />
         ))}
       </div>
+      {centerToasts.length > 0 ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[#000435]/25 backdrop-blur-[2px]" />
+          <div className="pointer-events-none relative flex w-full max-w-md flex-col gap-3">
+            {centerToasts.map((t) => (
+              <ToastCard key={t.id} toast={t} onDismiss={dismiss} centered />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </ToastContext.Provider>
   );
 }
@@ -181,7 +196,15 @@ function resolveStyle(type: ToastType) {
   return BASE_STYLES[type] ?? BASE_STYLES.info;
 }
 
-function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: string) => void }) {
+function ToastCard({
+  toast,
+  onDismiss,
+  centered = false,
+}: {
+  toast: ToastItem;
+  onDismiss: (id: string) => void;
+  centered?: boolean;
+}) {
   const style = resolveStyle(toast.type);
   const [entered, setEntered] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -243,27 +266,52 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
 
   const timeLabel = isPersistent ? '...' : `${secondsLeft}s`;
 
+  const visible = entered && !leaving;
+  const motion = centered
+    ? visible
+      ? 'translate-y-0 scale-100 opacity-100'
+      : 'translate-y-3 scale-95 opacity-0'
+    : visible
+      ? 'translate-x-0 opacity-100'
+      : 'translate-x-[120%] opacity-0';
+
   return (
     <div
       onMouseEnter={handlePause}
       onMouseLeave={handleResume}
-      className={`pointer-events-auto overflow-hidden rounded-2xl border bg-white shadow-[0_12px_40px_rgba(0,4,53,0.16)] backdrop-blur transition-all duration-250 ${style.ring} ${
-        entered && !leaving ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0'
-      }`}
+      role={centered ? 'status' : undefined}
+      aria-live={centered ? 'polite' : undefined}
+      className={`pointer-events-auto overflow-hidden border bg-white backdrop-blur transition-all duration-300 ${
+        centered
+          ? 'w-full max-w-md rounded-3xl shadow-[0_24px_80px_rgba(0,4,53,0.28)] ring-1 ring-black/5'
+          : 'rounded-2xl shadow-[0_12px_40px_rgba(0,4,53,0.16)]'
+      } ${style.ring} ${motion}`}
     >
-      <div className="flex items-start gap-3 p-4">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${style.iconBg}`}>
+      <div className={`flex items-start gap-3 ${centered ? 'p-5 sm:p-6' : 'p-4'}`}>
+        <span
+          className={`flex shrink-0 items-center justify-center rounded-xl ${style.iconBg} ${
+            centered ? 'h-11 w-11 rounded-2xl' : 'h-9 w-9'
+          }`}
+        >
           {style.icon}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-navy">{toast.title ?? style.label}</p>
+            <p className={`font-semibold text-navy ${centered ? 'text-base' : 'text-sm'}`}>
+              {toast.title ?? style.label}
+            </p>
             <span className="shrink-0 rounded-full bg-navy/5 px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted">
               {timeLabel}
             </span>
           </div>
           {toast.description ? (
-            <p className="mt-0.5 break-words text-xs leading-relaxed text-muted">{toast.description}</p>
+            <p
+              className={`mt-0.5 break-words leading-relaxed text-muted ${
+                centered ? 'text-sm' : 'text-xs'
+              }`}
+            >
+              {toast.description}
+            </p>
           ) : null}
           {toast.action ? (
             <button

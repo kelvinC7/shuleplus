@@ -1,20 +1,34 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, RefreshCw, Search } from 'lucide-react';
+import { Bell, RefreshCw } from 'lucide-react';
 import { PageShell, Panel, filterSelectClass } from '@/components/attendance-ui';
+import {
+  AttendanceFilterBar,
+  filterSummary,
+  useAttendanceFilters,
+} from '@/components/attendance-filters';
+import { ListPagination } from '@/components/list-pagination';
 import { attendanceApi, type ParentNotification } from '@/services/attendance-api';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useToast } from '@/shared/notifications';
 
+function notificationDay(n: ParentNotification) {
+  const raw = n.sentAt ?? n.createdAt;
+  if (!raw) return '';
+  return new Date(raw).toISOString().slice(0, 10);
+}
+
 export function ParentSmsView() {
   const toast = useToast();
+  const { filters, setFilters, params, academic } = useAttendanceFilters({ mode: 'today' });
   const [rows, setRows] = useState<ParentNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
-  const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
-  const [channel, setChannel] = useState('SMS');
+  const [channel, setChannel] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(25);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,11 +46,35 @@ export function ParentSmsView() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filters, status, channel]);
+
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = filters.q.trim().toLowerCase();
+    const classNeedle = filters.className.trim().toLowerCase();
+    const dayIso =
+      filters.mode === 'date' && filters.date
+        ? filters.date.slice(0, 10)
+        : filters.mode === 'today'
+          ? new Date().toISOString().slice(0, 10)
+          : filters.mode === 'range' && filters.from
+            ? filters.from.slice(0, 10)
+            : '';
+
     return rows.filter((n) => {
       if (channel && n.channel !== channel) return false;
       if (status && n.status !== status) return false;
+      if (filters.mode === 'today' || filters.mode === 'date') {
+        if (dayIso && notificationDay(n) !== dayIso) return false;
+      } else if (filters.mode === 'range' && filters.from && filters.to) {
+        const d = notificationDay(n);
+        if (d < filters.from.slice(0, 10) || d > filters.to.slice(0, 10)) return false;
+      }
+      if (classNeedle) {
+        const hay = `${n.studentName} ${n.message} ${n.title}`.toLowerCase();
+        if (!hay.includes(classNeedle)) return false;
+      }
       if (!needle) return true;
       return (
         n.studentName.toLowerCase().includes(needle) ||
@@ -44,8 +82,10 @@ export function ParentSmsView() {
         n.title.toLowerCase().includes(needle)
       );
     });
-  }, [rows, q, status, channel]);
+  }, [rows, filters, status, channel]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / limit));
+  const paged = filtered.slice((page - 1) * limit, page * limit);
   const sent = filtered.filter((n) => n.status === 'SENT').length;
   const failed = filtered.filter((n) => n.status === 'FAILED').length;
 
@@ -65,7 +105,7 @@ export function ParentSmsView() {
   return (
     <PageShell
       title="Parent SMS"
-      subtitle="Message log and absence alerts"
+      subtitle={filterSummary(filters, academic)}
       actions={
         <>
           <button type="button" className="btn-secondary" onClick={() => void load()}>
@@ -77,7 +117,7 @@ export function ParentSmsView() {
             disabled={notifying}
             onClick={() => void notifyAbsent()}
           >
-            <Bell size={16} /> {notifying ? 'Sending' : 'Notify absent today'}
+            <Bell size={16} /> {notifying ? 'Sending' : 'Notify absent (filtered day)'}
           </button>
         </>
       }
@@ -97,16 +137,15 @@ export function ParentSmsView() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            className="input pl-9"
-            placeholder="Search student or message"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
+      <AttendanceFilterBar
+        filters={filters}
+        setFilters={setFilters}
+        academic={academic}
+        showClassFilter
+        searchPlaceholder="Search student or message"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
         <select className={filterSelectClass} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
           <option value="SENT">Sent</option>
@@ -121,7 +160,7 @@ export function ParentSmsView() {
         </select>
       </div>
 
-      <Panel title="Log">
+      <Panel title="Message log">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
@@ -140,14 +179,14 @@ export function ParentSmsView() {
                     Loading
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : paged.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-muted">
                     No messages match these filters
                   </td>
                 </tr>
               ) : (
-                filtered.map((n) => (
+                paged.map((n) => (
                   <tr key={n.id} className="border-b border-border/60 hover:bg-slate-50/80">
                     <td className="px-4 py-3 font-semibold text-navy">{n.studentName}</td>
                     <td className="px-4 py-3 text-xs">{n.channel}</td>
@@ -168,7 +207,9 @@ export function ParentSmsView() {
                       <span className="line-clamp-2">{n.message}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted">
-                      {new Date(n.sentAt ?? n.createdAt).toLocaleString()}
+                      {new Date(n.sentAt ?? n.createdAt).toLocaleString(undefined, {
+                        timeZone: 'Africa/Kigali',
+                      })}
                     </td>
                   </tr>
                 ))
@@ -176,6 +217,17 @@ export function ParentSmsView() {
             </tbody>
           </table>
         </div>
+        <ListPagination
+          page={page}
+          totalPages={totalPages}
+          total={filtered.length}
+          limit={limit}
+          onPageChange={setPage}
+          onLimitChange={(n) => {
+            setLimit(n);
+            setPage(1);
+          }}
+        />
       </Panel>
     </PageShell>
   );

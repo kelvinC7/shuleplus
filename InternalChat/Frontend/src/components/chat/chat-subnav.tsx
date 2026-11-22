@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { ACCENT, ACCENT_BORDER, GLASS, PRIMARY } from '@/shared/styles';
+import { ACCENT, ACCENT_BORDER, ACCENT_FADED, GLASS, PRIMARY } from '@/shared/styles';
 import ForumIcon from '@mui/icons-material/Forum';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
@@ -20,10 +20,16 @@ export function ChatSubNav({ activeTab, showAdmin = true }: ChatSubNavProps) {
       sx={{
         display: 'flex',
         alignItems: 'center',
-        px: { xs: 2, md: 4 },
+        px: { xs: 1.25, sm: 2, md: 4 },
+        py: { xs: 0.25, md: 0 },
         bgcolor: GLASS,
         backdropFilter: 'blur(20px)',
         borderBottom: `1px solid ${ACCENT_BORDER}`,
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        flexShrink: 0,
+        scrollbarWidth: 'none',
+        '&::-webkit-scrollbar': { display: 'none' },
       }}
     >
       {TABS.filter((t) => showAdmin || t.tabName !== 'admin').map((tab) => {
@@ -34,8 +40,9 @@ export function ChatSubNav({ activeTab, showAdmin = true }: ChatSubNavProps) {
             component={Link}
             to={`/${tab.tabName}`}
             sx={{
-              px: 2,
-              py: 1.5,
+              px: { xs: 1.5, md: 2 },
+              py: { xs: 1.1, md: 1.5 },
+              minHeight: { xs: 44, md: 'auto' },
               display: 'flex',
               alignItems: 'center',
               gap: 0.8,
@@ -60,7 +67,7 @@ export function ChatSubNav({ activeTab, showAdmin = true }: ChatSubNavProps) {
                 display: 'inline-flex',
                 '& .MuiSvgIcon-root': {
                   fontSize: 16,
-                  color: isActive ? ACCENT : 'rgba(245,158,11,0.4)',
+                  color: isActive ? ACCENT : ACCENT_FADED,
                   transition: 'all 0.2s',
                 },
               }}

@@ -13,6 +13,17 @@ export interface ProcurementReceiptSettings {
 export interface OrgSchoolProfile {
   organizationId: string;
   schoolName: string;
+  email?: string | null;
+  phone?: string | null;
+  poBox?: string | null;
+  website?: string | null;
+  address?: string | null;
+  country?: string | null;
+  province?: string | null;
+  district?: string | null;
+  sector?: string | null;
+  cell?: string | null;
+  village?: string | null;
   logoUrl?: string | null;
   stampUrl?: string | null;
   signatureUrl?: string | null;

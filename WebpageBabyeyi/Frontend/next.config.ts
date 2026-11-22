@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../..'),
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
-  /** Public marketing site — licensed school console lives on babyeyi.shuleplus.rw */
+  /** Public marketing site - licensed school console lives on babyeyi.shuleplus.rw */
   async redirects() {
     return [
       { source: '/dashboard', destination: '/', permanent: false },

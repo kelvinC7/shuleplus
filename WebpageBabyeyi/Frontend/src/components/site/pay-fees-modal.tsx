@@ -594,7 +594,7 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
           return;
         }
       } catch {
-        /* transient — keep polling */
+        /* transient - keep polling */
       }
       if (attempts >= opts.maxAttempts) {
         stopPolling();
@@ -654,8 +654,8 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
         studentId: student?.id ?? undefined,
         studentCode: (student?.studentCode ?? student?.shuleCode ?? undefined) as string | undefined,
         studentName,
-        academicYear: year || '—',
-        term: term || '—',
+        academicYear: year || '-',
+        term: term || '-',
         className: student?.classLabel ?? student?.className ?? undefined,
         amount,
         method: method.toUpperCase() as PublicPayMethod,
@@ -698,10 +698,10 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
         reference,
         studentName: student?.fullName ?? 'Student',
         schoolName: student?.schoolName ?? school.name,
-        studentClass: student?.classLabel ?? student?.className ?? '—',
+        studentClass: student?.classLabel ?? student?.className ?? '-',
         studentUid: student?.studentCode ?? student?.shuleCode ?? undefined,
-        academicYear: year || '—',
-        term: term || '—',
+        academicYear: year || '-',
+        term: term || '-',
         method: methodLabel,
         lines: paymentLines,
         amountPaid: amount,
@@ -1036,10 +1036,10 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
                     </div>
                     <div className="grid flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
                       <span className="truncate text-sm font-medium text-[#000435]">
-                        {student.fullName ?? '—'}
+                        {student.fullName ?? '-'}
                       </span>
                       <span className="truncate text-[12px] font-mono text-slate-500">
-                        {student.studentCode || student.shuleCode || '—'}
+                        {student.studentCode || student.shuleCode || '-'}
                       </span>
                       <span className="truncate text-[12px] text-slate-600">
                         {student.classLabel ?? student.className ?? t.classNotSet}
@@ -1051,10 +1051,10 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
                   </div>
                   <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10.5px]">
                     <span className="rounded-full bg-white px-2.5 py-1 font-medium text-slate-500 ring-1 ring-slate-200">
-                      {t.classLabel}: {student.classLabel ?? student.className ?? '—'}
+                      {t.classLabel}: {student.classLabel ?? student.className ?? '-'}
                     </span>
                     <span className="rounded-full bg-white px-2.5 py-1 font-medium text-slate-500 ring-1 ring-slate-200">
-                      {t.studentCodeBadge}: {student.studentCode || student.shuleCode || '—'}
+                      {t.studentCodeBadge}: {student.studentCode || student.shuleCode || '-'}
                     </span>
                     <span className="rounded-full bg-white px-2.5 py-1 font-medium text-slate-500 ring-1 ring-slate-200">
                       {student.schoolName ?? school.name}
@@ -1199,7 +1199,7 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
           {!paid && step === 4 && (
             <div className="space-y-4">
               <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                {t.settleQuestion(frw(totals.selectedRemaining), student?.fullName ?? '—', school.name)}
+                {t.settleQuestion(frw(totals.selectedRemaining), student?.fullName ?? '-', school.name)}
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1584,10 +1584,10 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-100 p-4">
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t.reviewStudent}</p>
-                <SummaryRow label={t.name} value={student?.fullName ?? '—'} />
+                <SummaryRow label={t.name} value={student?.fullName ?? '-'} />
                 <SummaryRow label={t.school} value={student?.schoolName ?? school.name} />
-                <SummaryRow label={t.classField} value={student?.classLabel ?? student?.className ?? '—'} />
-                <SummaryRow label={t.period} value={`${year || '—'} · ${term || '—'}`} />
+                <SummaryRow label={t.classField} value={student?.classLabel ?? student?.className ?? '-'} />
+                <SummaryRow label={t.period} value={`${year || '-'} · ${term || '-'}`} />
               </div>
 
               <div className="rounded-2xl border border-slate-100 p-4">
@@ -1611,7 +1611,7 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t.paymentMethod}</p>
                 <SummaryRow
                   label={t.method}
-                  value={paymentMethods.find((m) => m.id === method)?.label ?? '—'}
+                  value={paymentMethods.find((m) => m.id === method)?.label ?? '-'}
                 />
                 {method === 'momo' ? (
                   <SummaryRow label={t.phone} value={normalizeMomoPhone(momoPhone)} />
@@ -1656,7 +1656,7 @@ export function PayFeesModal({ school, open, onClose, onRequestLoan }: PayFeesMo
                 </p>
               ) : null}
               <p className="text-sm text-slate-500">
-                {t.paidSummary(frw(amount), student?.fullName ?? '—', year || '—', term || '')}
+                {t.paidSummary(frw(amount), student?.fullName ?? '-', year || '-', term || '')}
               </p>
               <div className="mx-auto max-w-sm rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-sm">
                 <div className="flex justify-between py-1">
@@ -1841,7 +1841,7 @@ function buildReceiptPdf(r: ReceiptShape): jsPDF {
     ['Student', r.studentName],
     ['School', r.schoolName],
     ['Class', r.studentClass],
-    ['Period', [r.academicYear, r.term].filter((v) => v && v !== '—').join(' · ') || '—'],
+    ['Period', [r.academicYear, r.term].filter((v) => v && v !== '-').join(' · ') || '-'],
     ['Method', r.method],
     ['Date', r.paidAt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })],
   ];
@@ -1854,7 +1854,7 @@ function buildReceiptPdf(r: ReceiptShape): jsPDF {
     doc.text(label, margin, y);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...NAVY);
-    doc.text(String(value || '—'), pageW - margin, y, { align: 'right' });
+    doc.text(String(value || '-'), pageW - margin, y, { align: 'right' });
     y += 5.5;
   }
   y += 2;

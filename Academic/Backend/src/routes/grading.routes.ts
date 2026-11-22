@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { gradingEngineController } from '../controllers/grading-engine.controller';
 import { reportCardController } from '../controllers/report-card.controller';
 import { assessmentMarkController } from '../controllers/assessment-mark.controller';
-import { authenticate, requireModuleLicense } from '../middleware/auth.middleware';
+import { authenticate, requireModuleLicense, requireAcademicPublishAccess } from '../middleware/auth.middleware';
 import { requireTenant } from '../middleware/tenant.middleware';
 
 const router = Router();
@@ -13,8 +13,9 @@ router.get('/report-card/settings', reportCardController.getSettings.bind(report
 router.get('/report-card/comments', reportCardController.getComments.bind(reportCardController));
 router.put('/report-card/comments', reportCardController.upsertComments.bind(reportCardController));
 router.get('/report-card/publications', reportCardController.listPublications.bind(reportCardController));
-router.post('/report-card/publish', reportCardController.publishOne.bind(reportCardController));
-router.post('/report-card/publish-class', reportCardController.publishClass.bind(reportCardController));
+router.get('/report-card/publication-batches', reportCardController.listPublicationBatches.bind(reportCardController));
+router.post('/report-card/publish', requireAcademicPublishAccess, reportCardController.publishOne.bind(reportCardController));
+router.post('/report-card/publish-class', requireAcademicPublishAccess, reportCardController.publishClass.bind(reportCardController));
 
 router.get('/dashboard', gradingEngineController.getAcademicDashboard);
 

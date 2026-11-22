@@ -90,7 +90,7 @@ export default function SettingsPage() {
   return (
     <MainLayout>
       <PlatformPageLayout
-        subtitle="Receipt signatories and academic period — synced with your organization."
+        subtitle="Receipt signatories and academic period, synced with your organization."
         actions={
           <button type="button" onClick={() => void handleSave()} disabled={saving} className="btn-primary">
             <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Settings'}

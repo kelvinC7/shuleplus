@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationPriority, NotificationStatus } from '@prisma/client';
+import { NotificationChannel, NotificationPriority, NotificationStatus, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { logService } from './log.service';
 
@@ -19,7 +19,7 @@ export const inAppService = {
         body: params.body,
         priority: params.priority ?? NotificationPriority.NORMAL,
         actionUrl: params.actionUrl,
-        metadata: params.metadata ?? undefined,
+        metadata: (params.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
 

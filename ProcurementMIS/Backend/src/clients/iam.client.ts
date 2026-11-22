@@ -9,6 +9,12 @@ export interface IamSchoolProfile {
   poBox?: string | null;
   website?: string | null;
   address?: string | null;
+  country?: string | null;
+  province?: string | null;
+  district?: string | null;
+  sector?: string | null;
+  cell?: string | null;
+  village?: string | null;
   logoUrl?: string | null;
   signatureUrl?: string | null;
   stampUrl?: string | null;
@@ -30,8 +36,9 @@ export interface AcademicSettings {
 
 async function iamFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   const base = env.IAM_API_URL.replace(/\/$/, '');
+  const url = `${base}${path}`;
   try {
-    const response = await fetch(`${base}${path}`, {
+    const response = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -40,10 +47,20 @@ async function iamFetch<T>(path: string, init?: RequestInit): Promise<T | null> 
         ...(init?.headers ?? {}),
       },
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn(
+        `[iam] ${init?.method ?? 'GET'} ${url} failed: ${response.status} ${response.statusText}`,
+      );
+      return null;
+    }
     const body = (await response.json()) as { success?: boolean; data?: T };
     return body.data ?? null;
-  } catch {
+  } catch (error) {
+    console.warn(
+      `[iam] ${init?.method ?? 'GET'} ${url} unreachable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
     return null;
   }
 }
@@ -81,4 +98,20 @@ export interface IamUserBrief {
 
 export async function fetchIamUser(userId: string): Promise<IamUserBrief | null> {
   return iamFetch<IamUserBrief>(`/internal/users/${userId}`);
+}
+
+export interface IamModuleVisibility {
+  accessLevel: 'USER' | 'HEAD';
+  dataScope: string;
+  canViewAll: boolean;
+}
+
+/** Resolve the caller's own module access level using their bearer token. */
+export async function fetchModuleVisibility(
+  accessToken: string,
+  moduleSlug: string = env.MODULE_SLUG,
+): Promise<IamModuleVisibility | null> {
+  return iamFetch<IamModuleVisibility>(`/iam/me/modules/${moduleSlug}/visibility`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 }

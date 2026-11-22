@@ -16,6 +16,41 @@ function academicYearVariants(year?: string): string[] {
   return [...out];
 }
 
+/** Match full names like "ISHIMWE Theoneste" (each token on first or last name). */
+function buildStudentSearchFilter(search: string): Prisma.StudentWhereInput {
+  const q = search.trim();
+  const codeOr: Prisma.StudentWhereInput[] = [
+    { studentUid: { contains: q, mode: 'insensitive' } },
+    { studentCode: { contains: q, mode: 'insensitive' } },
+    { sdmCode: { contains: q, mode: 'insensitive' } },
+  ];
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2) {
+    return {
+      OR: [
+        ...codeOr,
+        {
+          AND: tokens.map((token) => ({
+            OR: [
+              { firstName: { contains: token, mode: 'insensitive' } },
+              { lastName: { contains: token, mode: 'insensitive' } },
+            ],
+          })),
+        },
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+      ],
+    };
+  }
+  return {
+    OR: [
+      { firstName: { contains: q, mode: 'insensitive' } },
+      { lastName: { contains: q, mode: 'insensitive' } },
+      ...codeOr,
+    ],
+  };
+}
+
 export type ImportRowInput = {
   firstName?: string;
   lastName?: string;
@@ -23,6 +58,8 @@ export type ImportRowInput = {
   dateOfBirth?: string;
   age?: string | number;
   sdmCode?: string;
+  /** Existing Shule student code / UID from Excel (optional). */
+  studentCode?: string;
   className?: string;
   fatherName?: string;
   motherName?: string;
@@ -285,6 +322,119 @@ export class StudentService {
     return c.stream ? `${c.name} ${c.stream}` : c.name;
   }
 
+  private studentCurrentClassId(
+    enrollments: Array<{ class: { id: string; name: string; stream: string | null } }>
+  ) {
+    return enrollments[0]?.class?.id ?? null;
+  }
+
+  /** Match import row to an existing student (SDMS → Shule code → name+DOB → name+class). */
+  private matchExistingStudent(
+    existing: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      dateOfBirth: Date | null;
+      sdmCode: string | null;
+      studentUid: string;
+      studentCode: string | null;
+      enrollments: Array<{ class: { id: string; name: string; stream: string | null } }>;
+    }>,
+    ctx: {
+      sdmCode: string;
+      studentCode: string;
+      firstName: string;
+      lastName: string;
+      dobIso?: string;
+      resolvedClassId?: string;
+    }
+  ): { matchStudentId?: string; status?: 'duplicate' | 'review'; reason?: string } {
+    if (ctx.sdmCode) {
+      const hit = existing.find((s) => s.sdmCode?.toLowerCase() === ctx.sdmCode.toLowerCase());
+      if (hit) return { matchStudentId: hit.id, status: 'duplicate', reason: 'SDMS code already exists' };
+    }
+
+    if (ctx.studentCode) {
+      const code = ctx.studentCode.toLowerCase();
+      const hit = existing.find(
+        (s) =>
+          s.studentUid.toLowerCase() === code ||
+          (s.studentCode ?? '').toLowerCase() === code
+      );
+      if (hit) return { matchStudentId: hit.id, status: 'duplicate', reason: 'Shule code already exists' };
+    }
+
+    if (!ctx.firstName || !ctx.lastName) return {};
+
+    const fn = ctx.firstName.toLowerCase();
+    const ln = ctx.lastName.toLowerCase();
+    const nameHits = existing.filter(
+      (s) => s.firstName.toLowerCase() === fn && s.lastName.toLowerCase() === ln
+    );
+    if (!nameHits.length) return {};
+
+    if (ctx.dobIso) {
+      const dobHits = nameHits.filter(
+        (s) => s.dateOfBirth && s.dateOfBirth.toISOString().slice(0, 10) === ctx.dobIso
+      );
+      if (dobHits.length === 1) {
+        return { matchStudentId: dobHits[0].id, status: 'duplicate', reason: 'Same name and date of birth' };
+      }
+      if (dobHits.length > 1 && ctx.resolvedClassId) {
+        const classHit = dobHits.find(
+          (s) => this.studentCurrentClassId(s.enrollments) === ctx.resolvedClassId
+        );
+        if (classHit) {
+          return {
+            matchStudentId: classHit.id,
+            status: 'duplicate',
+            reason: 'Same name, DOB, and class',
+          };
+        }
+        return {
+          status: 'review',
+          reason: 'Multiple students with same name and DOB — class did not match uniquely',
+        };
+      }
+      if (dobHits.length > 1) {
+        return { status: 'review', reason: 'Multiple students with same name and DOB — add class in Excel' };
+      }
+    }
+
+    if (ctx.resolvedClassId) {
+      const classHits = nameHits.filter(
+        (s) => this.studentCurrentClassId(s.enrollments) === ctx.resolvedClassId
+      );
+      if (classHits.length === 1) {
+        return {
+          matchStudentId: classHits[0].id,
+          status: 'duplicate',
+          reason: 'Same name and class',
+        };
+      }
+      if (classHits.length > 1) {
+        return { status: 'review', reason: 'Multiple students with same name in this class — verify manually' };
+      }
+    }
+
+    if (nameHits.length === 1 && !ctx.dobIso && !ctx.resolvedClassId) {
+      return {
+        matchStudentId: nameHits[0].id,
+        status: 'review',
+        reason: 'Same name only — add class or date of birth in Excel to confirm',
+      };
+    }
+
+    if (nameHits.length > 1) {
+      return {
+        status: 'review',
+        reason: 'Multiple students with this name — include class (and DOB if possible) in Excel',
+      };
+    }
+
+    return {};
+  }
+
   async previewImport(
     organizationId: string,
     input: {
@@ -313,16 +463,13 @@ export class StudentService {
         dateOfBirth: true,
         sdmCode: true,
         studentUid: true,
+        studentCode: true,
         enrollments: {
           where: { isCurrent: true },
-          select: { class: { select: { name: true, stream: true } } },
+          select: { class: { select: { id: true, name: true, stream: true } } },
         },
       },
     });
-
-    const bySdm = new Map(
-      existing.filter((s) => s.sdmCode).map((s) => [s.sdmCode!.toLowerCase(), s] as const)
-    );
 
     const reviewed = input.rows.map((row, idx) => {
       const rowNum = idx + 2;
@@ -356,43 +503,24 @@ export class StudentService {
       }
 
       const sdmCode = row.sdmCode?.trim() || '';
+      const studentCode = row.studentCode?.trim() || '';
       let status: 'ready' | 'duplicate' | 'invalid' | 'review' = issues.length ? 'invalid' : 'ready';
       let reason = issues.length ? issues.join('; ') : 'Ready';
       let matchStudentId: string | undefined;
 
-      if (status !== 'invalid' && sdmCode && bySdm.has(sdmCode.toLowerCase())) {
-        status = 'duplicate';
-        reason = 'SDMS Code Exists';
-        matchStudentId = bySdm.get(sdmCode.toLowerCase())!.id;
-      } else if (status !== 'invalid' && firstName && lastName) {
-        const fn = firstName.toLowerCase();
-        const ln = lastName.toLowerCase();
-        if (dob.iso) {
-          const hit = existing.find(
-            (s) =>
-              s.firstName.toLowerCase() === fn &&
-              s.lastName.toLowerCase() === ln &&
-              s.dateOfBirth &&
-              s.dateOfBirth.toISOString().slice(0, 10) === dob.iso
-          );
-          if (hit) {
-            status = 'duplicate';
-            reason = 'Same Name + Date of Birth';
-            matchStudentId = hit.id;
-          }
-        } else {
-          const hit = existing.find((s) => {
-            if (s.firstName.toLowerCase() !== fn || s.lastName.toLowerCase() !== ln) return false;
-            const cur = s.enrollments[0]?.class;
-            if (!cur || !row.className?.trim()) return false;
-            const label = cur.stream ? `${cur.name} ${cur.stream}` : cur.name;
-            return label.toLowerCase() === row.className!.trim().toLowerCase();
-          });
-          if (hit) {
-            status = 'review';
-            reason = 'Same Name + Class (no DOB) — Review Required';
-            matchStudentId = hit.id;
-          }
+      if (status !== 'invalid') {
+        const match = this.matchExistingStudent(existing, {
+          sdmCode,
+          studentCode,
+          firstName,
+          lastName,
+          dobIso: dob.iso,
+          resolvedClassId: cls?.id,
+        });
+        if (match.status) {
+          status = match.status;
+          reason = match.reason ?? reason;
+          matchStudentId = match.matchStudentId;
         }
       }
 
@@ -453,7 +581,7 @@ export class StudentService {
 
     const year = options.academicYear.trim();
     const term = options.term?.trim() || undefined;
-    const duplicateMode = options.duplicateMode ?? 'skip';
+    const duplicateMode = options.duplicateMode ?? 'update';
     const importValidOnly = options.importValidOnly !== false;
     const generateMissingSdms = options.generateMissingSdms !== false;
 
@@ -492,49 +620,14 @@ export class StudentService {
             continue;
           }
           if (duplicateMode === 'update' && item.matchStudentId) {
-            await prisma.student.update({
-              where: { id: item.matchStudentId },
-              data: {
-                firstName: item.firstName,
-                lastName: item.lastName,
-                gender: item.gender as 'MALE' | 'FEMALE' | undefined,
-                dateOfBirth: item.dateOfBirth ? new Date(item.dateOfBirth) : undefined,
-                district: item.district,
-                sector: item.sector,
-                cell: item.cell,
-                village: item.village,
-                sdmCode: item.sdmCode || undefined,
-              },
-            });
-            if (item.classId) {
-              await prisma.enrollment.updateMany({
-                where: { studentId: item.matchStudentId, isCurrent: true },
-                data: { isCurrent: false },
-              });
-              await prisma.enrollment.upsert({
-                where: {
-                  organizationId_studentId_academicYear: {
-                    organizationId,
-                    studentId: item.matchStudentId,
-                    academicYear: year,
-                  },
-                },
-                create: {
-                  organizationId,
-                  studentId: item.matchStudentId,
-                  classId: item.classId,
-                  academicYear: year,
-                  term,
-                  isCurrent: true,
-                  recordedBy: userId,
-                },
-                update: {
-                  classId: item.classId,
-                  term,
-                  isCurrent: true,
-                },
-              });
-            }
+            await this.mergeStudentFromImport(
+              organizationId,
+              userId,
+              item.matchStudentId,
+              item,
+              year,
+              term
+            );
             updated += 1;
             continue;
           }
@@ -622,6 +715,82 @@ export class StudentService {
     };
   }
 
+  private async mergeStudentFromImport(
+    organizationId: string,
+    userId: string,
+    studentId: string,
+    item: {
+      firstName: string;
+      lastName: string;
+      gender?: string;
+      dateOfBirth?: string;
+      district?: string;
+      sector?: string;
+      cell?: string;
+      village?: string;
+      sdmCode?: string;
+      classId?: string;
+      fatherName?: string;
+      motherName?: string;
+      fatherPhone?: string;
+      motherPhone?: string;
+    },
+    academicYear: string,
+    term?: string
+  ) {
+    const current = await prisma.student.findFirst({
+      where: { id: studentId, organizationId },
+    });
+    if (!current) throw new AppError(404, 'Matched student not found');
+
+    await prisma.student.update({
+      where: { id: studentId },
+      data: {
+        firstName: item.firstName?.trim() || current.firstName,
+        lastName: item.lastName?.trim() || current.lastName,
+        gender: (item.gender as 'MALE' | 'FEMALE' | undefined) ?? current.gender ?? undefined,
+        dateOfBirth: item.dateOfBirth ? new Date(item.dateOfBirth) : current.dateOfBirth,
+        district: item.district?.trim() || current.district,
+        sector: item.sector?.trim() || current.sector,
+        cell: item.cell?.trim() || current.cell,
+        village: item.village?.trim() || current.village,
+        sdmCode: item.sdmCode?.trim() || current.sdmCode,
+      },
+    });
+
+    if (item.classId) {
+      await prisma.enrollment.updateMany({
+        where: { studentId, isCurrent: true },
+        data: { isCurrent: false },
+      });
+      await prisma.enrollment.upsert({
+        where: {
+          organizationId_studentId_academicYear: {
+            organizationId,
+            studentId,
+            academicYear,
+          },
+        },
+        create: {
+          organizationId,
+          studentId,
+          classId: item.classId,
+          academicYear,
+          term,
+          isCurrent: true,
+          recordedBy: userId,
+        },
+        update: {
+          classId: item.classId,
+          term,
+          isCurrent: true,
+        },
+      });
+    }
+
+    await this.attachImportParents(organizationId, studentId, item, { fillMissingOnly: true });
+  }
+
   private async attachImportParents(
     organizationId: string,
     studentId: string,
@@ -630,8 +799,10 @@ export class StudentService {
       motherName?: string;
       fatherPhone?: string;
       motherPhone?: string;
-    }
+    },
+    opts?: { fillMissingOnly?: boolean }
   ) {
+    const fillMissingOnly = opts?.fillMissingOnly ?? false;
     const links: Array<{ role: 'FATHER' | 'MOTHER'; name?: string; phone?: string }> = [
       { role: 'FATHER', name: item.fatherName, phone: item.fatherPhone },
       { role: 'MOTHER', name: item.motherName, phone: item.motherPhone },
@@ -654,6 +825,15 @@ export class StudentService {
             firstName,
             lastName,
             phone: link.phone,
+          },
+        });
+      } else if (fillMissingOnly) {
+        parent = await prisma.parent.update({
+          where: { id: parent.id },
+          data: {
+            firstName: parent.firstName?.trim() ? parent.firstName : firstName,
+            lastName: parent.lastName?.trim() ? parent.lastName : lastName,
+            phone: parent.phone?.trim() ? parent.phone : link.phone,
           },
         });
       }
@@ -684,14 +864,8 @@ export class StudentService {
       where.status = query.status as StudentStatus;
     }
 
-  if (query?.search) {
-    where.OR = [
-      { firstName: { contains: query.search, mode: 'insensitive' } },
-      { lastName: { contains: query.search, mode: 'insensitive' } },
-      { studentUid: { contains: query.search, mode: 'insensitive' } },
-      { studentCode: { contains: query.search, mode: 'insensitive' } },
-      { sdmCode: { contains: query.search, mode: 'insensitive' } },
-    ];
+  if (query?.search?.trim()) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), buildStudentSearchFilter(query.search)];
   }
 
   if (query?.rfidUid) {
@@ -778,7 +952,7 @@ export class StudentService {
       firstName: string;
       lastName: string;
       gender: string;
-      dateOfBirth: string;
+      dateOfBirth: string | null;
       nationality: string;
       province: string;
       district: string;
@@ -818,7 +992,9 @@ export class StudentService {
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
     if (data.lastName !== undefined) updateData.lastName = data.lastName;
     if (data.gender !== undefined) updateData.gender = data.gender;
-    if (data.dateOfBirth !== undefined) updateData.dateOfBirth = new Date(data.dateOfBirth);
+    if (data.dateOfBirth !== undefined) {
+      updateData.dateOfBirth = data.dateOfBirth ? new Date(data.dateOfBirth) : null;
+    }
     if (data.nationality !== undefined) updateData.nationality = data.nationality;
     if (data.province !== undefined) updateData.province = data.province;
     if (data.district !== undefined) updateData.district = data.district;

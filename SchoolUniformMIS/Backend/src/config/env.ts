@@ -8,8 +8,11 @@ function requireEnv(key: string, fallback?: string): string {
   return value;
 }
 
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+const isProduction = NODE_ENV === "production";
+
 export const env = {
-  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NODE_ENV,
   PORT: parseInt(process.env.PORT ?? "3051", 10),
   API_PREFIX: process.env.API_PREFIX ?? "/api",
   DATABASE_URL: requireEnv("DATABASE_URL"),
@@ -24,13 +27,14 @@ export const env = {
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:3050",
   MODULE_SLUG: process.env.MODULE_SLUG ?? "school-uniform",
   IAM_API_URL: (
-    process.env.IAM_API_URL ?? "http://localhost:3001/api/v1"
+    process.env.IAM_API_URL ??
+    (isProduction ? "http://localhost:4001/api/v1" : "http://localhost:3001/api/v1")
   ).replace(/\/$/, ""),
   /** Student Management is the canonical student roster source. */
   STUDENT_MANAGEMENT_API_URL: (
     process.env.STUDENT_MANAGEMENT_API_URL ??
     process.env.ACADEMIC_API_URL ??
-    "http://localhost:3052/api"
+    (isProduction ? "http://localhost:4024/api" : "http://localhost:3052/api")
   ).replace(/\/$/, ""),
   /** @deprecated Use STUDENT_MANAGEMENT_API_URL */
   ACADEMIC_API_URL: (process.env.ACADEMIC_API_URL ?? "").replace(/\/$/, ""),

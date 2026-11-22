@@ -671,6 +671,23 @@ export class HrController {
     }
   }
 
+  async activeLeaveInternal(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orgId = String(req.query.organizationId ?? '').trim();
+      const employeeId = String(req.query.employeeId ?? '').trim();
+      const dateRaw = String(req.query.date ?? '').trim();
+      if (!orgId || !employeeId) {
+        res.status(400).json({ success: false, message: 'organizationId and employeeId are required' });
+        return;
+      }
+      const onDate = dateRaw ? new Date(`${dateRaw.slice(0, 10)}T12:00:00`) : new Date();
+      const leave = await leaveService.activeApprovedLeave(orgId, employeeId, onDate);
+      res.json({ success: true, data: { active: Boolean(leave), leave } });
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async constants(_req: AuthenticatedRequest, res: Response) {
     res.json({ success: true, data: { leaveTypes: LEAVE_TYPES, qualificationLevels: QUALIFICATION_LEVELS } });
   }

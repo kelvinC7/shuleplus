@@ -31,6 +31,9 @@ declare -A BACKEND_PORT=(
   [Library]=4025
   [MiniWebsite]=4026
   [PrintCardMIS]=4028
+  [InternalChat]=4029
+  [ShuleTrip]=4033
+  [Transport]=4034
 )
 declare -A FRONTEND_PORT=(
   [Authentication]=6100
@@ -42,6 +45,9 @@ declare -A FRONTEND_PORT=(
   [Library]=6124
   [MiniWebsite]=6127
   [PrintCardMIS]=6128
+  [InternalChat]=6129
+  [ShuleTrip]=6130
+  [Transport]=6131
 )
 # server_name for the UI (Authentication uses platform hosts)
 declare -A FE_HOST=(
@@ -61,6 +67,9 @@ declare -A FE_HOST=(
   [Library]=library.shuleplus.rw
   [MiniWebsite]=website.shuleplus.rw
   [PrintCardMIS]=printcard.shuleplus.rw
+  [InternalChat]=shulechat.shuleplus.rw
+  [ShuleTrip]=shuletrip.shuleplus.rw
+  [Transport]=transport.shuleplus.rw
 )
 declare -A API_HOST=(
   [Authentication]=api.shuleplus.rw
@@ -79,9 +88,12 @@ declare -A API_HOST=(
   [Library]=library-api.shuleplus.rw
   [MiniWebsite]=website-api.shuleplus.rw
   [PrintCardMIS]=printcard-api.shuleplus.rw
+  [InternalChat]=shulechat-api.shuleplus.rw
+  [ShuleTrip]=shuletrip-api.shuleplus.rw
+  [Transport]=transport-api.shuleplus.rw
 )
 
-STATIC_MODULES=(Academic ShuleKitMIS StudentManagement TichaPortal TeacherPortal)
+STATIC_MODULES=(Academic ShuleKitMIS StudentManagement TichaPortal TeacherPortal InternalChat ShuleTrip)
 declare -A STATIC_ROOT=(
   [Academic]="$REPO/Academic/Frontend_react/dist"
   [ShuleKitMIS]="$REPO/ShuleKitMIS/Frontend/dist"
@@ -89,6 +101,8 @@ declare -A STATIC_ROOT=(
   [TichaPortal]="$REPO/TichaPortal/dist"
   [TeacherPortal]="$REPO/TichaPortal/dist"
   [MiniWebsite]="$REPO/MiniWebsite/Frontend/dist"
+  [InternalChat]="$REPO/InternalChat/Frontend/dist"
+  [ShuleTrip]="$REPO/ShuleTrip/Frontend_react/dist"
 )
 declare -A CONF_NAME=(
   [Authentication]=app
@@ -102,13 +116,16 @@ declare -A CONF_NAME=(
   [Library]=library
   [MiniWebsite]=website
   [PrintCardMIS]=printcard
+  [InternalChat]=shulechat
+  [ShuleTrip]=shuletrip
+  [Transport]=transport
 )
 
 MODULES=(
   Authentication Academic TichaPortal SchoolFeesPortal Budget Payroll HR Attendance
   ActionPlanMIS ProcurementMIS InventoryMIS AssetsPortal Cafeteria Timetable
   ParentMIS NesaDashboard BabyeyiWizard KaziAvance StudentDiscpline SampleModule
-  ShuleKitMIS TaskMIS SchoolUniformMIS StudentManagement Library MiniWebsite PrintCardMIS
+  ShuleKitMIS TaskMIS SchoolUniformMIS StudentManagement Library MiniWebsite PrintCardMIS InternalChat ShuleTrip Transport
 )
 
 is_static() {
@@ -188,7 +205,31 @@ for MOD in "${MODULES[@]}"; do
         proxy_cache_bypass \$http_upgrade;"
   fi
 
-  if [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ] || [ "$MOD" = "StudentManagement" ] || [ "$MOD" = "Academic" ] || [ "$MOD" = "ParentMIS" ] || [ "$MOD" = "ActionPlanMIS" ]; then
+  if [ "$MOD" = "InternalChat" ]; then
+    EXTRA_FE="
+    location /api/ {
+        proxy_pass http://localhost:$BPORT;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        client_max_body_size 12m;
+    }
+    location /socket.io/ {
+        proxy_pass http://localhost:$BPORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }"
+  fi
+
+  if [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ] || [ "$MOD" = "StudentManagement" ] || [ "$MOD" = "Academic" ] || [ "$MOD" = "ParentMIS" ] || [ "$MOD" = "ActionPlanMIS" ] || [ "$MOD" = "Transport" ]; then
     EXTRA_FE="
     location /uploads/ {
         proxy_pass http://localhost:$BPORT;

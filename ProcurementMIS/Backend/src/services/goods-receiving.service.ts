@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { Prisma } from '@prisma/client';
+import { applyDateFilter } from '../utils/date-range';
 
 function generateGRNNumber(): string {
   const date = new Date();
@@ -26,8 +27,10 @@ export interface GrnListFilters {
   supplierId?: string;
   poId?: string;
   departmentId?: string;
+  date?: string;
   dateFrom?: string;
   dateTo?: string;
+  week?: string;
   receivedBy?: string;
   academicYear?: string;
   term?: string;
@@ -43,14 +46,8 @@ export class GoodsReceivingService {
     if (filters?.poId) where.poId = filters.poId;
     if (filters?.receivedBy) where.receivedBy = filters.receivedBy;
 
-    if (filters?.dateFrom || filters?.dateTo) {
-      where.receivedDate = {};
-      if (filters.dateFrom) where.receivedDate.gte = new Date(filters.dateFrom);
-      if (filters.dateTo) {
-        const end = new Date(filters.dateTo);
-        end.setHours(23, 59, 59, 999);
-        where.receivedDate.lte = end;
-      }
+    if (filters?.dateFrom || filters?.dateTo || filters?.date || filters?.week) {
+      applyDateFilter(where as Record<string, any>, 'receivedDate', filters);
     }
 
     if (filters?.supplierId || filters?.departmentId || filters?.academicYear || filters?.term) {

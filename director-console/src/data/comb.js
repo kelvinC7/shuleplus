@@ -1,0 +1,1 @@
+export const COMB = {S4A:'PCM',S4B:'MEG',S4C:'HEG',S4D:'PCB',S5A:'PCM',S5B:'MEG',S5C:'HEG',S5D:'PCB',S6A:'PCM',S6B:'MEG',S6C:'HEG',S6D:'PCB'};

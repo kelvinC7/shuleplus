@@ -18,13 +18,15 @@ import {
   DollarSign,
   Truck,
   FileText,
+  FileDown,
+  Printer,
   Eye,
-  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlatformPageLayout } from '@/components/platform-page-layout';
 import { CreateReturnDrawer } from '@/components/create-return-drawer';
+import { GoodsReturnDetailDrawer } from '@/components/goods-return-detail-drawer';
+import { downloadReturnPdf, printReturnPdf } from '@/modules/documents/return-pdf';
 import { formatFrwCompact } from '@/utils/currency';
 import {
   RETURN_REASONS,
@@ -43,6 +45,8 @@ import {
   PageLoading,
   StatusBadge,
   EntityCard,
+  TablePagination,
+  useTablePagination,
 } from '@/components/list-ui';
 
 function tabMatchesStatus(tab: string, status: string): boolean {
@@ -65,6 +69,7 @@ export default function ReturnsPage() {
   const [initialGrnId, setInitialGrnId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<GoodsReturn | null>(null);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
 
   const [draftFilters, setDraftFilters] = useState({
     academicYear: '',
@@ -118,6 +123,10 @@ export default function ReturnsPage() {
     [returns, activeTab],
   );
 
+  const pagination = useTablePagination(tabFiltered, {
+    resetKey: `${activeTab}|${appliedFilters.academicYear}|${appliedFilters.term}|${appliedFilters.dateFrom}|${appliedFilters.dateTo}|${appliedFilters.supplierId}|${appliedFilters.reason}`,
+  });
+
   const viewDetail = async (ret: GoodsReturn) => {
     try {
       const detail = await procurementApi.returns.getById(ret.id);
@@ -125,6 +134,33 @@ export default function ReturnsPage() {
       setDetailOpen(true);
     } catch {
       toast.error('Failed to load return details');
+    }
+  };
+
+  const handlePdf = async (ret: GoodsReturn, mode: 'download' | 'print') => {
+    setPdfLoadingId(ret.id);
+    try {
+      const [detail, profile, receiptSettings] = await Promise.all([
+        procurementApi.returns.getById(ret.id),
+        procurementApi.settings.getOrgProfile(),
+        procurementApi.settings.getReceipt(),
+      ]);
+      const ctx = {
+        schoolName: profile?.schoolName ?? 'School',
+        logoUrl: profile?.logoUrl,
+        province: profile?.province,
+        district: profile?.district,
+        sector: profile?.sector,
+        website: profile?.website,
+        stampUrl: profile?.stampUrl,
+        receiptSettings,
+      };
+      if (mode === 'download') await downloadReturnPdf(detail, ctx);
+      else await printReturnPdf(detail, ctx);
+    } catch {
+      toast.error('Failed to generate return PDF');
+    } finally {
+      setPdfLoadingId(null);
     }
   };
 
@@ -150,7 +186,7 @@ export default function ReturnsPage() {
   return (
     <MainLayout>
       <PlatformPageLayout
-        subtitle="Track returns linked to goods received notes — replacement, credit, and refunds."
+        subtitle="Track returns linked to goods received notes: replacement, credit, and refunds."
         actions={
           <button
             type="button"
@@ -359,7 +395,7 @@ export default function ReturnsPage() {
               <DataTableTh className="text-center">Actions</DataTableTh>
             </DataTableHead>
             <tbody>
-              {tabFiltered.map((ret) => {
+              {pagination.rows.map((ret) => {
                 const totalQty = (ret.items ?? []).reduce((n, i) => n + Number(i.returnQty), 0);
                 const itemNames = (ret.items ?? []).map((i) => i.itemName).join(', ');
                 return (
@@ -384,14 +420,34 @@ export default function ReturnsPage() {
                         {RETURN_STATUS_LABELS[ret.status] ?? ret.status.replace(/_/g, ' ')}
                       </StatusBadge>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => viewDetail(ret)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-navy hover:bg-navy/5"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> View
-                      </button>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => viewDetail(ret)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-navy hover:bg-navy/5"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePdf(ret, 'download')}
+                          disabled={pdfLoadingId === ret.id}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-navy hover:bg-navy/5 disabled:opacity-50"
+                          title="Download PDF"
+                        >
+                          <FileDown className="h-3.5 w-3.5" /> PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePdf(ret, 'print')}
+                          disabled={pdfLoadingId === ret.id}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-navy hover:bg-navy/5 disabled:opacity-50"
+                          title="Print"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -401,6 +457,16 @@ export default function ReturnsPage() {
               ) : null}
             </tbody>
           </DataTable>
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </DataTableCard>
 
         {summary && (summary.supplierReturnRate.length > 0 || summary.returnReasons.length > 0) ? (
@@ -452,88 +518,15 @@ export default function ReturnsPage() {
         onSuccess={() => { setLoading(true); void load(); }}
       />
 
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{selected?.returnNumber} — Return Details</DialogTitle>
-          </DialogHeader>
-          {selected ? (
-            <div className="space-y-4 text-sm">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div><span className="text-muted">GRN:</span> {selected.grn?.grnNumber ?? '—'}</div>
-                <div><span className="text-muted">Reason:</span> {selected.reason}</div>
-                <div><span className="text-muted">Resolution:</span> {selected.resolution?.replace(/_/g, ' ') ?? '—'}</div>
-                <div><span className="text-muted">Value:</span> {formatFrwCompact(selected.returnValue ?? 0)}</div>
-              </div>
-              {selected.reasonDescription ? (
-                <p className="rounded-xl bg-[#f8fafc] p-3">{selected.reasonDescription}</p>
-              ) : null}
-              {selected.items?.length ? (
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[#f8fafc] text-left text-[11px] font-bold uppercase text-muted">
-                      <tr>
-                        <th className="px-3 py-2">Item</th>
-                        <th className="px-3 py-2 text-right">Return Qty</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.items.map((item) => (
-                        <tr key={item.id} className="border-t border-border/70">
-                          <td className="px-3 py-2">{item.itemName}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Number(item.returnQty)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase text-muted">Resolution Workflow</p>
-                <div className="flex flex-wrap items-center gap-1 text-xs text-muted">
-                  {['Return Created', 'Approved', 'Sent to Supplier', 'Supplier Response', 'Replacement / Credit', 'Closed'].map((step, i, arr) => (
-                    <span key={step} className="inline-flex items-center gap-1">
-                      <span className={`rounded-full px-2 py-0.5 ${i <= 2 ? 'bg-navy/10 font-semibold text-navy' : ''}`}>
-                        {step}
-                      </span>
-                      {i < arr.length - 1 ? <ChevronRight className="h-3 w-3" /> : null}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {selected.status === 'PENDING_APPROVAL' ? (
-                <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-                  <button
-                    type="button"
-                    className="btn-primary text-xs"
-                    onClick={() => { void updateStatus(selected.id, 'APPROVED'); setDetailOpen(false); }}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost text-xs text-red-600"
-                    onClick={() => { void updateStatus(selected.id, 'REJECTED'); setDetailOpen(false); }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              ) : null}
-              {selected.status === 'APPROVED' ? (
-                <button
-                  type="button"
-                  className="btn-primary text-xs"
-                  onClick={() => { void updateStatus(selected.id, 'SENT_TO_SUPPLIER'); setDetailOpen(false); }}
-                >
-                  Mark Sent to Supplier
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <GoodsReturnDetailDrawer
+        open={detailOpen}
+        ret={selected}
+        pdfLoading={selected ? pdfLoadingId === selected.id : false}
+        onClose={() => setDetailOpen(false)}
+        onDownloadPdf={(ret) => { void handlePdf(ret, 'download'); }}
+        onPrint={(ret) => { void handlePdf(ret, 'print'); }}
+        onStatusChange={(id, status) => { void updateStatus(id, status); }}
+      />
     </MainLayout>
   );
 }

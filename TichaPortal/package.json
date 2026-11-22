@@ -1,15 +1,21 @@
 {
-  "name": "frontend",
+  "name": "ticha-portal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --strictPort",
+    "dev": "vite --port 3000 --strictPort",
+    "dev:prod": "vite --mode production --port 3000 --strictPort",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "assets:generate": "capacitor-assets generate --android",
+    "cap:sync": "vite build && cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/text-zoom": "^8.0.1",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.14.0",
     "framer-motion": "^12.38.0",
@@ -21,10 +27,17 @@
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
+    "sonner": "^2.0.7",
     "tailwindcss": "^4.2.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@mui/material": "^6.4.0",
+    "@mui/icons-material": "^6.4.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.5.1",
     "@eslint/js": "^9.39.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

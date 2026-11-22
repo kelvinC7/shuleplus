@@ -9,6 +9,7 @@ export type SiteText = {
     jobsNews: string;
     about: string;
     signIn: string;
+    enterAsParent: string;
     registerSchool: string;
     tagline: string;
     menu: string;
@@ -165,6 +166,7 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       jobsNews: 'Akazi n\u2019amakuru',
       about: 'Ibyerekeye',
       signIn: 'Injira',
+      enterAsParent: 'Injira nk’umubyeyi',
       registerSchool: 'Andika ikigo cyawe',
       tagline: 'babyeyi.rw \u2014 ubufasha bw\u2019ababyeyi',
       menu: 'Ibikubiyemo',
@@ -344,8 +346,9 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       jobsNews: 'Jobs & News',
       about: 'About',
       signIn: 'Sign in',
-      registerSchool: 'Register school',
-      tagline: 'babyeyi.rw — parents convenience',
+      enterAsParent: 'Enter as Parent',
+      registerSchool: 'Register School',
+      tagline: 'babyeyi.rw - parents convenience',
       menu: 'Menu',
     },
     logoTagline: 'Parents Convenience',
@@ -440,7 +443,7 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       registryError: 'We couldn\u2019t reach the registry',
       tryAgain: 'Try again',
       noMatch: 'No schools match your filters',
-      noMatchHint: 'Try widening your search — clear a few filters or increase the fees range.',
+      noMatchHint: 'Try widening your search - clear a few filters or increase the fees range.',
       loadError: 'Could not load onboarded schools. Check your connection and try again.',
     },
     card: {
@@ -482,12 +485,12 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
     },
     cta: {
       title: 'Manage your school\u2019s profile on babyeyi.rw',
-      desc: 'Register your school to update your listing, publish A-Level combinations, post adverts, and respond to enquiries from parents — all from one dashboard.',
+      desc: 'Register your school to update your listing, publish A-Level combinations, post adverts, and respond to enquiries from parents - all from one dashboard.',
       button: 'Register your school',
     },
     footer: {
       blurb:
-        'The official-style directory of primary, secondary, TVET and university institutions across all 30 districts of Rwanda — in English and Kinyarwanda.',
+        'The official-style directory of primary, secondary, TVET and university institutions across all 30 districts of Rwanda - in English and Kinyarwanda.',
       forParents: 'For parents',
       forSchools: 'For schools',
       company: 'Company',
@@ -495,7 +498,7 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       schoolLinks: ['Register your school', 'School dashboard', 'Post an advert', 'Manage combinations'],
       companyLinks: ['About us', 'Contact', 'Privacy policy', 'Terms of use'],
       copyright: '\u00a9 2026 babyeyi.rw. All rights reserved.',
-      motto: 'Yego — kwiga neza biratangirira ku ishuri ryiza. EN \u00b7 RW \u00b7 FR',
+      motto: 'Yego - kwiga neza biratangirira ku ishuri ryiza. EN \u00b7 RW \u00b7 FR',
     },
     schoolInfo: {
       verified: 'Verified',
@@ -523,8 +526,9 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       jobsNews: 'Actualités',
       about: 'À propos',
       signIn: 'Se connecter',
+      enterAsParent: 'Entrer comme parent',
       registerSchool: 'Inscrire école',
-      tagline: 'babyeyi.rw — confort des parents',
+      tagline: 'babyeyi.rw - confort des parents',
       menu: 'Menu',
     },
     logoTagline: 'Confort des parents',
@@ -619,7 +623,7 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       registryError: 'Impossible d\u2019accéder au registre',
       tryAgain: 'Réessayer',
       noMatch: 'Aucune école ne correspond à vos filtres',
-      noMatchHint: 'Élargissez votre recherche — effacez quelques filtres ou augmentez la fourchette de frais.',
+      noMatchHint: 'Élargissez votre recherche - effacez quelques filtres ou augmentez la fourchette de frais.',
       loadError: 'Impossible de charger les écoles. Vérifiez votre connexion et réessayez.',
     },
     card: {
@@ -642,31 +646,31 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
         {
           tag: 'Annonce \u00b7 Payer les frais',
           title: 'Payez les frais scolaires via Bank of Africa',
-          desc: 'Paiements sécurisés et instantanés partout au Rwanda — confirmation envoyée directement à l\u2019école.',
+          desc: 'Paiements sécurisés et instantanés partout au Rwanda - confirmation envoyée directement à l\u2019école.',
           cta: 'Payer maintenant',
         },
         {
           tag: 'Annonce \u00b7 Marketplace',
-          title: 'Obtenez ShuleKit — la trousse complète de rentrée',
-          desc: 'Cahiers, stylos, matériel de géométrie et sac solide — un prix avantageux.',
+          title: 'Obtenez ShuleKit - la trousse complète de rentrée',
+          desc: 'Cahiers, stylos, matériel de géométrie et sac solide - un prix avantageux.',
           cta: 'Commander ShuleKit',
         },
         {
           tag: 'Annonce \u00b7 École sans cash',
-          title: 'Obtenez la ShuleCard — une carte pour tous les paiements',
-          desc: 'Cantine, bibliothèque et transport sans espèces — alertes de solde instantanées pour les parents.',
+          title: 'Obtenez la ShuleCard - une carte pour tous les paiements',
+          desc: 'Cantine, bibliothèque et transport sans espèces - alertes de solde instantanées pour les parents.',
           cta: 'Obtenir ShuleCard',
         },
       ],
     },
     cta: {
       title: 'Gérez le profil de votre école sur babyeyi.rw',
-      desc: 'Inscrivez votre école pour mettre à jour votre fiche, publier les combinaisons A-Level, poster des annonces et répondre aux parents — depuis un seul tableau de bord.',
+      desc: 'Inscrivez votre école pour mettre à jour votre fiche, publier les combinaisons A-Level, poster des annonces et répondre aux parents - depuis un seul tableau de bord.',
       button: 'Inscrire votre école',
     },
     footer: {
       blurb:
-        'Répertoire des établissements primaires, secondaires, TVET et universitaires dans les 30 districts du Rwanda — en anglais et kinyarwanda.',
+        'Répertoire des établissements primaires, secondaires, TVET et universitaires dans les 30 districts du Rwanda - en anglais et kinyarwanda.',
       forParents: 'Pour les parents',
       forSchools: 'Pour les écoles',
       company: 'Entreprise',
@@ -674,7 +678,7 @@ export const SITE_I18N: Record<SiteLang, SiteText> = {
       schoolLinks: ['Inscrire votre école', 'Tableau de bord', 'Publier une annonce', 'Gérer les combinaisons'],
       companyLinks: ['À propos', 'Contact', 'Politique de confidentialité', 'Conditions d\u2019utilisation'],
       copyright: '\u00a9 2026 babyeyi.rw. Tous droits réservés.',
-      motto: 'Yego — kwiga neza biratangirira ku ishuri ryiza. EN \u00b7 RW \u00b7 FR',
+      motto: 'Yego - kwiga neza biratangirira ku ishuri ryiza. EN \u00b7 RW \u00b7 FR',
     },
     schoolInfo: {
       verified: 'Vérifié',

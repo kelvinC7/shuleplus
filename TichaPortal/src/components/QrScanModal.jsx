@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Keyboard, Loader2, X } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import CloseIcon from '@mui/icons-material/Close';
+import KeyboardIcon from '@mui/icons-material/Keyboard';
+import { brand } from '../theme/theme';
 
 export default function QrScanModal({
   onScan,
@@ -57,36 +65,51 @@ export default function QrScanModal({
   }, [containerId, handleDecode]);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#000435]/60 p-4 sm:items-center">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-[#000435]">{title}</p>
-            <p className="mt-0.5 text-xs text-slate-500">{hint}</p>
-          </div>
-          <button type="button" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="relative bg-black">
-          <div id={containerId} className="min-h-[240px] w-full overflow-hidden" />
+    <Box
+      sx={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1300,
+        display: 'flex',
+        alignItems: { xs: 'flex-end', sm: 'center' },
+        justifyContent: 'center',
+        bgcolor: 'rgba(19,33,61,0.6)',
+        p: 2,
+      }}
+    >
+      <Box sx={{ width: '100%', maxWidth: 448, borderRadius: 2, bgcolor: '#fff', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ px: 2, py: 1.5, borderBottom: '1px solid #F1F5F9' }}>
+          <Box>
+            <Typography sx={{ fontSize: 14, fontWeight: 500, color: brand.navy }}>{title}</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, color: '#64748B' }}>{hint}</Typography>
+          </Box>
+          <IconButton size="small" onClick={onClose} aria-label="Close" sx={{ color: '#94A3B8', borderRadius: 1 }}>
+            <CloseIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Stack>
+
+        <Box sx={{ position: 'relative', bgcolor: '#000' }}>
+          <Box id={containerId} sx={{ minHeight: 240, width: '100%', overflow: 'hidden' }} />
           {starting && (
-            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 text-sm text-white">
-              <Loader2 className="h-4 w-4 animate-spin" /> Starting camera…
-            </div>
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14 }}>
+              <CircularProgress size={16} sx={{ color: '#fff' }} /> Starting camera...
+            </Stack>
           )}
-        </div>
-        {error && <p className="px-4 py-2 text-xs text-rose-700">{error}</p>}
+        </Box>
+
+        {error && <Typography sx={{ px: 2, py: 1, fontSize: 12, color: '#BE123C' }}>{error}</Typography>}
+
         {onManual && (
-          <button
-            type="button"
+          <Button
+            fullWidth
             onClick={onManual}
-            className="flex w-full items-center justify-center gap-2 border-t border-slate-100 px-4 py-3 text-sm font-medium text-[#000435]"
+            startIcon={<KeyboardIcon sx={{ fontSize: 16 }} />}
+            sx={{ justifyContent: 'center', py: 1.5, borderRadius: 0, borderTop: '1px solid #F1F5F9', textTransform: 'none', fontSize: 14, fontWeight: 500, color: brand.navy }}
           >
-            <Keyboard size={16} /> Enter code instead
-          </button>
+            Enter code instead
+          </Button>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

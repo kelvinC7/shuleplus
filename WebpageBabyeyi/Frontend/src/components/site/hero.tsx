@@ -7,6 +7,8 @@ import { LEVELS } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { BookIcon, GraduationCapIcon, MapPinIcon, SearchIcon, StarIcon } from './icons';
 import { useSiteLanguage } from './language-provider';
+import { EnterAsParentButton } from './enter-as-parent-button';
+import { RegisterSchoolButton } from './register-school-button';
 
 interface HeroProps {
   filters: DirectoryFilters;
@@ -29,7 +31,7 @@ export function Hero({
 }: HeroProps) {
   const { t } = useSiteLanguage();
 
-  const schoolValue = schoolsLoading ? '…' : schoolCount !== null ? String(schoolCount) : '—';
+  const schoolValue = schoolsLoading ? '…' : schoolCount !== null ? String(schoolCount) : '-';
 
   const stats = [
     { value: '30', label: t.hero.stats[0] },
@@ -50,7 +52,7 @@ export function Hero({
 
       <div className="site-container relative z-[2]">
         <div className="flex flex-col lg:flex-row lg:items-end lg:gap-7">
-          {/* Hero photo — prominent on mobile */}
+          {/* Hero photo - prominent on mobile */}
           <div className="relative mx-auto mb-2 flex w-full max-w-[420px] shrink-0 justify-center lg:mx-0 lg:mb-0 lg:w-auto lg:max-w-none lg:justify-start">
             <div
               aria-hidden
@@ -83,6 +85,10 @@ export function Hero({
               </h1>
               <p className="text-sm leading-relaxed text-sky-100 sm:text-base">{t.hero.subtitle}</p>
               <p className="mt-3 text-xs font-medium tracking-wide text-amber-300 sm:text-sm">{t.hero.subtitleActions}</p>
+              <div className="mt-5 flex flex-col items-stretch justify-center gap-2.5 sm:flex-row sm:items-center sm:justify-center lg:justify-start">
+                <EnterAsParentButton className="shadow-[0_12px_28px_rgba(0,0,0,0.25)] ring-white/40 sm:flex-1 sm:justify-center lg:flex-none" />
+                <RegisterSchoolButton className="shadow-[0_12px_28px_rgba(0,0,0,0.2)] sm:flex-1 sm:justify-center lg:flex-none" />
+              </div>
             </div>
 
             <form

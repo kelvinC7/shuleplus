@@ -184,7 +184,7 @@ export function DashboardView() {
           loading={loading}
           stroke="#6366f1"
           icon={<Briefcase size={20} />}
-          badge={usesStaffRoster ? 'HR · TT · IAM' : undefined}
+          badge={usesStaffRoster ? 'Users & Access (IAM)' : undefined}
         />
       </div>
 

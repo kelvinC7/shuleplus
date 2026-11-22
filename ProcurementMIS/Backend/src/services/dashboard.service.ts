@@ -28,6 +28,10 @@ export class DashboardService {
       spendingByCategory,
       topPurchasedItems,
       statusDistribution,
+      requestStatusDistribution,
+      recentRequests,
+      recentOrders,
+      totalOrderValue,
     ] = await Promise.all([
       prisma.purchaseRequest.count({ where: { organizationId } }),
       prisma.purchaseRequest.count({ where: { organizationId, status: 'PENDING' } }),
@@ -112,6 +116,28 @@ export class DashboardService {
         WHERE organization_id = ${organizationId}
         GROUP BY status
       `,
+      prisma.$queryRaw`
+        SELECT status, COUNT(*) as count
+        FROM purchase_requests
+        WHERE organization_id = ${organizationId}
+        GROUP BY status
+      `,
+      prisma.purchaseRequest.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { department: { select: { name: true } } },
+      }),
+      prisma.purchaseOrder.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { supplier: { select: { companyName: true } } },
+      }),
+      prisma.purchaseOrder.aggregate({
+        where: { organizationId },
+        _sum: { totalAmount: true },
+      }),
     ]);
 
     const totalBudget = Number((budgets._sum.totalBudget ?? 0));
@@ -167,6 +193,28 @@ export class DashboardService {
         status: s.status,
         count: Number(s.count),
       })),
+      requestStatusDistribution: (requestStatusDistribution as any[]).map((s: any) => ({
+        status: s.status,
+        count: Number(s.count),
+      })),
+      recentRequests: recentRequests.map((request: any) => ({
+        id: request.id,
+        prNumber: request.prNumber,
+        status: request.status,
+        priority: request.priority,
+        requestedByName: request.requestedByName,
+        department: request.department?.name ?? request.departmentOther ?? null,
+        createdAt: request.createdAt.toISOString(),
+      })),
+      recentOrders: recentOrders.map((order: any) => ({
+        id: order.id,
+        poNumber: order.poNumber,
+        status: order.status,
+        supplier: order.supplier?.companyName ?? null,
+        totalAmount: Number(order.totalAmount),
+        createdAt: order.createdAt.toISOString(),
+      })),
+      totalOrderValue: Number(totalOrderValue._sum.totalAmount ?? 0),
       recentActivities: recentActivities.map((a) => ({
         id: a.id,
         userId: a.userId,

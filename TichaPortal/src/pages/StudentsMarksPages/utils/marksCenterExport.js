@@ -68,7 +68,7 @@ export async function exportMarksCenterPdf(data, filters = {}) {
     [filters.academicYear || data?.selected?.academic_year, filters.term || data?.selected?.term].filter(Boolean).join(' · '),
   ].filter(Boolean).join(' · ');
 
-  doc.setFillColor(0, 4, 53);
+  doc.setFillColor(19, 33, 61);
   doc.rect(0, 0, W, 22, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
@@ -79,7 +79,7 @@ export async function exportMarksCenterPdf(data, filters = {}) {
   doc.text(sub || 'Assigned classes', margin, 17);
 
   y = 30;
-  doc.setTextColor(0, 4, 53);
+  doc.setTextColor(19, 33, 61);
   const kpis = data?.kpis || {};
   const kpiLine = [
     `Students: ${kpis.total_students ?? '-'}`,

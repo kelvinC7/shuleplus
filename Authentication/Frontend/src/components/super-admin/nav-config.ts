@@ -33,6 +33,8 @@ export const SUPER_ADMIN_SIDEBAR: SidebarNavConfig = {
         { href: '/super-admin/chief-accountants', label: 'Chief accountants', icon: 'admins' },
         { href: '/super-admin/sei-officers', label: 'SEI Officers', icon: 'admins' },
         { href: '/super-admin/deo-officers', label: 'DEO Officers', icon: 'admins' },
+        { href: '/super-admin/shule-trip-officials', label: 'ShuleTrip Government Users', icon: 'admins' },
+        { href: '/super-admin/shule-trip-school-registrations', label: 'ShuleTrip School Registrations', icon: 'approvals' },
         { href: '/super-admin/nesa-dashboard-users', label: 'NESA Dashboard Users', icon: 'analytics' },
         { href: '/super-admin/customers', label: 'Customers', icon: 'customers' },
       ],
@@ -93,6 +95,8 @@ export const SUPER_ADMIN_SIDEBAR: SidebarNavConfig = {
       icon: 'smartAccess',
       items: [
         { href: '/super-admin/smart-access', label: 'Smart Access', icon: 'smartAccess' },
+        { href: '/super-admin/smart-access/reports', label: 'Access reports', icon: 'reports' },
+        { href: '/super-admin/device-management', label: 'Device Management', icon: 'smartAccess' },
         { href: '/super-admin/gate-devices', label: 'Gate Devices', icon: 'smartAccess' },
         { href: '/super-admin/smart-cards', label: 'Print Card', icon: 'smartCards' },
       ],
@@ -116,6 +120,8 @@ export const SUPER_ADMIN_SIDEBAR: SidebarNavConfig = {
       icon: 'smsBulk',
       items: [
         { href: '/super-admin/sms-bulk', label: 'Dashboard', icon: 'dashboard' },
+        { href: '/super-admin/sms-bulk/school-access', label: 'School SMS access', icon: 'organizations' },
+        { href: '/super-admin/sms-bulk/parent-purchases', label: 'Parent purchases', icon: 'approvals' },
         { href: '/super-admin/sms-bulk/students', label: 'Students & Parents', icon: 'admins' },
         { href: '/super-admin/sms-bulk/send', label: 'Send SMS', icon: 'smsBulk' },
         { href: '/super-admin/sms-bulk/campaigns', label: 'Campaigns', icon: 'reports' },

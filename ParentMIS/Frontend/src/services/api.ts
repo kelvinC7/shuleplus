@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getToken, storeToken, getRefreshToken, clearTokens } from '@/shared/auth-token';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3048/api';
-const IAM_API_URL = process.env.NEXT_PUBLIC_IAM_API_URL ?? 'http://localhost:3001/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://parentsapi.shuleplus.rw/api';
+const IAM_API_URL = process.env.NEXT_PUBLIC_IAM_API_URL ?? 'https://shuleplus.rw/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

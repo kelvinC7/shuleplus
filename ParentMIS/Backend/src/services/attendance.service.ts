@@ -2,6 +2,8 @@ import { AppError } from '../middleware/error.middleware';
 import { parseStudentSelector, tryResolveActiveStudent } from './parent-context.service';
 import { attendanceApi, type AttendanceRecordView, type StudentAttendance } from './attendance-api';
 import { prisma } from '../config/database';
+import { parentAttendanceReportService } from './parent-attendance-report.service';
+import type { ParentAttendanceReportKind } from '../generated/prisma-client';
 import type { StudentSelector } from '../utils/student-param';
 
 function identityCodes(
@@ -128,50 +130,63 @@ export class AttendanceService {
     }
   }
 
+  async reportFromParent(
+    organizationId: string,
+    parentId: string,
+    input: { date: string; reason: string; kind?: ParentAttendanceReportKind; detail?: string },
+    requestedStudentId?: StudentSelector
+  ) {
+    const kind = input.kind ?? 'ABSENT';
+    const student = await tryResolveActiveStudent(organizationId, parentId, requestedStudentId);
+    if (!student) throw new AppError(404, 'Requested student is not linked to this parent');
+
+    const report = await parentAttendanceReportService.create({
+      organizationId,
+      parentId,
+      studentId: student.id,
+      date: input.date,
+      kind,
+      reason: input.reason,
+      detail: input.detail,
+    });
+
+    if (kind === 'ABSENT') {
+      try {
+        await attendanceApi.recordExcusedAbsence(organizationId, {
+          studentCode: student.shuleCode,
+          studentId: student.id,
+          date: input.date,
+          reason: input.detail ? `${input.reason} · ${input.detail}` : input.reason,
+          studentName: `${student.firstName} ${student.lastName}`,
+          className: student.className,
+        });
+      } catch (error) {
+        console.warn(`[attendance] RFID absence write failed (${(error as Error).message}); using local record`);
+        const date = new Date(input.date);
+        await prisma.attendanceRecord.upsert({
+          where: { studentId_date: { studentId: student.id, date } },
+          update: { status: 'EXCUSED', notes: report.reason },
+          create: {
+            organizationId,
+            studentId: student.id,
+            date,
+            status: 'EXCUSED',
+            notes: report.reason,
+          },
+        });
+      }
+    }
+
+    return report;
+  }
+
   async reportAbsence(
     organizationId: string,
     parentId: string,
     input: { date: string; reason: string },
     requestedStudentId?: StudentSelector
   ) {
-    const date = new Date(input.date);
-    if (Number.isNaN(date.getTime())) throw new AppError(400, 'Invalid date');
-
-    const student = await tryResolveActiveStudent(organizationId, parentId, requestedStudentId);
-    if (!student) throw new AppError(404, 'Requested student is not linked to this parent');
-
-    try {
-      return await attendanceApi.recordExcusedAbsence(organizationId, {
-        studentCode: student.shuleCode,
-        studentId: student.id,
-        date: input.date,
-        reason: input.reason,
-        studentName: `${student.firstName} ${student.lastName}`,
-        className: student.className,
-      });
-    } catch (error) {
-      console.warn(`[attendance] RFID absence write failed (${(error as Error).message}); using local record`);
-      const row = await prisma.attendanceRecord.upsert({
-        where: { studentId_date: { studentId: student.id, date } },
-        update: { status: 'EXCUSED', notes: input.reason },
-        create: {
-          organizationId,
-          studentId: student.id,
-          date,
-          status: 'EXCUSED',
-          notes: input.reason,
-        },
-      });
-      return {
-        id: row.id,
-        date: row.date.toISOString(),
-        checkInTime: row.checkInTime,
-        checkOutTime: row.checkOutTime,
-        status: row.status,
-        notes: row.notes,
-        source: 'MANUAL',
-      };
-    }
+    return this.reportFromParent(organizationId, parentId, { ...input, kind: 'ABSENT' }, requestedStudentId);
   }
 
   private async fallbackLocal(studentId: string) {

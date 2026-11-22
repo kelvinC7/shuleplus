@@ -4,10 +4,10 @@
   "description": "ShulePlus (Babyeyi) Identity & Access Management Service",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "node scripts/ensure-prisma.js && tsx watch src/server.ts",
+    "dev": "node scripts/ensure-prisma.js && node ../../scripts/run-backend-dev.mjs src/server.ts",
     "build": "prisma generate && tsc && node scripts/copy-generated.mjs",
     "start": "node dist/server.js",
-    "postinstall": "prisma generate",
+    "postinstall": "node scripts/ensure-prisma.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

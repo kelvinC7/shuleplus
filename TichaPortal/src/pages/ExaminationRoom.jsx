@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, QrCode } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
+import InputAdornment from '@mui/material/InputAdornment';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import SearchIcon from '@mui/icons-material/Search';
 import QrScanModal from '../components/QrScanModal';
-import TeacherPageShell, { tpActionBtn, tpActionBtnPrimary } from '../components/TeacherPageShell';
+import TeacherPageShell from '../components/TeacherPageShell';
 import {
   fetchExamRoom,
   markExamEntry,
@@ -10,6 +26,7 @@ import {
   tpApiDetails,
   tpApiError,
 } from '../services/teacherPortalApi';
+import { brand } from '../theme/theme';
 
 function parseCode(raw) {
   const trimmed = String(raw || '').trim();
@@ -55,7 +72,9 @@ export default function ExaminationRoom() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return students;
-    return students.filter((s) => s.fullName?.toLowerCase().includes(q) || s.studentCode?.toLowerCase().includes(q));
+    return students.filter(
+      (s) => s.fullName?.toLowerCase().includes(q) || s.studentCode?.toLowerCase().includes(q)
+    );
   }, [students, query]);
 
   const kpis = {
@@ -115,9 +134,9 @@ export default function ExaminationRoom() {
   ];
 
   const shellActions = (
-    <Link to="/examinations" className={`${tpActionBtn} w-full sm:w-auto`}>
-      <ArrowLeft className="h-4 w-4" /> All rooms
-    </Link>
+    <Button component={Link} to="/examinations" variant="outlined" startIcon={<ArrowBackIcon />}>
+      All rooms
+    </Button>
   );
 
   return (
@@ -127,71 +146,110 @@ export default function ExaminationRoom() {
       stats={shellStats}
       actions={shellActions}
     >
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
-      {info && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{info}</div>}
+      {error ? <Alert severity="error">{error}</Alert> : null}
+      {info ? <Alert severity="success">{info}</Alert> : null}
 
-      <div className="tp-card p-4 sm:p-5">
-        <div className="flex flex-wrap gap-2">
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5 }, borderColor: brand.border }}>
+        <Stack direction="row" spacing={1}>
           {['entry', 'exit'].map((m) => (
-            <button
+            <Button
               key={m}
-              type="button"
               onClick={() => setMode(m)}
-              className={`rounded-full px-4 py-1.5 text-sm capitalize ${
-                mode === m ? 'bg-[#000435] text-white' : 'bg-slate-100 text-slate-600'
-              }`}
+              size="small"
+              disableElevation
+              sx={{
+                borderRadius: 999,
+                px: 2,
+                textTransform: 'capitalize',
+                bgcolor: mode === m ? brand.navy : '#F1F5F9',
+                color: mode === m ? '#fff' : brand.muted,
+                '&:hover': { bgcolor: mode === m ? brand.navy2 : '#E2E8F0' },
+              }}
             >
               {m}
-            </button>
+            </Button>
           ))}
-        </div>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <input
-            className="tp-input flex-1"
+        </Stack>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+          <TextField
+            fullWidth
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Student code"
             onKeyDown={(e) => e.key === 'Enter' && void record(code, 'MANUAL')}
           />
-          <button type="button" className={`${tpActionBtnPrimary} w-full sm:w-auto`} disabled={busy} onClick={() => void record(code, 'MANUAL')}>
+          <Button
+            variant="contained"
+            color="primary"
+            disabled={busy}
+            onClick={() => void record(code, 'MANUAL')}
+            sx={{ flexShrink: 0 }}
+          >
             Record {mode}
-          </button>
-          <button type="button" className={`${tpActionBtn} w-full sm:w-auto`} onClick={() => setScanOpen(true)}>
-            <QrCode className="h-4 w-4" /> Scan
-          </button>
-        </div>
-        <input
-          className="tp-input mt-3"
+          </Button>
+          <Button variant="outlined" onClick={() => setScanOpen(true)} startIcon={<QrCodeScannerIcon />} sx={{ flexShrink: 0 }}>
+            Scan
+          </Button>
+        </Stack>
+
+        <TextField
+          fullWidth
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search roster…"
+          sx={{ mt: 1.5 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 16, color: brand.muted }} />
+              </InputAdornment>
+            ),
+          }}
         />
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-2 py-2">Student</th>
-                <th className="px-2 py-2">Code</th>
-                <th className="px-2 py-2">Seat</th>
-                <th className="px-2 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
+
+        <TableContainer sx={{ mt: 1.5 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {['Student', 'Code', 'Seat', 'Status'].map((h) => (
+                  <TableCell
+                    key={h}
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: brand.muted,
+                      borderColor: brand.border,
+                    }}
+                  >
+                    {h}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {filtered.map((s) => (
-                <tr key={s.studentId} className="border-b border-slate-50">
-                  <td className="px-2 py-2 text-[#000435]">{s.fullName}</td>
-                  <td className="px-2 py-2 text-slate-500">{s.studentCode}</td>
-                  <td className="px-2 py-2 text-slate-500">{s.seatCode || '-'}</td>
-                  <td className="px-2 py-2">
+                <TableRow key={s.studentId}>
+                  <TableCell sx={{ color: brand.navy, borderColor: brand.border }}>{s.fullName}</TableCell>
+                  <TableCell sx={{ color: brand.muted, borderColor: brand.border }}>{s.studentCode}</TableCell>
+                  <TableCell sx={{ color: brand.muted, borderColor: brand.border }}>{s.seatCode || '-'}</TableCell>
+                  <TableCell sx={{ borderColor: brand.border }}>
                     {s.checkInAt ? 'Present' : allowedOf(s) ? 'Allowed' : 'Not allowed'}
                     {s.exitAt ? ' · exited' : ''}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {!filtered.length ? (
+          <Typography sx={{ py: 3, textAlign: 'center', fontSize: 13, color: brand.muted }}>
+            No students found.
+          </Typography>
+        ) : null}
+      </Paper>
 
       {scanOpen ? (
         <QrScanModal

@@ -1,11 +1,12 @@
 import { fetchHrTeachers } from '../clients/hr.client';
+import { fetchIamTeachingStaff } from '../clients/iam.client';
 import { fetchTimetableTeacherProfiles } from '../clients/timetable.client';
 
 export type TeacherCandidate = {
   id: string;
   name: string;
   email: string | null;
-  source: 'TIMETABLE' | 'HR' | 'MANUAL';
+  source: 'IAM' | 'TIMETABLE' | 'HR' | 'MANUAL';
   userId: string | null;
   refId: string | null;
   subtitle: string | null;
@@ -19,7 +20,8 @@ export async function listTeacherCandidates(
   organizationId: string,
   search?: string
 ): Promise<TeacherCandidate[]> {
-  const [timetableProfiles, hrTeachers] = await Promise.all([
+  const [iamTeachers, timetableProfiles, hrTeachers] = await Promise.all([
+    fetchIamTeachingStaff(organizationId, search).catch(() => []),
     fetchTimetableTeacherProfiles(organizationId).catch(() => []),
     fetchHrTeachers(organizationId).catch(() => []),
   ]);
@@ -27,9 +29,29 @@ export async function listTeacherCandidates(
   const byKey = new Map<string, TeacherCandidate>();
   const q = search?.trim().toLowerCase() ?? '';
 
+  for (const teacher of iamTeachers) {
+    const email = teacher.email?.trim() || null;
+    const key = teacher.id || normalizeEmail(email) || teacher.name.toLowerCase();
+    byKey.set(key, {
+      id: teacher.id,
+      name: teacher.name,
+      email,
+      source: 'IAM',
+      userId: teacher.id,
+      refId: null,
+      subtitle: [teacher.position, teacher.department, 'Users & Access'].filter(Boolean).join(' · '),
+    });
+  }
+
   for (const profile of timetableProfiles) {
     const email = profile.loginEmail?.trim() || null;
     const key = profile.teacherUserId || normalizeEmail(email) || profile.teacherName.toLowerCase();
+    const existing = byKey.get(key) ?? [...byKey.values()].find((c) => normalizeEmail(c.email) === normalizeEmail(email));
+    if (existing) {
+      existing.subtitle = [existing.subtitle, 'Timetable'].filter(Boolean).join(' · ');
+      if (!existing.userId && profile.teacherUserId) existing.userId = profile.teacherUserId;
+      continue;
+    }
     byKey.set(key, {
       id: profile.teacherUserId,
       name: profile.teacherName,

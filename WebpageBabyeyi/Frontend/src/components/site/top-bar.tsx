@@ -3,6 +3,7 @@
 import { PhoneIcon } from './icons';
 import { cn } from '@/lib/utils';
 import { useSiteLanguage } from './language-provider';
+import { PARENT_PORTAL_URL, REGISTER_SCHOOL_URL } from '@/lib/auth-urls';
 import type { SiteLang } from '@/lib/site-i18n';
 
 const LANG_OPTIONS: { code: SiteLang; label: string }[] = [
@@ -19,11 +20,14 @@ export function TopBar() {
       <div className="site-container flex flex-wrap items-center justify-between gap-1.5 py-2">
         <div className="flex min-w-0 items-center gap-5">
           <div className="flex items-center gap-5">
-            {t.topBarLinks.map((l) => (
-              <a key={l} href="#" className="opacity-85 transition-opacity hover:text-amber-300 hover:opacity-100">
-                {l}
-              </a>
-            ))}
+            {t.topBarLinks.map((l, i) => {
+              const href = i === 0 ? PARENT_PORTAL_URL : i === 1 ? REGISTER_SCHOOL_URL : '#help';
+              return (
+                <a key={l} href={href} className="opacity-85 transition-opacity hover:text-amber-300 hover:opacity-100">
+                  {l}
+                </a>
+              );
+            })}
           </div>
         </div>
         <div className="flex items-center gap-5">

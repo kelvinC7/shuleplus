@@ -1,129 +1,199 @@
-import { addPaymentInterval, formatFrw, formatPlanDate } from "./avanceRepayment";
+import {
+  addPaymentInterval,
+  firstPaymentDate,
+  formatFrw,
+  formatPlanDate,
+  frequencyLabel,
+  computeAvancePlan,
+} from "./avanceRepayment";
 
-export const FILTERS = [
-  "All",
-  "Active",
-  "Pending",
-  "Approved",
-  "Rejected",
-  "Completed",
-  "Overdue",
-  "Cancelled",
-];
+/**
+ * Helpers for the Repayment Schedule page (src/pages/RepaymentSchedule.jsx).
+ *
+ * NOTE: this file was empty in the uploaded project, so it was rebuilt from how the page
+ * and the receipt PDF code use it. If you have the original version in git, prefer that.
+ */
 
-const STATUS_PILL = {
-  Active: { label: "Active", className: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Pending: { label: "Pending", className: "bg-amber-50 text-amber-800", dot: "bg-amber-500" },
-  "Under Review": { label: "Under Review", className: "bg-sky-50 text-sky-800", dot: "bg-sky-500" },
-  Approved: { label: "Approved", className: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Rejected: { label: "Rejected", className: "bg-red-50 text-red-700", dot: "bg-red-500" },
-  Completed: { label: "Completed", className: "bg-slate-100 text-slate-700", dot: "bg-slate-400" },
-  Overdue: { label: "Overdue", className: "bg-red-50 text-red-700", dot: "bg-red-500" },
-  Cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
-  Disbursed: { label: "Active", className: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Paid: { label: "Paid", className: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  Upcoming: { label: "Upcoming", className: "bg-amber-50 text-amber-800", dot: "bg-amber-400" },
-};
+export { formatPlanDate };
 
+/** Filter chips shown above the table. */
+export const FILTERS = ["All", "Active", "Pending", "Completed", "Rejected"];
+
+/** Currency formatter used across the page ("150,000 Frw", or "-" when not a number). */
 export function money(n) {
-  return formatFrw(Number(n) || 0);
+  return formatFrw(n);
 }
 
-export function statusPill(status) {
-  return STATUS_PILL[status] || { label: status || "-", className: "bg-slate-100 text-slate-600", dot: "bg-slate-400" };
+function toDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function displayAdvanceStatus(row) {
-  if (row?.overdue && ["Approved", "Disbursed"].includes(row.status)) return "Overdue";
-  if (row?.status === "Disbursed") return "Active";
-  if (row?.status === "Submitted") return "Pending";
-  return row?.status || "Pending";
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
-export function matchesFilter(row, filter) {
-  if (!filter || filter === "All") return true;
-  const status = displayAdvanceStatus(row);
-  if (filter === "Pending") return status === "Pending" || status === "Under Review";
-  if (filter === "Active") return status === "Active" || row.status === "Disbursed";
-  if (filter === "Overdue") return status === "Overdue" || Boolean(row.overdue);
-  return status === filter;
+function num(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
+/** Whole days from today to `date` (negative when the date is in the past). */
+export function daysFromToday(date) {
+  const d = toDate(date);
+  if (!d) return 0;
+  const ms = startOfDay(d).getTime() - startOfDay(new Date()).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+/** Lower-case, trimmed raw status from the API (e.g. "pending_accountant", "Disbursed"). */
+function rawStatus(row) {
+  return String(row?.status ?? "").trim().toLowerCase();
+}
+
+function isRejected(s) {
+  return s.startsWith("reject") || s.startsWith("declin");
+}
+
+function isPending(s) {
+  return (
+    !s ||
+    s.startsWith("pending") ||
+    s === "sent_to_manager" ||
+    s === "submitted" ||
+    s === "waiting" ||
+    s === "draft"
+  );
+}
+
+/** Frequency label for a request: "Daily" | "Weekly" | "Monthly". */
 export function parseFrequency(row) {
-  if (row?.frequency) return row.frequency;
-  const match = /Frequency:\s*(Daily|Weekly|Monthly)/i.exec(row?.description || "");
-  if (!match) return "Monthly";
-  const v = match[1].toLowerCase();
-  return v.charAt(0).toUpperCase() + v.slice(1);
+  const raw = String(row?.frequency ?? row?.paymentFrequency ?? row?.repaymentFrequency ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw.startsWith("day")) return frequencyLabel("daily");
+  if (raw.startsWith("week")) return frequencyLabel("weekly");
+  return frequencyLabel("monthly");
 }
 
-function frequencyKey(label) {
-  const v = String(label || "Monthly").toLowerCase();
-  if (v.startsWith("day")) return "daily";
-  if (v.startsWith("week")) return "weekly";
-  return "monthly";
+function frequencyKey(row) {
+  return parseFrequency(row).toLowerCase();
 }
 
-export function buildSchedule(row) {
-  const amount = Number(row?.amount) || 0;
-  const months = Math.max(1, Number(row?.months) || 1);
-  const existing = Array.isArray(row?.repayments) ? [...row.repayments] : [];
-  existing.sort((a, b) => (a.installmentNumber || 0) - (b.installmentNumber || 0));
+/** Installments the backend already provides, if any. */
+function apiInstallments(advance) {
+  const list = advance?.schedule ?? advance?.installments ?? advance?.repayments;
+  return Array.isArray(list) && list.length ? list : null;
+}
 
-  let items = existing;
-  if (!items.length && amount > 0) {
-    const freq = frequencyKey(parseFrequency(row));
-    const per = Number(row?.monthlyDeduction) || Math.round(amount / months);
-    const startSrc = row?.startDate || row?.disbursedAt || row?.approvedAt || row?.submittedAt;
-    const start = startSrc ? new Date(startSrc) : new Date();
-    items = Array.from({ length: months }, (_, i) => {
-      const due = addPaymentInterval(start, freq, i + 1);
+function normalizeInstallmentStatus(value) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (s === "paid" || s === "completed" || s === "settled") return "Paid";
+  if (s === "overdue" || s === "late") return "Overdue";
+  if (s === "partial" || s === "partially paid") return "Partial";
+  return "Upcoming";
+}
+
+/**
+ * Repayment schedule for one advance.
+ * Uses installments from the API when present; otherwise generates an even schedule from
+ * amount / months / frequency and marks installments as paid from `totalPaid`.
+ * Pending and rejected requests have no schedule.
+ */
+export function buildSchedule(advance) {
+  if (!advance) return [];
+  const reqNo = advance.requestNumber || advance.requestNo || advance.id || "ADV";
+  const today = startOfDay(new Date());
+
+  const fromApi = apiInstallments(advance);
+  if (fromApi) {
+    return fromApi.map((r, i) => {
+      const amount = num(r.amount ?? r.dueAmount) ?? 0;
+      const dueDate = r.dueDate ?? r.due ?? r.date ?? null;
+      let status = normalizeInstallmentStatus(r.status);
+      const paid = num(r.paid ?? r.paidAmount) ?? (status === "Paid" ? amount : 0);
+      const due = toDate(dueDate);
+      if (status === "Upcoming" && due && startOfDay(due) < today && paid < amount) {
+        status = "Overdue";
+      }
       return {
-        id: `${row.id}-syn-${i + 1}`,
-        installmentNumber: i + 1,
-        amount: i === months - 1 ? amount - per * (months - 1) : per,
-        paidAmount: 0,
-        dueDate: due.toISOString(),
-        paidAt: null,
-        status: due.getTime() < Date.now() ? "Overdue" : "Upcoming",
-        method: "Payroll",
-        reference: `PAY-${String(i + 1).padStart(4, "0")}`,
+        id: r.id ?? `${reqNo}-${i + 1}`,
+        n: r.n ?? i + 1,
+        dueDate,
+        amount,
+        paid,
+        balance: num(r.balance) ?? Math.max(0, amount - paid),
+        status,
+        method: r.method ?? r.paymentMethod ?? "Payroll deduction",
+        reference: r.reference ?? (status === "Paid" ? `${reqNo}-P${i + 1}` : "-"),
+        date: r.paidAt ?? r.date ?? dueDate,
+        paidAt: r.paidAt ?? (status === "Paid" ? dueDate : null),
       };
     });
   }
 
-  let remaining = amount;
-  return items.map((r, i) => {
-    const due = r.dueDate || r.date;
-    const isPaid = r.status === "Paid" || Boolean(r.paidAt) || Number(r.paidAmount) >= Number(r.amount);
-    const paidAmt = isPaid ? Number(r.paidAmount || r.amount) || 0 : 0;
-    remaining = Math.max(0, remaining - paidAmt);
-    let status = r.status;
-    if (isPaid) status = "Paid";
-    else if (new Date(due).getTime() < Date.now()) status = "Overdue";
-    else status = "Upcoming";
+  const s = rawStatus(advance);
+  if (isRejected(s) || isPending(s) || s.startsWith("cancel")) return [];
+
+  const months = Math.max(0, Math.floor(Number(advance.months) || 0));
+  const principal = num(advance.amount) ?? 0;
+  if (!months || principal <= 0) return [];
+
+  const frequency = frequencyKey(advance);
+  const plan = computeAvancePlan({
+    amount: principal,
+    periodCount: months,
+    periodUnit: "months",
+    frequency,
+    serviceFee: advance.serviceFee,
+    interest: advance.interest,
+  });
+  if (!plan.payments) return [];
+
+  const startFrom =
+    toDate(advance.startDate || advance.disbursedAt || advance.approvedAt || advance.submittedAt) ?? new Date();
+  const first = firstPaymentDate(frequency, startFrom);
+
+  // How much has been repaid so far (never trust a missing number).
+  const remaining = num(advance.remainingBalance);
+  let pool = num(advance.totalPaid);
+  if (pool === null) pool = remaining !== null ? Math.max(0, plan.totalRepayment - remaining) : 0;
+
+  return plan.schedule.map((item, i) => {
+    const dueDate = addPaymentInterval(first, frequency, i);
+    const paid = Math.min(item.amount, Math.max(0, pool));
+    pool -= paid;
+    let status = "Upcoming";
+    if (paid >= item.amount) status = "Paid";
+    else if (startOfDay(dueDate) < today) status = "Overdue";
+    else if (paid > 0) status = "Partial";
     return {
-      id: r.id || `${row.id}-${i + 1}`,
-      n: r.installmentNumber || i + 1,
-      dueDate: due,
-      amount: Number(r.amount) || 0,
-      paid: paidAmt,
-      balance: isPaid ? remaining : 0,
-      remainingAfter: remaining,
+      id: `${reqNo}-${item.n}`,
+      n: item.n,
+      dueDate,
+      amount: item.amount,
+      paid,
+      balance: Math.max(0, item.amount - paid),
       status,
-      method: r.method || "Payroll",
-      reference: r.reference || `PAY-${String(r.installmentNumber || i + 1).padStart(4, "0")}`,
-      paidAt: r.paidAt || (isPaid ? due : null),
+      method: advance.paymentMethod || "Payroll deduction",
+      reference: status === "Paid" ? `${reqNo}-P${item.n}` : "-",
+      date: status === "Paid" ? dueDate : null,
+      paidAt: status === "Paid" ? dueDate : null,
     };
   });
 }
 
+/** Paid installments, shaped for the "Payment history" table. */
 export function paymentHistory(schedule) {
-  return schedule
+  return (schedule || [])
     .filter((r) => r.status === "Paid")
     .map((r) => ({
-      id: `PAY-${String(r.n).padStart(3, "0")}`,
-      date: r.paidAt || r.dueDate,
+      id: r.reference && r.reference !== "-" ? r.reference : r.id,
+      date: r.paidAt || r.date || r.dueDate,
       amount: r.paid || r.amount,
       method: r.method,
       reference: r.reference,
@@ -131,46 +201,114 @@ export function paymentHistory(schedule) {
     }));
 }
 
+/** The next payment to collect: the oldest overdue one, otherwise the first unpaid. */
 export function nextPayment(schedule) {
-  return schedule.find((r) => r.status !== "Paid") || null;
+  const unpaid = (schedule || []).filter((r) => r.status !== "Paid");
+  if (!unpaid.length) return null;
+  return unpaid.find((r) => r.status === "Overdue") || unpaid[0];
 }
 
-export function daysFromToday(date) {
-  if (!date) return 0;
-  const a = new Date(date);
-  a.setHours(0, 0, 0, 0);
-  const b = new Date();
-  b.setHours(0, 0, 0, 0);
-  return Math.round((a.getTime() - b.getTime()) / 86400000);
+/**
+ * Label shown in the status pill:
+ * "Pending" | "Rejected" | "Cancelled" | "Active" | "Overdue" | "Completed"
+ */
+export function displayAdvanceStatus(row) {
+  const s = rawStatus(row);
+  if (isRejected(s)) return "Rejected";
+  if (s.startsWith("cancel")) return "Cancelled";
+  if (isPending(s)) return "Pending";
+
+  if (["completed", "paid", "repaid", "closed", "settled"].includes(s)) return "Completed";
+
+  const schedule = buildSchedule(row);
+  if (schedule.length && schedule.every((r) => r.status === "Paid")) return "Completed";
+  if (schedule.some((r) => r.status === "Overdue")) return "Overdue";
+
+  const remaining = num(row?.remainingBalance);
+  if (remaining !== null && remaining <= 0 && (num(row?.totalPaid) ?? 0) > 0) return "Completed";
+
+  if (["approved", "disbursed", "active", "ongoing", "overdue"].includes(s)) return "Active";
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "Pending";
 }
 
+/** Does this request belong under the selected filter chip? */
+export function matchesFilter(row, filter) {
+  if (!filter || filter === "All") return true;
+  const status = displayAdvanceStatus(row);
+  if (filter === "Active") return status === "Active" || status === "Overdue";
+  return status === filter;
+}
+
+/** The advance currently being repaid (most recently submitted active one), or null. */
 export function currentAdvance(rows) {
+  const active = (rows || []).filter((r) => matchesFilter(r, "Active"));
+  if (!active.length) return null;
+  const time = (r) => toDate(r.submittedAt || r.date || r.approvedAt)?.getTime() ?? 0;
+  return [...active].sort((a, b) => time(b) - time(a))[0];
+}
+
+const PILLS = {
+  Paid: { label: "Paid", className: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  Completed: { label: "Completed", className: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  Active: { label: "Active", className: "bg-sky-50 text-sky-700", dot: "bg-sky-500" },
+  Approved: { label: "Approved", className: "bg-sky-50 text-sky-700", dot: "bg-sky-500" },
+  Disbursed: { label: "Disbursed", className: "bg-sky-50 text-sky-700", dot: "bg-sky-500" },
+  Upcoming: { label: "Upcoming", className: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+  Partial: { label: "Partial", className: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
+  Pending: { label: "Pending", className: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
+  Overdue: { label: "Overdue", className: "bg-red-50 text-red-700", dot: "bg-red-500" },
+  Rejected: { label: "Rejected", className: "bg-red-50 text-red-700", dot: "bg-red-500" },
+  Cancelled: { label: "Cancelled", className: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
+};
+
+/** Styling for a status pill: { label, className, dot }. */
+export function statusPill(status) {
+  const key = String(status ?? "");
   return (
-    rows.find((r) => displayAdvanceStatus(r) === "Active" || displayAdvanceStatus(r) === "Overdue") ||
-    rows.find((r) => r.status === "Approved") ||
-    null
+    PILLS[key] || {
+      label: key || "-",
+      className: "bg-slate-100 text-slate-600",
+      dot: "bg-slate-400",
+    }
   );
 }
 
+/** Numbers for the KPI cards at the top of the page. */
 export function workspaceKpis(rows, summary = {}) {
-  const completed = rows.filter((r) => displayAdvanceStatus(r) === "Completed").length;
-  const active = rows.filter((r) => {
-    const s = displayAdvanceStatus(r);
-    return s === "Active" || s === "Overdue" || r.status === "Approved" || r.status === "Disbursed";
-  }).length;
-  const borrowed = rows
-    .filter((r) => ["Approved", "Disbursed", "Completed"].includes(r.status))
-    .reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const remaining = rows
-    .filter((r) => ["Approved", "Disbursed"].includes(r.status))
-    .reduce((s, r) => s + (Number(r.remainingBalance) || 0), 0);
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return {
+      totalAdvances: num(summary?.totalAdvances) ?? 0,
+      activeAdvances: num(summary?.activeAdvances) ?? 0,
+      totalBorrowed: num(summary?.totalBorrowed) ?? 0,
+      remainingBalance: num(summary?.remainingBalance) ?? 0,
+      completed: num(summary?.completed) ?? 0,
+    };
+  }
+
+  let activeAdvances = 0;
+  let completed = 0;
+  let totalBorrowed = 0;
+  let remainingBalance = 0;
+
+  for (const row of list) {
+    const status = displayAdvanceStatus(row);
+    if (status === "Pending" || status === "Rejected" || status === "Cancelled") continue;
+    totalBorrowed += num(row.amount) ?? 0;
+    if (status === "Completed") {
+      completed += 1;
+      continue;
+    }
+    activeAdvances += 1;
+    const remaining = num(row.remainingBalance);
+    remainingBalance += remaining !== null ? remaining : Math.max(0, (num(row.amount) ?? 0) - (num(row.totalPaid) ?? 0));
+  }
+
   return {
-    totalAdvances: summary.totalAdvances ?? rows.length,
-    activeAdvances: summary.activeAdvances ?? active,
-    totalBorrowed: summary.totalReceived ?? borrowed,
-    remainingBalance: summary.outstanding ?? remaining,
-    completed: summary.completed ?? completed,
+    totalAdvances: list.length,
+    activeAdvances,
+    totalBorrowed,
+    remainingBalance,
+    completed,
   };
 }
-
-export { formatPlanDate };

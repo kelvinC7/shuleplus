@@ -237,6 +237,10 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
           name: s.name,
           gender: s.gender,
         }));
+        // Keep the marks roster in ascending alphabetical order (A–Z).
+        list.sort((x, y) =>
+          String(x.name || '').localeCompare(String(y.name || ''), undefined, { sensitivity: 'base', numeric: true }),
+        );
         setStudents(list);
         const apiTypes = mRes.data?.assessment_types;
         if (apiTypes?.length) setTypes(apiTypes);
@@ -487,26 +491,26 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
         onKeyDown={(e) => { if (e.key === 'Enter') pickAssignment(a); }}
         className={`group text-left w-full rounded-2xl border bg-white transition-all hover:shadow-md cursor-pointer ${
           compact ? '' : ''
-        } ${selected?.id === a.id ? 'border-[#ff8c00] shadow-sm' : 'border-black/8 hover:border-black/15'}`}
+        } ${selected?.id === a.id ? 'border-[#13213D] shadow-sm' : 'border-black/8 hover:border-black/15'}`}
       >
         <div className={compact ? 'p-3' : 'p-4'}>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-8 h-8 rounded-lg bg-[#000435]/5 flex items-center justify-center shrink-0">
-                  <BookOpen size={15} className="text-[#000435]" />
+                <span className="w-8 h-8 rounded-lg bg-[#13213D]/5 flex items-center justify-center shrink-0">
+                  <BookOpen size={15} className="text-[#13213D]" />
                 </span>
-                <p className="text-sm font-bold text-[#000435] truncate leading-tight">{a.subject_name}</p>
+                <p className="text-sm font-bold text-[#13213D] truncate leading-tight">{a.subject_name}</p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-[#000435]/70">
-                <GraduationCap size={13} className="shrink-0 text-[#ff8c00]" />
+              <div className="flex items-center gap-1.5 text-xs text-[#13213D]/70">
+                <GraduationCap size={13} className="shrink-0 text-[#13213D]" />
                 <span className="font-semibold truncate">{a.class_name}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#ff8c00]/10 text-[#000435] border border-[#ff8c00]/20">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#13213D]/10 text-[#13213D] border border-[#13213D]/20">
                   {a.term || activeTerm || 'Term 1'}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#000435]/50">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#13213D]/50">
                   <Users size={11} />
                   {a.student_count ?? 0} students
                 </span>
@@ -518,7 +522,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
               className="p-1.5 rounded-lg hover:bg-black/5 shrink-0"
               title={isFav ? 'Remove favorite' : 'Favorite'}
             >
-              <Star size={14} className={isFav ? 'fill-[#ff8c00] text-[#ff8c00]' : 'text-[#000435]/25'} />
+              <Star size={14} className={isFav ? 'fill-[#13213D] text-[#13213D]' : 'text-[#13213D]/25'} />
             </button>
           </div>
         </div>
@@ -532,12 +536,12 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
     <div className="fixed inset-0 z-[200] flex flex-col bg-[#f8f9fc]">
       <header className="shrink-0 bg-white border-b border-black/6 shadow-sm px-5 sm:px-8 lg:px-10 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-black/5 text-[#000435]/50">
+          <button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-black/5 text-[#13213D]/50">
             <X size={20} />
           </button>
           <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-[#000435]/40">Record marks</p>
-            <h2 className="text-base font-semibold text-[#000435] truncate">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[#13213D]/40">Record marks</p>
+            <h2 className="text-base font-semibold text-[#13213D] truncate">
               {step === 0 ? 'Select teaching assignment' : selected ? `${selected.subject_name} · ${selected.class_name}` : STEPS[step]}
             </h2>
           </div>
@@ -546,37 +550,37 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center gap-1">
               <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${
-                i === step ? 'bg-[#000435] text-white' : i < step ? 'bg-[#ff8c00]/15 text-[#000435]' : 'bg-black/5 text-[#000435]/40'
+                i === step ? 'bg-[#13213D] text-white' : i < step ? 'bg-[#13213D]/15 text-[#13213D]' : 'bg-black/5 text-[#13213D]/40'
               }`}>
                 {i + 1}. {label}
               </span>
-              {i < STEPS.length - 1 && <span className="text-[#000435]/20">→</span>}
+              {i < STEPS.length - 1 && <span className="text-[#13213D]/20">→</span>}
             </div>
           ))}
         </div>
-        <p className="md:hidden text-xs font-medium text-[#000435]/50">Step {step + 1}/{STEPS.length}</p>
+        <p className="md:hidden text-xs font-medium text-[#13213D]/50">Step {step + 1}/{STEPS.length}</p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 sm:px-8 lg:px-10 py-6">
         <div className="w-full max-w-6xl mx-auto">
         {loading && step === 0 ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#000435]/30" size={32} /></div>
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#13213D]/30" size={32} /></div>
         ) : step === 0 ? (
           <div className="max-w-5xl mx-auto space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-[#000435]">My assigned courses</h3>
-                <p className="text-sm text-[#000435]/50 mt-1">
+                <h3 className="text-lg font-semibold text-[#13213D]">My assigned courses</h3>
+                <p className="text-sm text-[#13213D]/50 mt-1">
                   Select academic year and term, then pick a teaching assignment.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                 <div className="min-w-[160px]">
-                  <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">Academic year *</label>
+                  <label className="text-[10px] font-medium text-[#13213D]/45 block mb-1">Academic year *</label>
                   <select
                     value={selectedAcademicYear || academicYear || currentAcademicYear || ''}
                     onChange={(e) => handleAcademicYearChange(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm text-[#000435] bg-white focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm text-[#13213D] bg-white focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                   >
                     {(academicYearOptions.length
                       ? academicYearOptions
@@ -589,11 +593,11 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                   </select>
                 </div>
                 <div className="min-w-[160px]">
-                  <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">Term *</label>
+                  <label className="text-[10px] font-medium text-[#13213D]/45 block mb-1">Term *</label>
                   <select
                     value={selectedTerm || activeTerm || ''}
                     onChange={(e) => handleTermChange(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm text-[#000435] bg-white focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm text-[#13213D] bg-white focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                   >
                     {(termOptions.length ? termOptions : ['Term 1', 'Term 2', 'Term 3']).map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -604,19 +608,19 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#000435]/30" />
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#13213D]/30" />
                 <input
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search course or class…"
-                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-black/10 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                  className="w-full h-10 pl-10 pr-3 rounded-xl border border-black/10 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                 />
               </div>
               <select
                 value={classFilter}
                 onChange={(e) => setClassFilter(e.target.value)}
-                className="h-10 rounded-xl border border-black/10 px-3 text-sm text-[#000435] bg-white"
+                className="h-10 rounded-xl border border-black/10 px-3 text-sm text-[#13213D] bg-white"
               >
                 <option value="">All classes</option>
                 {classOptions.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -625,7 +629,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
 
             {recentAssignments.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-[#000435]/45 mb-2">Recent</p>
+                <p className="text-xs font-medium text-[#13213D]/45 mb-2">Recent</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {recentAssignments.map((a) => renderAssignmentCard(a, true))}
                 </div>
@@ -634,7 +638,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
 
             {favoriteAssignments.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-[#000435]/45 mb-2">Favorites</p>
+                <p className="text-xs font-medium text-[#13213D]/45 mb-2">Favorites</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {favoriteAssignments.map((a) => renderAssignmentCard(a, true))}
                 </div>
@@ -642,9 +646,9 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
             )}
 
             <div>
-              <p className="text-xs font-medium text-[#000435]/45 mb-2">All assignments ({filteredAssignments.length})</p>
+              <p className="text-xs font-medium text-[#13213D]/45 mb-2">All assignments ({filteredAssignments.length})</p>
               {filteredAssignments.length === 0 ? (
-                <p className="text-sm text-[#000435]/40 py-8 text-center rounded-2xl border border-dashed border-black/10 bg-white">
+                <p className="text-sm text-[#13213D]/40 py-8 text-center rounded-2xl border border-dashed border-black/10 bg-white">
                   No courses assigned to you for this term. Your timetable coordinator can add assignments under Timetable.
                 </p>
               ) : (
@@ -657,17 +661,17 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
         ) : step === 1 ? (
           <div className="max-w-2xl mx-auto space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-[#000435]">Create assessment</h3>
-              <p className="text-sm text-[#000435]/50 mt-1">
+              <h3 className="text-lg font-semibold text-[#13213D]">Create assessment</h3>
+              <p className="text-sm text-[#13213D]/50 mt-1">
                 {selected?.subject_name} · {selected?.class_name}
                 {selected?.term ? ` · ${selected.term}` : ''}
               </p>
             </div>
 
             {templateInfo && templateOptions.length === 0 ? (
-              <div className="rounded-xl border border-[#ff8c00]/25 bg-[#ff8c00]/5 px-4 py-3 text-sm text-[#000435]/80">
-                <p className="font-medium text-[#000435]">{templateInfo.name}</p>
-                <p className="text-xs text-[#000435]/55 mt-1">
+              <div className="rounded-xl border border-[#13213D]/25 bg-[#13213D]/5 px-4 py-3 text-sm text-[#13213D]/80">
+                <p className="font-medium text-[#13213D]">{templateInfo.name}</p>
+                <p className="text-xs text-[#13213D]/55 mt-1">
                   School assessment template for {[templateInfo.academic_year, templateInfo.term].filter(Boolean).join(' · ') || 'this session'}.
                 </p>
               </div>
@@ -675,7 +679,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
 
             {templateOptions.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#000435]/45">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#13213D]/45">
                   School assessment template
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -691,15 +695,15 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                         }}
                         className={`text-left rounded-2xl border p-4 transition-all ${
                           active
-                            ? 'border-[#ff8c00] bg-[#ff8c00]/8 shadow-sm ring-1 ring-[#ff8c00]/30'
-                            : 'border-black/8 bg-white hover:border-[#000435]/20'
+                            ? 'border-[#13213D] bg-[#13213D]/8 shadow-sm ring-1 ring-[#13213D]/30'
+                            : 'border-black/8 bg-white hover:border-[#13213D]/20'
                         }`}
                       >
                         <div className="flex items-start gap-2">
-                          <Layers size={18} className={active ? 'text-[#ff8c00]' : 'text-[#000435]/35'} />
+                          <Layers size={18} className={active ? 'text-[#13213D]' : 'text-[#13213D]/35'} />
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-[#000435] truncate">{t.name}</p>
-                            <p className="text-[11px] text-[#000435]/50 mt-0.5">
+                            <p className="text-sm font-semibold text-[#13213D] truncate">{t.name}</p>
+                            <p className="text-[11px] text-[#13213D]/50 mt-0.5">
                               {[t.academic_year, t.term].filter(Boolean).join(' · ')}
                               {t.components_count != null ? ` · ${t.components_count} components` : ''}
                             </p>
@@ -709,7 +713,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                               </span>
                             ) : null}
                           </div>
-                          {active ? <CheckCircle2 size={18} className="text-[#ff8c00] shrink-0" /> : null}
+                          {active ? <CheckCircle2 size={18} className="text-[#13213D] shrink-0" /> : null}
                         </div>
                       </button>
                     );
@@ -717,9 +721,9 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 </div>
               </div>
             ) : !templateInfo && !linkedToSchoolTemplate ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-[#000435]/75">
-                <p className="font-medium text-[#000435]">No school template loaded for this class yet</p>
-                <p className="mt-1 text-xs leading-relaxed text-[#000435]/60">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-[#13213D]/75">
+                <p className="font-medium text-[#13213D]">No school template loaded for this class yet</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#13213D]/60">
                   We could not find an active assessment template for{' '}
                   {[sessionYearLabel, sessionTermLabel].filter(Boolean).join(' · ') || 'the selected year and term'}
                   {selected?.class_name ? ` (${selected.class_name})` : ''}. You can still record marks using the standard categories below.
@@ -730,11 +734,11 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
 
             <div className="bg-white rounded-2xl border border-black/6 p-5 space-y-4 shadow-sm">
               <div>
-                <label className="text-xs font-medium text-[#000435]/55 block mb-1.5">Assessment category *</label>
+                <label className="text-xs font-medium text-[#13213D]/55 block mb-1.5">Assessment category *</label>
                 <select
                   value={typeSlug}
                   onChange={(e) => { setTypeSlug(e.target.value); setAssessmentName(''); }}
-                  className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                  className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                 >
                   <option value="">Select category from Academic template…</option>
                   {types.map((t) => (
@@ -744,26 +748,26 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                   ))}
                 </select>
                 {!types.length && (
-                  <p className="text-xs text-[#000435]/55 mt-2">
+                  <p className="text-xs text-[#13213D]/55 mt-2">
                     No categories available yet. Choose a template above or contact your academic office if this class should use the school template.
                   </p>
                 )}
                 {types.length > 0 && !linkedToSchoolTemplate && (
-                  <p className="text-xs text-[#000435]/55 mt-2">
+                  <p className="text-xs text-[#13213D]/55 mt-2">
                     Using standard categories for now. Marks will save normally; report-card weights apply once your school template is linked for this class.
                   </p>
                 )}
                 {typeSlug && typeWeight != null && (
-                  <div className="mt-3 p-3 rounded-xl bg-[#000435]/[0.03] border border-black/6 text-xs text-[#000435]/60">
-                    <p><span className="font-medium text-[#000435]/80">{selectedType?.name}</span> category weight: <span className="font-semibold text-[#ff8c00]">{typeWeight}%</span></p>
+                  <div className="mt-3 p-3 rounded-xl bg-[#13213D]/[0.03] border border-black/6 text-xs text-[#13213D]/60">
+                    <p><span className="font-medium text-[#13213D]/80">{selectedType?.name}</span> category weight: <span className="font-semibold text-[#13213D]">{typeWeight}%</span></p>
                     <p className="mt-1">Assessments recorded: {typeCount}</p>
-                    <p className="mt-1 text-[#000435]/40">System calculates category average as total obtained ÷ total maximum, then applies this weight.</p>
+                    <p className="mt-1 text-[#13213D]/40">System calculates category average as total obtained ÷ total maximum, then applies this weight.</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[#000435]/55 block mb-1.5">Assessment name *</label>
+                <label className="text-xs font-medium text-[#13213D]/55 block mb-1.5">Assessment name *</label>
                 <input
                   value={assessmentName}
                   onChange={(e) => {
@@ -771,7 +775,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                     setDuplicateWarn(false);
                   }}
                   placeholder="e.g. Algebra Homework 1"
-                  className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                  className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                 />
                 {duplicateWarn && (
                   <p className="text-xs text-amber-700 mt-1.5 flex items-center gap-1"><AlertTriangle size={12} /> This assessment name already exists.</p>
@@ -779,7 +783,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 {suggestions.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {suggestions.slice(0, 4).map((s) => (
-                      <button key={s} type="button" onClick={() => setAssessmentName(s)} className="text-[10px] font-medium px-2 py-1 rounded-lg bg-[#ff8c00]/10 text-[#000435] hover:bg-[#ff8c00]/20">
+                      <button key={s} type="button" onClick={() => setAssessmentName(s)} className="text-[10px] font-medium px-2 py-1 rounded-lg bg-[#13213D]/10 text-[#13213D] hover:bg-[#13213D]/20">
                         {s}
                       </button>
                     ))}
@@ -789,34 +793,34 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-[#000435]/55 block mb-1.5">Maximum marks *</label>
+                  <label className="text-xs font-medium text-[#13213D]/55 block mb-1.5">Maximum marks *</label>
                   <input
                     type="number"
                     min={1}
                     max={200}
                     value={maxScore}
                     onChange={(e) => setMaxScore(Math.max(1, Number(e.target.value) || 1))}
-                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-[#000435]/55 block mb-1.5">Assessment date *</label>
+                  <label className="text-xs font-medium text-[#13213D]/55 block mb-1.5">Assessment date *</label>
                   <input
                     type="date"
                     value={assessmentDate}
                     onChange={(e) => setAssessmentDate(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                    className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[#000435]/55 block mb-1.5">Description (optional)</label>
+                <label className="text-xs font-medium text-[#13213D]/55 block mb-1.5">Description (optional)</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none resize-none"
+                  className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm focus:ring-2 focus:ring-[#13213D]/25 focus:outline-none resize-none"
                   placeholder="Notes for this assessment…"
                 />
               </div>
@@ -826,11 +830,11 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
           <div className="max-w-3xl mx-auto space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-[#000435]">Enter marks</h3>
-                <p className="text-sm text-[#000435]/50 mt-0.5">{assessmentName} · max {maxScore} · use A/E/M for absent/excused/missing</p>
+                <h3 className="text-lg font-semibold text-[#13213D]">Enter marks</h3>
+                <p className="text-sm text-[#13213D]/50 mt-0.5">{assessmentName} · max {maxScore} · use A/E/M for absent/excused/missing</p>
               </div>
               {lastDraftSave && (
-                <p className="text-[10px] text-[#000435]/35">Draft auto-saved {lastDraftSave.toLocaleTimeString()}</p>
+                <p className="text-[10px] text-[#13213D]/35">Draft auto-saved {lastDraftSave.toLocaleTimeString()}</p>
               )}
             </div>
 
@@ -843,8 +847,8 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 { label: 'Missing', value: liveStats.missing, warn: liveStats.missing > 0 },
               ].map((s) => (
                 <div key={s.label} className={`rounded-xl border px-3 py-2.5 ${s.warn ? 'border-amber-200 bg-amber-50' : 'border-black/6 bg-white'}`}>
-                  <p className="text-[10px] text-[#000435]/40">{s.label}</p>
-                  <p className="text-sm font-semibold text-[#000435]">{s.value}</p>
+                  <p className="text-[10px] text-[#13213D]/40">{s.label}</p>
+                  <p className="text-sm font-semibold text-[#13213D]">{s.value}</p>
                 </div>
               ))}
             </div>
@@ -859,14 +863,14 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
             )}
 
             <div className="bg-white rounded-2xl border border-black/6 overflow-hidden shadow-sm" onPaste={handleBulkPaste}>
-              <div className="px-4 py-2.5 border-b border-black/6 bg-[#000435]/[0.02] flex items-center justify-between">
-                <p className="text-xs text-[#000435]/50">{students.length} students · Enter to move down · paste from Excel</p>
-                <Zap size={14} className="text-[#ff8c00]" />
+              <div className="px-4 py-2.5 border-b border-black/6 bg-[#13213D]/[0.02] flex items-center justify-between">
+                <p className="text-xs text-[#13213D]/50">{students.length} students · Enter to move down · paste from Excel</p>
+                <Zap size={14} className="text-[#13213D]" />
               </div>
               <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white z-10">
-                    <tr className="border-b border-black/6 text-[10px] font-medium uppercase tracking-wide text-[#000435]/45">
+                    <tr className="border-b border-black/6 text-[10px] font-medium uppercase tracking-wide text-[#13213D]/45">
                       <th className="text-left py-2.5 px-4 w-10">#</th>
                       <th className="text-left py-2.5 px-4">Student</th>
                       <th className="text-left py-2.5 px-4 w-36">Marks</th>
@@ -880,11 +884,11 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                       const num = entry?.code ? null : (entry?.value ? Number(entry.value) : null);
                       const pct = num != null && maxScore > 0 ? Math.round((num / maxScore) * 100) : null;
                       return (
-                        <tr key={s.student_id} className="border-t border-black/4 hover:bg-[#ff8c00]/3">
-                          <td className="px-4 py-2 text-[#000435]/35 text-xs">{idx + 1}</td>
+                        <tr key={s.student_id} className="border-t border-black/4 hover:bg-[#13213D]/3">
+                          <td className="px-4 py-2 text-[#13213D]/35 text-xs">{idx + 1}</td>
                           <td className="px-4 py-2">
-                            <p className="font-medium text-[#000435]">{s.name}</p>
-                            <p className="text-[10px] text-[#000435]/35">{s.student_uid}</p>
+                            <p className="font-medium text-[#13213D]">{s.name}</p>
+                            <p className="text-[10px] text-[#13213D]/35">{s.student_uid}</p>
                           </td>
                           <td className="px-4 py-2">
                             <input
@@ -894,10 +898,10 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                               onChange={(e) => setMark(s.student_id, e.target.value)}
                               onKeyDown={(e) => handleKeyDown(idx, e)}
                               placeholder="-"
-                              className="w-full h-9 px-3 rounded-lg border border-black/10 text-sm font-medium text-center focus:ring-2 focus:ring-[#ff8c00]/30 focus:outline-none"
+                              className="w-full h-9 px-3 rounded-lg border border-black/10 text-sm font-medium text-center focus:ring-2 focus:ring-[#13213D]/30 focus:outline-none"
                             />
                           </td>
-                          <td className="px-4 py-2 text-center text-xs text-[#000435]/50">
+                          <td className="px-4 py-2 text-center text-xs text-[#13213D]/50">
                             {entry?.code ? entry.code : pct != null ? `${pct}%` : '-'}
                           </td>
                         </tr>
@@ -914,23 +918,23 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
               <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={28} className="text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-[#000435]">Marks published</h3>
-              <p className="text-sm text-[#000435]/50 mt-1">Averages, grades, and rankings will update automatically.</p>
+              <h3 className="text-lg font-semibold text-[#13213D]">Marks published</h3>
+              <p className="text-sm text-[#13213D]/50 mt-1">Averages, grades, and rankings will update automatically.</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-black/6 p-5 space-y-3 text-sm shadow-sm">
-              <div className="grid grid-cols-2 gap-2 text-[#000435]/70">
-                <span>Course</span><span className="font-medium text-[#000435] text-right">{selected?.subject_name}</span>
-                <span>Class</span><span className="font-medium text-[#000435] text-right">{selected?.class_name}</span>
-                <span>Assessment</span><span className="font-medium text-[#000435] text-right">{assessmentName}</span>
-                <span>Maximum marks</span><span className="font-medium text-[#000435] text-right">{maxScore}</span>
-                <span>Students</span><span className="font-medium text-[#000435] text-right">{students.length}</span>
+              <div className="grid grid-cols-2 gap-2 text-[#13213D]/70">
+                <span>Course</span><span className="font-medium text-[#13213D] text-right">{selected?.subject_name}</span>
+                <span>Class</span><span className="font-medium text-[#13213D] text-right">{selected?.class_name}</span>
+                <span>Assessment</span><span className="font-medium text-[#13213D] text-right">{assessmentName}</span>
+                <span>Maximum marks</span><span className="font-medium text-[#13213D] text-right">{maxScore}</span>
+                <span>Students</span><span className="font-medium text-[#13213D] text-right">{students.length}</span>
               </div>
               <div className="pt-3 border-t border-black/6 grid grid-cols-2 gap-3">
-                <div><p className="text-[10px] text-[#000435]/40">Highest</p><p className="font-semibold">{publishResult.stats.highest ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Lowest</p><p className="font-semibold">{publishResult.stats.lowest ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Average</p><p className="font-semibold">{publishResult.stats.average ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Pass rate</p><p className="font-semibold">{publishResult.stats.pass_rate != null ? `${publishResult.stats.pass_rate}%` : '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Highest</p><p className="font-semibold">{publishResult.stats.highest ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Lowest</p><p className="font-semibold">{publishResult.stats.lowest ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Average</p><p className="font-semibold">{publishResult.stats.average ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Pass rate</p><p className="font-semibold">{publishResult.stats.pass_rate != null ? `${publishResult.stats.pass_rate}%` : '-'}</p></div>
               </div>
             </div>
 
@@ -944,24 +948,24 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
         ) : (
           <div className="max-w-lg mx-auto space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-[#000435]">Review & publish</h3>
-              <p className="text-sm text-[#000435]/50 mt-1">Confirm details before publishing to students and reports.</p>
+              <h3 className="text-lg font-semibold text-[#13213D]">Review & publish</h3>
+              <p className="text-sm text-[#13213D]/50 mt-1">Confirm details before publishing to students and reports.</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-black/6 p-5 space-y-3 text-sm shadow-sm">
-              <div className="grid grid-cols-2 gap-2 text-[#000435]/70">
-                <span>Course</span><span className="font-medium text-[#000435] text-right">{selected?.subject_name}</span>
-                <span>Class</span><span className="font-medium text-[#000435] text-right">{selected?.class_name}</span>
-                <span>Assessment</span><span className="font-medium text-[#000435] text-right">{assessmentName}</span>
-                <span>Type</span><span className="font-medium text-[#000435] text-right">{selectedType?.name} ({selectedType?.weight_percent}%)</span>
-                <span>Maximum marks</span><span className="font-medium text-[#000435] text-right">{maxScore}</span>
-                <span>Students marked</span><span className="font-medium text-[#000435] text-right">{liveStats.filled} / {students.length}</span>
+              <div className="grid grid-cols-2 gap-2 text-[#13213D]/70">
+                <span>Course</span><span className="font-medium text-[#13213D] text-right">{selected?.subject_name}</span>
+                <span>Class</span><span className="font-medium text-[#13213D] text-right">{selected?.class_name}</span>
+                <span>Assessment</span><span className="font-medium text-[#13213D] text-right">{assessmentName}</span>
+                <span>Type</span><span className="font-medium text-[#13213D] text-right">{selectedType?.name} ({selectedType?.weight_percent}%)</span>
+                <span>Maximum marks</span><span className="font-medium text-[#13213D] text-right">{maxScore}</span>
+                <span>Students marked</span><span className="font-medium text-[#13213D] text-right">{liveStats.filled} / {students.length}</span>
               </div>
               <div className="pt-3 border-t border-black/6 grid grid-cols-2 gap-3">
-                <div><p className="text-[10px] text-[#000435]/40">Highest</p><p className="font-semibold">{liveStats.highest ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Lowest</p><p className="font-semibold">{liveStats.lowest ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Average</p><p className="font-semibold">{liveStats.average ?? '-'}</p></div>
-                <div><p className="text-[10px] text-[#000435]/40">Pass rate</p><p className="font-semibold">{liveStats.passRate != null ? `${liveStats.passRate}%` : '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Highest</p><p className="font-semibold">{liveStats.highest ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Lowest</p><p className="font-semibold">{liveStats.lowest ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Average</p><p className="font-semibold">{liveStats.average ?? '-'}</p></div>
+                <div><p className="text-[10px] text-[#13213D]/40">Pass rate</p><p className="font-semibold">{liveStats.passRate != null ? `${liveStats.passRate}%` : '-'}</p></div>
               </div>
             </div>
 
@@ -975,14 +979,14 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
         </div>
       </div>
 
-      <footer className="shrink-0 bg-white border-t border-black/6 shadow-[0_-4px_24px_rgba(0,4,53,0.06)] px-5 sm:px-8 lg:px-10 py-4">
+      <footer className="shrink-0 bg-white border-t border-black/6 shadow-[0_-4px_24px_rgba(19,33,61,0.06)] px-5 sm:px-8 lg:px-10 py-4">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
         <div>
           {step > 0 && step < 3 && (
             <button
               type="button"
               onClick={() => setStep((s) => Math.max(0, s - 1))}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border border-black/10 text-[#000435]/70 hover:bg-black/5"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium border border-black/10 text-[#13213D]/70 hover:bg-black/5"
             >
               <ArrowLeft size={14} /> Back
             </button>
@@ -994,7 +998,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
               type="button"
               onClick={goToEnterMarks}
               disabled={!typeSlug || !assessmentName.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-medium text-white bg-[#000435] hover:bg-[#0a116b] disabled:opacity-40"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-medium text-white bg-[#13213D] hover:bg-[#24396A] disabled:opacity-40"
             >
               Continue <ArrowRight size={14} />
             </button>
@@ -1005,7 +1009,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 type="button"
                 onClick={() => handleSave('draft')}
                 disabled={saving || liveStats.filled === 0}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-black/10 text-[#000435]/70 hover:bg-black/5 disabled:opacity-40"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-black/10 text-[#13213D]/70 hover:bg-black/5 disabled:opacity-40"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save draft
               </button>
@@ -1013,7 +1017,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 type="button"
                 onClick={() => setStep(3)}
                 disabled={liveStats.filled === 0}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-[#ff8c00]/30 text-[#000435] hover:bg-[#ff8c00]/10 disabled:opacity-40"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium border border-[#13213D]/30 text-[#13213D] hover:bg-[#13213D]/10 disabled:opacity-40"
               >
                 Review <ArrowRight size={14} />
               </button>
@@ -1021,7 +1025,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
           )}
           {step === 3 && !publishResult && (
             <>
-              <button type="button" onClick={() => setStep(2)} className="px-4 py-2.5 rounded-xl text-xs font-medium border border-black/10 text-[#000435]/70 hover:bg-black/5">
+              <button type="button" onClick={() => setStep(2)} className="px-4 py-2.5 rounded-xl text-xs font-medium border border-black/10 text-[#13213D]/70 hover:bg-black/5">
                 Edit marks
               </button>
               <button
@@ -1043,7 +1047,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                 type="button"
                 onClick={() => handleSave('published')}
                 disabled={saving || liveStats.filled === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-[#ff8c00] to-[#ff6b00] hover:opacity-95 shadow-md shadow-[#ff8c00]/25 disabled:opacity-40"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-[#13213D] to-[#ff6b00] hover:opacity-95 shadow-md shadow-[#13213D]/25 disabled:opacity-40"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publish marks
               </button>
@@ -1062,7 +1066,7 @@ export default function RecordMarksWizard({ open, onClose, onPublished, preset =
                   setDuplicateWarn(false);
                   setStep(1);
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-medium text-white bg-[#000435]"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-medium text-white bg-[#13213D]"
               >
                 <Plus size={14} /> Add another assessment
               </button>

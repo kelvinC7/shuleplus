@@ -5,7 +5,7 @@ import { SessionExpiredIllustration } from './session-expired-illustration';
 export type SessionAccessDeniedProps = {
  error?: string | null;
  moduleName?: string;
- /** Defaults to NEXT_PUBLIC_IAM_URL or http://localhost:3000 */
+ /** Defaults to NEXT_PUBLIC_IAM_URL or https://app.shuleplus.rw */
  iamUrl?: string;
  primaryHref?: string;
  primaryLabel?: string;
@@ -38,7 +38,7 @@ export function SessionAccessDeniedScreen({
  (typeof process !== 'undefined'
  ? process.env.NEXT_PUBLIC_IAM_URL || process.env.VITE_IAM_URL
 : undefined) ??
- 'http://localhost:3000'
+ 'https://app.shuleplus.rw'
  ).replace(/\/$/, '');
 
  const href = primaryHref ?? `${base}/organization-admin`;

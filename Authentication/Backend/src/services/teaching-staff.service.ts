@@ -1,8 +1,16 @@
 import { UserStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
 
-const TEACHING_POSITION = /teacher|instructor|lecturer|head\s*of/i;
+const TEACHING_POSITION = /teacher|instructor|lecturer|head\s*of|ticha|tutor/i;
 const TEACHING_DEPARTMENT = /teach|academic|education/i;
+
+/** Module access from org Users & Access that should appear as class-teacher candidates. */
+const TEACHING_MODULE_SLUGS = new Set([
+  'teacher-portal',
+  'ticha-portal',
+  'academic',
+  'timetable',
+]);
 
 export type TeachingStaffRow = {
   id: string;
@@ -24,7 +32,7 @@ function isTeachingUser(input: {
   department: string | null;
   moduleSlugs: string[];
 }) {
-  if (input.moduleSlugs.includes('teacher-portal')) return true;
+  if (input.moduleSlugs.some((slug) => TEACHING_MODULE_SLUGS.has(slug))) return true;
   if (input.position && TEACHING_POSITION.test(input.position)) return true;
   if (input.department && TEACHING_DEPARTMENT.test(input.department)) return true;
   return false;
@@ -88,6 +96,6 @@ export const teachingStaffService = {
       );
     }
 
-    return rows.slice(0, 50);
+    return rows.slice(0, search?.trim() ? 50 : 500);
   },
 };

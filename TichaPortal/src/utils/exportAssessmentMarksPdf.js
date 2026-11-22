@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../services/api';
 import { gradeFromScale } from '../pages/coursesMarks/statusUtils.js';
 import { convertScoreToCourseDefault, percentageFromScore } from './markScale.js';
 
-const NAVY = [0, 4, 53];
+const NAVY = [19, 33, 61];
 const AMBER = [252, 176, 56];
 const WHITE = [255, 255, 255];
 
@@ -257,7 +257,7 @@ export async function exportAssessmentMarksPdf({
     }
 
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 4, 53);
+    doc.setTextColor(19, 33, 61);
     doc.setFontSize(8);
 
     doc.text(String(idx + 1), colX[0] + 1.5, y);
@@ -270,7 +270,7 @@ export async function exportAssessmentMarksPdf({
       doc.setTextColor(100, 116, 139);
       doc.text(row.studentCode.slice(0, 24), colX[1] + 1.5, y + 3.2);
       doc.setFontSize(8);
-      doc.setTextColor(0, 4, 53);
+      doc.setTextColor(19, 33, 61);
     }
 
     doc.setFont('helvetica', 'bold');
@@ -281,7 +281,7 @@ export async function exportAssessmentMarksPdf({
       doc.setTextColor(100, 116, 139);
       doc.text(row.enteredSubtext, colX[2] + colWidths[2] - 2, y + 3.2, { align: 'right' });
       doc.setFontSize(8);
-      doc.setTextColor(0, 4, 53);
+      doc.setTextColor(19, 33, 61);
     }
 
     doc.setFont('helvetica', 'normal');

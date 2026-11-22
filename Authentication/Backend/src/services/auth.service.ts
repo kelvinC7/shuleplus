@@ -471,7 +471,7 @@ export class AuthService {
       },
     });
 
-    const jwtPayload: JwtPayload = {
+    let jwtPayload: JwtPayload = {
       sub: user.id,
       email: user.email,
       organizationId: user.organizationId,
@@ -480,6 +480,8 @@ export class AuthService {
       modules,
       position: user.position ?? null,
     };
+    const { withShuleTripJwtScope } = await import('../utils/jwt-trip-scope');
+    jwtPayload = await withShuleTripJwtScope(user.id, jwtPayload);
 
     const accessToken = signAccessToken(jwtPayload);
     const refreshToken = signRefreshToken({
@@ -646,7 +648,11 @@ export class AuthService {
     organizationId: string,
     roles: string[]
   ): Promise<string[]> {
-    if (roles.includes(ROLES.ROOT_ADMIN) || roles.includes(ROLES.SUPER_ADMIN)) {
+    const platformOnlyAdmin =
+      (roles.includes(ROLES.ROOT_ADMIN) || roles.includes(ROLES.SUPER_ADMIN)) &&
+      !roles.includes(ROLES.ORGANIZATION_ADMIN);
+
+    if (platformOnlyAdmin) {
       return [];
     }
 
@@ -772,7 +778,7 @@ export class AuthService {
       roles
     );
 
-    const jwtPayload: JwtPayload = {
+    let jwtPayload: JwtPayload = {
       sub: stored.userId,
       email: stored.user.email,
       organizationId: stored.user.organizationId,
@@ -781,6 +787,8 @@ export class AuthService {
       modules,
       position: stored.user.position ?? null,
     };
+    const { withShuleTripJwtScope } = await import('../utils/jwt-trip-scope');
+    jwtPayload = await withShuleTripJwtScope(stored.userId, jwtPayload);
 
     const accessToken = signAccessToken(jwtPayload);
 

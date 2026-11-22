@@ -1,54 +1,105 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, Box, Typography } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import WarningRoundedIcon from '@mui/icons-material/WarningRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { dismissToast, subscribeToasts, type ToastItem, type ToastKind } from '@/lib/toast';
 
+const NAVY = '#000435';
+
 const ICONS: Record<ToastKind, ReactNode> = {
-  success: <CheckCircleRoundedIcon sx={{ fontSize: 22 }} />,
-  error: <ErrorRoundedIcon sx={{ fontSize: 22 }} />,
-  info: <InfoRoundedIcon sx={{ fontSize: 22 }} />,
-  warning: <WarningRoundedIcon sx={{ fontSize: 22 }} />,
+  success: <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />,
+  error: <ErrorRoundedIcon sx={{ fontSize: 20 }} />,
+  info: <InfoRoundedIcon sx={{ fontSize: 20 }} />,
+  warning: <WarningRoundedIcon sx={{ fontSize: 20 }} />,
 };
 
-const TONE: Record<ToastKind, { bar: string; icon: string }> = {
-  success: { bar: '#16a34a', icon: '#16a34a' },
-  error: { bar: '#dc2626', icon: '#dc2626' },
-  info: { bar: '#2563eb', icon: '#2563eb' },
-  warning: { bar: '#f59e0b', icon: '#d97706' },
+const TONE: Record<
+  ToastKind,
+  { accent: string; iconBg: string; iconColor: string; label: string }
+> = {
+  success: { accent: '#16a34a', iconBg: '#ecfdf5', iconColor: '#15803d', label: 'Success' },
+  error: { accent: '#dc2626', iconBg: '#fef2f2', iconColor: '#b91c1c', label: 'Error' },
+  info: { accent: '#2563eb', iconBg: '#eff6ff', iconColor: '#1d4ed8', label: 'Info' },
+  warning: { accent: '#d97706', iconBg: '#fffbeb', iconColor: '#b45309', label: 'Notice' },
 };
 
 function ToastCard({ item }: { item: ToastItem }) {
   const tone = TONE[item.kind];
   return (
-    <Alert
-      icon={ICONS[item.kind]}
-      severity={item.kind}
-      variant="outlined"
-      onClose={() => dismissToast(item.id)}
+    <Box
+      role="status"
+      aria-live="polite"
       sx={{
         pointerEvents: 'auto',
         width: '100%',
-        alignItems: 'center',
+        display: 'flex',
+        gap: 1.25,
+        alignItems: 'flex-start',
         bgcolor: '#fff',
-        color: '#0f172a',
         border: '1px solid #e2e8f0',
-        borderLeft: `4px solid ${tone.bar}`,
-        borderRadius: '12px',
-        boxShadow: '0 12px 40px rgba(0, 31, 63, 0.16)',
-        py: 0.35,
-        px: 0.5,
-        animation: 'academic-toast-in 220ms ease-out',
-        '& .MuiAlert-icon': { color: tone.icon, mr: 1, py: 0.5 },
-        '& .MuiAlert-message': { py: 0.6, pr: 0.5 },
+        borderLeft: `4px solid ${tone.accent}`,
+        borderRadius: '14px',
+        boxShadow: '0 16px 48px rgba(0, 4, 53, 0.12)',
+        p: 1.5,
+        pr: 1,
+        animation: 'academic-toast-in 240ms ease-out',
+        '@keyframes academic-toast-in': {
+          from: { opacity: 0, transform: 'translateY(8px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
       }}
     >
-      <Typography sx={{ fontSize: '0.8125rem', fontWeight: 700, lineHeight: 1.35, color: '#0f172a' }}>
-        {item.title}
-      </Typography>
-    </Alert>
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: '10px',
+          bgcolor: tone.iconBg,
+          color: tone.iconColor,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {ICONS[item.kind]}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0, pt: 0.15 }}>
+        <Typography
+          component="span"
+          sx={{
+            display: 'block',
+            fontSize: '0.6875rem',
+            fontWeight: 800,
+            color: tone.iconColor,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            mb: 0.35,
+          }}
+        >
+          {tone.label}
+        </Typography>
+        <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, lineHeight: 1.35, color: NAVY }}>
+          {item.title}
+        </Typography>
+        {item.detail ? (
+          <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.45, color: '#64748b', mt: 0.5 }}>
+            {item.detail}
+          </Typography>
+        ) : null}
+      </Box>
+      <IconButton
+        size="small"
+        aria-label="Dismiss"
+        onClick={() => dismissToast(item.id)}
+        sx={{ color: '#94a3b8', mt: -0.25, mr: -0.25 }}
+      >
+        <CloseRoundedIcon sx={{ fontSize: 18 }} />
+      </IconButton>
+    </Box>
   );
 }
 
@@ -63,15 +114,17 @@ export function AcademicToaster() {
     <Box
       sx={{
         position: 'fixed',
-        top: { xs: 16, md: 20 },
-        right: { xs: 12, md: 20 },
         zIndex: 10000,
         display: 'flex',
         flexDirection: 'column',
         gap: 1.25,
-        width: { xs: 'calc(100vw - 24px)', sm: 380 },
-        maxWidth: 380,
         pointerEvents: 'none',
+        top: { xs: 'auto', md: 20 },
+        bottom: { xs: 16, md: 'auto' },
+        left: { xs: 12, md: 'auto' },
+        right: { xs: 12, md: 20 },
+        width: { xs: 'auto', sm: 400 },
+        maxWidth: { xs: 'none', sm: 400 },
       }}
     >
       {items.map((item) => (

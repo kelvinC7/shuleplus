@@ -13,15 +13,15 @@ export const LEVELS = [
 export const SCHOOL_TYPES = ['Government', 'Government-aided', 'Private', 'International'] as const;
 
 export const COMBINATIONS = [
-  { value: 'MPC', label: 'MPC — Math, Physics, Computer Science' },
-  { value: 'PCB', label: 'PCB — Physics, Chemistry, Biology' },
-  { value: 'MCB', label: 'MCB — Math, Chemistry, Biology' },
-  { value: 'MEG', label: 'MEG — Math, Economics, Geography' },
-  { value: 'HEG', label: 'HEG — History, Economics, Geography' },
-  { value: 'HGL', label: 'HGL — History, Geography, Literature' },
-  { value: 'PCM', label: 'PCM — Physics, Chemistry, Math' },
-  { value: 'TVET', label: 'TVET — Technical & vocational trades' },
-  { value: 'TTC', label: 'TTC — Teacher training (ECLPE/SME)' },
+  { value: 'MPC', label: 'MPC - Math, Physics, Computer Science' },
+  { value: 'PCB', label: 'PCB - Physics, Chemistry, Biology' },
+  { value: 'MCB', label: 'MCB - Math, Chemistry, Biology' },
+  { value: 'MEG', label: 'MEG - Math, Economics, Geography' },
+  { value: 'HEG', label: 'HEG - History, Economics, Geography' },
+  { value: 'HGL', label: 'HGL - History, Geography, Literature' },
+  { value: 'PCM', label: 'PCM - Physics, Chemistry, Math' },
+  { value: 'TVET', label: 'TVET - Technical & vocational trades' },
+  { value: 'TTC', label: 'TTC - Teacher training (ECLPE/SME)' },
 ] as const;
 
 export const DEFAULT_FILTERS: DirectoryFilters = {

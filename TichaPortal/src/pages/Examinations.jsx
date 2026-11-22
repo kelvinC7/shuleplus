@@ -1,14 +1,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DoorOpen, ListChecks, ScanLine, Search, X } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Alert from '@mui/material/Alert';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import QrScanModal from '../components/QrScanModal';
-import TeacherPageShell, { tpActionBtn, tpActionBtnPrimary } from '../components/TeacherPageShell';
+import { PageLoading, EmptyState } from '../components/ui';
+import {
+  ListPage,
+  StickyTabs,
+  StickyFilterBar,
+  BarSelect,
+  ListPageBody,
+  PageTitleRow,
+  NavyStats,
+  SectionPaper,
+} from '../components/ListPageKit';
 import {
   checkExamEligibility,
   fetchExamLists,
   fetchMyExamRooms,
   tpApiError,
 } from '../services/teacherPortalApi';
+import { brand } from '../theme/theme';
 
 function roomHref(room) {
   const qs = new URLSearchParams({
@@ -23,13 +46,19 @@ function roomListKey(room) {
   return `${room.sessionId}|${room.examDate}|${room.slotCode}|${room.roomName}`;
 }
 
-function listLabel(student) {
-  if (student.examAllowed === false) return { text: 'Not allowed', tone: 'bg-rose-50 text-rose-800' };
-  if (student.examDecision === 'NO_LIST') return { text: 'No list', tone: 'bg-amber-50 text-amber-800' };
-  return { text: 'Allowed', tone: 'bg-emerald-50 text-emerald-800' };
+const STATUS_STYLES = {
+  allowed: { bgcolor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' },
+  noList: { bgcolor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' },
+  denied: { bgcolor: '#FEF2F2', color: '#9F1239', border: '1px solid #FECDD3' },
+};
+
+function listStatus(student) {
+  if (student.examAllowed === false) return { text: 'Not allowed', tone: 'denied' };
+  if (student.examDecision === 'NO_LIST') return { text: 'No list', tone: 'noList' };
+  return { text: 'Allowed', tone: 'allowed' };
 }
 
-function resultFromStudent(student, room) {
+function resultFromStudent(student) {
   const noList = student.examDecision === 'NO_LIST';
   return {
     studentCode: student.studentCode,
@@ -44,29 +73,37 @@ function resultFromStudent(student, room) {
   };
 }
 
-function EligibilityResult({ result, onClose }) {
+function EligibilityDialog({ result, onClose }) {
   const allowed = result.published && result.allowed;
   const noList = !result.published || result.status === 'NO_LIST';
+  const tone = noList ? 'noList' : allowed ? 'allowed' : 'denied';
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#000435]/50 sm:items-center sm:p-4">
-      <div className="w-full max-w-md rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <div className="mb-3 flex justify-between">
-          <p className="text-sm font-medium text-[#000435]">Eligibility</p>
-          <button type="button" onClick={onClose} className="p-1 text-slate-400">
-            <X size={16} />
-          </button>
-        </div>
-        <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            noList ? 'border-amber-200 bg-amber-50' : allowed ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'
-          }`}
-        >
-          <p className="font-medium text-[#000435]">{result.studentName || result.studentCode}</p>
-          <p className="mt-1 text-slate-600">{noList ? 'No list' : allowed ? 'Allowed' : 'Not allowed'}</p>
-          {result.message && <p className="mt-2">{result.message}</p>}
-        </div>
-      </div>
-    </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 2 } }}>
+      <DialogContent sx={{ p: 2.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>Eligibility</Typography>
+          <Button
+            size="small"
+            onClick={onClose}
+            aria-label="Close"
+            sx={{ minWidth: 0, p: 0.5, color: brand.muted }}
+          >
+            <CloseIcon fontSize="small" />
+          </Button>
+        </Stack>
+        <Box sx={{ ...STATUS_STYLES[tone], borderRadius: 1.5, px: 2, py: 1.75 }}>
+          <Typography sx={{ fontWeight: 600, color: brand.navy }}>
+            {result.studentName || result.studentCode}
+          </Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 13, color: 'text.secondary' }}>
+            {noList ? 'No list' : allowed ? 'Allowed' : 'Not allowed'}
+          </Typography>
+          {result.message ? (
+            <Typography sx={{ mt: 1, fontSize: 13, color: 'text.secondary' }}>{result.message}</Typography>
+          ) : null}
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -78,7 +115,8 @@ export default function Examinations() {
   const [error, setError] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
-  const [manualOpen, setManualOpen] = useState(false);
+  const [tab, setTab] = useState('rooms');
+  const [roomQuery, setRoomQuery] = useState('');
   const [manualCode, setManualCode] = useState('');
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null);
@@ -106,8 +144,8 @@ export default function Examinations() {
     };
   }, []);
 
-  async function openManual() {
-    setManualOpen(true);
+  async function loadLists() {
+    if (lists.length) return;
     setListsLoading(true);
     try {
       const data = await fetchExamLists();
@@ -138,6 +176,19 @@ export default function Examinations() {
     }
   }
 
+  useEffect(() => {
+    if (tab === 'lists') void loadLists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const filteredRooms = useMemo(() => {
+    const q = roomQuery.trim().toLowerCase();
+    if (!q) return rooms;
+    return rooms.filter((r) =>
+      `${r.roomName || ''} ${r.subjectName || r.sessionName || ''} ${r.examDate || ''}`.toLowerCase().includes(q)
+    );
+  }, [rooms, roomQuery]);
+
   const selectedList = lists.find((row) => roomListKey(row.room) === listRoomKey) || lists[0];
   const filteredStudents = useMemo(() => {
     const students = selectedList?.students ?? [];
@@ -152,7 +203,6 @@ export default function Examinations() {
   }, [selectedList, listQuery]);
 
   const totalStudents = rooms.reduce((s, r) => s + (r.studentCount || 0), 0);
-
   const subjectCount = new Set(rooms.map((r) => r.subjectName || r.sessionName).filter(Boolean)).size;
 
   const stats = [
@@ -162,137 +212,146 @@ export default function Examinations() {
     { label: 'Room Lists', value: lists.length || '-' },
   ];
 
-  const actions = (
-    <>
-      <button type="button" className={tpActionBtnPrimary} onClick={() => setScanOpen(true)} disabled={checking}>
-        <ScanLine size={16} /> {checking ? 'Checking…' : 'Scan QR'}
-      </button>
-      <button type="button" className={tpActionBtn} onClick={() => void openManual()}>
-        <ListChecks size={16} /> Room lists
-      </button>
-      <button type="button" className={tpActionBtn} onClick={() => setCodeOpen(true)}>
-        Enter code
-      </button>
-    </>
-  );
+  const alertSeverity = /not running|3003/i.test(error) ? 'warning' : 'error';
+
+  const tabs = [
+    { id: 'rooms', label: 'Your rooms' },
+    { id: 'lists', label: 'Room lists' },
+  ];
 
   return (
     <>
-      <TeacherPageShell
-        title="Examinations"
-        subtitle="Invigilation and examination lists"
-        stats={stats}
-        actions={actions}
-      >
-        {error && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm ${
-              /not running|3003/i.test(error) ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-800'
-            }`}
-          >
-            {error}
-          </div>
+      <ListPage>
+        <StickyTabs tabs={tabs} value={tab} onChange={setTab} />
+
+        {tab === 'rooms' ? (
+          <StickyFilterBar top={42} search={roomQuery} onSearch={setRoomQuery} searchPlaceholder="Search rooms…" />
+        ) : (
+          <StickyFilterBar top={42} search={listQuery} onSearch={setListQuery} searchPlaceholder="Search students…">
+            {lists.length ? (
+              <BarSelect
+                label="Room"
+                value={selectedList ? roomListKey(selectedList.room) : ''}
+                onChange={setListRoomKey}
+                options={lists.map((row) => ({ value: roomListKey(row.room), label: row.room.roomName }))}
+              />
+            ) : null}
+          </StickyFilterBar>
         )}
 
-        {manualOpen && (
-          <div className="tp-card overflow-hidden p-0">
-            <div className="tp-card-header border-b border-black/[0.06]">
-              <h3>Room lists</h3>
-              <button type="button" className="ml-auto text-xs text-slate-500" onClick={() => setManualOpen(false)}>
-                Close
-              </button>
-            </div>
-            {listsLoading ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">Loading…</p>
-            ) : !lists.length ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">No lists yet.</p>
-            ) : (
+        <ListPageBody>
+          <PageTitleRow
+            title="Examinations"
+            subtitle="Invigilation and examination lists"
+            actions={
               <>
-                <div className="flex gap-2 overflow-x-auto border-b border-black/[0.06] px-3 py-2">
-                  {lists.map((row) => {
-                    const key = roomListKey(row.room);
-                    const active = key === (selectedList ? roomListKey(selectedList.room) : '');
+                <Button
+                  variant="contained"
+                  onClick={() => setScanOpen(true)}
+                  disabled={checking}
+                  startIcon={<QrCodeScannerIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 700, bgcolor: brand.navy, color: '#fff', '&:hover': { bgcolor: '#1B2D52' } }}
+                >
+                  {checking ? 'Checking…' : 'Scan QR'}
+                </Button>
+                <Button variant="outlined" onClick={() => setCodeOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, borderColor: brand.border }}>
+                  Enter code
+                </Button>
+              </>
+            }
+          />
+
+          {error ? <Alert severity={alertSeverity} sx={{ borderRadius: 1 }}>{error}</Alert> : null}
+
+          <NavyStats stats={stats} />
+
+          {tab === 'rooms' ? (
+            <SectionPaper title="Your rooms" count={filteredRooms.length}>
+              {loading ? (
+                <PageLoading label="Loading rooms…" />
+              ) : !filteredRooms.length ? (
+                <EmptyState title="No exam rooms found" description={rooms.length ? 'Try a different search.' : 'No exam rooms assigned.'} />
+              ) : (
+                filteredRooms.map((room, idx) => (
+                  <ButtonBase
+                    key={room.key || roomHref(room)}
+                    component={Link}
+                    to={roomHref(room)}
+                    sx={{
+                      display: 'flex',
+                      width: '100%',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1.5,
+                      px: 1.5,
+                      py: 1.35,
+                      textAlign: 'left',
+                      bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                      borderBottom: idx < filteredRooms.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none',
+                      '&:hover': { bgcolor: 'rgba(245,166,35,0.06)' },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography noWrap sx={{ fontWeight: 700, fontSize: 14, color: brand.navy }}>{room.roomName}</Typography>
+                      <Typography noWrap sx={{ fontSize: 12, color: brand.muted }}>
+                        {room.examDate} · {room.subjectName || room.sessionName} · {room.studentCount} students
+                      </Typography>
+                    </Box>
+                    <MeetingRoomOutlinedIcon sx={{ fontSize: 18, color: brand.muted, flexShrink: 0 }} />
+                  </ButtonBase>
+                ))
+              )}
+            </SectionPaper>
+          ) : (
+            <SectionPaper title={selectedList?.room?.roomName || 'Room lists'} count={selectedList ? filteredStudents.length : undefined}>
+              {listsLoading ? (
+                <PageLoading label="Loading lists…" />
+              ) : !lists.length ? (
+                <EmptyState title="No lists yet" />
+              ) : !filteredStudents.length ? (
+                <EmptyState title="No students found" description="Try a different search." />
+              ) : (
+                <Box sx={{ maxHeight: 'min(560px, 60vh)', overflowY: 'auto' }}>
+                  {filteredStudents.map((student, idx) => {
+                    const badge = listStatus(student);
                     return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setListRoomKey(key)}
-                        className={`shrink-0 rounded-lg px-3 py-1.5 text-xs ${active ? 'bg-[#000435] text-white' : 'bg-slate-100 text-slate-600'}`}
+                      <ButtonBase
+                        key={student.studentId}
+                        onClick={() => setResult(resultFromStudent(student))}
+                        sx={{
+                          display: 'flex',
+                          width: '100%',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1,
+                          px: 1.5,
+                          py: 1.35,
+                          textAlign: 'left',
+                          bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                          borderBottom: idx < filteredStudents.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none',
+                          '&:hover': { bgcolor: 'rgba(245,166,35,0.06)' },
+                        }}
                       >
-                        {row.room.roomName}
-                      </button>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>{student.fullName}</Typography>
+                          <Typography noWrap sx={{ fontSize: 12, color: brand.muted }}>{student.studentCode}</Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={badge.text}
+                          sx={{ flexShrink: 0, height: 22, fontSize: 10, fontWeight: 700, ...STATUS_STYLES[badge.tone] }}
+                        />
+                      </ButtonBase>
                     );
                   })}
-                </div>
-                {selectedList && (
-                  <>
-                    <div className="relative border-b border-black/[0.06] px-3 py-2">
-                      <Search size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        className="tp-input w-full pl-8 py-2"
-                        placeholder="Search students"
-                        value={listQuery}
-                        onChange={(e) => setListQuery(e.target.value)}
-                      />
-                    </div>
-                    <ul className="max-h-[min(420px,50vh)] divide-y divide-black/[0.06] overflow-y-auto">
-                      {filteredStudents.map((student) => {
-                        const badge = listLabel(student);
-                        return (
-                          <li key={student.studentId}>
-                            <button
-                              type="button"
-                              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50"
-                              onClick={() => setResult(resultFromStudent(student, selectedList.room))}
-                            >
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-[#000435]">{student.fullName}</p>
-                                <p className="truncate text-xs text-slate-500">{student.studentCode}</p>
-                              </div>
-                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${badge.tone}`}>
-                                {badge.text}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="tp-card overflow-hidden p-0">
-          <div className="tp-card-header border-b border-black/[0.06]">
-            <h3>Your rooms</h3>
-          </div>
-          {loading ? (
-            <p className="px-4 py-10 text-center text-sm text-slate-500">Loading…</p>
-          ) : !rooms.length ? (
-            <p className="px-4 py-10 text-center text-sm text-slate-500">No exam rooms assigned.</p>
-          ) : (
-            <ul className="divide-y divide-black/[0.06]">
-              {rooms.map((room) => (
-                <li key={room.key || roomHref(room)}>
-                  <Link to={roomHref(room)} className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50">
-                    <div className="min-w-0">
-                      <p className="font-medium text-[#000435]">{room.roomName}</p>
-                      <p className="truncate text-xs text-slate-500">
-                        {room.examDate} · {room.subjectName || room.sessionName} · {room.studentCount} students
-                      </p>
-                    </div>
-                    <DoorOpen size={18} className="shrink-0 text-slate-400" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                </Box>
+              )}
+            </SectionPaper>
           )}
-        </div>
-      </TeacherPageShell>
+        </ListPageBody>
+      </ListPage>
 
-      {scanOpen && (
+      {scanOpen ? (
         <QrScanModal
           title="Scan student QR"
           hint="Check examination list"
@@ -303,31 +362,30 @@ export default function Examinations() {
             setCodeOpen(true);
           }}
         />
-      )}
+      ) : null}
 
-      {codeOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#000435]/50 sm:items-center sm:p-4">
-          <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-            <p className="text-sm font-medium text-[#000435]">Student code</p>
-            <input
-              className="tp-input mt-2"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void checkCode(manualCode)}
-            />
-            <div className="mt-3 flex gap-2">
-              <button type="button" className={`${tpActionBtn} flex-1`} onClick={() => setCodeOpen(false)}>
-                Cancel
-              </button>
-              <button type="button" className={`${tpActionBtnPrimary} flex-1`} onClick={() => void checkCode(manualCode)}>
-                Check
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={codeOpen} onClose={() => setCodeOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 2 } }}>
+        <DialogContent sx={{ p: 2.5 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy, mb: 1 }}>Student code</Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void checkCode(manualCode)}
+          />
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button fullWidth variant="outlined" onClick={() => setCodeOpen(false)}>
+              Cancel
+            </Button>
+            <Button fullWidth variant="contained" color="primary" onClick={() => void checkCode(manualCode)}>
+              Check
+            </Button>
+          </Stack>
+        </DialogContent>
+      </Dialog>
 
-      {result && <EligibilityResult result={result} onClose={() => setResult(null)} />}
+      {result ? <EligibilityDialog result={result} onClose={() => setResult(null)} /> : null}
     </>
   );
 }

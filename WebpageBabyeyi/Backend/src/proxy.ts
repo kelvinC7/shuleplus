@@ -49,7 +49,7 @@ export async function proxyGet(
 
 /**
  * Proxy a GET request to an upstream microservice and stream the raw body
- * back untouched (content-type, status, headers) — for HTML/print/PDF routes
+ * back untouched (content-type, status, headers) - for HTML/print/PDF routes
  * where `proxyGet`'s JSON-decoding would corrupt the payload.
  */
 export async function proxyGetRaw(

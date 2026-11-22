@@ -382,3 +382,463 @@ export type ApiEnvelope<T> = {
   data: T;
   message?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Independent Land module
+// ---------------------------------------------------------------------------
+
+export interface LandSetupYear {
+  id: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  setup: { id: string; openingAmount: number; updatedAt?: string } | null;
+  importCount: number;
+}
+
+export interface LandMeta {
+  years: LandSetupYear[];
+  activeYear: number | null;
+  provinces: string[];
+  districts: string[];
+  sectors: string[];
+  categories: string[];
+  suppliers: string[];
+}
+
+export interface LandRecord {
+  id: string;
+  organizationId: string;
+  financialYearId: string;
+  year: number;
+  sequence: number;
+  province?: string | null;
+  district?: string | null;
+  sector?: string | null;
+  cellule?: string | null;
+  village?: string | null;
+  landType?: string | null;
+  category?: string | null;
+  supplier?: string | null;
+  tax?: string | null;
+  upi?: string | null;
+  sku?: string | null;
+  size?: string | null;
+  sizeValue?: number | null;
+  material?: string | null;
+  purchaseYear?: number | null;
+  purchaseMonth?: number | null;
+  purchaseDay?: number | null;
+  purchaseDate?: string | null;
+  purchaseUnitPrice: number;
+  openingAmount: number;
+  totalBalance: number;
+  importBatchId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LandRecordDetail extends LandRecord {
+  previous?: { id: string; sequence: number; upi?: string | null; totalBalance: number } | null;
+  next?: { id: string; sequence: number; upi?: string | null; openingAmount: number } | null;
+  calculation: {
+    previousBalance: number;
+    purchaseUnitPrice: number;
+    totalBalance: number;
+  };
+}
+
+export interface LandSetupSummary {
+  id: string | null;
+  organizationId: string;
+  financialYearId: string;
+  year: number;
+  configured: boolean;
+  openingAmount: number;
+  recordCount: number;
+  totalPurchaseValue: number;
+  totalSize: number;
+  closingBalance: number;
+  updatedAt?: string | null;
+}
+
+export interface LandPaginated {
+  success: boolean;
+  data: LandRecord[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: { totalPurchaseValue: number; totalSize: number };
+}
+
+export interface LandDashboard {
+  financialYear: {
+    year: number;
+    status: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    configured: boolean;
+    openingAmount: number;
+  };
+  stats: {
+    totalRecords: number;
+    openingAmount: number;
+    totalPurchaseValue: number;
+    totalLandBalance: number;
+    totalSize: number;
+    closingBalance: number;
+  };
+  charts: {
+    byProvince: LandChartPoint[];
+    byDistrict: LandChartPoint[];
+    byCategory: LandChartPoint[];
+    byType: LandChartPoint[];
+    purchaseTrend: { year: number; value: number; count: number }[];
+  };
+  filters: {
+    provinces: string[];
+    districts: string[];
+    sectors: string[];
+    categories: string[];
+    suppliers: string[];
+  };
+}
+
+export interface LandChartPoint {
+  label: string;
+  count: number;
+  value: number;
+  size: number;
+}
+
+export interface LandImportPreviewRow {
+  row: number;
+  status: 'valid' | 'invalid' | 'duplicate';
+  errors: string[];
+  data: Record<string, unknown> | null;
+  openingAmount: number | null;
+  purchaseUnitPrice: number | null;
+  totalBalance: number | null;
+}
+
+export interface LandImportPreview {
+  summary: {
+    total: number;
+    valid: number;
+    invalid: number;
+    duplicates: number;
+    year: number;
+    openingAmount: number;
+    totalPurchaseValue: number;
+    expectedTotalBalance: number;
+    canImport: boolean;
+  };
+  rows: LandImportPreviewRow[];
+}
+
+export interface LandReportColumn {
+  key: string;
+  label: string;
+  type: 'text' | 'money' | 'number' | 'date' | string;
+}
+
+export interface LandReport {
+  type: string;
+  title: string;
+  subtitle: string;
+  generatedAt: string;
+  organization: { name: string; code?: string | null };
+  financialYear: { year: number; status: string; startDate?: string | null; endDate?: string | null };
+  filters: Record<string, unknown>;
+  summary: Array<{ label: string; value: number | string; type?: string }>;
+  columns: LandReportColumn[];
+  rows: Record<string, string | number | null>[];
+}
+
+export interface LandReportType {
+  type: string;
+  label: string;
+}
+
+// ---------------------------------------------------------------------------
+// Independent Vehicle module
+// ---------------------------------------------------------------------------
+
+export interface VehicleSetupYear {
+  id: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  setup: {
+    id: string;
+    openingAmount: number;
+    accumulatedDepreciation: number;
+    depreciationMode: string;
+    depreciationRate: number;
+    usefulYears: number;
+    updatedAt?: string;
+  } | null;
+  importCount: number;
+}
+
+export interface VehicleMeta {
+  organizationName: string;
+  years: VehicleSetupYear[];
+  activeYear: number | null;
+  locations: string[];
+  names: string[];
+  labels: string[];
+  types: string[];
+  categories: string[];
+  suppliers: string[];
+  purchaseYears: number[];
+}
+
+export interface VehicleRecord {
+  id: string;
+  organizationId: string;
+  financialYearId: string;
+  year: number;
+  sequence: number;
+  location?: string | null;
+  name?: string | null;
+  label?: string | null;
+  vehicleType?: string | null;
+  type?: string | null;
+  category?: string | null;
+  supplier?: string | null;
+  tax?: string | null;
+  upi?: string | null;
+  sku?: string | null;
+  size?: string | null;
+  material?: string | null;
+  purchaseYear?: number | null;
+  purchaseMonth?: number | null;
+  purchaseDay?: number | null;
+  purchaseDate?: string | null;
+  purchaseUnitPrice: number;
+  saleBalance: number;
+  openingAmount: number;
+  totalBalance: number;
+  accumulatedDepreciation: number;
+  annualDep: number;
+  totalDep: number;
+  netBookValue: number;
+  depRate: number;
+  depMode: string;
+  usefulYears: number;
+  useSetupDepreciation: boolean;
+  quantity: number;
+  decimalDepreciation?: number;
+  importBatchId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VehicleRecordDetail extends VehicleRecord {
+  previous?: {
+    id: string;
+    sequence: number;
+    name?: string | null;
+    upi?: string | null;
+    totalBalance: number;
+  } | null;
+  next?: {
+    id: string;
+    sequence: number;
+    name?: string | null;
+    upi?: string | null;
+    openingAmount: number;
+  } | null;
+  calculation: {
+    previousBalance: number;
+    purchaseUnitPrice: number;
+    saleBalance: number;
+    totalBalance: number;
+    accumulatedDepreciation: number;
+    annualDep: number;
+    totalDep: number;
+    netBookValue: number;
+    formula: string;
+  };
+  lastCalculatedAt?: string;
+}
+
+export interface VehicleSetupSummary {
+  id: string | null;
+  organizationId: string;
+  financialYearId: string;
+  year: number;
+  configured: boolean;
+  openingAmount: number;
+  accumulatedDepreciation: number;
+  depreciationMode: string;
+  depreciationRate: number;
+  usefulYears: number;
+  recordCount: number;
+  totalPurchaseValue: number;
+  totalSaleBalance: number;
+  totalQuantity: number;
+  totalAnnualDepreciation: number;
+  totalAccumulatedDepreciation: number;
+  totalDepreciation: number;
+  totalNetBookValue: number;
+  closingBalance: number;
+  updatedAt?: string | null;
+}
+
+export interface VehiclePaginated {
+  success: boolean;
+  data: VehicleRecord[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: {
+    totalPurchaseValue: number;
+    totalSaleBalance: number;
+    totalQuantity: number;
+    totalAnnualDepreciation: number;
+    totalDepreciation: number;
+    totalNetBookValue: number;
+  };
+}
+
+export interface VehicleChartPoint {
+  label: string;
+  count: number;
+  purchaseValue: number;
+  saleBalance: number;
+  totalBalance: number;
+  quantity: number;
+}
+
+export interface VehicleDashboard {
+  financialYear: {
+    year: number;
+    status: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    configured: boolean;
+    openingAmount: number;
+    depreciationMode: string;
+    depreciationRate: number;
+    usefulYears: number;
+    accumulatedDepreciation: number;
+  };
+  stats: {
+    totalVehicles: number;
+    openingAmount: number;
+    totalPurchaseValue: number;
+    totalSaleBalance: number;
+    totalBalance: number;
+    accumulatedDepreciation: number;
+    annualDepreciation: number;
+    totalDepreciation: number;
+    netBookValue: number;
+    totalQuantity: number;
+    closingBalance: number;
+  };
+  charts: {
+    byLocation: VehicleChartPoint[];
+    byType: VehicleChartPoint[];
+    byCategory: VehicleChartPoint[];
+    purchaseValueByYear: { year: number; value: number; count: number }[];
+    saleBalanceByYear: { year: number; value: number; count: number }[];
+    totalBalanceByFY: { year: number; value: number; count: number }[];
+    depreciationTrends: {
+      year: number;
+      annualDepreciation: number;
+      totalDepreciation: number;
+      accumulatedDepreciation: number;
+    }[];
+    netBookValueTrends: { year: number; netBookValue: number; totalBalance: number }[];
+  };
+  filters: {
+    locations: string[];
+    types: string[];
+    categories: string[];
+    suppliers: string[];
+    purchaseYears: number[];
+  };
+}
+
+export interface VehicleImportPreviewRow {
+  row: number;
+  status: 'valid' | 'invalid' | 'duplicate';
+  errors: string[];
+  data: Record<string, unknown> | null;
+  openingAmount: number | null;
+  purchaseUnitPrice: number | null;
+  saleBalance: number | null;
+  totalBalance: number | null;
+  accumulatedDepreciation: number | null;
+  annualDep: number | null;
+  totalDep: number | null;
+  netBookValue: number | null;
+}
+
+export interface VehicleImportPreview {
+  summary: {
+    total: number;
+    valid: number;
+    invalid: number;
+    duplicates: number;
+    year: number;
+    openingAmount: number;
+    startingOpeningAmount: number;
+    totalPurchaseValue: number;
+    totalSaleBalance: number;
+    expectedTotalBalance: number;
+    expectedAnnualDepreciation: number;
+    expectedTotalDepreciation: number;
+    expectedAccumulatedDepreciation: number;
+    expectedNetBookValue: number;
+    depreciationMode: string;
+    depreciationRate: number;
+    usefulYears: number;
+    canImport: boolean;
+  };
+  rows: VehicleImportPreviewRow[];
+}
+
+export interface VehicleReportColumn {
+  key: string;
+  label: string;
+  type: 'text' | 'money' | 'number' | 'date' | string;
+}
+
+export interface VehicleReport {
+  type: string;
+  title: string;
+  subtitle: string;
+  generatedAt: string;
+  organization: { name: string; code?: string | null };
+  financialYear: { year: number; status: string; startDate?: string | null; endDate?: string | null };
+  filters: Record<string, unknown>;
+  summary: Array<{ label: string; value: number | string; type?: string }>;
+  columns: VehicleReportColumn[];
+  rows: Record<string, string | number | null>[];
+}
+
+export interface VehicleReportType {
+  type: string;
+  label: string;
+}
+
+export interface VehicleAuditLog {
+  id: string;
+  organizationId: string;
+  vehicleRecordId?: string | null;
+  financialYearId?: string | null;
+  year?: number | null;
+  action: string;
+  detail?: string | null;
+  metadata?: Record<string, unknown> | null;
+  actorUserId?: string | null;
+  actorEmail?: string | null;
+  createdAt: string;
+}

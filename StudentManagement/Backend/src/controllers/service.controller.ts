@@ -66,6 +66,29 @@ function matchClassLabel(classes: ClassRef[], className: string): ClassRef | und
   return undefined;
 }
 
+const CLASS_TEACHER_EDITABLE_FIELDS = [
+  'firstName',
+  'lastName',
+  'gender',
+  'dateOfBirth',
+  'sdmCode',
+  'nationality',
+  'district',
+  'sector',
+  'cell',
+  'village',
+  'bloodGroup',
+  'allergies',
+  'hasMedicalCondition',
+  'medicalConditionDetails',
+  'fatherLiving',
+  'motherLiving',
+  'formerSchool',
+  'leavingReason',
+  'isBoarding',
+  'parents',
+] as const;
+
 export const serviceController = {
   async listClasses(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -184,6 +207,44 @@ export const serviceController = {
           matched: Boolean(classId),
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /** Service-to-service: guardian phone lookup across all schools (ParentMIS login). */
+  async lookupParentsByPhone(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const phone = typeof req.query.phone === 'string' ? req.query.phone.trim() : '';
+      if (!phone) {
+        throw new AppError(400, 'phone query parameter is required');
+      }
+
+      const rows = await parentService.findAllByPhone(phone);
+      const data = rows.map((p) => ({
+        organizationId: p.organizationId,
+        id: p.id,
+        fullName: [p.firstName, p.lastName].filter(Boolean).join(' ').trim(),
+        firstName: p.firstName,
+        lastName: p.lastName,
+        phone: p.phone,
+        email: p.email,
+        students: (p.studentParents ?? []).map((sp) => {
+          const enrollment = sp.student?.enrollments?.[0];
+          const cls = enrollment?.class;
+          return {
+            studentId: sp.student?.id,
+            studentCode: sp.student?.studentCode || sp.student?.studentUid || sp.student?.id,
+            studentName: sp.student
+              ? [sp.student.firstName, sp.student.lastName].filter(Boolean).join(' ').trim()
+              : null,
+            className: cls ? classLabel(cls) : null,
+            role: sp.role,
+          };
+        }),
+      }));
+
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
@@ -316,6 +377,136 @@ export const serviceController = {
           identityRemarks: data.identityRemarks,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async classTeacherStudents(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organizationId = req.organizationRef!;
+      let classId = typeof req.query.classId === 'string' ? req.query.classId : '';
+      const className = typeof req.query.className === 'string' ? req.query.className : '';
+      if (!classId && className) {
+        const classes = await classService.list(organizationId);
+        classId = matchClassLabel(classes, className)?.id ?? '';
+      }
+      const data = await classService.listStudentsForClassTeacher(
+        classId,
+        organizationId,
+        {
+          userId: typeof req.query.teacherUserId === 'string' ? req.query.teacherUserId : null,
+          email: typeof req.query.teacherEmail === 'string' ? req.query.teacherEmail : null,
+        }
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async classTeacherUpdateStudent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      if (body.parents !== undefined && !Array.isArray(body.parents)) {
+        throw new AppError(400, 'parents must be an array');
+      }
+      const picked: Record<string, unknown> = {};
+      for (const key of CLASS_TEACHER_EDITABLE_FIELDS) {
+        if (body[key] !== undefined) picked[key] = body[key];
+      }
+      const data = await classService.updateStudentForClassTeacher(
+        String(req.params.studentId),
+        req.organizationRef!,
+        {
+          userId: typeof body.teacherUserId === 'string' ? body.teacherUserId : null,
+          email: typeof body.teacherEmail === 'string' ? body.teacherEmail : null,
+        },
+        picked
+      );
+      res.json({ success: true, data: { id: data.id } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async classTeacherSearchParents(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      let classId = String(req.query.classId ?? '');
+      const className = typeof req.query.className === 'string' ? req.query.className : '';
+      if (!classId && className) {
+        const classes = await classService.list(req.organizationRef!);
+        classId = matchClassLabel(classes, className)?.id ?? '';
+      }
+      await classService.authorizeClassTeacherStudentEdit(classId, req.organizationRef!, {
+        userId: typeof req.query.teacherUserId === 'string' ? req.query.teacherUserId : null,
+        email: typeof req.query.teacherEmail === 'string' ? req.query.teacherEmail : null,
+      });
+      const q = String(req.query.q ?? '').trim();
+      const data = q ? await parentService.search(req.organizationRef!, q) : [];
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async classTeacherCreateParent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      let classId = String(req.body.classId ?? '');
+      const className = typeof req.body.className === 'string' ? req.body.className : '';
+      if (!classId && className) {
+        const classes = await classService.list(req.organizationRef!);
+        classId = matchClassLabel(classes, className)?.id ?? '';
+      }
+      await classService.authorizeClassTeacherStudentEdit(classId, req.organizationRef!, {
+        userId: typeof req.body.teacherUserId === 'string' ? req.body.teacherUserId : null,
+        email: typeof req.body.teacherEmail === 'string' ? req.body.teacherEmail : null,
+      });
+      const firstName = String(req.body.firstName ?? '').trim();
+      const lastName = String(req.body.lastName ?? '').trim();
+      if (!firstName || !lastName) throw new AppError(400, 'Parent first and last names are required');
+      const data = await parentService.create(req.organizationRef!, {
+        firstName,
+        lastName,
+        phone: typeof req.body.phone === 'string' ? req.body.phone.trim() || undefined : undefined,
+        email: typeof req.body.email === 'string' ? req.body.email.trim() || undefined : undefined,
+        nationalId:
+          typeof req.body.nationalId === 'string' ? req.body.nationalId.trim() || undefined : undefined,
+        occupation:
+          typeof req.body.occupation === 'string' ? req.body.occupation.trim() || undefined : undefined,
+        address: typeof req.body.address === 'string' ? req.body.address.trim() || undefined : undefined,
+      });
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async classTeacherUpdateParent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+      const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
+      if (!firstName || !lastName) throw new AppError(400, 'Parent first and last names are required');
+      const data = await classService.updateLinkedParentForClassTeacher(
+        String(req.params.studentId),
+        String(req.params.parentId),
+        req.organizationRef!,
+        {
+          userId: typeof body.teacherUserId === 'string' ? body.teacherUserId : null,
+          email: typeof body.teacherEmail === 'string' ? body.teacherEmail : null,
+        },
+        {
+          firstName,
+          lastName,
+          phone: typeof body.phone === 'string' ? body.phone.trim() : undefined,
+          email: typeof body.email === 'string' ? body.email.trim() : undefined,
+          nationalId: typeof body.nationalId === 'string' ? body.nationalId.trim() : undefined,
+          occupation: typeof body.occupation === 'string' ? body.occupation.trim() : undefined,
+          address: typeof body.address === 'string' ? body.address.trim() : undefined,
+        }
+      );
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

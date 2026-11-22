@@ -15,6 +15,7 @@ import {
   FileDown,
   Receipt,
   Bell,
+  Bus,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -39,11 +40,18 @@ export const NAV_ITEMS = [
     ],
   },
   {
+    label: 'Transport',
+    icon: Bus,
+    children: [
+      { label: 'Transport overview', href: '/transport', icon: Bus },
+      { label: 'Notifications', href: '/notifications', icon: Bell },
+    ],
+  },
+  {
     label: 'Life',
     icon: MessageSquare,
     children: [
       { label: 'Communication', href: '/communication', icon: MessageSquare },
-      { label: 'Notifications', href: '/notifications', icon: Bell },
       { label: 'Leave & Permission', href: '/leave', icon: CalendarClock },
       { label: 'Discipline', href: '/discipline', icon: ShieldAlert },
       { label: 'Health Center', href: '/health', icon: Stethoscope },

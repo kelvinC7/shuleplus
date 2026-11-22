@@ -150,7 +150,23 @@ export class ModuleManagementController {
         body.action,
         body.limits
       );
-      res.json({ success: true, data, message: `Module ${body.action} applied.` });
+      const provisioning =
+        'provisioning' in data && data.provisioning
+          ? (data.provisioning as {
+              attempted: boolean;
+              provisioned: boolean;
+              error?: string;
+            })
+          : undefined;
+      let message = `Module ${body.action} applied.`;
+      if (provisioning?.attempted) {
+        message = provisioning.provisioned
+          ? `Module ${body.action === 'unlock' ? 'unlocked' : 'activated'} and tenant workspace is ready.`
+          : `Module ${body.action === 'unlock' ? 'unlocked' : 'activated'}, but tenant setup failed: ${
+              provisioning.error ?? 'unknown error'
+            }. Use Provision to retry.`;
+      }
+      res.json({ success: true, data, message });
     } catch (e) {
       next(e);
     }

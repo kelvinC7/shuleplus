@@ -55,6 +55,9 @@ export class AssessmentService {
     assessmentTime?: string;
     maxMark: number;
     duration?: string;
+    reportingStage?: 'UNASSIGNED' | 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
+    assessmentCategory?: string;
+    catAllocationStage?: 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
     createdBy?: string;
   }) {
     if (!data.subjectId && !data.subjectName) {
@@ -139,6 +142,26 @@ export class AssessmentService {
       assessmentDate = Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
+    let inferredStage = data.reportingStage || 'UNASSIGNED';
+    const category = String((data as any).assessmentCategory || '').toUpperCase();
+    if (!data.reportingStage && category) {
+      if (category === 'BEGINNING_TEST' || category === 'BEGINNING_TERM') inferredStage = 'BEGINNING_TERM';
+      else if (category === 'MIDTERM_TEST' || category === 'MID_TERM_TEST' || category === 'MID_TERM') inferredStage = 'MID_TERM';
+      else if (category === 'END_OF_TERM_EXAM' || category === 'END_TERM_EXAM' || category === 'TERM_FINAL') inferredStage = 'TERM_FINAL';
+      else if ((category === 'CAT' || category === 'CONTINUOUS' || category === 'CONTINUOUS_ASSESSMENT') && (data as any).catAllocationStage) {
+        inferredStage = String((data as any).catAllocationStage).toUpperCase() as any;
+      }
+    }
+    // Template component is the central source: a configured component stage overrides client input.
+    if (data.componentId) {
+      const comp = await prisma.assessmentComponent.findFirst({
+        where: { id: data.componentId, template: { organizationId } },
+        select: { reportingStage: true },
+      });
+      const compStage = String(comp?.reportingStage || 'UNASSIGNED').toUpperCase();
+      if (['BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL'].includes(compStage)) inferredStage = compStage as any;
+    }
+
     return prisma.assessment.create({
       data: {
         organizationId,
@@ -155,6 +178,7 @@ export class AssessmentService {
         maxMark: data.maxMark,
         duration: data.duration ?? null,
         status: 'OPEN',
+        reportingStage: inferredStage as any,
         createdBy: data.createdBy ?? null,
         publishedBy: data.createdBy ?? null,
         publishedAt: new Date(),
@@ -177,6 +201,7 @@ export class AssessmentService {
     componentId?: string;
     templateId?: string;
     createdBy?: string;
+    reportingStage?: string;
   }) {
     const where: any = { organizationId };
     if (filters?.status) where.status = filters.status;
@@ -187,6 +212,7 @@ export class AssessmentService {
     if (filters?.componentId) where.componentId = filters.componentId;
     if (filters?.templateId) where.templateId = filters.templateId;
     if (filters?.createdBy) where.createdBy = filters.createdBy;
+    if (filters?.reportingStage) where.reportingStage = filters.reportingStage;
 
     const rows = await prisma.assessment.findMany({
       where,
@@ -236,11 +262,12 @@ export class AssessmentService {
       assessmentTime?: string;
       maxMark?: number;
       duration?: string;
+      reportingStage?: 'UNASSIGNED' | 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
     }
   ) {
     const assessment = await prisma.assessment.findFirst({ where: { id, organizationId } });
     if (!assessment) throw new AppError(404, 'Assessment not found');
-    if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
+    if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status) && data.reportingStage === undefined) {
       throw new AppError(400, 'Only scheduled assessments that are not yet submitted can be edited');
     }
 
@@ -261,6 +288,16 @@ export class AssessmentService {
       throw new AppError(400, 'Maximum mark must be greater than 0');
     }
 
+    let reportingStage: string | undefined = data.reportingStage;
+    if (assessment.componentId) {
+      const comp = await prisma.assessmentComponent.findFirst({
+        where: { id: assessment.componentId, template: { organizationId } },
+        select: { reportingStage: true },
+      });
+      const compStage = String(comp?.reportingStage || 'UNASSIGNED').toUpperCase();
+      if (['BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL'].includes(compStage)) reportingStage = compStage;
+    }
+
     return prisma.assessment.update({
       where: { id },
       data: {
@@ -269,9 +306,215 @@ export class AssessmentService {
         ...(assessmentDate !== undefined ? { assessmentDate } : {}),
         ...(data.maxMark != null ? { maxMark: data.maxMark } : {}),
         ...(data.duration !== undefined ? { duration: data.duration?.trim() || null } : {}),
+        ...(reportingStage ? { reportingStage: reportingStage as any } : {}),
       },
       include: { subject: true, class: true, component: true, template: true },
     });
+  }
+
+  async listAssessmentMarkRecordsForStatusUpdate(
+    organizationId: string,
+    filters: {
+      academicYear?: string;
+      term?: string;
+      classId?: string;
+      stream?: string;
+      subjectId?: string;
+      componentId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      search?: string;
+      reportingStage?: string;
+    }
+  ) {
+    const assessmentWhere: any = { organizationId };
+    if (filters.academicYear) assessmentWhere.academicYear = filters.academicYear;
+    if (filters.term) assessmentWhere.term = filters.term;
+    if (filters.classId) assessmentWhere.classId = filters.classId;
+    if (filters.subjectId) assessmentWhere.subjectId = filters.subjectId;
+    if (filters.componentId) assessmentWhere.componentId = filters.componentId;
+    if (filters.reportingStage) assessmentWhere.reportingStage = filters.reportingStage;
+    if (filters.stream) assessmentWhere.class = { stream: { equals: filters.stream, mode: 'insensitive' } };
+
+    if (filters.dateFrom || filters.dateTo) {
+      assessmentWhere.assessmentDate = {};
+      if (filters.dateFrom) {
+        const d = new Date(filters.dateFrom);
+        if (!Number.isNaN(d.getTime())) assessmentWhere.assessmentDate.gte = d;
+      }
+      if (filters.dateTo) {
+        const d = new Date(filters.dateTo);
+        if (!Number.isNaN(d.getTime())) {
+          d.setHours(23, 59, 59, 999);
+          assessmentWhere.assessmentDate.lte = d;
+        }
+      }
+    }
+
+    const marks = await prisma.assessmentMark.findMany({
+      where: {
+        organizationId,
+        assessment: assessmentWhere,
+        ...(filters.search
+          ? {
+              OR: [
+                { student: { firstName: { contains: filters.search, mode: 'insensitive' } } },
+                { student: { lastName: { contains: filters.search, mode: 'insensitive' } } },
+                { student: { studentCode: { contains: filters.search, mode: 'insensitive' } } },
+                { student: { studentUid: { contains: filters.search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            studentCode: true,
+            studentUid: true,
+          },
+        },
+        assessment: {
+          include: {
+            subject: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true, stream: true } },
+            component: { select: { id: true, name: true, code: true } },
+          },
+        },
+      },
+      orderBy: [
+        { assessment: { class: { name: 'asc' } } },
+        { assessment: { subject: { name: 'asc' } } },
+        { assessment: { assessmentDate: 'desc' } },
+        { student: { lastName: 'asc' } },
+      ],
+      take: 2000,
+    });
+
+    return marks.map((m) => ({
+      markId: m.id,
+      assessmentId: m.assessmentId,
+      studentId: m.studentId,
+      studentName: `${m.student?.firstName || ''} ${m.student?.lastName || ''}`.trim() || 'Student',
+      studentCode: m.student?.studentCode || m.student?.studentUid || '',
+      classId: m.assessment.classId,
+      className: m.assessment.class?.name || '',
+      stream: m.assessment.class?.stream || '',
+      subjectId: m.assessment.subjectId,
+      subjectName: m.assessment.subject?.name || '',
+      componentId: m.assessment.componentId || '',
+      componentName: m.assessment.component?.name || m.assessment.title || 'Assessment',
+      assessmentTitle: m.assessment.title,
+      assessmentDate: m.assessment.assessmentDate,
+      score: m.score,
+      maxMark: m.maxMark ?? m.assessment.maxMark,
+      markStatus: m.markStatus,
+      currentReportingStage: (m.assessment as any).reportingStage || 'UNASSIGNED',
+      assessmentStatus: m.assessment.status,
+    }));
+  }
+
+  async bulkUpdateAssessmentReportingStage(
+    organizationId: string,
+    actor: { id?: string; name?: string; roles?: string[] },
+    input: {
+      assessmentIds?: string[];
+      markIds?: string[];
+      reportingStage: 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL' | 'UNASSIGNED';
+      filters?: {
+        academicYear?: string;
+        term?: string;
+        classId?: string;
+      };
+    }
+  ) {
+    const stage = input.reportingStage;
+    if (!['BEGINNING_TERM', 'MID_TERM', 'TERM_FINAL', 'UNASSIGNED'].includes(stage)) {
+      throw new AppError(400, 'Invalid reporting stage');
+    }
+
+    let targetAssessmentIds = Array.from(new Set((input.assessmentIds || []).filter(Boolean)));
+
+    if ((!targetAssessmentIds.length) && input.markIds?.length) {
+      const rows = await prisma.assessmentMark.findMany({
+        where: { organizationId, id: { in: Array.from(new Set(input.markIds.filter(Boolean))) } },
+        select: { assessmentId: true },
+      });
+      targetAssessmentIds = Array.from(new Set(rows.map((r) => r.assessmentId)));
+    }
+
+    if (!targetAssessmentIds.length) {
+      return { updated: 0, skipped: 0, unchanged: 0, reportingStage: stage, affectedAssessmentIds: [] as string[] };
+    }
+
+    const assessments = await prisma.assessment.findMany({
+      where: {
+        organizationId,
+        id: { in: targetAssessmentIds },
+        ...(input.filters?.academicYear ? { academicYear: input.filters.academicYear } : {}),
+        ...(input.filters?.term ? { term: input.filters.term } : {}),
+        ...(input.filters?.classId ? { classId: input.filters.classId } : {}),
+      },
+      select: {
+        id: true,
+        reportingStage: true,
+        classId: true,
+        subjectId: true,
+        academicYear: true,
+        term: true,
+        title: true,
+      },
+    });
+
+    const allowedIds = assessments.map((a) => a.id);
+    const skipped = targetAssessmentIds.length - allowedIds.length;
+    const toUpdate = assessments.filter((a) => String((a as any).reportingStage || 'UNASSIGNED') !== stage);
+    const unchanged = assessments.length - toUpdate.length;
+
+    if (!toUpdate.length) {
+      return { updated: 0, skipped, unchanged, reportingStage: stage, affectedAssessmentIds: allowedIds };
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.assessment.updateMany({
+        where: { organizationId, id: { in: toUpdate.map((a) => a.id) } },
+        data: { reportingStage: stage as any },
+      });
+      return { updated: toUpdate.length };
+    });
+
+    // Audit is best-effort and outside the transaction so a log failure cannot roll back marks.
+    try {
+      await prisma.academicAuditLog.createMany({
+        data: toUpdate.map((a) => ({
+          organizationId,
+          action: 'ASSESSMENT_REPORTING_STAGE_UPDATED',
+          entityType: 'ASSESSMENT',
+          entityId: a.id,
+          classId: a.classId,
+          academicYear: a.academicYear,
+          term: a.term,
+          actorId: actor.id || null,
+          actorName: actor.name || null,
+          actorRoles: (Array.isArray(actor.roles) ? actor.roles.join(',') : typeof actor.roles === 'string' ? actor.roles : null) || null,
+          beforeState: { reportingStage: (a as any).reportingStage || 'UNASSIGNED' } as any,
+          afterState: { reportingStage: stage } as any,
+          details: { title: a.title } as any,
+        })),
+      });
+    } catch (err) {
+      console.warn('[assessment] reporting-stage audit log failed:', err instanceof Error ? err.message : err);
+    }
+
+    return {
+      ...result,
+      skipped,
+      unchanged,
+      reportingStage: stage,
+      affectedAssessmentIds: allowedIds,
+    };
   }
 
   async getById(id: string, organizationId: string) {
@@ -505,6 +748,91 @@ export class AssessmentService {
 
     await prisma.assessment.delete({ where: { id } });
     return { message: 'Assessment deleted' };
+  }
+
+  /** Admin: remove an assessment (course) together with every mark entered for it. */
+  async deleteCourse(
+    id: string,
+    organizationId: string,
+    actor: { id?: string; name?: string; roles?: string[] }
+  ) {
+    const assessment = await prisma.assessment.findFirst({
+      where: { id, organizationId },
+      include: { _count: { select: { marks: true } } },
+    });
+    if (!assessment) throw new AppError(404, 'Assessment not found');
+    const marksRemoved = assessment._count.marks;
+
+    await prisma.assessment.delete({ where: { id } });
+
+    try {
+      await prisma.academicAuditLog.create({
+        data: {
+          organizationId,
+          action: 'ASSESSMENT_COURSE_DELETED',
+          entityType: 'ASSESSMENT',
+          entityId: id,
+          classId: assessment.classId,
+          academicYear: assessment.academicYear,
+          term: assessment.term,
+          actorId: actor.id || null,
+          actorName: actor.name || null,
+          actorRoles: (actor.roles ?? []).join(',') || null,
+          beforeState: { title: assessment.title, status: assessment.status, marksRemoved } as any,
+          afterState: null as any,
+          details: { title: assessment.title, marksRemoved } as any,
+        },
+      });
+    } catch (err) {
+      console.warn('[assessment] course delete audit failed:', err instanceof Error ? err.message : err);
+    }
+
+    return { deleted: true, marksRemoved };
+  }
+
+  /** Admin: remove every mark entered for an assessment. The course stays and reports update immediately. */
+  async deleteAllMarks(
+    assessmentId: string,
+    organizationId: string,
+    actor: { id?: string; name?: string; roles?: string[] }
+  ) {
+    const assessment = await prisma.assessment.findFirst({
+      where: { id: assessmentId, organizationId },
+      include: { _count: { select: { marks: true } } },
+    });
+    if (!assessment) throw new AppError(404, 'Assessment not found');
+    const marksRemoved = assessment._count.marks;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.assessmentMark.deleteMany({ where: { assessmentId, organizationId } });
+      if (['SUBMITTED', 'REVIEWED', 'APPROVED', 'LOCKED'].includes(String(assessment.status))) {
+        await tx.assessment.update({ where: { id: assessmentId }, data: { status: 'MARK_ENTRY' } });
+      }
+    });
+
+    try {
+      await prisma.academicAuditLog.create({
+        data: {
+          organizationId,
+          action: 'ASSESSMENT_MARKS_DELETED',
+          entityType: 'ASSESSMENT',
+          entityId: assessmentId,
+          classId: assessment.classId,
+          academicYear: assessment.academicYear,
+          term: assessment.term,
+          actorId: actor.id || null,
+          actorName: actor.name || null,
+          actorRoles: (actor.roles ?? []).join(',') || null,
+          beforeState: { status: assessment.status, marksRemoved } as any,
+          afterState: { status: 'MARK_ENTRY', marksRemoved: 0 } as any,
+          details: { title: assessment.title, marksRemoved } as any,
+        },
+      });
+    } catch (err) {
+      console.warn('[assessment] marks delete audit failed:', err instanceof Error ? err.message : err);
+    }
+
+    return { marksRemoved };
   }
 
   async getTeacherDashboard(organizationId: string, teacherId: string, filters?: {

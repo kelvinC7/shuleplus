@@ -1,6 +1,7 @@
-import { TimePreference, Prisma } from '../generated/prisma';
+import { TimePreference, Prisma, AssignmentStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { syncCourseDefaultMarksToAcademic } from '../clients/academic-sync.client';
 import {
   assertUniqueCourseCode,
   generateUniqueCourseCode,
@@ -21,6 +22,7 @@ type CourseUpsertFields = {
   customWindowEnd?: string | null;
   schedulingRules?: Prisma.InputJsonValue;
   isCore?: boolean;
+  defaultCourseMarks?: number | null;
 };
 
 const TIME_PREFERENCES = new Set<string>(['ANY', 'MORNING', 'AFTERNOON', 'CUSTOM']);
@@ -64,7 +66,44 @@ function pickCourseFields(raw: Record<string, unknown>): CourseUpsertFields {
   }
   const isCore = asBoolean(raw.isCore);
   if (isCore !== undefined) fields.isCore = isCore;
+  if (raw.defaultCourseMarks === null) fields.defaultCourseMarks = null;
+  else {
+    const dcm = asFiniteNumber(raw.defaultCourseMarks);
+    if (dcm !== undefined) fields.defaultCourseMarks = Math.max(1, Math.min(1000, Math.round(dcm)));
+  }
   return fields;
+}
+
+async function propagateDefaultMarksForSubject(
+  organizationId: string,
+  subjectName: string,
+  defaultCourseMarks: number | null | undefined
+) {
+  if (defaultCourseMarks == null || !Number.isFinite(defaultCourseMarks)) return;
+  const value = Math.max(1, Math.min(1000, Number(defaultCourseMarks)));
+  await prisma.teacherAssignment.updateMany({
+    where: { organizationId, subjectName, status: AssignmentStatus.ACTIVE },
+    data: { defaultCourseMarks: value },
+  });
+  const assignments = await prisma.teacherAssignment.findMany({
+    where: { organizationId, subjectName, status: AssignmentStatus.ACTIVE },
+    select: {
+      className: true,
+      subjectName: true,
+      academicYear: true,
+      term: true,
+      defaultCourseMarks: true,
+    },
+  });
+  for (const a of assignments) {
+    void syncCourseDefaultMarksToAcademic(organizationId, {
+      className: a.className,
+      subjectName: a.subjectName,
+      academicYear: a.academicYear,
+      term: a.term,
+      defaultCourseMarks: a.defaultCourseMarks != null ? Number(a.defaultCourseMarks) : null,
+    });
+  }
 }
 
 export class CourseConfigService {
@@ -145,6 +184,7 @@ export class CourseConfigService {
       ...(fields.schedulingRules !== undefined ? { schedulingRules: fields.schedulingRules } : {}),
       ...(fields.isCore !== undefined ? { isCore: fields.isCore } : {}),
       ...(fields.color !== undefined ? { color: fields.color } : {}),
+      ...(fields.defaultCourseMarks !== undefined ? { defaultCourseMarks: fields.defaultCourseMarks } : {}),
     };
   }
 
@@ -154,7 +194,11 @@ export class CourseConfigService {
     const fields = pickCourseFields(raw);
     const { courseCode, codeMode } = await this.resolveCourseCode(organizationId, subjectName, fields, null);
     const payload = this.buildPayload(organizationId, subjectName, fields, courseCode, codeMode);
-    return prisma.timetableCourseConfig.create({ data: payload });
+    const row = await prisma.timetableCourseConfig.create({ data: payload });
+    if (fields.defaultCourseMarks !== undefined) {
+      await propagateDefaultMarksForSubject(organizationId, subjectName, fields.defaultCourseMarks);
+    }
+    return row;
   }
 
   async updateById(organizationId: string, id: string, raw: Record<string, unknown>) {
@@ -174,10 +218,18 @@ export class CourseConfigService {
       ...updateData,
       ...(nextName !== existing.subjectName ? { subjectName: nextName } : {}),
     };
-    return prisma.timetableCourseConfig.update({
+    const row = await prisma.timetableCourseConfig.update({
       where: { id: existing.id },
       data,
     });
+    if (fields.defaultCourseMarks !== undefined) {
+      const syncName = nextName !== existing.subjectName ? nextName : existing.subjectName;
+      await propagateDefaultMarksForSubject(organizationId, syncName, fields.defaultCourseMarks);
+      if (nextName !== existing.subjectName) {
+        await propagateDefaultMarksForSubject(organizationId, existing.subjectName, fields.defaultCourseMarks);
+      }
+    }
+    return row;
   }
 
   private async resolveCourseCode(

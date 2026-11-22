@@ -1,13 +1,10 @@
 ﻿import type { Metadata } from 'next';
-import { Montserrat, Geist } from 'next/font/google';
+import { Montserrat } from 'next/font/google';
 import Script from 'next/script';
 import { TokenBootstrapSuspense } from '@/components/token-bootstrap';
 import { AuthProvider } from '@/contexts/auth-context';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat' });
 
@@ -19,8 +16,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className={`${montserrat.variable} antialiased`}>
+    <html lang="en">
+      <body className={`${montserrat.variable} font-sans antialiased`}>
         <TokenBootstrapSuspense />
         <AuthProvider>{children}</AuthProvider>
         <Toaster position="bottom-right" richColors closeButton />

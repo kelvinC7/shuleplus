@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  BookOpen,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  GraduationCap,
-  Loader2,
-  Sparkles,
-  StickyNote,
-  X,
-} from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import Drawer from '@mui/material/Drawer';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import InputBase from '@mui/material/InputBase';
+import CloseIcon from '@mui/icons-material/Close';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import {
   fetchBookTree,
   fetchClassRosterSummary,
@@ -19,15 +22,90 @@ import {
   generateLessonPlan,
 } from '../../services/lessonPlanningApi';
 import { booksForAssignment, extractGradeFromClass, subjectsMatch } from '../../utils/curriculumMatch';
-
-const NAVY = '#000435';
+import { brand } from '../../theme/theme';
 
 const STEPS = [
-  { id: 'schedule', label: 'Schedule', short: 'When', icon: CalendarDays },
-  { id: 'class', label: 'Class', short: 'Who', icon: GraduationCap },
-  { id: 'curriculum', label: 'Curriculum', short: 'What', icon: BookOpen },
-  { id: 'notes', label: 'Notes', short: 'Notes', icon: StickyNote },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'class', label: 'Class' },
+  { id: 'curriculum', label: 'Curriculum' },
+  { id: 'notes', label: 'Notes' },
 ];
+
+const fieldShellSx = {
+  bgcolor: '#F2F4F8',
+  borderRadius: 2,
+  px: 1.75,
+  py: 1,
+  fontSize: 15.5,
+  color: brand.navy,
+  border: '1.5px solid transparent',
+  transition: 'border-color 120ms ease, background-color 120ms ease',
+  width: '100%',
+  '&:hover': { bgcolor: '#EDF0F6' },
+  '&.Mui-focused': { bgcolor: '#fff', borderColor: brand.primary },
+  '& input, & textarea, & select': {
+    fontSize: 15.5,
+    fontFamily: 'inherit',
+    color: brand.navy,
+    '&::placeholder': { color: '#98A2B3', opacity: 1 },
+  },
+};
+
+const selectSx = {
+  '& .MuiOutlinedInput-root': {
+    bgcolor: '#F2F4F8',
+    borderRadius: 2,
+    fontSize: 15,
+    transition: 'border-color 120ms ease, background-color 120ms ease',
+    '& fieldset': { borderColor: 'transparent' },
+    '&:hover': { bgcolor: '#EDF0F6' },
+    '&:hover fieldset': { borderColor: 'transparent' },
+    '&.Mui-focused': { bgcolor: '#fff' },
+    '&.Mui-focused fieldset': { borderColor: brand.primary, borderWidth: 2 },
+  },
+  '& .MuiSelect-select': { py: 1.15 },
+};
+
+const inputSx = { ...fieldShellSx, minHeight: 44 };
+
+/** MUI select styled like the Request-edit modal */
+function SelectField({ value, onChange, disabled, children }) {
+  return (
+    <TextField
+      select
+      fullWidth
+      value={value ?? ''}
+      onChange={onChange}
+      disabled={disabled}
+      sx={selectSx}
+      SelectProps={{ displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 320 } } } }}
+    >
+      {children}
+    </TextField>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <Box sx={{ display: 'block', mb: 0.25 }}>
+      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: brand.muted || '#64748B', mb: 0.5 }}>
+        {label}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function StatPill({ label, value }) {
+  return (
+    <Box sx={{ textAlign: 'center' }}>
+      <Typography sx={{ fontSize: 10, fontWeight: 500, color: '#94A3B8' }}>{label}</Typography>
+      <Typography sx={{ mt: 0.25, fontSize: 14, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#0F172A' }}>
+        {value !== '' && value != null ? value : '-'}
+      </Typography>
+    </Box>
+  );
+}
 
 export default function GenerateLessonPlanModal({ open, onClose }) {
   const navigate = useNavigate();
@@ -281,328 +359,325 @@ export default function GenerateLessonPlanModal({ open, onClose }) {
     }
   };
 
-  if (!open) return null;
-
   const isLast = step === STEPS.length - 1;
+  const durationLabel =
+    sessionDuration?.source === 'timetable'
+      ? `Duration - ${sessionDuration.periodCount} ${sessionDuration.periodCount === 1 ? 'period' : 'periods'}${sessionDuration.startTime ? ` - ${sessionDuration.startTime}` : ''}`
+      : 'Duration (minutes)';
 
   return (
-    <div
-      className="fixed inset-0 z-[130] flex items-end justify-center p-0 sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="generate-lesson-plan-title"
+    <Drawer
+      anchor="bottom"
+      open={open}
+      onClose={generating ? undefined : onClose}
+      PaperProps={{
+        role: 'dialog',
+        'aria-labelledby': 'generate-lesson-plan-title',
+        sx: {
+          width: '100%',
+          maxWidth: 520,
+          mx: 'auto',
+          maxHeight: '92dvh',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          bgcolor: '#fff',
+          color: brand.navy,
+          boxShadow: '0 -12px 40px rgba(0,4,53,0.28)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        },
+      }}
+      slotProps={{ backdrop: { sx: { bgcolor: 'rgba(0,2,31,0.55)' } } }}
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
+        <Box
+          sx={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 1.5,
+            borderBottom: '1px solid #E5E8EF',
+            flexShrink: 0,
+          }}
+        >
+          <Box sx={{ position: 'absolute', top: 6, width: 36, height: 4, borderRadius: 2, bgcolor: '#D5D9E3' }} />
+          <Box sx={{ textAlign: 'center', mt: 0.5, px: 5 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: brand.muted }}>
+              Step {step + 1} of {STEPS.length}
+            </Typography>
+            <Typography id="generate-lesson-plan-title" sx={{ fontSize: 14, fontWeight: 800 }}>
+              {STEPS[step].label}
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            aria-label="Close"
+            size="small"
+            disabled={generating}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
 
-      <div className="relative flex max-h-[min(100dvh,680px)] w-full max-w-lg flex-col overflow-hidden rounded-t-xl bg-white shadow-xl ring-1 ring-black/5 sm:max-h-[min(90dvh,680px)] sm:rounded-lg">
-        <div className="flex shrink-0 justify-center pt-2 sm:hidden" aria-hidden>
-          <span className="h-1 w-10 rounded-full bg-slate-300" />
-        </div>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', px: 2, pt: 1.75, pb: 2 }}>
+          <Box sx={{ width: '100%' }}>
+            {error ? (
+              <Box sx={{ mb: 2, borderRadius: 1, border: '1px solid #FECACA', bgcolor: '#FEF2F2', px: 1.5, py: 1.25, fontSize: 14, color: '#991B1B' }}>{error}</Box>
+            ) : null}
 
-        <header className="shrink-0 border-b border-slate-200 px-5 pb-4 pt-4 sm:px-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs text-slate-400">
-                Step {step + 1} of {STEPS.length}
-              </p>
-              <h2 id="generate-lesson-plan-title" className="text-lg font-semibold text-slate-900">
-                {STEPS[step].label}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-              aria-label="Close"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">{STEPS.map((s) => s.label).join(' · ')}</p>
-        </header>
+            {loading ? (
+              <Stack alignItems="center" justifyContent="center" spacing={1.5} sx={{ py: 8 }}>
+                <CircularProgress size={36} sx={{ color: brand.navy }} />
+                <Typography sx={{ fontSize: 14, color: '#64748B' }}>Loading...</Typography>
+              </Stack>
+            ) : (
+              <>
+                {step === 0 ? (
+                  <Box>
+                    <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { sm: '1fr 1fr' } }}>
+                      <Field label="Academic year">
+                        <SelectField value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })}>
+                          {(context?.academicYears || [form.academicYear]).map((y) => (
+                            <MenuItem key={y} value={y}>{y}</MenuItem>
+                          ))}
+                        </SelectField>
+                      </Field>
+                      <Field label="Term">
+                        <SelectField value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })}>
+                          {(context?.terms || ['Term 1', 'Term 2', 'Term 3']).map((t) => (
+                            <MenuItem key={t} value={t}>{t}</MenuItem>
+                          ))}
+                        </SelectField>
+                      </Field>
+                    </Box>
+                    <Box sx={{ mt: 1.5, display: 'grid', gap: 1.5, gridTemplateColumns: { sm: '1fr 1fr' } }}>
+                      <Field label="Lesson date">
+                        <InputBase fullWidth type="date" sx={inputSx} value={form.lessonDate} onChange={(e) => setForm({ ...form, lessonDate: e.target.value })} />
+                      </Field>
+                      <Field label="Language">
+                        <SelectField value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+                          <MenuItem value="English">English</MenuItem>
+                          <MenuItem value="Kinyarwanda">Kinyarwanda</MenuItem>
+                          <MenuItem value="French">French</MenuItem>
+                        </SelectField>
+                      </Field>
+                    </Box>
+                  </Box>
+                ) : null}
 
-        <div className="flex-1 overflow-y-auto overscroll-contain bg-white px-6 py-6">
-          <div className="mx-auto w-full max-w-sm sm:max-w-md">
-          {error ? (
-            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">{error}</div>
-          ) : null}
+                {step === 1 ? (
+                  <Box>
+                    {(context?.assignments || []).length === 0 ? (
+                      <Typography sx={{ fontSize: 14, color: '#475569' }}>No courses linked. Set up your timetable first.</Typography>
+                    ) : (
+                      <Field label="Course & class">
+                        <SelectField value={assignmentKey} onChange={(e) => setAssignmentKey(e.target.value)}>
+                          {(context?.assignments || []).map((a) => {
+                            const key = `${a.subjectName}|${a.className}`;
+                            return (
+                              <MenuItem key={key} value={key}>
+                                {a.subjectName} · {a.classLabel || a.className}{a.room ? ` · ${a.room}` : ''}
+                              </MenuItem>
+                            );
+                          })}
+                        </SelectField>
+                      </Field>
+                    )}
 
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16">
-              <Loader2 className="animate-spin" style={{ color: NAVY }} size={36} />
-              <p className="text-sm text-slate-500">Loading…</p>
-            </div>
-          ) : (
-            <>
-              {step === 0 ? (
-                <StepPanel>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Academic year">
-                      <select
-                        className={inputCls}
-                        value={form.academicYear}
-                        onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
-                      >
-                        {(context?.academicYears || [form.academicYear]).map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
+                    <Box sx={{ mt: 1.5 }}>
+                      <Field label={durationLabel}>
+                        <InputBase
+                          fullWidth
+                          type="number"
+                          readOnly={sessionDuration?.source === 'timetable'}
+                          inputProps={{ inputMode: 'numeric', min: 20, max: 240 }}
+                          sx={{ ...inputSx, fontVariantNumeric: 'tabular-nums', ...(sessionDuration?.source === 'timetable' ? { opacity: 0.85, cursor: 'default' } : {}) }}
+                          value={form.durationMinutes}
+                          onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
+                        />
+                      </Field>
+                    </Box>
+
+                    <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+                      <StatPill label="Male" value={form.maleLearners} />
+                      <StatPill label="Female" value={form.femaleLearners} />
+                      <StatPill label="Total" value={form.classSize} />
+                    </Box>
+                  </Box>
+                ) : null}
+
+                {step === 2 ? (
+                  <Box>
+                    {recommendedBook && assignment && !subjectsMatch(recommendedBook.subject, assignment.subjectName) ? (
+                      <Box sx={{ mb: 1.5, borderRadius: 1, border: '1px solid #E2E8F0', bgcolor: '#F8FAFC', px: 1.5, py: 1, fontSize: 12, color: '#475569' }}>
+                        Using guide <b>{recommendedBook.subject}</b> ({recommendedBook.grade}) for <b>{assignment.subjectName}</b>.
+                      </Box>
+                    ) : null}
+                    <Field label="Teacher's guide">
+                      <SelectField value={bookId} onChange={(e) => setBookId(e.target.value)} disabled={!filteredBooks.length}>
+                        {filteredBooks.length === 0 ? (
+                          <MenuItem value="">No published guide for {assignment?.subjectName || 'this subject'}</MenuItem>
+                        ) : null}
+                        {filteredBooks.map((b) => (
+                          <MenuItem key={b.id} value={b.id}>{b.subject} · {b.grade} · {b.title}</MenuItem>
                         ))}
-                      </select>
+                      </SelectField>
                     </Field>
-                    <Field label="Term">
-                      <select className={inputCls} value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })}>
-                        {(context?.terms || ['Term 1', 'Term 2', 'Term 3']).map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Field label="Lesson date">
-                      <input
-                        type="date"
-                        className={inputCls}
-                        value={form.lessonDate}
-                        onChange={(e) => setForm({ ...form, lessonDate: e.target.value })}
+                    <Box sx={{ mt: 1.5, display: 'grid', gap: 1.5, gridTemplateColumns: { sm: '1fr 1fr' } }}>
+                      <Field label="Unit">
+                        <SelectField
+                          value={unitId}
+                          disabled={!bookId || !(tree?.units?.length)}
+                          onChange={(e) => {
+                            setUnitId(e.target.value);
+                            const u = tree?.units?.find((x) => x.id === e.target.value);
+                            setLessonId(u?.lessons?.[0]?.id || '');
+                          }}
+                        >
+                          {!bookId ? <MenuItem value="">Select a guide first</MenuItem> : null}
+                          {(tree?.units || []).map((u) => (
+                            <MenuItem key={u.id} value={u.id}>
+                              Unit {u.unitNumber} · {u.title.slice(0, 40)}{u.title.length > 40 ? '...' : ''}
+                            </MenuItem>
+                          ))}
+                        </SelectField>
+                      </Field>
+                      <Field label="Lesson">
+                        <SelectField value={lessonId} disabled={!unitId || !lessons.length} onChange={(e) => setLessonId(e.target.value)}>
+                          {!unitId ? <MenuItem value="">Select a unit first</MenuItem> : null}
+                          {lessons.map((l) => (
+                            <MenuItem key={l.id} value={l.id}>
+                              {l.lessonNumber ? `${l.lessonNumber} · ` : ''}{l.title.slice(0, 36)}{l.title.length > 36 ? '...' : ''}
+                            </MenuItem>
+                          ))}
+                        </SelectField>
+                      </Field>
+                    </Box>
+                  </Box>
+                ) : null}
+
+                {step === 3 ? (
+                  <Box>
+                    <Field label="Differentiation / SEN (optional)">
+                      <InputBase
+                        fullWidth
+                        multiline
+                        minRows={4}
+                        maxRows={8}
+                        sx={inputSx}
+                        placeholder="Optional notes for this class"
+                        value={form.sen}
+                        onChange={(e) => setForm({ ...form, sen: e.target.value })}
                       />
                     </Field>
-                    <Field label="Language">
-                      <select className={inputCls} value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
-                        <option>English</option>
-                        <option>Kinyarwanda</option>
-                        <option>French</option>
-                      </select>
-                    </Field>
-                  </div>
-                </StepPanel>
-              ) : null}
+                  </Box>
+                ) : null}
+              </>
+            )}
+          </Box>
+        </Box>
 
-              {step === 1 ? (
-                <StepPanel>
-                  {(context?.assignments || []).length === 0 ? (
-                    <p className="text-sm text-slate-600">No courses linked. Set up your timetable first.</p>
-                  ) : (
-                    <Field label="Course & class">
-                      <select
-                        className={inputCls}
-                        value={assignmentKey}
-                        onChange={(e) => setAssignmentKey(e.target.value)}
-                      >
-                        {(context?.assignments || []).map((a) => {
-                          const key = `${a.subjectName}|${a.className}`;
-                          return (
-                            <option key={key} value={key}>
-                              {a.subjectName} · {a.classLabel || a.className}
-                              {a.room ? ` · ${a.room}` : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </Field>
-                  )}
-
-                  <Field
-                    label={
-                      sessionDuration?.source === 'timetable'
-                        ? `Duration · ${sessionDuration.periodCount} ${
-                            sessionDuration.periodCount === 1 ? 'period' : 'periods'
-                          }${sessionDuration.startTime ? ` · ${sessionDuration.startTime}` : ''}`
-                        : 'Duration (minutes)'
-                    }
-                    className="mt-3"
-                  >
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={20}
-                      max={240}
-                      readOnly={sessionDuration?.source === 'timetable'}
-                      className={`${inputCls}${sessionDuration?.source === 'timetable' ? ' cursor-default bg-slate-50 text-slate-700' : ''}`}
-                      value={form.durationMinutes}
-                      onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })}
-                    />
-                  </Field>
-
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    <StatPill label="Male" value={form.maleLearners} />
-                    <StatPill label="Female" value={form.femaleLearners} />
-                    <StatPill label="Total" value={form.classSize} />
-                  </div>
-                </StepPanel>
-              ) : null}
-
-              {step === 2 ? (
-                <StepPanel>
-                  {recommendedBook && assignment && !subjectsMatch(recommendedBook.subject, assignment.subjectName) ? (
-                    <p className="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                      Using guide <strong>{recommendedBook.subject}</strong> ({recommendedBook.grade}) for{' '}
-                      <strong>{assignment.subjectName}</strong>.
-                    </p>
-                  ) : null}
-                  <Field label="Teacher&apos;s guide">
-                    <select
-                      className={inputCls}
-                      value={bookId}
-                      onChange={(e) => setBookId(e.target.value)}
-                      disabled={!filteredBooks.length}
-                    >
-                      {filteredBooks.length === 0 ? (
-                        <option value="">
-                          No published guide for {assignment?.subjectName || 'this subject'}
-                        </option>
-                      ) : null}
-                      {filteredBooks.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.subject} · {b.grade} · {b.title}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Field label="Unit">
-                      <select
-                        className={inputCls}
-                        value={unitId}
-                        disabled={!bookId || !(tree?.units?.length)}
-                        onChange={(e) => {
-                          setUnitId(e.target.value);
-                          const u = tree?.units?.find((x) => x.id === e.target.value);
-                          setLessonId(u?.lessons?.[0]?.id || '');
-                        }}
-                      >
-                        {!bookId ? <option value="">Select a guide first</option> : null}
-                        {(tree?.units || []).map((u) => (
-                          <option key={u.id} value={u.id}>
-                            Unit {u.unitNumber} · {u.title.slice(0, 40)}
-                            {u.title.length > 40 ? '…' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Lesson">
-                      <select
-                        className={inputCls}
-                        value={lessonId}
-                        disabled={!unitId || !lessons.length}
-                        onChange={(e) => setLessonId(e.target.value)}
-                      >
-                        {!unitId ? <option value="">Select a unit first</option> : null}
-                        {lessons.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.lessonNumber ? `${l.lessonNumber} · ` : ''}
-                            {l.title.slice(0, 36)}
-                            {l.title.length > 36 ? '…' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                </StepPanel>
-              ) : null}
-
-              {step === 3 ? (
-                <StepPanel>
-                  <Field label="Differentiation / SEN (optional)">
-                    <textarea
-                      className={`${inputCls} min-h-[96px] resize-y`}
-                      placeholder="Optional notes for this class"
-                      value={form.sen}
-                      onChange={(e) => setForm({ ...form, sen: e.target.value })}
-                    />
-                  </Field>
-                </StepPanel>
-              ) : null}
-            </>
-          )}
-          </div>
-        </div>
-
-        <footer className="shrink-0 border-t border-slate-200 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="flex gap-2 sm:gap-3">
+        <Box
+          sx={{
+            flexShrink: 0,
+            borderTop: '1px solid #E5E8EF',
+            p: 1.5,
+            pb: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
+          <Stack direction="row" spacing={1}>
             {step > 0 ? (
-              <button
+              <Button
                 type="button"
                 disabled={generating}
                 onClick={() => setStep((s) => s - 1)}
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 sm:flex-none sm:px-4"
+                startIcon={<ChevronLeftIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  height: 48,
+                  flex: 1,
+                  borderRadius: 999,
+                  border: '1px solid #E5E8EF',
+                  bgcolor: '#fff',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: brand.navy,
+                  textTransform: 'none',
+                }}
               >
-                <ChevronLeft size={18} />
                 Back
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={onClose}
-                className="min-h-[44px] flex-1 rounded-md border border-slate-200 bg-white text-sm font-semibold text-slate-700 sm:flex-none sm:px-4"
+                sx={{
+                  height: 48,
+                  flex: 1,
+                  borderRadius: 999,
+                  border: '1px solid #E5E8EF',
+                  bgcolor: '#fff',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: brand.navy,
+                  textTransform: 'none',
+                }}
               >
                 Cancel
-              </button>
+              </Button>
             )}
 
             {isLast ? (
-              <button
+              <Button
                 type="button"
                 disabled={generating || loading || !lessonId}
                 onClick={() => void onSubmit()}
-                className="inline-flex min-h-[44px] flex-[1.4] items-center justify-center gap-2 rounded-md text-sm font-semibold text-white disabled:opacity-60"
-                style={{ background: NAVY }}
+                startIcon={generating ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  height: 48,
+                  flex: 1.35,
+                  borderRadius: 999,
+                  bgcolor: brand.navy,
+                  color: '#fff !important',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  boxShadow: '0 8px 20px rgba(19,33,61,0.22)',
+                  '&:hover': { bgcolor: '#1B2D52' },
+                  '&.Mui-disabled': { bgcolor: 'rgba(19,33,61,0.35)', color: 'rgba(255,255,255,0.8)' },
+                }}
               >
-                {generating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
                 Generate plan
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 disabled={loading || !canNext}
                 onClick={() => {
                   setError('');
                   setStep((s) => Math.min(s + 1, STEPS.length - 1));
                 }}
-                className="inline-flex min-h-[44px] flex-[1.4] items-center justify-center gap-1 rounded-md text-sm font-bold text-white disabled:opacity-50"
-                style={{ background: NAVY }}
+                endIcon={<ChevronRightIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  height: 48,
+                  flex: 1.35,
+                  borderRadius: 999,
+                  bgcolor: brand.navy,
+                  color: '#fff !important',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  boxShadow: '0 8px 20px rgba(19,33,61,0.22)',
+                  '&:hover': { bgcolor: '#1B2D52' },
+                  '&.Mui-disabled': { bgcolor: 'rgba(19,33,61,0.35)', color: 'rgba(255,255,255,0.8)' },
+                }}
               >
                 Continue
-                <ChevronRight size={18} />
-              </button>
+              </Button>
             )}
-          </div>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-const inputCls =
-  'w-full min-h-[40px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 transition focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-200';
-
-function StepPanel({ children }) {
-  return <div>{children}</div>;
-}
-
-function Field({ label, children, className = '' }) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <div className="mt-1.5">{children}</div>
-    </label>
-  );
-}
-
-function StatPill({ label, value }) {
-  return (
-    <div className="text-center">
-      <p className="text-[10px] font-medium text-slate-400">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
-        {value !== '' && value != null ? value : '–'}
-      </p>
-    </div>
+          </Stack>
+        </Box>
+    </Drawer>
   );
 }

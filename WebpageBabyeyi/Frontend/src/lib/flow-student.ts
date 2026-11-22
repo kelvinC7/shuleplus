@@ -13,7 +13,7 @@ export function assertStudentBelongsToSchool(
   }
 }
 
-/** Browser-loadable student photo — rewrites localhost / SM API hosts to `/uploads/...`. */
+/** Browser-loadable student photo - rewrites localhost / SM API hosts to `/uploads/...`. */
 export function normalizeStudentPhotoUrl(photoUrl?: string | null): string | null {
   const resolved = resolveAssetUrl(photoUrl);
   return resolved || null;

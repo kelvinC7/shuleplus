@@ -1,51 +1,60 @@
-import React from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
 import TeacherOrangeHero from './TeacherOrangeHero';
+import { brand } from '../theme/theme';
+import { pageSx } from '../theme/sx';
 
-/** Dashboard-style floating stat strip (2×2 mobile, 4 cols desktop). */
-export const tpActionBtn =
-  'inline-flex items-center justify-center gap-2 rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 text-sm text-[#000435] hover:bg-slate-50 transition-colors disabled:opacity-50';
-export const tpActionBtnPrimary =
-  'inline-flex items-center justify-center gap-2 rounded-xl bg-[#000435] px-4 py-2.5 text-sm text-white hover:bg-[#000650] transition-colors disabled:opacity-50';
+export const tpActionBtn = undefined; // legacy class export removed — use MUI Button
+export const tpActionBtnPrimary = undefined;
 
 export function TeacherStatGrid({ stats = [] }) {
   if (!stats.length) return null;
-
-  const gridClass =
-    stats.length === 5
-      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
-      : stats.length === 3
-        ? 'grid-cols-2 sm:grid-cols-3'
-        : stats.length === 2
-          ? 'grid-cols-2'
-          : 'grid-cols-2 sm:grid-cols-4';
+  const cols =
+    stats.length === 5 ? { xs: 2, sm: 3, lg: 5 } : stats.length === 3 ? { xs: 2, sm: 3 } : stats.length === 2 ? { xs: 2 } : { xs: 2, sm: 4 };
 
   return (
-    <div className={`tp-stat-grid shadow-sm !grid ${gridClass}`}>
-      {stats.map((stat, i) => {
-        const isLast = i === stats.length - 1;
-        const isOddCol = i % 2 === 0;
-        const showBottomBorder = stats.length > 2 && i < stats.length - (stats.length % 2 === 0 ? 2 : 1);
-
-        return (
-          <div
-            key={stat.label}
-            className={`tp-stat-cell border-black/[0.05]
-              ${!isLast && isOddCol && stats.length > 1 ? 'border-r' : ''}
-              ${showBottomBorder ? 'border-b sm:border-b-0' : ''}
-              ${i < stats.length - 1 ? 'sm:border-r' : ''}`}
-          >
-            <span className="tp-stat-value">{stat.value}</span>
-            <p className="tp-stat-label">{stat.label}</p>
-          </div>
-        );
-      })}
-    </div>
+    <Paper
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: `repeat(${Math.min(2, stats.length)}, 1fr)`,
+          sm: `repeat(${cols.sm || cols.xs}, 1fr)`,
+          lg: cols.lg ? `repeat(${cols.lg}, 1fr)` : undefined,
+        },
+        overflow: 'hidden',
+        borderRadius: 2,
+      }}
+    >
+      {stats.map((stat, i) => (
+        <Box
+          key={stat.label}
+          sx={{
+            px: 2,
+            py: 1.75,
+            borderRight: {
+              xs: i % 2 === 0 && i < stats.length - 1 ? `1px solid ${brand.border}` : 'none',
+              sm: i < stats.length - 1 ? `1px solid ${brand.border}` : 'none',
+            },
+            borderBottom: {
+              xs: i < stats.length - 2 ? `1px solid ${brand.border}` : 'none',
+              sm: 'none',
+            },
+          }}
+        >
+          <Typography sx={{ fontSize: '1.15rem', fontWeight: 600, color: brand.navy, lineHeight: 1.1 }}>
+            {stat.value}
+          </Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 11, fontWeight: 500, color: brand.muted }}>
+            {stat.label}
+          </Typography>
+        </Box>
+      ))}
+    </Paper>
   );
 }
 
-/**
- * Dashboard-aligned layout: hero → stat grid → optional actions → content (no heavy wrapper).
- */
 export default function TeacherPageShell({
   title,
   subtitle,
@@ -55,18 +64,31 @@ export default function TeacherPageShell({
   badgeLabel = 'ShuleTicha · Secure',
 }) {
   return (
-    <div className="min-h-full animate-in fade-in duration-500 pb-24 lg:pb-10">
+    <Box sx={{ ...pageSx, minHeight: '100%', pb: { xs: 12, lg: 4 } }}>
       <TeacherOrangeHero title={title} subtitle={subtitle} badgeLabel={badgeLabel} />
 
-      <div className="relative z-20 mx-auto max-w-[1300px] space-y-5 px-4 pb-10 sm:px-6 lg:px-8 -mt-8">
+      <Box
+        sx={{
+          position: 'relative',
+          zIndex: 20,
+          mx: 'auto',
+          maxWidth: 1300,
+          px: { xs: 2, sm: 3, lg: 4 },
+          mt: -4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2.5,
+          pb: 5,
+        }}
+      >
         <TeacherStatGrid stats={stats} />
-
         {actions ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">{actions}</div>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
+            {actions}
+          </Stack>
         ) : null}
-
         {children}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

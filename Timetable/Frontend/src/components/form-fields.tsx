@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import type { ReactNode } from 'react';
 
 export function FormField({
@@ -109,6 +110,95 @@ export function SelectField({
           </option>
         ))}
       </select>
+    </FormField>
+  );
+}
+
+
+export function SearchableSelectField({
+  label,
+  required,
+  value,
+  onChange,
+  options,
+  placeholder = 'Select an option',
+  searchPlaceholder = 'Search...',
+  className = '',
+  compact = false,
+  disabled = false,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  className?: string;
+  compact?: boolean;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+  const filtered = options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase()));
+
+  return (
+    <FormField label={label} required={required} className={className} compact={compact}>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => { if (!disabled) { setOpen((v) => !v); setQ(''); } }}
+          className={`input w-full text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FCB038] ${compact ? '!rounded-xl !py-2.5 !px-3.5 !text-sm' : ''} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+        >
+          <span className={selected ? 'text-navy' : 'text-muted'}>{selected?.label || placeholder}</span>
+        </button>
+        {open && !disabled ? (
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-white shadow-lg">
+            <div className="p-2 border-b border-border">
+              <input
+                autoFocus
+                className="input !py-2 !px-3 !text-sm w-full"
+                placeholder={searchPlaceholder}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            <div className="max-h-56 overflow-auto py-1">
+              <button
+                type="button"
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${!value ? 'font-semibold text-navy bg-slate-50' : 'text-muted'}`}
+                onClick={() => { onChange(''); setOpen(false); setQ(''); }}
+              >
+                {placeholder}
+              </button>
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted">No results found</div>
+              ) : filtered.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${opt.value === value ? 'font-semibold text-navy bg-primary/5' : 'text-slate-700'}`}
+                  onClick={() => { onChange(opt.value); setOpen(false); setQ(''); }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </FormField>
   );
 }

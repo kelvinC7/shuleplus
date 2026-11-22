@@ -127,6 +127,7 @@ model Tenant {
   organizationName String       @map("organization_name")
   district         String?
   schoolCode       String?      @map("school_code")
+  reportFooterSettings Json?    @map("report_footer_settings")
   status           TenantStatus @default(ACTIVE)
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
@@ -158,33 +159,49 @@ model Tenant {
   examConflicts         ExamConflict[]
   examInvigilatorDuties ExamInvigilatorDuty[]
   examInvigilatorStaff  ExamInvigilatorStaff[]
-  examAuditLogs         ExamAuditLog[]
-  reportCardComments      ReportCardComment[]
-  courseDefaultMarks      CourseDefaultMarks[]
-  reportCardPublications  ReportCardPublication[]
+  examAuditLogs           ExamAuditLog[]
+  examinationTypes          ExaminationType[]
+  classExaminationTimetables ClassExaminationTimetable[]
+  examinationLists           ExaminationList[]
+  examinationInvigilatorAssignments ExaminationInvigilatorAssignment[]
+  reportCardComments        ReportCardComment[]
+  courseDefaultMarks        CourseDefaultMarks[]
+  reportCardPublications    ReportCardPublication[]
+  reportPublicationBatches  ReportPublicationBatch[]
+  reportPublicationRecipients ReportPublicationRecipient[]
+  marksSubmissions          MarksSubmission[]
+  marksSubmissionEvents     MarksSubmissionEvent[]
+  academicAuditLogs         AcademicAuditLog[]
+  academicNotificationOutbox AcademicNotificationOutbox[]
 
   @@map("tenants")
 }
 
 model ReportCardPublication {
-  id             String   @id @default(uuid())
-  organizationId String   @map("organization_id")
-  studentId      String   @map("student_id")
-  classId        String   @map("class_id")
-  className      String?  @map("class_name")
-  studentName    String?  @map("student_name")
-  studentCode    String?  @map("student_code")
-  academicYear   String   @map("academic_year")
-  term           String
-  publishedAt    DateTime @default(now()) @map("published_at")
-  publishedBy    String?  @map("published_by")
-  publishedByName String? @map("published_by_name")
+  id              String                   @id @default(uuid())
+  organizationId  String                   @map("organization_id")
+  studentId       String                   @map("student_id")
+  classId         String                   @map("class_id")
+  className       String?                  @map("class_name")
+  studentName     String?                  @map("student_name")
+  studentCode     String?                  @map("student_code")
+  academicYear    String                   @map("academic_year")
+  term            String
+  reportKind      String                   @default("standard") @map("report_kind")
+  batchId         String?                  @map("batch_id")
+  accessPolicy    PublicationAccessPolicy  @default(PAID_ONLY) @map("access_policy")
+  status          String                   @default("PUBLISHED")
+  publishedAt     DateTime                 @default(now()) @map("published_at")
+  publishedBy     String?                  @map("published_by")
+  publishedByName String?                  @map("published_by_name")
 
   tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  batch  ReportPublicationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, studentId, classId, academicYear, term])
+  @@unique([organizationId, studentId, classId, academicYear, term, reportKind])
   @@index([organizationId, classId, academicYear, term])
   @@index([organizationId, academicYear, term, publishedAt])
+  @@index([batchId])
   @@map("report_card_publications")
 }
 
@@ -533,18 +550,20 @@ model AssessmentTemplate {
 }
 
 model AssessmentComponent {
-  id               String   @id @default(uuid())
-  templateId       String   @map("template_id")
+  id               String                   @id @default(uuid())
+  templateId       String                   @map("template_id")
   name             String
   code             String
   description      String?
-  maxMark          Decimal? @default(0) @map("max_mark")
-  weightPercentage Decimal? @map("weight_percentage")
-  isRequired       Boolean  @default(true) @map("is_required")
-  sortOrder        Int      @default(0) @map("sort_order")
-  isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  maxMark          Decimal?                 @default(0) @map("max_mark")
+  weightPercentage Decimal?                 @map("weight_percentage")
+  isRequired       Boolean                  @default(true) @map("is_required")
+  sortOrder        Int                      @default(0) @map("sort_order")
+  isActive         Boolean                  @default(true) @map("is_active")
+  assessmentCategory String?                @map("assessment_category")
+  reportingStage     AssessmentReportingStage @default(UNASSIGNED) @map("reporting_stage")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
 
   template    AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   marks       ComponentMark[]
@@ -684,26 +703,27 @@ model GradingScale {
 // ─── Actual Assessments (Teacher Creates) ──────────────
 
 model Assessment {
-  id             String              @id @default(uuid())
-  organizationId String              @map("organization_id")
-  templateId     String?             @map("template_id")
-  componentId    String?             @map("component_id")
-  subjectId      String              @map("subject_id")
-  classId        String              @map("class_id")
+  id             String                   @id @default(uuid())
+  organizationId String                   @map("organization_id")
+  templateId     String?                  @map("template_id")
+  componentId    String?                  @map("component_id")
+  subjectId      String                   @map("subject_id")
+  classId        String                   @map("class_id")
   title          String
-  assessmentCode String?             @map("assessment_code")
+  assessmentCode String?                  @map("assessment_code")
   description    String?
-  academicYear   String              @map("academic_year")
+  academicYear   String                   @map("academic_year")
   term           String
-  assessmentDate DateTime?           @map("assessment_date")
-  maxMark        Decimal             @map("max_mark")
+  assessmentDate DateTime?                @map("assessment_date")
+  maxMark        Decimal                  @map("max_mark")
   duration       String?
-  status         AssessmentLifecycle @default(DRAFT)
-  createdBy      String?             @map("created_by")
-  publishedBy    String?             @map("published_by")
-  publishedAt    DateTime?           @map("published_at")
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
+  status         AssessmentLifecycle      @default(DRAFT)
+  reportingStage AssessmentReportingStage @default(UNASSIGNED) @map("reporting_stage")
+  createdBy      String?                  @map("created_by")
+  publishedBy    String?                  @map("published_by")
+  publishedAt    DateTime?                @map("published_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
 
   tenant      Tenant                  @relation(fields: [organizationId], references: [organizationId])
   template    AssessmentTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
@@ -720,6 +740,7 @@ model Assessment {
   @@index([subjectId])
   @@index([classId])
   @@index([status])
+  @@index([reportingStage])
   @@index([organizationId, academicYear, term])
   @@index([classId, academicYear, term])
   @@map("assessments")
@@ -904,6 +925,41 @@ enum ExamCheckMethod {
   MANUAL
   QR
   RFID
+}
+
+enum PublicationAccessPolicy {
+  PAID_ONLY
+  ALL_PARENTS
+}
+
+enum AssessmentReportingStage {
+  UNASSIGNED
+  BEGINNING_TERM
+  MID_TERM
+  TERM_FINAL
+}
+
+enum PublicationBatchStatus {
+  DRAFT
+  PUBLISHED
+  PARTIALLY_PUBLISHED
+  REVOKED
+}
+
+enum MarksSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  RETURNED
+  APPROVED
+  PUBLISHED
+}
+
+enum MarksApprovalStatus {
+  PENDING
+  APPROVED
+  RETURNED
+  REJECTED
 }
 
 model ExamSession {
@@ -1142,4 +1198,436 @@ model ExamAuditLog {
 
   @@index([sessionId])
   @@map("exam_audit_logs")
+}
+
+model ReportPublicationBatch {
+  id                String                  @id @default(uuid())
+  organizationId    String                  @map("organization_id")
+  academicYear      String                  @map("academic_year")
+  term              String
+  reportKind        String                  @default("standard") @map("report_kind")
+  publicationType   String?                 @map("publication_type")
+  classId           String?                 @map("class_id")
+  className         String?                 @map("class_name")
+  accessPolicy      PublicationAccessPolicy @default(PAID_ONLY) @map("access_policy")
+  status            PublicationBatchStatus  @default(PUBLISHED)
+  notifyInApp       Boolean                 @default(true) @map("notify_in_app")
+  notifyPush        Boolean                 @default(true) @map("notify_push")
+  includeReportLink Boolean                 @default(true) @map("include_report_link")
+  selectedCount     Int                     @default(0) @map("selected_count")
+  publishedCount    Int                     @default(0) @map("published_count")
+  skippedCount      Int                     @default(0) @map("skipped_count")
+  publishedAt       DateTime                @default(now()) @map("published_at")
+  publishedBy       String?                 @map("published_by")
+  publishedByName   String?                 @map("published_by_name")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+
+  tenant       Tenant                        @relation(fields: [organizationId], references: [organizationId])
+  recipients   ReportPublicationRecipient[]
+  publications ReportCardPublication[]
+
+  @@index([organizationId, academicYear, term, publishedAt])
+  @@index([organizationId, classId, academicYear, term])
+  @@map("report_publication_batches")
+}
+
+model ReportPublicationRecipient {
+  id                 String                  @id @default(uuid())
+  organizationId     String                  @map("organization_id")
+  batchId            String                  @map("batch_id")
+  publicationId      String?                 @map("publication_id")
+  studentId          String                  @map("student_id")
+  studentCode        String?                 @map("student_code")
+  studentName        String?                 @map("student_name")
+  classId            String                  @map("class_id")
+  className          String?                 @map("class_name")
+  academicYear       String                  @map("academic_year")
+  term               String
+  reportKind         String                  @default("standard") @map("report_kind")
+  accessPolicy       PublicationAccessPolicy @default(PAID_ONLY) @map("access_policy")
+  status             String                  @default("PUBLISHED")
+  publishedAt        DateTime?               @map("published_at")
+  viewedAt           DateTime?               @map("viewed_at")
+  downloadedAt       DateTime?               @map("downloaded_at")
+  notificationStatus String?                 @map("notification_status")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  tenant Tenant                 @relation(fields: [organizationId], references: [organizationId])
+  batch  ReportPublicationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, batchId, studentId, reportKind])
+  @@index([batchId])
+  @@index([organizationId, studentId, academicYear, term])
+  @@map("report_publication_recipients")
+}
+
+model MarksSubmission {
+  id              String                @id @default(uuid())
+  organizationId  String                @map("organization_id")
+  assessmentId    String?               @map("assessment_id")
+  classId         String?               @map("class_id")
+  className       String?               @map("class_name")
+  subjectId       String?               @map("subject_id")
+  subjectName     String?               @map("subject_name")
+  academicYear    String                @map("academic_year")
+  term            String
+  submittedBy     String?               @map("submitted_by")
+  submittedByName String?               @map("submitted_by_name")
+  submittedAt     DateTime?             @map("submitted_at")
+  status          MarksSubmissionStatus @default(DRAFT)
+  reviewNotes     String?               @map("review_notes")
+  reviewedBy      String?               @map("reviewed_by")
+  reviewedByName  String?               @map("reviewed_by_name")
+  reviewedAt      DateTime?             @map("reviewed_at")
+  approvedBy      String?               @map("approved_by")
+  approvedByName  String?               @map("approved_by_name")
+  approvedAt      DateTime?             @map("approved_at")
+  returnedReason  String?               @map("returned_reason")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  tenant Tenant                @relation(fields: [organizationId], references: [organizationId])
+  events MarksSubmissionEvent[]
+
+  @@index([organizationId, academicYear, term, status])
+  @@index([assessmentId])
+  @@map("marks_submissions")
+}
+
+model MarksSubmissionEvent {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  submissionId   String   @map("submission_id")
+  eventType      String   @map("event_type")
+  fromStatus     String?  @map("from_status")
+  toStatus       String?  @map("to_status")
+  actorId        String?  @map("actor_id")
+  actorName      String?  @map("actor_name")
+  actorRoles     String?  @map("actor_roles")
+  comment        String?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant          @relation(fields: [organizationId], references: [organizationId])
+  submission MarksSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId, createdAt])
+  @@map("marks_submission_events")
+}
+
+model AcademicAuditLog {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  action         String
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  batchId        String?  @map("batch_id")
+  studentId      String?  @map("student_id")
+  classId        String?  @map("class_id")
+  academicYear   String?  @map("academic_year")
+  term           String?
+  actorId        String?  @map("actor_id")
+  actorName      String?  @map("actor_name")
+  actorRoles     String?  @map("actor_roles")
+  beforeState    Json?    @map("before_state")
+  afterState     Json?    @map("after_state")
+  details        Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@map("academic_audit_logs")
+}
+
+model AcademicNotificationOutbox {
+  id             String                   @id @default(uuid())
+  organizationId String                   @map("organization_id")
+  eventType      String                   @map("event_type")
+  entityType     String?                  @map("entity_type")
+  entityId       String?                  @map("entity_id")
+  batchId        String?                  @map("batch_id")
+  studentId      String?                  @map("student_id")
+  studentCode    String?                  @map("student_code")
+  classId        String?                  @map("class_id")
+  academicYear   String?                  @map("academic_year")
+  term           String?
+  accessPolicy   PublicationAccessPolicy? @map("access_policy")
+  targetModule   String                   @default("parentmis") @map("target_module")
+  status         String                   @default("PENDING")
+  attempts       Int                      @default(0)
+  payload        Json?
+  lastError      String?                  @map("last_error")
+  sentAt         DateTime?                @map("sent_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([organizationId, status, createdAt])
+  @@map("academic_notification_outbox")
+}
+
+enum ExaminationSessionPeriod {
+  MORNING
+  AFTERNOON
+}
+
+model ExaminationType {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  academicYear   String   @map("academic_year")
+  term           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant                      @relation(fields: [organizationId], references: [organizationId])
+  timetables     ClassExaminationTimetable[]
+  examinationLists ExaminationList[]
+
+  @@unique([organizationId, academicYear, term, name])
+  @@index([organizationId, academicYear, term])
+  @@map("examination_types")
+}
+
+model ClassExaminationTimetable {
+  id                String   @id @default(uuid())
+  organizationId    String   @map("organization_id")
+  examinationCode   String?  @unique @map("examination_code")
+  name              String?
+  examinationTypeId String?  @map("examination_type_id")
+  classId           String   @map("class_id")
+  className         String   @map("class_name")
+  academicYear      String   @map("academic_year")
+  term              String
+  startDate         DateTime @map("start_date")
+  endDate           DateTime @map("end_date")
+  excludeWeekends   Boolean  @default(false) @map("exclude_weekends")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant                     @relation(fields: [organizationId], references: [organizationId])
+  examinationType ExaminationType?           @relation(fields: [examinationTypeId], references: [id], onDelete: SetNull)
+  slots           ClassExaminationSlot[]
+  examinationLists ExaminationList[]
+  invigilatorAssignments ExaminationInvigilatorAssignment[]
+
+  @@unique([organizationId, classId, academicYear, term, examinationTypeId])
+  @@index([organizationId, academicYear, term])
+  @@index([organizationId, examinationCode])
+  @@index([examinationTypeId])
+  @@map("class_examination_timetables")
+}
+
+model ClassExaminationSlot {
+  id          String                   @id @default(uuid())
+  timetableId String                   @map("timetable_id")
+  examDate    DateTime                 @map("exam_date")
+  session     ExaminationSessionPeriod
+  courseName  String                   @map("course_name")
+  startTime   String                   @map("start_time")
+  endTime     String                   @map("end_time")
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  timetable ClassExaminationTimetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+
+  @@unique([timetableId, examDate, session])
+  @@index([timetableId, examDate])
+  @@map("class_examination_slots")
+}
+
+enum ExaminationDistributionMethod {
+  KEEP_CLASS
+  MIX_CLASSES
+}
+
+enum ExaminationListStatus {
+  DRAFT
+  GENERATED
+  PUBLISHED
+}
+
+model ExaminationList {
+  id                     String                        @id @default(uuid())
+  organizationId         String                        @map("organization_id")
+  listCode               String?                       @unique @map("list_code")
+  examinationTimetableId String?                       @map("examination_timetable_id")
+  examinationTypeId      String?                       @map("examination_type_id")
+  examinationCode        String?                       @map("examination_code")
+  examinationName        String?                       @map("examination_name")
+  academicYear           String                        @map("academic_year")
+  term                   String
+  name                   String?
+  startDate              DateTime?                     @map("start_date")
+  endDate                DateTime?                     @map("end_date")
+  distributionMethod     ExaminationDistributionMethod @map("distribution_method")
+  mixQuantity            Int?                          @map("mix_quantity")
+  defaultCapacity        Int                           @default(40) @map("default_capacity")
+  status                 ExaminationListStatus         @default(DRAFT)
+  generatedAt            DateTime?                     @map("generated_at")
+  publishedAt            DateTime?                     @map("published_at")
+  createdAt              DateTime                      @default(now()) @map("created_at")
+  updatedAt              DateTime                      @updatedAt @map("updated_at")
+
+  tenant                Tenant                        @relation(fields: [organizationId], references: [organizationId])
+  examinationTimetable  ClassExaminationTimetable?    @relation(fields: [examinationTimetableId], references: [id], onDelete: SetNull)
+  examinationType       ExaminationType?              @relation(fields: [examinationTypeId], references: [id], onDelete: SetNull)
+  rooms                 ExaminationListRoom[]
+  classes               ExaminationListClass[]
+  allocations           ExaminationAllocation[]
+  invigilatorAssignments ExaminationInvigilatorAssignment[]
+  attendanceRecords      ExaminationAttendance[]
+
+  @@index([organizationId, academicYear, term])
+  @@index([examinationTimetableId])
+  @@index([examinationTypeId])
+  @@index([examinationCode])
+  @@map("examination_lists")
+}
+
+model ExaminationListRoom {
+  id               String   @id @default(uuid())
+  listId           String   @map("list_id")
+  sourceRoomId     String?  @map("source_room_id")
+  roomName         String   @map("room_name")
+  roomNumber       String?  @map("room_number")
+  capacity         Int
+  isUniqueCapacity Boolean  @default(false) @map("is_unique_capacity")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  list        ExaminationList         @relation(fields: [listId], references: [id], onDelete: Cascade)
+  allocations ExaminationAllocation[]
+  invigilatorAssignments ExaminationInvigilatorAssignment[]
+  attendanceRecords      ExaminationAttendance[]
+
+  @@index([listId])
+  @@map("examination_list_rooms")
+}
+
+model ExaminationListClass {
+  id           String   @id @default(uuid())
+  listId       String   @map("list_id")
+  classId      String   @map("class_id")
+  className    String   @map("class_name")
+  studentCount Int      @map("student_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  list ExaminationList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, classId])
+  @@index([listId])
+  @@map("examination_list_classes")
+}
+
+model ExaminationAllocation {
+  id          String   @id @default(uuid())
+  listId      String   @map("list_id")
+  roomId      String   @map("room_id")
+  studentId   String   @map("student_id")
+  studentCode String?  @map("student_code")
+  studentName String   @map("student_name")
+  classId     String   @map("class_id")
+  className   String   @map("class_name")
+  gender      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  list ExaminationList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  room ExaminationListRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, studentId])
+  @@index([listId])
+  @@index([roomId])
+  @@map("examination_allocations")
+}
+
+enum ExaminationInvigilatorAssignmentType {
+  AUTOMATIC
+  MANUAL
+}
+
+enum ExaminationInvigilatorAssignmentStatus {
+  ASSIGNED
+  PENDING
+  CHECKED_IN
+  REPLACED
+}
+
+model ExaminationInvigilatorAssignment {
+  id                     String                                 @id @default(uuid())
+  organizationId         String                                 @map("organization_id")
+  examinationTimetableId String?                                @map("examination_timetable_id")
+  examinationListId      String                                 @map("examination_list_id")
+  examinationCode        String?                                @map("examination_code")
+  listCode               String?                                @map("list_code")
+  roomId                 String                                 @map("room_id")
+  roomName               String                                 @map("room_name")
+  roomNumber             String?                                @map("room_number")
+  examDate               DateTime                               @map("exam_date")
+  session                ExaminationSessionPeriod
+  startTime              String?                                @map("start_time")
+  endTime                String?                                @map("end_time")
+  teacherUserId          String                                 @map("teacher_user_id")
+  teacherName            String                                 @map("teacher_name")
+  teacherEmail           String?                                @map("teacher_email")
+  assignmentType         ExaminationInvigilatorAssignmentType   @default(AUTOMATIC) @map("assignment_type")
+  status                 ExaminationInvigilatorAssignmentStatus @default(ASSIGNED)
+  notes                  String?
+  createdAt              DateTime                               @default(now()) @map("created_at")
+  updatedAt              DateTime                               @updatedAt @map("updated_at")
+
+  tenant               Tenant                     @relation(fields: [organizationId], references: [organizationId])
+  examinationTimetable ClassExaminationTimetable? @relation(fields: [examinationTimetableId], references: [id], onDelete: SetNull)
+  examinationList      ExaminationList            @relation(fields: [examinationListId], references: [id], onDelete: Cascade)
+  room                 ExaminationListRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([examinationListId, roomId, examDate, session, teacherUserId])
+  @@index([organizationId, examinationListId, examDate, session])
+  @@index([teacherUserId, examDate, session])
+  @@index([examinationCode])
+  @@map("examination_invigilator_assignments")
+}
+
+enum ExaminationAttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+model ExaminationAttendance {
+  id                String                      @id @default(uuid())
+  organizationId    String                      @map("organization_id")
+  examinationListId String                      @map("examination_list_id")
+  roomId            String                      @map("room_id")
+  studentId         String                      @map("student_id")
+  studentCode       String?                     @map("student_code")
+  studentName       String                      @map("student_name")
+  classId           String?                     @map("class_id")
+  className         String?                     @map("class_name")
+  examDate          DateTime                    @map("exam_date")
+  session           ExaminationSessionPeriod
+  status            ExaminationAttendanceStatus @default(PRESENT)
+  markedByUserId    String?                     @map("marked_by_user_id")
+  markedByName      String?                     @map("marked_by_name")
+  markedAt          DateTime?                   @map("marked_at")
+  notes             String?
+  createdAt         DateTime                    @default(now()) @map("created_at")
+  updatedAt         DateTime                    @updatedAt @map("updated_at")
+
+  examinationList ExaminationList     @relation(fields: [examinationListId], references: [id], onDelete: Cascade)
+  room            ExaminationListRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([examinationListId, roomId, examDate, session, studentId])
+  @@index([organizationId, examinationListId, examDate, session])
+  @@index([roomId, examDate, session])
+  @@map("examination_attendance")
 }

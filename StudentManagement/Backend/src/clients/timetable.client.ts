@@ -38,3 +38,33 @@ export async function fetchTimetableTeacherProfiles(
   );
   return Array.isArray(body?.data) ? body.data : [];
 }
+
+export async function purgeTimetableClass(
+  organizationId: string,
+  className: string
+): Promise<{ ok: boolean; status?: number; message?: string }> {
+  const qs = new URLSearchParams({ organizationId, className });
+  const url = `${baseUrl()}/internal/classes?${qs.toString()}`;
+  try {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-service-key': env.SERVICE_API_KEY,
+        'x-source-service': 'student-management',
+      },
+    });
+    if (response.ok) return { ok: true, status: response.status };
+    const text = await response.text().catch(() => '');
+    return {
+      ok: false,
+      status: response.status,
+      message: text || `Timetable purge failed with status ${response.status}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Failed to reach timetable service',
+    };
+  }
+}

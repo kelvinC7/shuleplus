@@ -1,7 +1,7 @@
 'use client';
 
-import { BusesView } from '@/modules/fleet/fleet-views';
+import { BusesFleetView } from '@/modules/fleet/buses-fleet-view';
 
 export default function Page() {
-  return <BusesView />;
+  return <BusesFleetView />;
 }

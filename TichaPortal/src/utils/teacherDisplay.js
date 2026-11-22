@@ -1,11 +1,14 @@
+const isLocalOrigin = (value) =>
+  /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?\/?$/i.test(String(value || ''));
+
 export function resolveTeacherPhotoUrl(photo) {
   if (!photo) return null;
   const s = String(photo).trim();
   if (!s) return null;
-  if (s.startsWith('blob:') || s.startsWith('data:') || s.startsWith('http://') || s.startsWith('https://')) {
+  if (s.startsWith('blob:') || s.startsWith('data:')) {
     return s;
   }
-  const path = s.startsWith('/') ? s : `/${s}`;
+
   const apiOrigin = (
     import.meta.env.VITE_TP_API_URL ||
     import.meta.env.VITE_API_URL ||
@@ -13,11 +16,21 @@ export function resolveTeacherPhotoUrl(photo) {
   )
     .replace(/\/api\/?$/, '')
     .replace(/\/$/, '');
-  if (path.startsWith('/uploads')) {
-    if (apiOrigin && !import.meta.env.DEV) return `${apiOrigin}${path}`;
-    return path;
+  const hostedOrigin = isLocalOrigin(apiOrigin) ? '' : apiOrigin;
+
+  // Absolute /uploads URLs may embed a stale/other-host origin (e.g. localhost:3000).
+  // Serve them from the hosted API instead of requesting that host.
+  const uploadsIdx = s.indexOf('/uploads/');
+  if (uploadsIdx !== -1) {
+    const rel = s.slice(uploadsIdx);
+    if (hostedOrigin) return `${hostedOrigin}${rel}`;
+    return rel;
   }
-  if (apiOrigin) return `${apiOrigin}${path}`;
+
+  if (/^https?:\/\//i.test(s)) return s;
+
+  const path = s.startsWith('/') ? s : `/${s}`;
+  if (hostedOrigin) return `${hostedOrigin}${path}`;
   return path;
 }
 

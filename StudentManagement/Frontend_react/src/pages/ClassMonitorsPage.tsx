@@ -298,7 +298,7 @@ export default function ClassMonitorsPage() {
             value={slot}
             onChange={(e) => setSlot(Number(e.target.value) as 1 | 2)}
             size="small"
-            SelectProps={{ native: true }}
+            slotProps={{ select: { native: true } }}
           >
             <option value={1}>Monitor 1</option>
             <option value={2}>Monitor 2</option>

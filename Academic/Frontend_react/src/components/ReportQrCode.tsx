@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
+import { generateReportQrDataUrl } from '@/lib/report-qr';
 
 type Props = {
   value: string;
@@ -7,7 +7,7 @@ type Props = {
 };
 
 /** QR image via `qrcode` (avoids qrcode.react + React 19 duplicate-React hook errors). */
-export default function ReportQrCode({ value, size = 96 }: Props) {
+export default function ReportQrCode({ value, size = 72 }: Props) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,13 +16,9 @@ export default function ReportQrCode({ value, size = 96 }: Props) {
       return;
     }
     let cancelled = false;
-    QRCode.toDataURL(value, { width: size, margin: 1, errorCorrectionLevel: 'M' })
-      .then((url) => {
-        if (!cancelled) setSrc(url);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
+    void generateReportQrDataUrl(value, size).then((url) => {
+      if (!cancelled) setSrc(url);
+    });
     return () => {
       cancelled = true;
     };

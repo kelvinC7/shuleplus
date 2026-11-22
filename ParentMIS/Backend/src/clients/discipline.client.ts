@@ -5,11 +5,22 @@ export type DisciplineCaseRow = {
   incidentDate?: string | Date | null;
   createdAt?: string | Date | null;
   markName?: string | null;
+  customCaseName?: string | null;
   description?: string | null;
   incidentNotes?: string | null;
   appliedPoints?: number | null;
   status?: string | null;
   studentCode?: string | null;
+};
+
+export type DisciplineProfile = {
+  studentCode?: string | null;
+  currentScore: number;
+  maxScore: number;
+  startingScore?: number;
+  totalCases?: number;
+  casesThisTerm?: number;
+  initialized?: boolean;
 };
 
 async function disciplineFetch<T>(path: string): Promise<T> {
@@ -37,6 +48,17 @@ export async function listDisciplineCases(
     `/service/discipline/cases?organizationId=${encodeURIComponent(organizationId)}&studentCode=${encodeURIComponent(studentCode)}`
   );
   return Array.isArray(data) ? data : [];
+}
+
+/** Current score and configured maximum from the Student Discipline module. */
+export async function getDisciplineProfile(
+  organizationId: string,
+  studentCode: string
+): Promise<DisciplineProfile | null> {
+  const data = await disciplineFetch<DisciplineProfile | null>(
+    `/service/discipline/profile?organizationId=${encodeURIComponent(organizationId)}&studentCode=${encodeURIComponent(studentCode)}`
+  );
+  return data && typeof data === 'object' ? data : null;
 }
 
 export type DisciplinePermissionRow = {

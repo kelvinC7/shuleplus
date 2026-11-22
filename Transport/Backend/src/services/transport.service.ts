@@ -1,16 +1,19 @@
 import {
   AlertSeverity,
   AlertType,
+  AttendanceMethod,
+  AttendanceSyncStatus,
   BoardingType,
+  TransportEventType,
   BusStatus,
   CardStatus,
   DeviceStatus,
   EmergencyStatus,
   EmergencyType,
   FeeStatus,
-  NotificationChannel,
   PassengerMark,
   Prisma,
+  RouteStatus,
   StaffStatus,
   StudentTransportState,
   TripDirection,
@@ -20,6 +23,11 @@ import { prisma } from "../config/database";
 import { AppError } from "../middleware/error.middleware";
 import { fetchStudentByRfidUid, isStudentManagementEnabled } from "../clients/student-management.client";
 import { writeAudit } from "./seed.service";
+import {
+  ensureDefaultNotificationTemplates,
+  queueTransportEventNotifications,
+  resolveTransportEventType,
+} from "./transport-notification.service";
 
 function dateOnly(d = new Date()) {
   return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -58,11 +66,17 @@ function isMissingMark(mark: PassengerMark) {
 }
 
 export async function getOrCreateSettings(organizationId: string) {
-  return prisma.transportSettings.upsert({
+  const settings = await prisma.transportSettings.upsert({
     where: { organizationId },
     update: {},
     create: { organizationId },
   });
+  try {
+    await ensureDefaultNotificationTemplates(organizationId);
+  } catch (err) {
+    console.warn("[Transport] Notification template seed skipped:", err);
+  }
+  return settings;
 }
 
 export async function updateSettings(organizationId: string, body: Record<string, unknown>) {
@@ -87,6 +101,9 @@ export async function updateSettings(organizationId: string, body: Record<string
       ...(body.academicYear !== undefined ? { academicYear: String(body.academicYear) } : {}),
       ...(body.term !== undefined ? { term: String(body.term) } : {}),
       ...(body.schoolName !== undefined ? { schoolName: String(body.schoolName) } : {}),
+      ...(body.defaultNotifyLanguage !== undefined
+        ? { defaultNotifyLanguage: String(body.defaultNotifyLanguage) as "RW" | "EN" | "FR" }
+        : {}),
     },
   });
 }
@@ -102,58 +119,6 @@ async function raiseAlert(
   return prisma.safetyAlert.create({
     data: { organizationId, type, title, message, severity, ...related },
   });
-}
-
-async function queueParentNotify(
-  organizationId: string,
-  studentName: string,
-  studentCode: string | null | undefined,
-  title: string,
-  message: string
-) {
-  const settings = await getOrCreateSettings(organizationId);
-  if (!settings.enableParentNotify) return;
-
-  const parents = await prisma.parentContact.findMany({
-    where: {
-      organizationId,
-      deletedAt: null,
-      OR: [
-        ...(studentCode ? [{ studentCode }] : []),
-        { studentName: { equals: studentName, mode: "insensitive" } },
-      ],
-    },
-  });
-
-  const channels: NotificationChannel[] = [];
-  if (settings.enablePush) channels.push(NotificationChannel.PUSH);
-  if (settings.enableEmail) channels.push(NotificationChannel.EMAIL);
-  if (settings.enableSms) channels.push(NotificationChannel.SMS);
-  if (settings.enableWhatsapp) channels.push(NotificationChannel.WHATSAPP);
-  if (!channels.length) channels.push(NotificationChannel.APP);
-
-  for (const p of parents.length ? parents : [null]) {
-    for (const channel of channels) {
-      if (p) {
-        if (channel === NotificationChannel.SMS && !p.notifySms) continue;
-        if (channel === NotificationChannel.EMAIL && !p.notifyEmail) continue;
-        if (channel === NotificationChannel.WHATSAPP && !p.notifyWhatsapp) continue;
-        if (channel === NotificationChannel.PUSH && !p.notifyPush) continue;
-      }
-      await prisma.parentNotification.create({
-        data: {
-          organizationId,
-          parentId: p?.id,
-          studentName,
-          channel,
-          title,
-          message,
-          sentAt: new Date(),
-          status: "SENT",
-        },
-      });
-    }
-  }
 }
 
 function isAfternoon(settings: { morningStart: string; afternoonStart: string }) {
@@ -185,28 +150,59 @@ const tripInclude = {
   passengers: { orderBy: { studentName: "asc" as const } },
 } satisfies Prisma.TripInclude;
 
+function last7DayLabels(): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    out.push({
+      key,
+      label: d.toLocaleDateString("en-GB", { weekday: "short" }),
+    });
+  }
+  return out;
+}
+
 export async function dashboard(organizationId: string) {
   const today = dateOnly();
+  const todayEnd = new Date(today);
+  todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
+  const weekStart = new Date(today);
+  weekStart.setUTCDate(weekStart.getUTCDate() - 6);
+
   const settings = await getOrCreateSettings(organizationId);
   const [
     totalBuses,
     activeBuses,
+    inactiveBuses,
     movingBuses,
     maintenanceBuses,
+    totalRoutes,
+    activeRoutes,
+    tripsToday,
+    scansToday,
     students,
     onBus,
     expected,
     missing,
-    activeDrivers,
-    activeAttendants,
     liveTrips,
     alerts,
     recentEvents,
+    weekEvents,
   ] = await Promise.all([
     prisma.bus.count({ where: { organizationId, deletedAt: null } }),
     prisma.bus.count({ where: { organizationId, deletedAt: null, status: BusStatus.ACTIVE } }),
+    prisma.bus.count({ where: { organizationId, deletedAt: null, status: BusStatus.INACTIVE } }),
     prisma.trip.count({ where: { organizationId, tripDate: today, status: TripStatus.LIVE } }),
     prisma.bus.count({ where: { organizationId, deletedAt: null, status: BusStatus.MAINTENANCE } }),
+    prisma.route.count({ where: { organizationId, deletedAt: null } }),
+    prisma.route.count({ where: { organizationId, deletedAt: null, status: RouteStatus.ACTIVE } }),
+    prisma.trip.count({ where: { organizationId, tripDate: today } }),
+    prisma.boardingEvent.count({
+      where: { organizationId, scannedAt: { gte: today, lt: todayEnd } },
+    }),
     prisma.studentAssignment.count({ where: { organizationId, deletedAt: null } }),
     prisma.studentAssignment.count({
       where: { organizationId, deletedAt: null, liveState: StudentTransportState.ON_BUS },
@@ -217,28 +213,48 @@ export async function dashboard(organizationId: string) {
     prisma.studentAssignment.count({
       where: { organizationId, deletedAt: null, liveState: StudentTransportState.MISSING },
     }),
-    prisma.driver.count({ where: { organizationId, deletedAt: null, status: StaffStatus.ACTIVE } }),
-    prisma.attendant.count({ where: { organizationId, deletedAt: null, status: StaffStatus.ACTIVE } }),
     prisma.trip.findMany({
       where: {
         organizationId,
         tripDate: today,
-        status: { in: [TripStatus.BOARDING, TripStatus.LIVE] },
+        status: { in: [TripStatus.BOARDING, TripStatus.LIVE, TripStatus.SCHEDULED] },
       },
       include: tripInclude,
       orderBy: { createdAt: "desc" },
+      take: 8,
     }),
     prisma.safetyAlert.count({ where: { organizationId, resolved: false } }),
     prisma.boardingEvent.findMany({
-      where: { organizationId },
+      where: { organizationId, scannedAt: { gte: today, lt: todayEnd } },
       orderBy: { scannedAt: "desc" },
-      take: 12,
+      take: 8,
+    }),
+    prisma.boardingEvent.findMany({
+      where: { organizationId, scannedAt: { gte: weekStart } },
+      select: { scannedAt: true },
     }),
   ]);
 
   const late = await prisma.safetyAlert.count({
     where: { organizationId, resolved: false, type: AlertType.LATE_BOARDING },
   });
+
+  const dayBuckets = new Map(last7DayLabels().map((d) => [d.key, 0]));
+  for (const ev of weekEvents) {
+    const key = ev.scannedAt.toISOString().slice(0, 10);
+    if (dayBuckets.has(key)) dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + 1);
+  }
+  const boardingTrend = last7DayLabels().map((d) => ({
+    day: d.label,
+    boarded: dayBuckets.get(d.key) ?? 0,
+  }));
+
+  const fleetBreakdown = {
+    active: activeBuses,
+    maintenance: maintenanceBuses,
+    inactive: inactiveBuses,
+    other: Math.max(0, totalBuses - activeBuses - maintenanceBuses - inactiveBuses),
+  };
 
   return {
     organizationName: settings.schoolName || "School",
@@ -247,18 +263,24 @@ export async function dashboard(organizationId: string) {
     kpis: {
       totalBuses,
       activeBuses,
+      totalRoutes,
+      activeRoutes,
+      tripsToday,
+      scansToday,
       studentsAssigned: students,
       studentsOnBuses: onBus,
       notYetBoarded: expected + missing,
       lateOrMissed: late + missing,
       busesMoving: movingBuses,
       maintenanceBuses,
-      activeDrivers,
-      activeAttendants,
       openAlerts: alerts,
     },
     liveTrips,
     recentEvents,
+    charts: {
+      boardingTrend,
+      fleetBreakdown,
+    },
   };
 }
 
@@ -308,10 +330,19 @@ export async function liveOperations(organizationId: string) {
 }
 
 async function resolveCard(organizationId: string, cardNumber: string) {
-  const normalized = cardNumber.trim().toUpperCase();
+  const raw = cardNumber.trim();
+  const normalized = raw.toUpperCase();
   let card = await prisma.rfidCard.findFirst({
-    where: { organizationId, deletedAt: null, OR: [{ cardNumber: normalized }, { uid: normalized }] },
-    include: { assignment: { include: { morningBus: true, afternoonBus: true, route: true, pickupStop: true } } },
+    where: {
+      organizationId,
+      deletedAt: null,
+      OR: [{ cardNumber: normalized }, { uid: normalized }, { qrPayload: raw }, { qrPayload: normalized }],
+    },
+    include: {
+      assignment: {
+        include: { morningBus: true, afternoonBus: true, route: true, pickupStop: true, dropoffStop: true },
+      },
+    },
   });
   if (card) return card;
 
@@ -337,14 +368,29 @@ async function resolveCard(organizationId: string, cardNumber: string) {
       issuedAt: new Date(),
       activatedAt: new Date(),
     },
-    include: { assignment: { include: { morningBus: true, afternoonBus: true, route: true, pickupStop: true } } },
+    include: {
+      assignment: {
+        include: { morningBus: true, afternoonBus: true, route: true, pickupStop: true, dropoffStop: true },
+      },
+    },
   });
   return card;
 }
 
 export async function processTap(
   organizationId: string,
-  input: { cardNumber: string; deviceCode?: string; type?: BoardingType | string; busCode?: string }
+  input: {
+    cardNumber: string;
+    deviceCode?: string;
+    type?: BoardingType | string;
+    busCode?: string;
+    tripId?: string;
+    eventType?: TransportEventType;
+    idempotencyKey?: string;
+    attendanceMethod?: AttendanceMethod;
+    recordedByUserId?: string;
+    clientRecordedAt?: string;
+  }
 ) {
   const settings = await getOrCreateSettings(organizationId);
   const cardNumber = input.cardNumber.trim().toUpperCase();
@@ -429,16 +475,28 @@ export async function processTap(
     );
   }
 
+  if (input.idempotencyKey) {
+    const idem = await prisma.boardingEvent.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
+    if (idem) {
+      throw new AppError(409, `Duplicate scan: already recorded at ${idem.scannedAt.toISOString()}`);
+    }
+  }
+
   const today = dateOnly();
-  let trip = await prisma.trip.findFirst({
-    where: {
-      organizationId,
-      busId: detectedBus.id,
-      tripDate: today,
-      status: { in: [TripStatus.SCHEDULED, TripStatus.BOARDING, TripStatus.LIVE] },
-    },
-    include: tripInclude,
-  });
+  let trip = input.tripId
+    ? await prisma.trip.findFirst({
+        where: { id: input.tripId, organizationId },
+        include: tripInclude,
+      })
+    : await prisma.trip.findFirst({
+        where: {
+          organizationId,
+          busId: detectedBus.id,
+          tripDate: today,
+          status: { in: [TripStatus.SCHEDULED, TripStatus.BOARDING, TripStatus.LIVE] },
+        },
+        include: tripInclude,
+      });
 
   if (!trip) {
     trip = await prepareTrip(organizationId, {
@@ -447,10 +505,48 @@ export async function processTap(
     });
   }
 
+  if (input.tripId && trip.busId !== detectedBus.id && !settings.allowWrongBus) {
+    throw new AppError(403, "Card tap bus does not match selected trip");
+  }
+
+  const type: BoardingType = input.eventType
+    ? input.eventType === TransportEventType.BOARDING_TO_SCHOOL ||
+      input.eventType === TransportEventType.BOARDING_TO_HOME
+      ? BoardingType.BOARDING
+      : BoardingType.EXIT
+    : (input.type as BoardingType) ||
+      (assignment?.liveState === StudentTransportState.ON_BUS ? BoardingType.EXIT : BoardingType.BOARDING);
+
+  const eventType = input.eventType ?? resolveTransportEventType(trip.direction, type);
+
+  const attendanceMethod =
+    input.attendanceMethod ?? (device ? AttendanceMethod.RFID : AttendanceMethod.QR);
+
+  const studentCodeForEvent = card.studentCode ?? assignment?.studentCode ?? undefined;
+  if (input.eventType && studentCodeForEvent) {
+    const prior = await prisma.boardingEvent.findFirst({
+      where: {
+        organizationId,
+        tripId: trip.id,
+        studentCode: studentCodeForEvent,
+        eventType,
+        outcome: "OK",
+      },
+    });
+    if (prior) {
+      throw new AppError(
+        409,
+        `Duplicate scan: ${eventType} already recorded at ${prior.scannedAt.toISOString()} on bus ${prior.busCode ?? detectedBus.code}`
+      );
+    }
+  }
+
   const recent = await prisma.boardingEvent.findFirst({
     where: {
       organizationId,
-      cardId: card.id,
+      tripId: trip.id,
+      studentCode: studentCodeForEvent,
+      eventType,
       scannedAt: { gte: new Date(Date.now() - settings.duplicateTapSeconds * 1000) },
     },
   });
@@ -459,16 +555,15 @@ export async function processTap(
       organizationId,
       AlertType.DUPLICATE_TAP,
       "Duplicate tap",
-      `${card.studentName} already boarded. Last scan on ${recent.busCode ?? detectedBus.code}.`,
+      `${card.studentName} — ${eventType} already recorded on ${recent.busCode ?? detectedBus.code}.`,
       AlertSeverity.INFO,
       { relatedType: "event", relatedId: recent.id }
     );
-    throw new AppError(429, `Student already boarded. Last scan: ${recent.scannedAt.toISOString()} · Bus ${recent.busCode}`);
+    throw new AppError(
+      429,
+      `Duplicate scan: ${eventType} already recorded at ${recent.scannedAt.toISOString()} on bus ${recent.busCode ?? detectedBus.code}`
+    );
   }
-
-  const type: BoardingType =
-    (input.type as BoardingType) ||
-    (assignment?.liveState === StudentTransportState.ON_BUS ? BoardingType.EXIT : BoardingType.BOARDING);
 
   const now = new Date();
   const passenger = await prisma.tripPassenger.findFirst({
@@ -513,27 +608,38 @@ export async function processTap(
     });
   }
 
+  const stopForEvent =
+    eventType === TransportEventType.DROPPED_OFF_HOME || eventType === TransportEventType.BOARDING_TO_HOME
+      ? assignment?.dropoffStop
+      : assignment?.pickupStop;
+
   const event = await prisma.boardingEvent.create({
     data: {
       organizationId,
       tripId: trip.id,
       cardId: card.id,
       deviceId: device?.id,
-      stopId: assignment?.pickupStopId,
+      stopId: stopForEvent?.id ?? assignment?.pickupStopId,
       studentCode: card.studentCode,
       studentName: card.studentName ?? "Unknown",
       className: card.className,
       cardNumber,
       busCode: detectedBus.code,
       routeName: detectedBus.route?.name ?? trip.route?.name,
-      stopName: assignment?.pickupStop?.name,
+      stopName: stopForEvent?.name ?? assignment?.pickupStop?.name,
       driverName: detectedBus.driver?.name ?? trip.driver?.name,
       deviceCode: device?.deviceCode,
       type,
+      eventType,
+      attendanceMethod,
+      recordedByUserId: input.recordedByUserId,
+      idempotencyKey: input.idempotencyKey,
+      syncStatus: AttendanceSyncStatus.SYNCED,
+      clientRecordedAt: input.clientRecordedAt ? new Date(input.clientRecordedAt) : undefined,
       outcome: "OK",
       academicYear: settings.academicYear,
       term: settings.term,
-      scannedAt: now,
+      scannedAt: input.clientRecordedAt ? new Date(input.clientRecordedAt) : now,
     },
   });
 
@@ -548,19 +654,21 @@ export async function processTap(
   await refreshTripCounts(trip.id);
 
   const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const notifyMessage =
-    type === BoardingType.BOARDING
-      ? `${card.studentName} boarded ${detectedBus.code} at ${timeStr}.`
-      : trip.direction === TripDirection.TO_SCHOOL
-        ? `${card.studentName} arrived at school at ${timeStr}.`
-        : `${card.studentName} exited ${detectedBus.code} at ${timeStr}.`;
-  await queueParentNotify(
+  await queueTransportEventNotifications({
     organizationId,
-    card.studentName ?? "Student",
-    card.studentCode,
-    type === BoardingType.BOARDING ? "Boarded" : "Exited",
-    notifyMessage
-  );
+    eventType,
+    studentName: card.studentName ?? "Student",
+    studentCode: card.studentCode,
+    boardingEventId: event.id,
+    vars: {
+      studentName: card.studentName ?? "Student",
+      busCode: detectedBus.code,
+      time: timeStr,
+      routeName: detectedBus.route?.name ?? trip.route?.name,
+      schoolName: settings.schoolName ?? "School",
+      stopName: assignment?.pickupStop?.name ?? assignment?.dropoffStop?.name,
+    },
+  });
 
   const refreshed = await prisma.trip.findUnique({ where: { id: trip.id }, include: tripInclude });
 
@@ -582,7 +690,8 @@ export async function processTap(
     time: now.toISOString(),
     event,
     trip: refreshed,
-    parentMessage: notifyMessage,
+    parentMessage: `${eventType} recorded · notifications queued`,
+    eventType,
   };
 }
 
@@ -670,7 +779,48 @@ export async function startTrip(organizationId: string, tripId: string, force = 
   });
   if (!trip) throw new AppError(404, "Trip not found");
 
-  const missing = trip.passengers.filter((p) => isMissingMark(p.mark));
+  const departureEventType =
+    trip.direction === TripDirection.TO_SCHOOL
+      ? TransportEventType.BOARDING_TO_SCHOOL
+      : TransportEventType.BOARDING_TO_HOME;
+
+  const departureAttendance = await prisma.boardingEvent.findMany({
+    where: {
+      organizationId,
+      tripId: trip.id,
+      eventType: departureEventType,
+      studentCode: { in: trip.passengers.map((p) => p.studentCode) },
+      outcome: { in: ["OK", "ABSENT"] },
+    },
+    select: { studentCode: true, outcome: true, scannedAt: true },
+  });
+  const accountedByAttendance = new Set(
+    departureAttendance.map((e) => e.studentCode).filter((c): c is string => Boolean(c))
+  );
+
+  for (const ev of departureAttendance) {
+    if (!ev.studentCode) continue;
+    const passenger = trip.passengers.find((p) => p.studentCode === ev.studentCode);
+    if (!passenger || !isMissingMark(passenger.mark)) continue;
+    if (ev.outcome === "ABSENT") {
+      await prisma.tripPassenger.update({
+        where: { id: passenger.id },
+        data: { mark: PassengerMark.ABSENT },
+      });
+    } else {
+      await prisma.tripPassenger.update({
+        where: { id: passenger.id },
+        data: { mark: PassengerMark.MANUAL, boardedAt: ev.scannedAt },
+      });
+    }
+  }
+
+  const refreshedPassengers = await prisma.tripPassenger.findMany({ where: { tripId: trip.id } });
+
+  const missing = refreshedPassengers.filter((p) => {
+    if (accountedByAttendance.has(p.studentCode)) return false;
+    return isMissingMark(p.mark);
+  });
   if (settings.requireReconciliation && missing.length && !force) {
     await prisma.tripPassenger.updateMany({
       where: { id: { in: missing.map((m) => m.id) } },
@@ -869,9 +1019,44 @@ export async function listBuses(organizationId: string) {
   }));
 }
 
+export async function nextBusCode(organizationId: string) {
+  const buses = await prisma.bus.findMany({
+    where: { organizationId },
+    select: { code: true },
+  });
+  let max = 0;
+  for (const b of buses) {
+    const m = /^BUS-(\d+)$/i.exec(b.code.trim());
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `BUS-${String(max + 1).padStart(3, "0")}`;
+}
+
+export async function getBus(organizationId: string, id: string) {
+  const bus = await prisma.bus.findFirst({
+    where: { id, organizationId, deletedAt: null },
+    include: { driver: true, attendant: true, route: true },
+  });
+  if (!bus) throw new AppError(404, "Bus not found");
+  return bus;
+}
+
+export async function deleteBus(organizationId: string, id: string) {
+  const bus = await prisma.bus.findFirst({
+    where: { id, organizationId, deletedAt: null },
+  });
+  if (!bus) throw new AppError(404, "Bus not found");
+  await prisma.bus.update({
+    where: { id },
+    data: { deletedAt: new Date(), status: BusStatus.INACTIVE },
+  });
+  return { id };
+}
+
 export async function upsertBus(organizationId: string, body: Record<string, unknown>, id?: string) {
+  let code = str(body.code);
   const data = {
-    code: str(body.code),
+    code,
     plateNumber: str(body.plateNumber),
     busType: str(body.busType),
     capacity: num(body.capacity),
@@ -885,27 +1070,97 @@ export async function upsertBus(organizationId: string, body: Record<string, unk
     nextServiceKm: num(body.nextServiceKm),
   };
   if (id) {
+    const existing = await prisma.bus.findFirst({ where: { id, organizationId, deletedAt: null } });
+    if (!existing) throw new AppError(404, "Bus not found");
     return prisma.bus.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        code: data.code || existing.code,
+      },
       include: { driver: true, attendant: true, route: true },
     });
   }
-  if (!data.code || !data.plateNumber) throw new AppError(400, "code and plateNumber are required");
+  if (!data.plateNumber) throw new AppError(400, "plateNumber is required");
+  if (!code) code = await nextBusCode(organizationId);
   return prisma.bus.create({
     data: {
       organizationId,
-      code: data.code,
+      code,
       plateNumber: data.plateNumber,
       busType: data.busType ?? "School Bus",
       capacity: data.capacity ?? 40,
+      status: data.status ?? BusStatus.ACTIVE,
       gpsDevice: data.gpsDevice,
       driverId: data.driverId,
       attendantId: data.attendantId,
       routeId: data.routeId,
       notes: data.notes,
+      mileageKm: data.mileageKm ?? 0,
+      nextServiceKm: data.nextServiceKm,
     },
     include: { driver: true, attendant: true, route: true },
+  });
+}
+
+export async function listOrgUsersForTransport(organizationId: string, q?: string) {
+  const { listOrganizationUsers } = await import("../clients/iam.client");
+  const users = await listOrganizationUsers(organizationId);
+  const active = users.filter((u) => u.status === "ACTIVE" || u.status === "PENDING_VERIFICATION");
+  const needle = q?.trim().toLowerCase();
+  const filtered = needle
+    ? active.filter(
+        (u) =>
+          u.name.toLowerCase().includes(needle) ||
+          u.email.toLowerCase().includes(needle) ||
+          (u.phone?.includes(needle) ?? false) ||
+          (u.position?.toLowerCase().includes(needle) ?? false)
+      )
+    : active;
+  return filtered.slice(0, 40).map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    phone: u.phone,
+    position: u.position,
+    roles: u.roles,
+  }));
+}
+
+export async function resolveOrCreateDriverFromOrgUser(
+  organizationId: string,
+  input: { iamUserId?: string; name: string; phone?: string; licenseNumber?: string }
+) {
+  const name = input.name.trim();
+  if (!name) throw new AppError(400, "Driver name is required");
+  const phone = input.phone?.trim() || null;
+  const iamTag = input.iamUserId ? `iamUserId:${input.iamUserId}` : null;
+
+  if (phone) {
+    const byPhone = await prisma.driver.findFirst({
+      where: { organizationId, deletedAt: null, phone },
+    });
+    if (byPhone) return byPhone;
+  }
+  if (iamTag) {
+    const byIam = await prisma.driver.findFirst({
+      where: { organizationId, deletedAt: null, notes: { contains: iamTag } },
+    });
+    if (byIam) return byIam;
+  }
+  const byName = await prisma.driver.findFirst({
+    where: { organizationId, deletedAt: null, name: { equals: name, mode: "insensitive" } },
+  });
+  if (byName) return byName;
+
+  return prisma.driver.create({
+    data: {
+      organizationId,
+      name,
+      phone,
+      licenseNumber: input.licenseNumber?.trim() || null,
+      notes: iamTag ?? undefined,
+    },
   });
 }
 
@@ -1024,6 +1279,7 @@ export async function listStudents(organizationId: string, q?: string) {
 export async function upsertStudent(organizationId: string, body: Record<string, unknown>, id?: string) {
   const settings = await getOrCreateSettings(organizationId);
   const data = {
+    studentId: str(body.studentId) || str(body.studentCode),
     studentCode: str(body.studentCode),
     studentName: str(body.studentName),
     className: str(body.className),
@@ -1037,6 +1293,12 @@ export async function upsertStudent(organizationId: string, body: Record<string,
     guardianPhone: str(body.guardianPhone),
     transportSuspended: bool(body.transportSuspended),
     liveState: body.liveState as StudentTransportState | undefined,
+    serviceDirection: body.serviceDirection as
+      | import("@prisma/client").TransportServiceDirection
+      | undefined,
+    enrollmentStatus: body.enrollmentStatus as
+      | import("@prisma/client").TransportEnrollmentStatus
+      | undefined,
     academicYear: settings.academicYear,
     term: settings.term,
   };
@@ -1044,14 +1306,14 @@ export async function upsertStudent(organizationId: string, body: Record<string,
     return prisma.studentAssignment.update({
       where: { id },
       data,
-      include: { pickupStop: true, morningBus: true, afternoonBus: true, route: true },
+      include: { pickupStop: true, dropoffStop: true, morningBus: true, afternoonBus: true, route: true },
     });
   }
   if (!data.studentCode || !data.studentName) throw new AppError(400, "studentCode and studentName are required");
   return prisma.studentAssignment.create({
     data: {
       organizationId,
-      studentId: data.studentCode,
+      studentId: data.studentId ?? data.studentCode,
       studentCode: data.studentCode,
       studentName: data.studentName,
       className: data.className,
@@ -1063,10 +1325,12 @@ export async function upsertStudent(organizationId: string, body: Record<string,
       routeId: data.routeId,
       guardianName: data.guardianName,
       guardianPhone: data.guardianPhone,
+      serviceDirection: data.serviceDirection,
+      enrollmentStatus: data.enrollmentStatus,
       academicYear: data.academicYear,
       term: data.term,
     },
-    include: { pickupStop: true, morningBus: true, afternoonBus: true, route: true },
+    include: { pickupStop: true, dropoffStop: true, morningBus: true, afternoonBus: true, route: true },
   });
 }
 

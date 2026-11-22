@@ -149,6 +149,6 @@ export const MAX_DOC_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 
 export function formatRwf(amount: number | null | undefined): string {
-  if (amount == null) return '—';
+  if (amount == null) return '-';
   return `${new Intl.NumberFormat('en-RW').format(amount)} Frw`;
 }

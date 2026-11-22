@@ -1368,6 +1368,27 @@ export class LeaveService {
     return items.map((l) => this.mapRow(l));
   }
 
+  /** Approved leave covering a calendar day (for gate permission exit). */
+  async activeApprovedLeave(orgId: string, employeeId: string, onDate: Date) {
+    const dayStart = new Date(onDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(onDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    const row = await prisma.leaveRequest.findFirst({
+      where: {
+        organizationId: orgId,
+        employeeId,
+        status: 'APPROVED',
+        startDate: { lte: dayEnd },
+        endDate: { gte: dayStart },
+      },
+      orderBy: { startDate: 'desc' },
+      include: { employee: { include: { department: true } } },
+    });
+    if (!row) return null;
+    return this.mapRow(row);
+  }
+
   async stats(orgId: string) {
     const year = new Date().getFullYear();
     const monthStart = new Date(year, new Date().getMonth(), 1);

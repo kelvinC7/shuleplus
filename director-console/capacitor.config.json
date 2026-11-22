@@ -1,0 +1,8 @@
+{
+  "appId": "rw.shuleplus.director",
+  "appName": "Director Console",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

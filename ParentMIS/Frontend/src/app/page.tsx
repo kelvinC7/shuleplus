@@ -1,1 +1,5 @@
-import { redirect } from 'next/navigation'; export default function Page() { redirect('/login'); }
+import { ParentWelcomePage } from '@/components/auth/ParentWelcomePage';
+
+export default function HomePage() {
+  return <ParentWelcomePage />;
+}

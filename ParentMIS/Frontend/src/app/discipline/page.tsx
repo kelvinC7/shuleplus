@@ -20,6 +20,8 @@ interface DisciplineRecord {
 
 interface DisciplineResponse {
   score: number;
+  maxScore?: number;
+  startingScore?: number;
   totalPoints: number;
   records: DisciplineRecord[];
 }
@@ -30,6 +32,9 @@ export default function DisciplinePage() {
   const merits = records.filter((r) => r.points > 0);
   const demerits = records.filter((r) => r.points < 0);
   const score = data?.score ?? 0;
+  const maxScore = Math.max(1, Number(data?.maxScore) || 100);
+  const scorePct = Math.max(0, Math.min(1, score / maxScore));
+  const ringLength = 327;
 
   return (
     <div className="space-y-6">
@@ -61,22 +66,28 @@ export default function DisciplinePage() {
                     fill="none"
                     strokeWidth="12"
                     strokeLinecap="round"
-                    strokeDasharray={`${(score / 100) * 327} 327`}
+                    strokeDasharray={`${scorePct * ringLength} ${ringLength}`}
                     className={cn(
                       'transition-all duration-700',
-                      score >= 80 ? 'stroke-emerald-500' : score >= 60 ? 'stroke-primary' : 'stroke-red-500'
+                      scorePct >= 0.8
+                        ? 'stroke-emerald-500'
+                        : scorePct >= 0.6
+                          ? 'stroke-primary'
+                          : 'stroke-red-500'
                     )}
                   />
                 </svg>
                 <div className="absolute text-center">
                   <p className="text-3xl font-bold text-navy">{score}</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">/ 100</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                    / {maxScore}
+                  </p>
                 </div>
               </div>
               <div className="grid flex-1 gap-3 sm:grid-cols-3 sm:gap-4">
                 <StatCard
                   title="Conduct Score"
-                  value={`${score}/100`}
+                  value={`${score}/${maxScore}`}
                   icon={<Award />}
                   description="Overall behaviour"
                 />
@@ -126,9 +137,16 @@ export default function DisciplinePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-navy">
-                          {r.type === 'MERIT' ? 'Merit' : 'Conduct Note'}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-navy">
+                            {r.type === 'MERIT' ? 'Merit' : r.type || 'Conduct Note'}
+                          </p>
+                          {/round roll call/i.test(r.description || '') && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                              Roll call absence
+                            </span>
+                          )}
+                        </div>
                         <span
                           className={cn(
                             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',

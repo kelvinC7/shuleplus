@@ -4,7 +4,7 @@ import { useMemo, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getStoredUser, getAccessToken, getRefreshToken, resolvePostLoginRoute } from '@/lib/auth';
-import { tryLaunchDefaultModule } from '@/lib/module-launch';
+import { tryLaunchDefaultModule, tryLaunchDirectorConsole } from '@/lib/module-launch';
 import { useAppLanguage } from '@/i18n/app-language';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { EyeIcon, LockIcon } from '@/components/auth/modern-field';
@@ -107,6 +107,10 @@ export default function ChangePasswordPage() {
       if (user) {
         user.mustChangePassword = false;
         localStorage.setItem('user', JSON.stringify(user));
+        const accessToken = getAccessToken();
+        if (accessToken && tryLaunchDirectorConsole(user, accessToken)) {
+          return;
+        }
         if (user.roles?.includes('school_representative')) {
           router.push('/school-representative');
           return;

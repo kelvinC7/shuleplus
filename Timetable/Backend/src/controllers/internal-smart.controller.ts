@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/error.middleware';
+import { prisma } from '../config/database';
 import * as smart from '../services/smart.service';
 import { assignmentService } from '../services/assignment.service';
 import { classConfigService } from '../services/class-config.service';
@@ -7,6 +8,7 @@ import { courseConfigService } from '../services/course-config.service';
 import { teacherProfileService } from '../services/teacher-profile.service';
 import { teacherAccountService } from '../services/teacher-account.service';
 import { smartAccessStaffService } from '../services/smart-access-staff.service';
+import { timetableService } from '../services/timetable.service';
 import { getParentStudentWeek, listClassTeachers } from '../services/parent-read.service';
 
 /** Service-to-service (Teacher Portal) — bypasses JWT module license checks. */
@@ -15,6 +17,80 @@ function qStr(req: Request, key: string) {
 }
 
 export const internalSmartController = {
+  /** Director Console / school-wide timetable rows (service key, organizationId query). */
+  /** Director Console - live lesson sessions for a day (teacher started class, period attendance). */
+  async listLessonSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.query.organizationId ?? '');
+      if (!organizationId) throw new AppError(400, 'organizationId is required');
+      const date = qStr(req, 'date') ?? new Date().toISOString().slice(0, 10);
+      const rows = await prisma.lessonSession.findMany({
+        where: { organizationId, lessonDate: new Date(`${date}T00:00:00.000Z`) },
+        orderBy: [{ scheduledStart: 'asc' }, { className: 'asc' }],
+      });
+      res.json({
+        success: true,
+        data: rows.map((r) => ({
+          id: r.id,
+          className: r.className,
+          subjectName: r.subjectName,
+          teacherUserId: r.teacherUserId,
+          teacherName: r.teacherName,
+          room: r.room,
+          periodLabel: r.periodLabel,
+          scheduledStart: r.scheduledStart,
+          scheduledEnd: r.scheduledEnd,
+          status: r.status,
+          punctuality: r.punctuality,
+          startedAt: r.startedAt,
+          completedAt: r.completedAt,
+          attendanceDone: r.attendanceDone,
+          attendanceSubmittedAt: r.attendanceSubmittedAt,
+        })),
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async listTimetable(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.query.organizationId ?? '');
+      if (!organizationId) throw new AppError(400, 'organizationId is required');
+      const rows = await prisma.academicTimetable.findMany({
+        where: {
+          organizationId,
+          ...(qStr(req, 'term') ? { term: qStr(req, 'term') } : {}),
+          ...(qStr(req, 'academicYear') ? { academicYear: qStr(req, 'academicYear') } : {}),
+          ...(qStr(req, 'className') ? { className: qStr(req, 'className') } : {}),
+          ...(qStr(req, 'teacherUserId') ? { teacherUserId: qStr(req, 'teacherUserId') } : {}),
+          ...(qStr(req, 'day') ? { dayOfWeek: qStr(req, 'day') } : {}),
+        },
+        orderBy: [{ className: 'asc' }, { dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      });
+      res.json({
+        success: true,
+        data: rows.map((r) => ({
+          id: r.id,
+          organizationId: r.organizationId,
+          className: r.className,
+          subjectName: r.subjectName,
+          teacherUserId: r.teacherUserId,
+          teacherName: r.teacherName,
+          dayOfWeek: r.dayOfWeek,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          room: r.room,
+          term: r.term,
+          academicYear: r.academicYear,
+          isExtraActivity: r.isExtraActivity,
+        })),
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async teacherToday(req: Request, res: Response, next: NextFunction) {
     try {
       const organizationId = String(req.query.organizationId ?? '');
@@ -451,6 +527,32 @@ export const internalSmartController = {
         term: qStr(req, 'term'),
         academicYear: qStr(req, 'academicYear') ?? qStr(req, 'academic_year'),
       });
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  /** Purge all timetable data for a class when it is deleted in Student Management. */
+  async purgeClass(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.query.organizationId ?? req.body?.organizationId ?? '');
+      const className = String(req.query.className ?? req.body?.className ?? '');
+      if (!organizationId || !className) {
+        throw new AppError(400, 'organizationId and className are required');
+      }
+      const data = await timetableService.purgeClass(organizationId, className);
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async classrooms(req: Request, res: Response, next: NextFunction) {
+    try {
+      const organizationId = String(req.query.organizationId ?? '');
+      if (!organizationId) throw new AppError(400, 'organizationId is required');
+      const data = await smart.listClassrooms(organizationId);
       res.json({ success: true, data });
     } catch (e) {
       next(e);

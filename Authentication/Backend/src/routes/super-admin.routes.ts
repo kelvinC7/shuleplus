@@ -5,6 +5,7 @@ import { organizationRegistrationController } from '../controllers/organization-
 import { subscriptionController } from '../controllers/subscription.controller';
 import { smartAccessController } from '../controllers/smart-access.controller';
 import { gateDevicesController } from '../controllers/gate-devices.controller';
+import { staffSchoolAssignmentController } from '../controllers/staff-school-assignment.controller';
 import { smsBulkController } from '../controllers/sms-bulk.controller';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
 import { ROLES } from '../constants/roles';
@@ -12,6 +13,8 @@ import { schoolRepresentativeController } from '../controllers/school-representa
 import { chiefAccountantController } from '../controllers/chief-accountant.controller';
 import { seiOfficerController } from '../controllers/sei-officer.controller';
 import { deoOfficerController } from '../controllers/deo-officer.controller';
+import { shuleTripOfficialController } from '../controllers/shule-trip-official.controller';
+import { shuleTripSchoolRegistrationsController } from '../controllers/shule-trip-school-registrations.controller';
 
 const router = Router();
 
@@ -81,6 +84,33 @@ router.patch('/gate-devices/schools/:organizationId/devices/:deviceId', (req, re
 );
 router.delete('/gate-devices/schools/:organizationId/devices/:deviceId', (req, res, next) =>
   gateDevicesController.deleteDevice(req, res, next)
+);
+router.get('/gate-devices/schools/:organizationId/devices/:deviceId/schools', (req, res, next) =>
+  gateDevicesController.listDeviceSchools(req, res, next)
+);
+router.post('/gate-devices/schools/:organizationId/devices/:deviceId/schools', (req, res, next) =>
+  gateDevicesController.linkDeviceSchool(req, res, next)
+);
+router.delete('/gate-devices/schools/:organizationId/devices/:deviceId/schools/:schoolId', (req, res, next) =>
+  gateDevicesController.unlinkDeviceSchool(req, res, next)
+);
+
+// Device Management (Smart Access) - device assignments & staff multi-school assignments
+router.get('/device-management/schools', (req, res, next) => staffSchoolAssignmentController.schools(req, res, next));
+router.get('/device-management/schools/:organizationId/staff', (req, res, next) =>
+  staffSchoolAssignmentController.listStaff(req, res, next)
+);
+router.get('/device-management/schools/:organizationId/staff-assignments', (req, res, next) =>
+  staffSchoolAssignmentController.listAssignmentsForSchool(req, res, next)
+);
+router.get('/device-management/staff/:staffKey/assignments', (req, res, next) =>
+  staffSchoolAssignmentController.listAssignmentsForStaff(req, res, next)
+);
+router.post('/device-management/staff-assignments', (req, res, next) =>
+  staffSchoolAssignmentController.upsert(req, res, next)
+);
+router.delete('/device-management/schools/:organizationId/staff-assignments/:staffKey', (req, res, next) =>
+  staffSchoolAssignmentController.remove(req, res, next)
 );
 
 router.get('/organization-registrations', (req, res, next) =>
@@ -230,6 +260,20 @@ router.get('/audit-logs/access-analytics', (req, res, next) =>
   rootAdminController.auditAccessAnalytics(req, res, next)
 );
 
+router.get('/sms/school-access', (req, res, next) => smsBulkController.schoolSmsAccess(req, res, next));
+router.patch('/sms/school-access/:organizationId', (req, res, next) =>
+  smsBulkController.updateSchoolSmsAccess(req, res, next)
+);
+router.get('/sms/parent-purchases/stats', (req, res, next) =>
+  smsBulkController.parentPurchaseStats(req, res, next)
+);
+router.get('/sms/parent-purchases', (req, res, next) => smsBulkController.listParentPurchases(req, res, next));
+router.post('/sms/parent-purchases/:purchaseId/activate', (req, res, next) =>
+  smsBulkController.activateParentPurchase(req, res, next)
+);
+router.post('/sms/parent-purchases/:purchaseId/reject', (req, res, next) =>
+  smsBulkController.rejectParentPurchase(req, res, next)
+);
 router.get('/sms/status', (req, res) => smsBulkController.status(req, res));
 router.post('/sms/send', (req, res, next) => smsBulkController.send(req, res, next));
 router.post('/sms/send-bulk', (req, res, next) => smsBulkController.sendBulk(req, res, next));
@@ -300,6 +344,29 @@ router.patch('/deo-officers/:id', (req, res, next) => deoOfficerController.admin
 router.delete('/deo-officers/:id', (req, res, next) => deoOfficerController.adminDelete(req, res, next));
 router.post('/deo-officers/:id/reset-password', (req, res, next) =>
   deoOfficerController.adminResetPassword(req, res, next)
+);
+
+router.get('/shule-trip-officials', (req, res, next) =>
+  shuleTripOfficialController.adminList(req, res, next)
+);
+router.post('/shule-trip-officials', (req, res, next) =>
+  shuleTripOfficialController.adminCreate(req, res, next)
+);
+router.patch('/shule-trip-officials/:id', (req, res, next) =>
+  shuleTripOfficialController.adminUpdate(req, res, next)
+);
+router.delete('/shule-trip-officials/:id', (req, res, next) =>
+  shuleTripOfficialController.adminDelete(req, res, next)
+);
+router.post('/shule-trip-officials/:id/reset-password', (req, res, next) =>
+  shuleTripOfficialController.adminResetPassword(req, res, next)
+);
+
+router.get('/shule-trip-school-registrations', (req, res, next) =>
+  shuleTripSchoolRegistrationsController.list(req, res, next)
+);
+router.patch('/shule-trip-school-registrations/:id', (req, res, next) =>
+  shuleTripSchoolRegistrationsController.review(req, res, next)
 );
 
 export default router;

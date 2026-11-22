@@ -1,15 +1,30 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Archive,
-  Copy,
-  FileDown,
-  Loader2,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-} from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
+import Menu from '@mui/material/Menu';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LessonPlanningLayout from '../../components/lessonPlanning/LessonPlanningLayout';
+import LessonPlanFilterBar from '../../components/lessonPlanning/LessonPlanFilterBar';
 import GenerateLessonPlanModal from '../../components/lessonPlanning/GenerateLessonPlanModal';
 import ConfirmDeleteModal from '../../components/common/ConfirmDeleteModal';
 import {
@@ -19,15 +34,16 @@ import {
   downloadLessonPlanExport,
   listLessonPlansPaginated,
 } from '../../services/lessonPlanningApi';
+import { EmptyState } from '../../components/ui';
+import { brand } from '../../theme/theme';
 
-const NAVY = '#000435';
 const PAGE_SIZE = 10;
 
-const STATUS_STYLE = {
-  DRAFT: 'text-slate-600 ring-slate-200',
-  SUBMITTED: 'text-slate-700 ring-slate-200',
-  APPROVED: 'text-slate-700 ring-slate-200',
-  ARCHIVED: 'text-slate-500 ring-slate-200',
+const STATUS_TONE = {
+  DRAFT: { color: '#475569', ring: '#E2E8F0' },
+  SUBMITTED: { color: '#334155', ring: '#E2E8F0' },
+  APPROVED: { color: '#334155', ring: '#E2E8F0' },
+  ARCHIVED: { color: '#64748B', ring: '#E2E8F0' },
 };
 
 function lessonLabel(p) {
@@ -35,6 +51,20 @@ function lessonLabel(p) {
   const title = p.lesson?.title || p.planContent?.preparation?.lessonTitle?.value || 'Lesson plan';
   return num ? `${num} · ${title}` : title;
 }
+
+const headCellSx = {
+  px: 2,
+  py: 1.25,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  color: '#64748B',
+  whiteSpace: 'nowrap',
+  borderBottom: '1px solid #E2E8F0',
+  bgcolor: '#F8FAFC',
+};
+const bodyCellSx = { px: 2, py: 1.25, fontSize: 14 };
 
 export default function AllLessonPlansPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,149 +102,137 @@ export default function AllLessonPlansPage() {
     <LessonPlanningLayout
       title="All lesson plans"
       subtitle="Your saved plans."
+      filterBar={
+        <LessonPlanFilterBar
+          filters={[
+            {
+              key: 'status',
+              label: 'Status',
+              value: status,
+              onChange: (v) => {
+                setStatus(v);
+                setPage(1);
+              },
+              options: [
+                { value: '', label: 'All statuses' },
+                { value: 'DRAFT', label: 'Draft' },
+                { value: 'SUBMITTED', label: 'Submitted' },
+                { value: 'APPROVED', label: 'Approved' },
+                { value: 'ARCHIVED', label: 'Archived' },
+              ],
+            },
+          ]}
+          search={{
+            value: search,
+            onChange: (v) => {
+              setSearch(v);
+              setPage(1);
+            },
+            placeholder: 'Search title, class, subject…',
+          }}
+        />
+      }
       actions={
-        <button
+        <Button
           type="button"
+          variant="contained"
+          color="secondary"
           onClick={() => setModalOpen(true)}
-          className="rounded-md px-4 py-2 text-sm font-semibold text-white"
-          style={{ background: NAVY }}
+          sx={{ height: 36, width: { xs: '100%', sm: 'auto' }, px: 2, fontSize: 13, fontWeight: 600, textTransform: 'none', bgcolor: brand.navy, color: '#fff !important', '&:hover': { bgcolor: '#1B2D52' } }}
         >
           Generate new
-        </button>
+        </Button>
       }
     >
-      <p className="text-sm text-slate-600">
-        <span className="tabular-nums font-medium text-slate-900">{s.total ?? data.total}</span> plans
-        {(s.draft != null || s.submitted != null) && (
-          <>
-            {' · '}
-            {s.draft ?? 0} draft · {s.submitted ?? 0} submitted
-            {s.taught != null ? ` · ${s.taught} taught` : ''}
-          </>
-        )}
-      </p>
-
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="flex flex-col gap-2 border-b border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
-          <input
-            className="h-9 w-full flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-            placeholder="Search title, class, subject…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-          <select
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm sm:w-40"
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="APPROVED">Approved</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-        </div>
-
-        {/* Mobile list */}
-        <div className="divide-y divide-slate-100 md:hidden">
+      <Paper variant="outlined" sx={{ borderRadius: 1, overflow: 'hidden', bgcolor: '#fff' }}>
+        <Box sx={{ display: { xs: 'block', md: 'none' }, "& > * + *": { borderTop: '1px solid #F1F5F9' } }}>
           {loading ? (
-            <div className="flex justify-center py-14">
-              <Loader2 className="animate-spin" style={{ color: NAVY }} size={28} />
-            </div>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 7 }}>
+              <CircularProgress size={28} sx={{ color: brand.navy }} />
+            </Box>
           ) : data.items.length === 0 ? (
             <EmptyRow />
           ) : (
             data.items.map((p, idx) => (
-              <article key={p.id} className="px-3 py-3">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs font-bold tabular-nums text-slate-600">
+              <Box component="article" key={p.id} sx={{ px: 1.5, py: 1.5 }}>
+                <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                  <Box sx={{ display: 'flex', width: 28, height: 28, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 1, bgcolor: '#F1F5F9', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
                     {rowOffset + idx + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[#000435]">{lessonLabel(p)}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                  </Box>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography noWrap sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{lessonLabel(p)}</Typography>
+                    <Typography sx={{ mt: 0.25, fontSize: 12, color: '#64748B' }}>
                       {p.subjectLabel} · {p.className || p.gradeLabel || '–'}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
                       <StatusBadge status={p.status} taught={p.taughtAt} />
-                      <span className="text-xs text-slate-400">{p.durationMinutes} min</span>
-                    </div>
-                  </div>
-                  <PlanActions plan={p} onChanged={load} onDeleteRequest={setDeleteTarget} align="right" />
-                </div>
-              </article>
+                      <Box component="span" sx={{ fontSize: 12, color: '#94A3B8' }}>{p.durationMinutes} min</Box>
+                    </Stack>
+                  </Box>
+                  <PlanActions plan={p} onChanged={load} onDeleteRequest={setDeleteTarget} />
+                </Stack>
+              </Box>
             ))
           )}
-        </div>
+        </Box>
 
-        {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                <th className="w-14 px-4 py-2.5 text-center">No.</th>
-                <th className="px-4 py-2.5">Lesson</th>
-                <th className="px-4 py-2.5">Course / class</th>
-                <th className="px-4 py-2.5">Unit</th>
-                <th className="px-4 py-2.5">Date</th>
-                <th className="px-4 py-2.5">Duration</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="w-14 px-2 py-2.5 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+        <TableContainer sx={{ display: { xs: 'none', md: 'block' } }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ ...headCellSx, width: 56, textAlign: 'center' }}>No.</TableCell>
+                <TableCell sx={headCellSx}>Lesson</TableCell>
+                <TableCell sx={headCellSx}>Course / class</TableCell>
+                <TableCell sx={headCellSx}>Unit</TableCell>
+                <TableCell sx={headCellSx}>Date</TableCell>
+                <TableCell sx={headCellSx}>Duration</TableCell>
+                <TableCell sx={headCellSx}>Status</TableCell>
+                <TableCell sx={{ ...headCellSx, width: 56, textAlign: 'center' }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-14 text-center">
-                    <Loader2 className="mx-auto animate-spin" style={{ color: NAVY }} size={28} />
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ py: 7, textAlign: 'center' }}>
+                    <CircularProgress size={28} sx={{ color: brand.navy }} />
+                  </TableCell>
+                </TableRow>
               ) : data.items.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <EmptyRow />
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ p: 0 }}><EmptyRow /></TableCell>
+                </TableRow>
               ) : (
                 data.items.map((p, idx) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5 text-center text-xs font-semibold tabular-nums text-slate-500">
+                  <TableRow key={p.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                    <TableCell sx={{ ...bodyCellSx, textAlign: 'center', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#64748B' }}>
                       {rowOffset + idx + 1}
-                    </td>
-                    <td className="max-w-[220px] truncate px-4 py-2.5 font-medium text-[#000435]">{lessonLabel(p)}</td>
-                    <td className="px-4 py-2.5 text-slate-600">
-                      {p.subjectLabel || '–'}
-                      <span className="text-slate-300"> · </span>
-                      {p.className || p.gradeLabel || '–'}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600">
+                    </TableCell>
+                    <TableCell sx={{ ...bodyCellSx, maxWidth: 220, fontWeight: 500, color: brand.navy }}>
+                      <Box noWrap>{lessonLabel(p)}</Box>
+                    </TableCell>
+                    <TableCell sx={{ ...bodyCellSx, color: '#475569' }}>
+                      {p.subjectLabel || '–'}<Box component="span" sx={{ color: '#CBD5E1' }}> · </Box>{p.className || p.gradeLabel || '–'}
+                    </TableCell>
+                    <TableCell sx={{ ...bodyCellSx, color: '#475569' }}>
                       {p.lesson?.unit ? `Unit ${p.lesson.unit.unitNumber}` : '–'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                    </TableCell>
+                    <TableCell sx={{ ...bodyCellSx, color: '#475569', whiteSpace: 'nowrap' }}>
                       {p.lessonDate ? new Date(p.lessonDate).toLocaleDateString() : '–'}
-                    </td>
-                    <td className="px-4 py-2.5 tabular-nums text-slate-600">{p.durationMinutes} min</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={p.status} taught={p.taughtAt} />
-                    </td>
-                    <td className="px-2 py-2.5 text-center">
-                      <PlanActions plan={p} onChanged={load} onDeleteRequest={setDeleteTarget} align="right" />
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell sx={{ ...bodyCellSx, color: '#475569', fontVariantNumeric: 'tabular-nums' }}>{p.durationMinutes} min</TableCell>
+                    <TableCell sx={bodyCellSx}><StatusBadge status={p.status} taught={p.taughtAt} /></TableCell>
+                    <TableCell sx={{ ...bodyCellSx, textAlign: 'center' }}>
+                      <PlanActions plan={p} onChanged={load} onDeleteRequest={setDeleteTarget} />
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
 
         <PlansPagination data={data} page={page} setPage={setPage} pageSize={PAGE_SIZE} />
-      </div>
+      </Paper>
 
       <GenerateLessonPlanModal open={modalOpen} onClose={() => setModalOpen(false)} />
 
@@ -244,17 +262,34 @@ export default function AllLessonPlansPage() {
 }
 
 function EmptyRow() {
-  return <p className="py-12 text-center text-sm text-slate-500">No lesson plans match your filters.</p>;
+  return (
+    <EmptyState
+      title="No lesson plans yet"
+      description="Generate a plan from curriculum, or adjust filters to find existing ones."
+    />
+  );
 }
 
 function StatusBadge({ status, taught }) {
+  const tone = STATUS_TONE[status] || { color: '#475569', ring: '#E2E8F0' };
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${STATUS_STYLE[status] || 'text-slate-600 ring-slate-200'}`}
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        borderRadius: 0.5,
+        px: 1,
+        py: 0.25,
+        fontSize: 11,
+        fontWeight: 500,
+        color: tone.color,
+        boxShadow: `inset 0 0 0 1px ${tone.ring}`,
+      }}
     >
       {status}
       {taught ? ' · taught' : ''}
-    </span>
+    </Box>
   );
 }
 
@@ -273,158 +308,137 @@ function PlansPagination({ data, page, setPage, pageSize }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-      <span>
-        Showing <strong className="font-semibold text-[#000435]">{from}</strong>–
-        <strong className="font-semibold text-[#000435]">{to}</strong> of{' '}
-        <strong className="font-semibold text-[#000435]">{data.total}</strong>
-      </span>
-      <div className="flex flex-wrap items-center justify-end gap-1">
-        <PageBtn disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-          Prev
-        </PageBtn>
+    <Stack
+      direction={{ xs: 'column', sm: 'row' }}
+      alignItems={{ sm: 'center' }}
+      justifyContent={{ sm: 'space-between' }}
+      spacing={1}
+      sx={{ borderTop: '1px solid #F1F5F9', px: { xs: 1.5, sm: 2 }, py: 1.5, fontSize: 12, color: '#475569' }}
+    >
+      <Box component="span">
+        Showing <Box component="strong" sx={{ fontWeight: 600, color: brand.navy }}>{from}</Box>–
+        <Box component="strong" sx={{ fontWeight: 600, color: brand.navy }}>{to}</Box> of{' '}
+        <Box component="strong" sx={{ fontWeight: 600, color: brand.navy }}>{data.total}</Box>
+      </Box>
+      <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="flex-end" gap={0.5}>
+        <PageBtn disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</PageBtn>
         {pages.map((p, i) =>
           p === '…' ? (
-            <span key={`e-${i}`} className="px-1 text-slate-400">
-              …
-            </span>
+            <Box key={`e-${i}`} component="span" sx={{ px: 0.5, color: '#94A3B8' }}>…</Box>
           ) : (
-            <PageBtn key={p} active={p === page} onClick={() => setPage(p)}>
-              {p}
-            </PageBtn>
+            <PageBtn key={p} active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
           )
         )}
-        <PageBtn disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-          Next
-        </PageBtn>
-      </div>
-    </div>
+        <PageBtn disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</PageBtn>
+      </Stack>
+    </Stack>
   );
 }
 
 function PageBtn({ children, disabled, active, onClick }) {
   return (
-    <button
+    <ButtonBase
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`min-w-[2rem] rounded-md px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
-        active ? 'bg-[#000435] text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-      }`}
+      sx={{
+        minWidth: 32,
+        px: 1.25,
+        py: 0.75,
+        borderRadius: 1,
+        fontSize: 12,
+        fontWeight: 600,
+        border: '1px solid',
+        borderColor: active ? brand.navy : '#E2E8F0',
+        bgcolor: active ? brand.navy : '#fff',
+        color: active ? '#fff' : '#334155',
+        '&:hover': { bgcolor: active ? brand.navy : '#F8FAFC' },
+        '&.Mui-disabled': { opacity: 0.4 },
+      }}
     >
       {children}
-    </button>
+    </ButtonBase>
   );
 }
 
-function PlanActions({ plan, onChanged, onDeleteRequest, align = 'right' }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+function PlanActions({ plan, onChanged, onDeleteRequest }) {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
-
-  const itemCls =
-    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50';
+  const menuItemSx = { display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1, fontSize: 14, color: '#334155' };
 
   return (
-    <div ref={ref} className={`relative inline-block ${align === 'right' ? 'text-right' : ''}`}>
-      <button
+    <Box sx={{ display: 'inline-block' }}>
+      <IconButton
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-[#000435]"
-        onClick={() => setOpen((v) => !v)}
+        aria-label="Lesson plan actions"
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+        sx={{ width: 32, height: 32, borderRadius: 1, border: '1px solid #E2E8F0', bgcolor: '#fff', color: '#475569', '&:hover': { bgcolor: '#F8FAFC', color: brand.navy } }}
       >
-        <MoreHorizontal size={16} />
-      </button>
-      {open ? (
-        <div
-          role="menu"
-          className={`absolute z-30 mt-1 min-w-[11.5rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg ${
-            align === 'right' ? 'right-0' : 'left-0'
-          }`}
+        <MoreHorizIcon sx={{ fontSize: 17 }} />
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { mt: 0.5, minWidth: 184, borderRadius: 1.5, border: '1px solid #E2E8F0' } }}
+      >
+        <MenuItem component={Link} to={`/lesson-plans/${plan.id}`} onClick={() => setAnchorEl(null)} sx={menuItemSx}>
+          <EditOutlinedIcon sx={{ fontSize: 15, color: '#94A3B8' }} /> Open / edit
+        </MenuItem>
+        <MenuItem
+          sx={menuItemSx}
+          onClick={async () => {
+            await duplicateLessonPlan(plan.id);
+            setAnchorEl(null);
+            onChanged();
+          }}
         >
-          <Link
-            role="menuitem"
-            to={`/lesson-plans/${plan.id}`}
-            className={itemCls}
-            onClick={() => setOpen(false)}
-          >
-            <Pencil size={15} className="shrink-0 text-slate-400" />
-            Open / edit
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            className={itemCls}
-            onClick={async () => {
-              await duplicateLessonPlan(plan.id);
-              setOpen(false);
-              onChanged();
-            }}
-          >
-            <Copy size={15} className="shrink-0 text-slate-400" />
-            Duplicate
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={itemCls}
-            onClick={async () => {
-              await downloadLessonPlanExport(plan.id, 'pdf');
-              setOpen(false);
-            }}
-          >
-            <FileDown size={15} className="shrink-0 text-slate-400" />
-            Download PDF
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={itemCls}
-            onClick={async () => {
-              await downloadLessonPlanExport(plan.id, 'docx');
-              setOpen(false);
-            }}
-          >
-            <FileDown size={15} className="shrink-0 text-slate-400" />
-            Download DOCX
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={itemCls}
-            onClick={async () => {
-              await archiveLessonPlan(plan.id);
-              setOpen(false);
-              onChanged();
-            }}
-          >
-            <Archive size={15} className="shrink-0 text-slate-400" />
-            Archive
-          </button>
-          <div className="my-1 border-t border-slate-100" />
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-            onClick={() => {
-              setOpen(false);
-              onDeleteRequest?.(plan);
-            }}
-          >
-            <Trash2 size={15} className="shrink-0" />
-            Delete
-          </button>
-        </div>
-      ) : null}
-    </div>
+          <ContentCopyIcon sx={{ fontSize: 15, color: '#94A3B8' }} /> Duplicate
+        </MenuItem>
+        <MenuItem
+          sx={menuItemSx}
+          onClick={async () => {
+            await downloadLessonPlanExport(plan.id, 'pdf');
+            setAnchorEl(null);
+          }}
+        >
+          <FileDownloadOutlinedIcon sx={{ fontSize: 15, color: '#94A3B8' }} /> Download PDF
+        </MenuItem>
+        <MenuItem
+          sx={menuItemSx}
+          onClick={async () => {
+            await downloadLessonPlanExport(plan.id, 'docx');
+            setAnchorEl(null);
+          }}
+        >
+          <FileDownloadOutlinedIcon sx={{ fontSize: 15, color: '#94A3B8' }} /> Download DOCX
+        </MenuItem>
+        <MenuItem
+          sx={menuItemSx}
+          onClick={async () => {
+            await archiveLessonPlan(plan.id);
+            setAnchorEl(null);
+            onChanged();
+          }}
+        >
+          <ArchiveOutlinedIcon sx={{ fontSize: 15, color: '#94A3B8' }} /> Archive
+        </MenuItem>
+        <Divider sx={{ my: 0.5 }} />
+        <MenuItem
+          sx={{ ...menuItemSx, fontWeight: 500, color: '#DC2626' }}
+          onClick={() => {
+            setAnchorEl(null);
+            onDeleteRequest?.(plan);
+          }}
+        >
+          <DeleteOutlineIcon sx={{ fontSize: 15 }} /> Delete
+        </MenuItem>
+      </Menu>
+    </Box>
   );
 }

@@ -2,11 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="preload" as="image" href="/st-wordmark.webp" />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="ShuleTicha" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="text-scale" content="scale" />
     <title>Shule+ · Teacher Portal</title>
     <meta name="description" content="Shule+ Teacher Portal for classes, marks, attendance, timetables, and staff services." />
-    <meta name="theme-color" content="#000435" />
+    <meta name="theme-color" content="#13213D" />
     <meta property="og:title" content="Shule+ · Teacher Portal" />
     <meta property="og:description" content="Teacher workspace for classes, marks, attendance, timetables, and staff services." />
     <meta property="og:image" content="/yellow-icon.png" />
@@ -15,9 +23,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-  </head>
+  <style>
+body{margin:0}.st-splash{position:relative;min-height:100dvh;background:radial-gradient(120% 70% at 50% 40%,#1B2D52 0,#13213D 55%,#0B1220 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Montserrat,system-ui,sans-serif}
+.st-brand{display:flex;flex-direction:column;align-items:center;gap:14px}.st-brand img{width:230px;height:auto}
+.st-brand p{margin:0;font-size:11px;font-weight:700;color:#9FB0D3;letter-spacing:2.2px;text-transform:uppercase}
+.st-ld{width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:10px}.st-ld i{display:block;height:100%;width:40%;background:#F5A623;border-radius:3px;animation:ldbar 1.1s ease-in-out infinite}
+@keyframes ldbar{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+</style></head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="st-splash"><div class="st-brand"><img src="/st-wordmark.webp" alt="ShuleTicha"><p>The teacher’s workspace</p><div class="st-ld"><i></i></div></div></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

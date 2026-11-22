@@ -1,6 +1,13 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import type { StudentSelector } from '../utils/student-param';
+import {
+  manifestStudentKeysForPhone,
+  pruneGuardianLinksOutsideManifest,
+  studentMatchesManifestKeys,
+} from './manifest-guardian-scope.service';
+import { isParentShuleTripOnly } from './parent-portal-mode.service';
+import { provisionParentFromPublishedTrips } from './trip-guardian-provision.service';
 
 export interface ParentContext {
   parentId: string;
@@ -38,6 +45,40 @@ async function ensureLink(parentId: string, studentId: string) {
   await prisma.parentStudentLink.create({
     data: { parentId, studentId, relationship: 'GUARDIAN', isPrimary: false },
   });
+}
+
+async function ensureLinkIfManifestAllows(
+  organizationId: string,
+  parentId: string,
+  studentId: string
+) {
+  const parent = await prisma.parentAccount.findUnique({ where: { id: parentId } });
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student) return;
+
+  if (parent?.phone && (await isParentShuleTripOnly(organizationId, parentId))) {
+    const keys = await manifestStudentKeysForPhone(parent.phone);
+    if (keys.size && !studentMatchesManifestKeys(keys, student)) return;
+  }
+  await ensureLink(parentId, studentId);
+}
+
+/** Pull learners from ParentMIS ShuleTrip sync, then drop links for other guardians' manifest rows. */
+async function syncAndFilterLinksForGuardian(organizationId: string, parentId: string) {
+  const parent = await prisma.parentAccount.findUnique({ where: { id: parentId } });
+  if (!parent?.phone || !(await isParentShuleTripOnly(organizationId, parentId))) {
+    return linksForParent(parentId, organizationId);
+  }
+
+  await provisionParentFromPublishedTrips(parent.phone);
+  await pruneGuardianLinksOutsideManifest(parentId, parent.phone);
+
+  let links = await linksForParent(parentId, organizationId);
+  const keys = await manifestStudentKeysForPhone(parent.phone);
+  if (keys.size) {
+    links = links.filter((l) => studentMatchesManifestKeys(keys, l.student));
+  }
+  return links;
 }
 
 type LinkWithStudent = {
@@ -89,10 +130,11 @@ export async function resolveParentContext(
   parentId: string,
   requested?: StudentSelector
 ): Promise<ParentContext> {
-  let links = await linksForParent(parentId, organizationId);
+  let links = await syncAndFilterLinksForGuardian(organizationId, parentId);
   const { id: wantedId, code: wantedCode } = parseStudentSelector(requested);
+  const tripOnly = await isParentShuleTripOnly(organizationId, parentId);
 
-  if (links.length === 0 && (wantedId || wantedCode)) {
+  if (links.length === 0 && (wantedId || wantedCode) && !tripOnly) {
     const extra = await prisma.student.findFirst({
       where: {
         OR: [
@@ -110,8 +152,8 @@ export async function resolveParentContext(
           })
           .catch(() => null);
       }
-      await ensureLink(parentId, extra.id);
-      links = await linksForParent(parentId, organizationId);
+      await ensureLinkIfManifestAllows(organizationId, parentId, extra.id);
+      links = await syncAndFilterLinksForGuardian(organizationId, parentId);
       if (!links.length) {
         return {
           parentId,
@@ -122,8 +164,7 @@ export async function resolveParentContext(
     }
   }
 
-  if (links.length === 0) {
-    // Last resort: any parent account sharing this phone that already has links
+  if (links.length === 0 && !tripOnly) {
     const self = await prisma.parentAccount.findUnique({ where: { id: parentId } });
     if (self?.phone) {
       const siblings = await prisma.parentAccount.findMany({
@@ -134,11 +175,10 @@ export async function resolveParentContext(
         if (sibling.id === parentId) continue;
         const siblingLinks = await linksForParent(sibling.id, organizationId);
         if (siblingLinks.length) {
-          // Re-home links under the JWT local parent so future requests succeed
           for (const link of siblingLinks) {
-            await ensureLink(parentId, link.studentId);
+            await ensureLinkIfManifestAllows(organizationId, parentId, link.studentId);
           }
-          links = await linksForParent(parentId, organizationId);
+          links = await syncAndFilterLinksForGuardian(organizationId, parentId);
           break;
         }
       }
@@ -148,7 +188,7 @@ export async function resolveParentContext(
   if (links.length === 0) {
     throw new AppError(
       403,
-      'No students linked to this parent account. Sign in again from Parent Login.'
+      'No learners found for this guardian phone yet. Ask the school to submit the ShuleTrip application (with your number on the manifest), then sign in again or tap Refresh.'
     );
   }
 
@@ -169,13 +209,18 @@ export async function resolveParentContext(
       ],
     },
   });
-  if (extra) {
-    await ensureLink(parentId, extra.id);
+  if (extra && !tripOnly) {
+    await ensureLinkIfManifestAllows(organizationId, parentId, extra.id);
     return {
       parentId,
       organizationId: extra.organizationId || organizationId,
       studentId: extra.id,
     };
+  }
+
+  if (tripOnly && (wantedId || wantedCode)) {
+    const match = links.find((l) => matchesRequested(l.student, wantedId, wantedCode));
+    if (match) return ctxFromLink(parentId, organizationId, match);
   }
 
   const stubCode = wantedCode || (wantedId && !UUID_RE.test(wantedId) ? wantedId : undefined);
@@ -198,8 +243,8 @@ export async function resolveParentContext(
           },
         })
       );
-    if (created) {
-      await ensureLink(parentId, created.id);
+    if (created && !tripOnly) {
+      await ensureLinkIfManifestAllows(organizationId, parentId, created.id);
       return {
         parentId,
         organizationId: created.organizationId || organizationId,
@@ -238,21 +283,10 @@ export async function tryResolveActiveStudent(
 }
 
 export async function listLinkedStudents(parentId: string, organizationId: string) {
-  let links = await prisma.parentStudentLink.findMany({
-    where: { parentId, student: { organizationId } },
-    include: { student: true },
-    orderBy: { isPrimary: 'desc' },
-  });
-  if (!links.length) {
-    links = await prisma.parentStudentLink.findMany({
-      where: { parentId },
-      include: { student: true },
-      orderBy: { isPrimary: 'desc' },
-    });
-  }
+  const links = await syncAndFilterLinksForGuardian(organizationId, parentId);
   return links.map(({ student, relationship, isPrimary }) => ({
     id: student.id,
-    fullName: `${student.firstName} ${student.lastName}`,
+    fullName: `${student.firstName} ${student.lastName}`.trim(),
     firstName: student.firstName,
     lastName: student.lastName,
     shuleCode: student.shuleCode,

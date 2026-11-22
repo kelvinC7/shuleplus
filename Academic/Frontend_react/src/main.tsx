@@ -20,8 +20,11 @@ import NewExamPage from '@/pages/NewExamPage';
 import EditExamPage from '@/pages/EditExamPage';
 import MarksPage from '@/pages/MarksPage';
 import MarksRecordsPage from '@/pages/MarksRecordsPage';
+import CourseMonitoringPage from '@/pages/CourseMonitoringPage';
+import AcademicMarksReportsPage from '@/pages/AcademicMarksReportsPage';
 import ReportCardsPage from '@/pages/ReportCardsPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
+import AcademicReportFooterSettingsPage from '@/pages/AcademicReportFooterSettingsPage';
 import GraduationPage from '@/pages/GraduationPage';
 import AssessmentTemplatesPage from '@/pages/AssessmentTemplatesPage';
 import NewAssessmentTemplatePage from '@/pages/NewAssessmentTemplatePage';
@@ -32,11 +35,14 @@ import AssessmentDetailPage from '@/pages/AssessmentDetailPage';
 import MarkEntryPage from '@/pages/MarkEntryPage';
 import GradingScalePage from '@/pages/GradingScalePage';
 import ReportCardV2Page from '@/pages/ReportCardV2Page';
+import ReportVerifyPage from '@/pages/ReportVerifyPage';
+import MarksDemoPage from '@/pages/MarksDemoPage';
 import AcademicDashboardPage from '@/pages/AcademicDashboardPage';
 import CompetencyPage from '@/pages/CompetencyPage';
 import MarkCorrectionsPage from '@/pages/MarkCorrectionsPage';
 import TeachersPermissionPage from '@/pages/TeachersPermissionPage';
 import RoundRollCallPage from '@/pages/RoundRollCallPage';
+import PublishingPage from '@/pages/PublishingPage';
 import TeacherPortalPage from '@/pages/TeacherPortalPage';
 import TeacherCreateAssessmentPage from '@/pages/TeacherCreateAssessmentPage';
 import TeacherMarkEntryPage from '@/pages/TeacherMarkEntryPage';
@@ -51,6 +57,10 @@ import ExamInvigilatorDeskPage from '@/pages/exams/ExamInvigilatorDeskPage';
 import ExamLivePage from '@/pages/exams/ExamLivePage';
 import ExamPublishedPage from '@/pages/exams/ExamPublishedPage';
 import ExamReportsPage from '@/pages/exams/ExamReportsPage';
+import ExaminationTimetablePage from '@/pages/ExaminationTimetablePage';
+import ExaminationListsPage from '@/pages/ExaminationListsPage';
+import ExaminationInvigilatorsPage from '@/pages/ExaminationInvigilatorsPage';
+import ExaminationAttendancePage from '@/pages/ExaminationAttendancePage';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -61,6 +71,7 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       // IAM default launch path; Academic home is /home
       { path: 'dashboard', element: <HomePage /> },
+      { path: 'verify/report', element: <ReportVerifyPage /> },
       {
         element: <ModuleLayout />,
         children: [
@@ -78,6 +89,10 @@ const router = createBrowserRouter([
           { path: 'subjects/new', element: <NewSubjectPage /> },
           { path: 'subjects/:id/edit', element: <EditSubjectPage /> },
           { path: 'subjects', element: <Navigate to="/courses" replace /> },
+          { path: 'examination-timetable', element: <ExaminationTimetablePage /> },
+          { path: 'examination-lists', element: <ExaminationListsPage /> },
+          { path: 'examination-invigilators', element: <ExaminationInvigilatorsPage /> },
+          { path: 'examination-attendance', element: <ExaminationAttendancePage /> },
           { path: 'exams', element: <ExamDashboardPage /> },
           { path: 'exams/invigilator-desk', element: <ExamInvigilatorDeskPage /> },
           { path: 'exams/sessions/new', element: <ExamWizardPage /> },
@@ -97,9 +112,14 @@ const router = createBrowserRouter([
           { path: 'examinations/:id/edit', element: <EditExamPage /> },
           { path: 'examinations', element: <ExaminationsPage /> },
           { path: 'marks', element: <MarksPage /> },
+          { path: 'course-monitoring', element: <CourseMonitoringPage /> },
+          { path: 'marks-reports', element: <AcademicMarksReportsPage /> },
           { path: 'marks-records', element: <MarksRecordsPage /> },
-          { path: 'report-cards', element: <ReportCardsPage /> },
+          { path: 'publishing', element: <PublishingPage /> },
+          { path: 'report-cards', element: <ReportCardV2Page /> },
           { path: 'report-cards/v2', element: <ReportCardV2Page /> },
+          { path: 'report-cards/legacy', element: <ReportCardsPage /> },
+          { path: 'marks-demo', element: <MarksDemoPage /> },
           { path: 'grading-scales', element: <GradingScalePage /> },
           { path: 'academic-dashboard', element: <AcademicDashboardPage /> },
           { path: 'competency', element: <CompetencyPage /> },
@@ -114,6 +134,7 @@ const router = createBrowserRouter([
           { path: 'mark-entry/:assessmentId', element: <MarkEntryPage /> },
           { path: 'assignments', element: <AssignmentPage /> },
           { path: 'analytics', element: <AnalyticsPage /> },
+          { path: 'analytics/report-footer', element: <AcademicReportFooterSettingsPage /> },
           { path: 'graduation', element: <GraduationPage /> },
           { path: 'teacher', element: <TeacherPortalPage /> },
           { path: 'teacher/create-assessment', element: <TeacherCreateAssessmentPage /> },

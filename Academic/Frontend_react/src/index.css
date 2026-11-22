@@ -62,11 +62,182 @@ body {
     background: #fff !important;
   }
 
-  .modern-report-card,
-  .report-a4-document {
-    max-width: none !important;
-    width: 100% !important;
+  .modern-report-card {
+    max-width: 794px !important;
+    width: 794px !important;
     box-shadow: none !important;
-    border: none !important;
+  }
+
+  .report-a4-document {
+    max-width: 794px !important;
+    width: 794px !important;
+    box-shadow: none !important;
+  }
+
+  /* Babyeyi-style double frame — keep visible on PDF/print */
+  .report-a4-babyeyi-frame {
+    border: 2px solid #000000 !important;
+    border-radius: 14px !important;
+    padding: 3px !important;
+  }
+
+  .report-a4-babyeyi-frame-inner {
+    border: 1pt solid #fcb038 !important;
+    border-radius: 11px !important;
+  }
+
+  .midterm-report-card .report-school-header {
+    padding-top: 6px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .midterm-report-card table tfoot td {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .midterm-report-card table thead th,
+  .modern-report-card table thead th {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .modern-report-card table tfoot td {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .modern-report-card.midterm-report-card {
+    box-shadow: none !important;
+  }
+
+  .modern-report-card .section-row td {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .report-overview-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .report-analysis-row {
+    display: flex !important;
+    flex-direction: row !important;
+  }
+
+  .report-analysis-row > * {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Off-screen PDF capture — mirror on-screen report styling */
+.report-pdf-capture-host,
+.report-pdf-capture.modern-report-card {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.report-pdf-capture.modern-report-card {
+  border: 2px solid #000000 !important;
+  border-radius: 14px !important;
+  padding: 3px !important;
+  background: #fff !important;
+}
+
+  .report-pdf-capture .report-a4-babyeyi-frame-inner {
+  border: 1.5px solid #fcb038 !important;
+  border-radius: 11px !important;
+}
+
+.report-pdf-capture table thead th {
+  background: #f8fafc !important;
+  color: #000435 !important;
+}
+
+.report-pdf-capture table tfoot td {
+  background: #f8fafc !important;
+}
+
+.report-pdf-capture .report-overview-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+}
+
+.report-pdf-capture .report-analysis-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+.report-pdf-capture .report-analysis-row > * {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+.report-pdf-capture .report-section-overview,
+.report-pdf-capture .report-section-analysis,
+.report-pdf-capture .report-section-verify {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.report-pdf-capture table {
+  font-size: 0.6875rem !important;
+}
+
+.report-pdf-capture .report-qr-block {
+  border: 1px solid #e2e8f0 !important;
+  background: #fafbfc !important;
+}
+
+.report-pdf-capture .report-section-verify {
+  display: block !important;
+}
+
+.report-pdf-capture .report-section-verify > div {
+  flex-direction: row !important;
+  justify-content: space-between !important;
+}
+
+
+/* ============ Strong, print-safe borders on all student report cards ============ */
+/* Applies to Beginning Term, Mid-Term, Termly and standard reports, on screen and in PDF/print. */
+.report-a4-document,
+.report-pdf-capture.modern-report-card,
+.report-pdf-capture.midterm-report-card {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+/* Give every table cell a clear border (overrides light inline colors). */
+.report-a4-document table th,
+.report-a4-document table td,
+.report-pdf-capture table th,
+.report-pdf-capture table td {
+  border: 1px solid #000000 !important;
+}
+
+@media print {
+  .report-a4-document table th,
+  .report-a4-document table td {
+    border: 1px solid #000000 !important;
+  }
+  /* Keep the navy/amber double frame solid when printing. */
+  .report-a4-babyeyi-frame {
+    border: 2px solid #000000 !important;
+  }
+  .report-a4-babyeyi-frame-inner {
+    border: 1pt solid #fcb038 !important;
   }
 }

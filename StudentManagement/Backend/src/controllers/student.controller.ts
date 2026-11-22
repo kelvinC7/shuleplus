@@ -174,6 +174,17 @@ export function mapExcelRows(raw: Record<string, unknown>[]): ImportRowInput[] {
       age: cell(r, 'age') || undefined,
       // Government code — optional, never auto-generated
       sdmCode: cell(r, 'sdmCode', 'sdms', 'sdm', 'sdmscode', 'sdms code', 'sdmsCode') || undefined,
+      studentCode:
+        cell(
+          r,
+          'studentCode',
+          'student code',
+          'shulecode',
+          'shule code',
+          'studentUid',
+          'student uid',
+          'uid'
+        ) || undefined,
       className: cell(r, 'className', 'class', 'classname', 'grade') || undefined,
       fatherName: cell(r, 'fatherName', 'father', 'father name') || undefined,
       motherName: cell(r, 'motherName', 'mother', 'mother name') || undefined,
@@ -231,7 +242,7 @@ export class StudentController {
       let rows: ImportRowInput[] = [];
       let academicYear = '';
       let term: string | undefined;
-      let duplicateMode: 'skip' | 'update' = 'skip';
+      let duplicateMode: 'skip' | 'update' = 'update';
       let importValidOnly = true;
       let generateMissingSdms = true;
       let defaultClassId: string | undefined;
@@ -244,7 +255,8 @@ export class StudentController {
         rows = mapExcelRows(raw);
         academicYear = String(req.body.academicYear || '').trim();
         term = req.body.term ? String(req.body.term).trim() : undefined;
-        if (req.body.duplicateMode === 'update') duplicateMode = 'update';
+        if (req.body.duplicateMode === 'skip') duplicateMode = 'skip';
+        else if (req.body.duplicateMode === 'update') duplicateMode = 'update';
         if (req.body.importValidOnly === 'false' || req.body.importValidOnly === false) importValidOnly = false;
         if (req.body.generateMissingSdms === 'false' || req.body.generateMissingSdms === false) {
           generateMissingSdms = false;
@@ -256,7 +268,7 @@ export class StudentController {
         academicYear = body.academicYear;
         term = body.term;
         defaultClassId = body.defaultClassId;
-        duplicateMode = body.duplicateMode ?? 'skip';
+        duplicateMode = body.duplicateMode ?? 'update';
         importValidOnly = body.importValidOnly !== false;
         generateMissingSdms = body.generateMissingSdms !== false;
       }

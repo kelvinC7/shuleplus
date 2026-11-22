@@ -22,19 +22,21 @@ import {
   TableRow,
   TextField,
   Typography,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
 import CloseIcon from '@mui/icons-material/Close';
 import SchoolIcon from '@mui/icons-material/School';
-import { api, assignClassHeadTeacher, fetchTeacherCandidates } from '@/services/api';
+import { api, assignClassHeadTeacher, fetchTeacherCandidates, setClassStudentAccess } from '@/services/api';
 import type { ApiClass } from '@/types';
 
 type TeacherCandidate = {
   id: string;
   name: string;
   email: string | null;
-  source: 'TIMETABLE' | 'HR' | 'MANUAL';
+  source: 'IAM' | 'TIMETABLE' | 'HR' | 'MANUAL';
   userId: string | null;
   refId: string | null;
   subtitle: string | null;
@@ -46,6 +48,8 @@ function classLabel(cls: ApiClass) {
 
 function sourceColor(source?: string | null) {
   switch (source) {
+    case 'IAM':
+      return 'success';
     case 'TIMETABLE':
       return 'primary';
     case 'HR':
@@ -136,6 +140,20 @@ export default function ClassHeadTeachersPage() {
     setDialogOpen(true);
   }
 
+  async function handleToggleStudentAccess(cls: ApiClass, checked: boolean) {
+    try {
+      await setClassStudentAccess(cls.id, checked);
+      setSnackbar({
+        open: true,
+        message: checked ? 'Class teacher can now view and edit students' : 'Student access turned off',
+        severity: 'success',
+      });
+      await loadClasses();
+    } catch {
+      setSnackbar({ open: true, message: 'Could not update student access', severity: 'error' });
+    }
+  }
+
   async function handleSave() {
     if (!selectedClass) return;
     setSaving(true);
@@ -183,7 +201,7 @@ export default function ClassHeadTeachersPage() {
             Class Teachers
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Assign a head of class from Timetable, HR, or enter manually. Teachers see these classes in Teacher Portal · My Classes.
+            Assign a head of class from Users & Access (Authentication), Timetable, HR, or enter manually.
           </Typography>
         </Box>
         <Paper elevation={0} sx={{ px: 2.5, py: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -262,6 +280,18 @@ export default function ClassHeadTeachersPage() {
                       )}
                     </TableCell>
                     <TableCell align="right">
+                      <FormControlLabel
+                        sx={{ mr: 1, whiteSpace: 'nowrap' }}
+                        label={<Typography sx={{ fontSize: '0.75rem', color: '#475569' }}>Class teacher edits students</Typography>}
+                        control={
+                          <Switch
+                            size="small"
+                            checked={Boolean(cls.headTeacherCanEditStudents)}
+                            disabled={!cls.headTeacherName}
+                            onChange={(e) => void handleToggleStudentAccess(cls, e.target.checked)}
+                          />
+                        }
+                      />
                       <Button size="small" variant="outlined" onClick={() => openAssignDialog(cls)}>
                         {cls.headTeacherName ? 'Change' : 'Assign'}
                       </Button>
@@ -309,7 +339,7 @@ export default function ClassHeadTeachersPage() {
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Search teachers (Timetable / HR)…"
+                placeholder="Search teachers (Users & Access, Timetable, HR)…"
                 value={candidateSearch}
                 onChange={(e) => setCandidateSearch(e.target.value)}
                 sx={{ mb: 2 }}

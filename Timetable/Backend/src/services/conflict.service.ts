@@ -357,7 +357,7 @@ export class ConflictService {
 
     type SlotDef = { name?: string; startTime: string; endTime: string };
     const rawSlots = Array.isArray((schedule as { periodSlots?: unknown }).periodSlots)
-      ? ((schedule as { periodSlots: Array<SlotDef & { isBreak?: boolean }> }).periodSlots)
+      ? ((schedule as { periodSlots?: unknown }).periodSlots as unknown as Array<SlotDef & { isBreak?: boolean }>)
       : [];
     let lessonSlots: SlotDef[] = rawSlots.filter((s) => !s.isBreak);
 

@@ -1,31 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import IconButton from '@mui/material/IconButton';
+import Avatar from '@mui/material/Avatar';
+import ButtonBase from '@mui/material/ButtonBase';
+import InputBase from '@mui/material/InputBase';
+import CircularProgress from '@mui/material/CircularProgress';
+import HistoryIcon from '@mui/icons-material/History';
+import AddIcon from '@mui/icons-material/Add';
+import SendIcon from '@mui/icons-material/Send';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import api from '../services/api';
-import { PORTAL } from '../config/portal';
-import {
-  MessageSquare,
-  Send,
-  User,
-  Bot,
-  History,
-  Sparkles,
-  Mic,
-  Plus
-} from 'lucide-react';
+import { brand } from '../theme/theme';
 
-const TichaAI = () => {
+const SUGGESTIONS = [
+  'Plan a Senior 3 Mathematics lesson',
+  'Summarise this term’s learning gaps',
+  'Draft a parent message about attendance',
+  'Write a quiz on factorisation',
+];
+
+const dotSx = {
+  width: 6,
+  height: 6,
+  borderRadius: '50%',
+  bgcolor: brand.navy,
+  animation: 'typingBounce 1s infinite ease-in-out',
+  '@keyframes typingBounce': {
+    '0%, 80%, 100%': { opacity: 0.35, transform: 'translateY(0)' },
+    '40%': { opacity: 1, transform: 'translateY(-3px)' },
+  },
+};
+
+export default function TichaAI() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
-  const [showHistoryMob, setShowHistoryMob] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const fetchHistory = async () => {
@@ -34,8 +55,8 @@ const TichaAI = () => {
       if (res.data.success) {
         setHistory(res.data.history);
       }
-    } catch (err) {
-      console.error('Could not load AI history.');
+    } catch {
+      /* history is optional */
     }
   };
 
@@ -43,248 +64,326 @@ const TichaAI = () => {
     fetchHistory();
   }, []);
 
-  useEffect(() => {
-    const handleToggle = () => setShowHistoryMob(prev => !prev);
-    window.addEventListener('toggle-ticha-history', handleToggle);
-    return () => window.removeEventListener('toggle-ticha-history', handleToggle);
-  }, []);
+  const send = async (text) => {
+    const prompt = (text ?? input).trim();
+    if (!prompt || loading) return;
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const userMessage = { role: 'user', content: input.trim() };
+    const userMessage = { role: 'user', content: prompt };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
     try {
-      const res = await api.post('/tools/ticha-ai/assist', { prompt: userMessage.content });
+      const res = await api.post('/tools/ticha-ai/assist', { prompt });
       if (res.data.success) {
         setMessages((prev) => [...prev, { role: 'assistant', content: res.data.response }]);
         fetchHistory();
       }
-    } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again later.' }]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Sorry, I could not reach the assistant. Please try again.' },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSend = (e) => {
+    e.preventDefault();
+    void send();
+  };
+
+  const resetChat = () => {
+    setMessages([]);
+    setInput('');
+    setShowHistory(false);
+  };
+
   return (
-    <div className="relative w-full bg-white md:bg-re-bg min-h-screen">
-      {/* ── High-Fidelity Hero Section ── */}
-      <div className="hidden md:block relative w-full min-h-[140px] md:min-h-[200px] overflow-hidden">
-        <div className="absolute inset-0 bg-re-orange/70 z-10 backdrop-blur-[2px]"></div>
-        <img src={PORTAL.heroImage} alt="" className="absolute inset-0 w-full h-full object-cover scale-105 grayscale " />
-
-        <div className="relative z-20 max-w-[1600px] mx-auto px-6 md:px-12 pt-8 md:pt-12 pb-10 md:pb-16">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-4 h-1 bg-white/40 rounded-full"></span>
-              <p className="text-[9px] font-black text-white/50  tracking-[0.3em]">Cognitive Core</p>
-            </div>
-            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter leading-none mb-1 mt-1">Ticha<span className="text-white/40">AI</span></h1>
-            <p className="text-[10px] md:text-sm font-bold text-white/40 max-w-lg leading-relaxed  tracking-widest italic opacity-60">Draft parent letters, incident summaries, and talking points for {PORTAL.brandLine}.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Main Content Grid ── */}
-      <div className="max-w-[1600px] mx-auto px-0 md:px-12 -mt-0 md:-mt-12 relative z-20 md:pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 md:gap-8">
-
-          {/* ── Left Column (Chat Interface) ── */}
-          <div className="lg:col-span-2 flex flex-col h-[calc(100vh-56px)] md:h-[calc(100vh-280px)] min-h-[450px] bg-white md:rounded-[24px] md:shadow-2xl md:border md:border-black/5 overflow-hidden relative">
-            <header className="hidden md:flex px-5 py-3 md:py-4 border-b border-black/5 bg-white/80 backdrop-blur-md items-center justify-between sticky top-0 z-30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 md:w-9 md:h-9 bg-re-grad-orange rounded-lg flex items-center justify-center text-white shadow-re-glow">
-                  <Sparkles className="size-4 md:size-5" />
-                </div>
-                <div>
-                  <h2 className="text-sm md:text-base text-re-text-muted font-bold">Assistant Engine</h2>
-                </div>
-              </div>
-
-              {/* Mobile History Toggle Icon (Only visible if md:flex was somehow visible on mobile) */}
-              <button
-                onClick={() => setShowHistoryMob(!showHistoryMob)}
-                className="lg:hidden w-9 h-9 rounded-lg bg-re-bg flex items-center justify-center text-re-text-muted border border-black/5 active:scale-95 transition-all"
+    <Box sx={{ display: 'flex', minHeight: '100%', flexDirection: 'column', bgcolor: '#F4F5F8', pb: 14 }}>
+      <Box
+        sx={{
+          position: 'relative',
+          overflow: 'hidden',
+          bgcolor: brand.navy,
+          color: '#fff',
+          px: 2.5,
+          py: 1.75,
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            right: -60,
+            top: -70,
+            width: 200,
+            height: 200,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(245,166,35,0.2), transparent 65%)',
+            pointerEvents: 'none',
+          },
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ position: 'relative', zIndex: 1 }}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+            <Avatar
+              sx={{ width: 38, height: 38, bgcolor: brand.primary, color: brand.navy, fontWeight: 800, fontSize: 15 }}
+            >
+              AI
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{ display: 'block', fontSize: 10, color: '#9FB0D3', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase' }}
               >
-                <History size={18} />
-              </button>
-            </header>
+                Assistant engine
+              </Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Ticha AI</Typography>
+            </Box>
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <IconButton
+              onClick={() => setShowHistory((v) => !v)}
+              aria-label="History"
+              sx={{ color: brand.primary, bgcolor: 'rgba(255,255,255,0.08)', '&:hover': { bgcolor: 'rgba(255,255,255,0.16)' } }}
+            >
+              <HistoryIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              onClick={resetChat}
+              aria-label="New chat"
+              sx={{ color: brand.primary, bgcolor: 'rgba(255,255,255,0.08)', '&:hover': { bgcolor: 'rgba(255,255,255,0.16)' } }}
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Box>
 
-            {/* Mobile History Overlay (Slide down inside the card) */}
-            {showHistoryMob && (
-              <div className="lg:hidden absolute top-0 md:top-[68px] inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-xl border-b border-black/10 shadow-2xl overflow-y-auto animate-in slide-in-from-top duration-300">
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-0.5 h-2 bg-re-orange rounded-full"></span>
-                      <h3 className="text-xs font-bold text-re-text  opacity-40">Previous Inquiries</h3>
-                    </div>
-                    <button onClick={() => setShowHistoryMob(false)} className="text-xs font-bold text-re-orange ">Close</button>
-                  </div>
-                  {history.length > 0 ? history.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => { setInput(item.prompt); setShowHistoryMob(false); }}
-                      className="w-full text-left p-4 rounded-xl bg-re-bg/50 border border-black/5 active:bg-white transition-all"
-                    >
-                      <p className="text-xs font-bold text-re-text truncate ">{item.prompt}</p>
-                      <p className="text-[10px] text-re-text-muted font-bold mt-0.5 opacity-40 ">{new Date(item.created_at).toLocaleDateString()}</p>
-                    </button>
-                  )) : (
-                    <div className="py-12 text-center space-y-4 opacity-40 flex flex-col items-center">
-                      <img src="/ticha_ai_vector.png" alt="No data" className="w-20 mx-auto" />
-                      <p className="text-xs font-bold text-re-text-muted ">Zero trace of activity</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 md:py-8 space-y-6 custom-scrollbar bg-re-bg/20">
-              {messages.length === 0 ? (
-                <div className="max-w-2xl mx-auto pt-8 md:pt-10 text-center">
-                  <img src="/ticha_ai_vector.png" alt="Ticha AI" className="w-60 h-50 md:w-60 md:h-60 object-contain mx-auto " />
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-bold text-re-text tracking-tight  leading-tight">Muraho! How can I help?</h3>
-                    <p className="text-xs text-re-text-muted font-bold  opacity-60">Guidance • Curriculum • Planning</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 px-4 max-w-sm mx-auto">
-                    {[
-                      "Plan Senior 3 Physics",
-                      "English REB Goals",
-                      "Management Tips"
-                    ].map((text, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setInput(text)}
-                        className="p-3 rounded-lg bg-white hover:bg-re-orange/5 text-xs font-bold text-re-text-muted hover:text-re-orange border border-black/5 text-left transition-all  shadow-sm"
-                      >
-                        {text}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+      {showHistory ? (
+        <Box sx={{ px: 2, pt: 1.5 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderColor: brand.border }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: brand.muted }}>
+                Previous inquiries
+              </Typography>
+              <IconButton size="small" onClick={() => setShowHistory(false)} aria-label="Close history" sx={{ color: brand.muted }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+            <Box sx={{ maxHeight: 256, overflowY: 'auto' }}>
+              {history.length === 0 ? (
+                <Typography sx={{ py: 3, textAlign: 'center', fontSize: 12, color: brand.muted }}>
+                  No history yet.
+                </Typography>
               ) : (
-                <div className="max-w-4xl mx-auto space-y-5">
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`flex items-start gap-2 md:gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm border border-white/20 ${msg.role === 'user' ? 'bg-re-grad-orange text-white' : 'bg-re-grad-orange text-white'}`}>
-                        {msg.role === 'user' ? <User size={12} /> : <Bot size={12} />}
-                      </div>
-                      <div className={`p-3.5 md:p-4 rounded-[18px] md:rounded-[20px] shadow-sm border border-black/5 leading-relaxed max-w-[88%] md:max-w-[85%] text-sm font-medium ${msg.role === 'user' ? 'bg-re-grad-orange text-white rounded-tr-none' : 'bg-white text-re-text rounded-tl-none'}`}>
-                        {msg.content}
-                        <div className={`text-[10px] font-bold  mt-1.5 opacity-40 ${msg.role === 'user' ? 'text-white text-right' : 'text-re-text-muted'}`}>
-                          {msg.role === 'user' ? 'Sent' : 'TichaAI Responded'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {loading && (
-                    <div className="flex items-start gap-2 md:gap-3">
-                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-re-grad-orange text-white flex items-center justify-center shadow-sm">
-                        <Bot size={12} />
-                      </div>
-                      <div className="bg-white p-3.5 rounded-[18px] rounded-tl-none shadow-sm border border-black/5 flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-re-orange/40 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-re-orange/70 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                        <div className="w-1.5 h-1.5 bg-re-orange/90 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-3.5 md:p-5 border-t border-black/5 bg-white/50 backdrop-blur-md">
-              <form className="max-w-4xl mx-auto relative group flex gap-1.5" onSubmit={handleSend}>
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="Ask about curriculum..."
-                    className="w-full h-11 md:h-12 bg-re-bg rounded-xl pl-10 pr-10 font-bold outline-none border border-black/5 focus:border-re-orange/30 shadow-inner focus:ring-8 focus:ring-re-orange/5 transition-all text-re-text text-[11px] md:text-xs"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={loading}
-                  />
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-re-text-muted/40 group-focus-within:text-re-orange transition-colors">
-                    <MessageSquare size={14} />
-                  </div>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <button type="button" className="text-re-text-muted hover:text-re-orange transition-colors">
-                      <Mic size={16} />
-                    </button>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading || !input.trim()}
-                  className="w-11 h-11 md:w-12 md:h-12 bg-re-grad-orange rounded-xl flex items-center justify-center text-white shadow-re-glow hover:scale-[1.02] active:scale-95 transition-all shrink-0"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
-              <p className="text-center text-[10px] text-re-text-muted mt-2 font-bold  opacity-30 italic">Intelligent Support by Babyeyi AI Engine</p>
-            </div>
-          </div>
-
-          {/* ── Right Column (Sidebar & History) ── */}
-          <div className="hidden lg:flex flex-col space-y-6 lg:sticky lg:top-8 h-fit">
-            <div className="bg-white rounded-[24px] shadow-sm border border-black/5 p-5 pt-4 flex flex-col max-h-[600px]">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-0.5 h-3 bg-re-orange rounded-full"></span>
-                <h3 className="text-xs font-bold text-re-text  opacity-40">Previous Inquiries</h3>
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {history.map((item) => (
-                  <button
+                history.map((item) => (
+                  <ButtonBase
                     key={item.id}
-                    onClick={() => setInput(item.prompt)}
-                    className="w-full text-left p-4 rounded-xl bg-re-bg/50 hover:bg-white hover:shadow-re-soft border border-transparent hover:border-re-orange/10 transition-all group"
+                    onClick={() => {
+                      setInput(item.prompt);
+                      setShowHistory(false);
+                    }}
+                    sx={{
+                      display: 'flex',
+                      width: '100%',
+                      alignItems: 'center',
+                      gap: 1.25,
+                      py: 1,
+                      px: 1,
+                      borderRadius: 1.5,
+                      textAlign: 'left',
+                      justifyContent: 'flex-start',
+                      borderTop: '1px solid',
+                      borderColor: brand.border,
+                      '&:first-of-type': { borderTop: 'none' },
+                      '&:hover': { bgcolor: 'rgba(19,33,61,0.03)' },
+                    }}
                   >
-                    <p className="text-xs font-bold text-re-text truncate group-hover:text-re-orange ">{item.prompt}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] text-re-text-muted font-bold  opacity-40">
-                        {new Date(item.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
-                      </span>
-                      <div className="w-1 h-1 bg-black/10 rounded-full"></div>
-                      <span className="text-[10px] text-re-orange font-bold  opacity-60">Verified</span>
-                    </div>
-                  </button>
-                ))}
-                {history.length === 0 && (
-                  <div className="py-12 text-center space-y-4 opacity-40 flex flex-col items-center">
-                    <img src="/ticha_ai_vector.png" alt="No data" className="w-24 mx-auto" />
-                    <p className="text-xs font-bold text-re-text-muted ">Zero trace of activity</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="relative rounded-[24px] p-5 text-white shadow-re-glow overflow-hidden group cursor-pointer bg-re-grad-orange">
-              <div className="relative z-10 flex flex-col gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-md">
-                  <Plus size={16} />
-                </div>
-                <div>
-                  <h4 className="font-black text-[10px] tracking-widest  opacity-90">Incident &amp; letter drafts</h4>
-                  <p className="text-[9px] text-white font-bold leading-snug mt-1 opacity-80  tracking-tight">Turn bullet notes into clear, professional messages for families and staff.</p>
-                </div>
-              </div>
-              <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-            </div>
-          </div>
+                    <Avatar sx={{ width: 30, height: 30, bgcolor: 'rgba(19,33,61,0.08)', color: brand.navy, fontWeight: 800, fontSize: 11 }}>
+                      AI
+                    </Avatar>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography noWrap sx={{ fontSize: 12.5, fontWeight: 600, color: brand.navy }}>
+                        {item.prompt}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: brand.muted }}>
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </ButtonBase>
+                ))
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      ) : null}
 
-        </div>
-      </div>
-    </div>
+      <Box sx={{ flex: 1, px: { xs: 2, sm: 3 }, py: 2, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        {messages.length === 0 ? (
+          <Stack alignItems="center" justifyContent="center" spacing={1.25} sx={{ flex: 1, py: 4, textAlign: 'center' }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                display: 'grid',
+                placeItems: 'center',
+                color: brand.primary,
+                background: `radial-gradient(circle at 30% 30%, ${brand.navy2}, ${brand.navy})`,
+                boxShadow: '0 10px 30px rgba(19,33,61,0.25)',
+              }}
+            >
+              <AutoAwesomeIcon />
+            </Box>
+            <Typography sx={{ fontSize: 20, fontWeight: 600, color: brand.navy }}>
+              Muraho! How can I help?
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: brand.muted }}>
+              Guidance · Curriculum · Planning
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} justifyContent="center" sx={{ mt: 1, maxWidth: 560 }}>
+              {SUGGESTIONS.map((text) => (
+                <ButtonBase
+                  key={text}
+                  onClick={() => setInput(text)}
+                  sx={{
+                    px: 1.5,
+                    py: 0.85,
+                    borderRadius: 999,
+                    border: '1px solid',
+                    borderColor: brand.border,
+                    bgcolor: '#fff',
+                    fontSize: 12,
+                    color: brand.navy,
+                    '&:hover': { borderColor: brand.primary, bgcolor: 'rgba(245,166,35,0.06)' },
+                  }}
+                >
+                  {text}
+                </ButtonBase>
+              ))}
+            </Stack>
+          </Stack>
+        ) : (
+          messages.map((msg, i) => {
+            const isUser = msg.role === 'user';
+            return (
+              <Box
+                key={i}
+                sx={{
+                  maxWidth: { xs: '88%', sm: 560 },
+                  alignSelf: isUser ? 'flex-end' : 'flex-start',
+                  px: 1.75,
+                  py: 1.25,
+                  borderRadius: 2,
+                  bgcolor: isUser ? brand.navy : '#fff',
+                  color: isUser ? '#fff' : brand.text,
+                  border: isUser ? 'none' : '1px solid',
+                  borderColor: brand.border,
+                }}
+              >
+                <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mb: 0.5, opacity: 0.7 }}>
+                  {isUser ? <PersonOutlineIcon sx={{ fontSize: 12 }} /> : <SmartToyOutlinedIcon sx={{ fontSize: 12 }} />}
+                  <Typography sx={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {isUser ? 'You' : 'Ticha AI'}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.55 }}>
+                  {msg.content}
+                </Typography>
+              </Box>
+            );
+          })
+        )}
+
+        {loading ? (
+          <Box
+            sx={{
+              alignSelf: 'flex-start',
+              px: 1.75,
+              py: 1.5,
+              bgcolor: '#fff',
+              border: '1px solid',
+              borderColor: brand.border,
+              borderRadius: 2,
+            }}
+          >
+            <Stack direction="row" spacing={0.75}>
+              <Box sx={dotSx} />
+              <Box sx={{ ...dotSx, animationDelay: '0.2s' }} />
+              <Box sx={{ ...dotSx, animationDelay: '0.4s' }} />
+            </Stack>
+          </Box>
+        ) : null}
+        <Box ref={messagesEndRef} />
+      </Box>
+
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: { xs: 'calc(84px + env(safe-area-inset-bottom))', lg: 0 },
+          zIndex: 30,
+          px: 2,
+          pb: 1,
+        }}
+      >
+        <Paper
+          component="form"
+          onSubmit={handleSend}
+          variant="outlined"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            mx: 'auto',
+            maxWidth: 768,
+            p: 0.75,
+            pl: 2,
+            borderRadius: 999,
+            borderColor: brand.border,
+          }}
+        >
+          <InputBase
+            placeholder="Ask Ticha AI anything…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={loading}
+            aria-label="Message Ticha AI"
+            sx={{ flex: 1, fontSize: 13.5 }}
+          />
+          <IconButton
+            type="submit"
+            disabled={loading || !input.trim()}
+            aria-label="Send"
+            sx={{
+              width: 40,
+              height: 40,
+              bgcolor: brand.navy,
+              color: brand.primary,
+              '&:hover': { bgcolor: brand.navy2 },
+              '&.Mui-disabled': { bgcolor: 'rgba(19,33,61,0.12)', color: 'rgba(19,33,61,0.35)' },
+            }}
+          >
+            {loading ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+          </IconButton>
+        </Paper>
+        <Typography
+          sx={{
+            mt: 0.75,
+            textAlign: 'center',
+            fontSize: 9,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.14em',
+            color: 'rgba(107,115,133,0.6)',
+          }}
+        >
+          Intelligent support by Babyeyi AI
+        </Typography>
+      </Box>
+    </Box>
   );
-};
-
-export default TichaAI;
+}

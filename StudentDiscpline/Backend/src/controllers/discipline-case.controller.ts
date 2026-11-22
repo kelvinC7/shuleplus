@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { disciplineCaseService } from '../services/discipline-case.service';
+import { studentBalanceService } from '../services/student-balance.service';
 import { AppError } from '../middleware/error.middleware';
 
 export const disciplineCaseController = {
@@ -33,6 +34,27 @@ export const disciplineCaseController = {
           : ['sms', 'email', 'inapp'],
       });
       res.status(201).json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  /**
+   * Service-to-service discipline profile. Returns the learner score/max score
+   * from Student Discipline settings so ParentMIS does not hardcode /100.
+   */
+  async profileService(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const studentCode =
+        typeof req.query.studentCode === 'string' ? req.query.studentCode.trim() : '';
+      const studentId = typeof req.query.studentId === 'string' ? req.query.studentId.trim() : '';
+      if (!studentCode && !studentId) {
+        throw new AppError(400, 'studentCode or studentId is required');
+      }
+      const data = studentCode
+        ? await studentBalanceService.getProfileByCode(req.organizationRef!, studentCode)
+        : await studentBalanceService.getProfile(req.organizationRef!, studentId);
+      res.json({ success: true, data });
     } catch (e) {
       next(e);
     }

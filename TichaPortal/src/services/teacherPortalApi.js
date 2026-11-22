@@ -297,4 +297,20 @@ export async function saveReportCardComments(body) {
   return unwrap(data);
 }
 
+export async function fetchMyExaminationInvigilatorAssignments(params) {
+  const { data } = await tpApi.get('/examinations/invigilator-assignments', { params });
+  return unwrap(data);
+}
+
 export default tpApi;
+
+
+export async function fetchExaminationAttendance(params) {
+  const { data } = await tpApi.get('/examinations/attendance', { params });
+  return unwrap(data);
+}
+
+export async function markExaminationAttendance(body) {
+  const { data } = await tpApi.post('/examinations/attendance', body);
+  return unwrap(data);
+}

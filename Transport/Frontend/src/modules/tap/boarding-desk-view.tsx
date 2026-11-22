@@ -126,7 +126,7 @@ export function BoardingDeskView() {
                 ref={inputRef}
                 className="input font-mono text-base tracking-wider sm:text-lg"
                 autoComplete="off"
-                placeholder="e.g. RFID-004821"
+                placeholder="Scan or enter card UID"
                 value={cardNumber}
                 onChange={(e) => setCardNumber(e.target.value.toUpperCase())}
               />
@@ -153,7 +153,7 @@ export function BoardingDeskView() {
                 </>
               )}
             </button>
-            <p className="text-[11px] text-muted">Demo card: RFID-004821 · Reader: BUS-014-RFID</p>
+            <p className="text-[11px] text-muted">Use cards registered under RFID & devices for this organization.</p>
           </div>
         </form>
 
@@ -193,7 +193,7 @@ export function BoardingDeskView() {
                   </div>
                   <div className="rounded-xl border border-border bg-slate-50 px-3 py-2">
                     <p className="text-[10px] font-semibold uppercase text-muted">Route</p>
-                    <p className="font-semibold text-navy">{last.bus.route || '—'}</p>
+                    <p className="font-semibold text-navy">{last.bus.route || ''}</p>
                   </div>
                   <div className="rounded-xl border border-border bg-slate-50 px-3 py-2">
                     <p className="text-[10px] font-semibold uppercase text-muted">Time</p>

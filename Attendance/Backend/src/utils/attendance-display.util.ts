@@ -57,6 +57,12 @@ const EXCUSED = new Set<AttendanceStatus>([
 
 const ABSENT_LIKE = new Set<AttendanceStatus>([AttendanceStatus.ABSENT, AttendanceStatus.SUSPENDED]);
 
+/** Minutes-after-midnight (Kigali) after which check-in counts as late (Attendance settings: Late starts + grace). */
+export function lateThresholdMinutes(settings: ScheduleSettings, _isStaff?: boolean): number {
+  const grace = settings.graceMinutes ?? 0;
+  return parseHm(settings.lateStarts) + grace;
+}
+
 export function computeAttendanceDisplay(
   record: {
     status: AttendanceStatus;
@@ -65,8 +71,10 @@ export function computeAttendanceDisplay(
     lessonDate: Date;
   },
   settings: ScheduleSettings,
-  now: Date = new Date()
+  options?: { now?: Date; isStaff?: boolean }
 ): AttendanceDisplay {
+  const now = options?.now ?? new Date();
+  const isStaff = options?.isStaff ?? false;
   const expectedArrival = settings.schoolStarts;
   const expectedDeparture = settings.schoolEnds;
 
@@ -117,13 +125,9 @@ export function computeAttendanceDisplay(
 
   let punctuality: Punctuality = "ON_TIME";
   if (settings.enableLateDetection && record.entryTime) {
-    if (record.status === AttendanceStatus.LATE) {
-      punctuality = "LATE";
-    } else {
-      const entryMins = minutesInTz(record.entryTime);
-      const lateThreshold = parseHm(settings.lateStarts) + (settings.graceMinutes ?? 0);
-      punctuality = entryMins > lateThreshold ? "LATE" : "ON_TIME";
-    }
+    const entryMins = minutesInTz(record.entryTime);
+    const lateThreshold = lateThresholdMinutes(settings, isStaff);
+    punctuality = entryMins > lateThreshold ? "LATE" : "ON_TIME";
   }
 
   let checkoutStatus: CheckoutStatus = "PENDING";

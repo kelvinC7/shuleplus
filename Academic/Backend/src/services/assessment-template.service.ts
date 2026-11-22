@@ -99,6 +99,8 @@ export class AssessmentTemplateService {
       isRequired?: boolean;
       isActive?: boolean;
       sortOrder?: number;
+      assessmentCategory?: string | null;
+      reportingStage?: 'UNASSIGNED' | 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
     }>;
   }) {
     if (!data.components || data.components.length === 0) {
@@ -142,6 +144,8 @@ export class AssessmentTemplateService {
             isRequired: c.isRequired ?? true,
             isActive: c.isActive !== false,
             sortOrder: c.sortOrder ?? idx,
+            assessmentCategory: c.assessmentCategory ?? null,
+            reportingStage: (c.reportingStage as any) ?? 'UNASSIGNED',
           })),
         },
       },
@@ -351,6 +355,8 @@ export class AssessmentTemplateService {
     sortOrder?: number;
     required?: boolean;
     isActive?: boolean;
+    assessmentCategory?: string | null;
+    reportingStage?: string;
   }) {
     const template = await prisma.assessmentTemplate.findFirst({ where: { id: templateId, organizationId } });
     if (!template) throw new AppError(404, 'Assessment template not found');
@@ -382,6 +388,8 @@ export class AssessmentTemplateService {
         isRequired: data.required ?? true,
         isActive,
         sortOrder: data.sortOrder ?? 0,
+        assessmentCategory: data.assessmentCategory ?? null,
+        reportingStage: (data.reportingStage as any) ?? 'UNASSIGNED',
       },
     });
   }
@@ -395,6 +403,8 @@ export class AssessmentTemplateService {
     sortOrder?: number;
     isActive?: boolean;
     required?: boolean;
+    assessmentCategory?: string | null;
+    reportingStage?: string;
   }) {
     const component = await prisma.assessmentComponent.findFirst({
       where: { id: componentId, template: { organizationId } },
@@ -423,6 +433,8 @@ export class AssessmentTemplateService {
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.required !== undefined) updateData.isRequired = data.required;
+    if (data.assessmentCategory !== undefined) updateData.assessmentCategory = data.assessmentCategory ?? null;
+    if (data.reportingStage !== undefined) updateData.reportingStage = data.reportingStage as any;
 
     const nextWeight =
       data.weightPercentage !== undefined
@@ -451,6 +463,8 @@ export class AssessmentTemplateService {
       required?: boolean;
       isActive?: boolean;
       maxMark?: number;
+      assessmentCategory?: string | null;
+      reportingStage?: string;
     }>
   ) {
     const template = await prisma.assessmentTemplate.findFirst({ where: { id: templateId, organizationId } });
@@ -498,9 +512,14 @@ export class AssessmentTemplateService {
           isRequired: item.required !== false,
           isActive: item.isActive !== false,
           sortOrder: item.sortOrder ?? i,
+          assessmentCategory: item.assessmentCategory ?? null,
+          reportingStage: (item.reportingStage as any) ?? 'UNASSIGNED',
         };
         if (item.id && existing.some((e) => e.id === item.id)) {
-          out.push(await tx.assessmentComponent.update({ where: { id: item.id }, data: payload }));
+          const keepClassification: Record<string, unknown> = {};
+          if (item.assessmentCategory === undefined) delete (payload as any).assessmentCategory;
+          if (item.reportingStage === undefined) delete (payload as any).reportingStage;
+          out.push(await tx.assessmentComponent.update({ where: { id: item.id }, data: { ...payload, ...keepClassification } }));
         } else {
           const dup = await tx.assessmentComponent.findFirst({
             where: { templateId, code: item.code },

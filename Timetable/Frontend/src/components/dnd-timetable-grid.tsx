@@ -400,216 +400,227 @@ export function DndTimetableGrid({
         <table className="min-w-[640px] w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-border bg-slate-50/90">
-              <th className="sticky left-0 z-10 min-w-[88px] bg-slate-50/95 px-2 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted sm:min-w-[92px] sm:px-3">
-                Time
+              <th className="sticky left-0 z-20 min-w-[88px] bg-slate-50/95 px-2 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted sm:min-w-[92px] sm:px-3">
+                Day
               </th>
-              {days.map((day) => (
+              {slots.map((slot) => (
                 <th
-                  key={day}
-                  className="min-w-[100px] px-1.5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted sm:min-w-[128px] sm:px-2"
+                  key={slot.id}
+                  className={`min-w-[100px] px-1.5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider sm:min-w-[128px] sm:px-2 ${
+                    slot.isBreak ? 'bg-slate-100 text-slate-500' : 'bg-navy text-white'
+                  }`}
                 >
-                  {isMobile ? day.slice(0, 1) : day.slice(0, 3)}
+                  <span className="block leading-tight">{slot.name}</span>
+                  <span
+                    className={`mt-0.5 block font-medium normal-case tracking-normal ${
+                      slot.isBreak ? 'text-slate-400' : 'text-white/60'
+                    }`}
+                  >
+                    {slot.startTime}–{slot.endTime}
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {slots.map((slot) => {
-              const timeKey = timeSlotKey(slot.startTime, slot.endTime);
+            {days.map((day) => (
+              <tr key={day} className="border-b border-border/40">
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 bg-white px-2 py-2 text-left text-[10px] font-semibold text-navy whitespace-nowrap sm:px-3"
+                >
+                  <span className="hidden sm:inline">{day}</span>
+                  <span className="sm:hidden">
+                    {isMobile ? day.slice(0, 1) : day.slice(0, 3)}
+                  </span>
+                </th>
+                {slots.map((slot) => {
+                  const timeKey = timeSlotKey(slot.startTime, slot.endTime);
 
-              if (slot.isBreak) {
-                return (
-                  <tr key={slot.id} className="border-b border-border/40">
-                    <td className="sticky left-0 z-10 bg-white px-2 py-2 text-[10px] font-medium tabular-nums text-muted whitespace-nowrap sm:px-3">
-                      {slot.startTime}-{slot.endTime}
-                    </td>
-                    <td colSpan={days.length} className="p-1.5">
-                      <div className={breakBandClass(slot.slotType)}>
-                        <ScheduleSlotTypeIcon type={slot.slotType} size={14} className="text-navy/60" />
-                        <span className="font-semibold text-navy">{slot.name}</span>
-                        <span className="text-[10px] font-medium text-muted">{slot.durationMinutes} min</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              }
-
-              return (
-                <tr key={slot.id} className="border-b border-border/40">
-                  <td className="sticky left-0 z-10 bg-white px-2 py-2 text-[10px] font-semibold tabular-nums text-navy whitespace-nowrap sm:px-3">
-                    <div>{slot.name}</div>
-                    <div className="font-normal text-muted">
-                      {slot.startTime}-{slot.endTime}
-                    </div>
-                  </td>
-                  {days.map((day) => {
-                    const lesson = findLesson(day, slot.startTime, slot.endTime);
-                    const key = cellKey(day, timeKey);
-                    const isDrop = dropTarget === key;
-                    const bg = lesson
-                      ? resolveCourseColor(lesson.subjectName, courses as Parameters<typeof resolveCourseColor>[1])
-                      : undefined;
-                    const label = lesson ? courseLabel(lesson, courses) : '';
-                    const cellRef: TimetableCellRef = {
-                      dayOfWeek: day,
-                      startTime: slot.startTime,
-                      endTime: slot.endTime,
-                      periodLabel: slot.name,
-                    };
-
+                  if (slot.isBreak) {
                     return (
-                      <td key={key} className="p-0.5 align-top sm:p-1">
-                        <div
-                          className={`slot-cell group relative ${isDrop ? 'slot-cell-drop' : ''} ${
-                            moveModeId || (copyLesson && !lesson) ? 'cursor-pointer' : ''
-                          } ${copyLesson && !lesson ? 'ring-1 ring-sky-200/80' : ''}`}
-                          onClick={() => {
-                            if (moveModeId && !lesson) {
-                              void handleDrop(day, slot.startTime, slot.endTime, slot.name);
-                              return;
-                            }
-                            if (!lesson && copyLesson && onPasteCopy) {
-                              void openEmptyCell(day, slot);
-                            }
-                          }}
-                          onDragOver={(e) => {
-                            if (readOnly || isMobile) return;
-                            e.preventDefault();
-                            setDropTarget(key);
-                          }}
-                          onDragLeave={() => setDropTarget(null)}
-                          onDrop={(e) => {
-                            if (readOnly || isMobile) return;
-                            e.preventDefault();
-                            void handleDrop(day, slot.startTime, slot.endTime, slot.name);
-                          }}
-                        >
-                          {lesson ? (
-                            <div
-                              draggable={!readOnly && !busy && !lesson.isExtraActivity && !isMobile}
-                              onDragStart={() => {
-                                suppressLessonClickRef.current = true;
-                                setDragId(lesson.id);
-                                setDragOrigin(cellRef);
-                              }}
-                              onDragEnd={() => {
-                                setDragId(null);
-                                setDragOrigin(null);
-                                setDropTarget(null);
-                                window.setTimeout(() => {
-                                  suppressLessonClickRef.current = false;
-                                }, 80);
-                              }}
-                              onClick={() => {
-                                if (
-                                  isMobile ||
-                                  readOnly ||
-                                  lesson.isExtraActivity ||
-                                  !manualEntry ||
-                                  !onEditCourse ||
-                                  suppressLessonClickRef.current
-                                ) {
-                                  return;
-                                }
-                                onEditCourse(lesson, cellRef);
-                              }}
-                              className={`lesson-card relative min-h-[44px] sm:min-h-[48px] ${
-                                !isMobile && manualEntry && !lesson.isExtraActivity
-                                  ? 'cursor-pointer hover:ring-1 hover:ring-navy/15'
-                                  : ''
-                              }`}
-                              style={{
-                                backgroundColor: lesson.isExtraActivity ? '#E0F2FE' : bg,
-                                borderLeftWidth: 3,
-                                borderLeftColor: lesson.isExtraActivity ? '#0284C7' : '#00043533',
-                                opacity: dragId === lesson.id ? 0.55 : 1,
-                              }}
-                              title={
-                                lesson.isExtraActivity
-                                  ? lesson.subjectName
-                                  : cardSecondary === 'class'
-                                    ? `${lesson.subjectName}, ${lesson.className}`
-                                    : `${lesson.subjectName}, ${lesson.teacherName}`
-                              }
-                            >
-                              <p className="truncate pr-6 text-[11px] font-bold tracking-wide text-navy sm:text-xs">
-                                {label}
-                              </p>
-                              {!lesson.isExtraActivity ? (
-                                <p className="truncate text-[9px] font-normal text-navy/65 sm:text-[10px]">
-                                  {cardSecondary === 'class' ? lesson.className : lesson.teacherName}
-                                </p>
-                              ) : (
-                                <p className="truncate text-[9px] font-medium text-sky-700 sm:text-[10px]">Activity</p>
-                              )}
-                              {!readOnly && !lesson.isExtraActivity && manualEntry ? (
-                                <button
-                                  type="button"
-                                  className={`absolute right-0.5 top-0.5 rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-navy ${
-                                    isMobile ? 'opacity-100' : 'opacity-0 transition group-hover:opacity-100'
-                                  }`}
-                                  aria-label="Lesson actions"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActionSheet({ lesson, cell: cellRef });
-                                  }}
-                                  title="More actions"
-                                >
-                                  <MoreHorizontal size={14} />
-                                </button>
-                              ) : null}
-                              {lesson.isExtraActivity && lesson.extraActivityId && onRemoveExtra && !readOnly ? (
-                                <button
-                                  type="button"
-                                  className="absolute right-1 top-1 rounded-md bg-white/90 p-1 text-slate-400 opacity-0 shadow-sm transition group-hover:opacity-100 hover:text-red-600"
-                                  title="Remove activity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void removeExtra(lesson.extraActivityId!);
-                                  }}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <div
-                              className={`flex h-full min-h-[44px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200/90 bg-slate-50/30 px-0.5 text-center transition sm:min-h-[48px] ${
-                                canFillFreeSlot
-                                  ? 'group-hover:border-primary/40 group-hover:bg-primary/[0.04]'
-                                  : ''
-                              }`}
-                            >
-                              <span className="text-[9px] font-medium text-slate-400 group-hover:hidden sm:text-[10px]">
-                                {copyLesson ? 'Paste' : 'Free'}
-                              </span>
-                              {canFillFreeSlot || (copyLesson && onPasteCopy) ? (
-                                <button
-                                  type="button"
-                                  className={`items-center gap-0.5 rounded-md px-1.5 py-1 text-[9px] font-semibold text-navy hover:bg-white sm:gap-1 sm:px-2 sm:text-[10px] ${
-                                    isMobile || copyLesson ? 'inline-flex' : 'hidden group-hover:inline-flex'
-                                  }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void openEmptyCell(day, slot);
-                                  }}
-                                >
-                                  <Plus size={12} /> {copyLesson ? 'Paste' : 'Add'}
-                                </button>
-                              ) : (
-                                <span className="hidden text-[10px] font-medium text-slate-400 group-hover:inline">
-                                  Free
-                                </span>
-                              )}
-                            </div>
-                          )}
+                      <td key={`${day}-${slot.id}`} className="p-1 align-middle">
+                        <div className={breakBandClass(slot.slotType)}>
+                          <ScheduleSlotTypeIcon
+                            type={slot.slotType}
+                            size={14}
+                            className="text-navy/60"
+                          />
+                          <span className="font-semibold text-navy">{slot.name}</span>
+                          <span className="text-[10px] font-medium text-muted">
+                            {slot.durationMinutes} min
+                          </span>
                         </div>
                       </td>
                     );
-                  })}
-                </tr>
-              );
-            })}
+                  }
+
+                  const lesson = findLesson(day, slot.startTime, slot.endTime);
+                  const key = cellKey(day, timeKey);
+                  const isDrop = dropTarget === key;
+                  const bg = lesson
+                    ? resolveCourseColor(lesson.subjectName, courses as Parameters<typeof resolveCourseColor>[1])
+                    : undefined;
+                  const label = lesson ? courseLabel(lesson, courses) : '';
+                  const cellRef: TimetableCellRef = {
+                    dayOfWeek: day,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    periodLabel: slot.name,
+                  };
+
+                  return (
+                    <td key={key} className="p-0.5 align-top sm:p-1">
+                      <div
+                        className={`slot-cell group relative ${isDrop ? 'slot-cell-drop' : ''} ${
+                          moveModeId || (copyLesson && !lesson) ? 'cursor-pointer' : ''
+                        } ${copyLesson && !lesson ? 'ring-1 ring-sky-200/80' : ''}`}
+                        onClick={() => {
+                          if (moveModeId && !lesson) {
+                            void handleDrop(day, slot.startTime, slot.endTime, slot.name);
+                            return;
+                          }
+                          if (!lesson && copyLesson && onPasteCopy) {
+                            void openEmptyCell(day, slot);
+                          }
+                        }}
+                        onDragOver={(e) => {
+                          if (readOnly || isMobile) return;
+                          e.preventDefault();
+                          setDropTarget(key);
+                        }}
+                        onDragLeave={() => setDropTarget(null)}
+                        onDrop={(e) => {
+                          if (readOnly || isMobile) return;
+                          e.preventDefault();
+                          void handleDrop(day, slot.startTime, slot.endTime, slot.name);
+                        }}
+                      >
+                        {lesson ? (
+                          <div
+                            draggable={!readOnly && !busy && !lesson.isExtraActivity && !isMobile}
+                            onDragStart={() => {
+                              suppressLessonClickRef.current = true;
+                              setDragId(lesson.id);
+                              setDragOrigin(cellRef);
+                            }}
+                            onDragEnd={() => {
+                              setDragId(null);
+                              setDragOrigin(null);
+                              setDropTarget(null);
+                              window.setTimeout(() => {
+                                suppressLessonClickRef.current = false;
+                              }, 80);
+                            }}
+                            onClick={() => {
+                              if (
+                                isMobile ||
+                                readOnly ||
+                                lesson.isExtraActivity ||
+                                !manualEntry ||
+                                !onEditCourse ||
+                                suppressLessonClickRef.current
+                              ) {
+                                return;
+                              }
+                              onEditCourse(lesson, cellRef);
+                            }}
+                            className={`lesson-card relative min-h-[44px] sm:min-h-[48px] ${
+                              !isMobile && manualEntry && !lesson.isExtraActivity
+                                ? 'cursor-pointer hover:ring-1 hover:ring-navy/15'
+                                : ''
+                            }`}
+                            style={{
+                              backgroundColor: lesson.isExtraActivity ? '#E0F2FE' : bg,
+                              borderLeftWidth: 3,
+                              borderLeftColor: lesson.isExtraActivity ? '#0284C7' : '#00043533',
+                              opacity: dragId === lesson.id ? 0.55 : 1,
+                            }}
+                            title={
+                              lesson.isExtraActivity
+                                ? lesson.subjectName
+                                : cardSecondary === 'class'
+                                  ? `${lesson.subjectName}, ${lesson.className}`
+                                  : `${lesson.subjectName}, ${lesson.teacherName}`
+                            }
+                          >
+                            <p className="truncate pr-6 text-[11px] font-bold tracking-wide text-navy sm:text-xs">
+                              {label}
+                            </p>
+                            {!lesson.isExtraActivity ? (
+                              <p className="truncate text-[9px] font-normal text-navy/65 sm:text-[10px]">
+                                {cardSecondary === 'class' ? lesson.className : lesson.teacherName}
+                              </p>
+                            ) : (
+                              <p className="truncate text-[9px] font-medium text-sky-700 sm:text-[10px]">Activity</p>
+                            )}
+                            {!readOnly && !lesson.isExtraActivity && manualEntry ? (
+                              <button
+                                type="button"
+                                className={`absolute right-0.5 top-0.5 rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-navy ${
+                                  isMobile ? 'opacity-100' : 'opacity-0 transition group-hover:opacity-100'
+                                }`}
+                                aria-label="Lesson actions"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActionSheet({ lesson, cell: cellRef });
+                                }}
+                                title="More actions"
+                              >
+                                <MoreHorizontal size={14} />
+                              </button>
+                            ) : null}
+                            {lesson.isExtraActivity && lesson.extraActivityId && onRemoveExtra && !readOnly ? (
+                              <button
+                                type="button"
+                                className="absolute right-1 top-1 rounded-md bg-white/90 p-1 text-slate-400 opacity-0 shadow-sm transition group-hover:opacity-100 hover:text-red-600"
+                                title="Remove activity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void removeExtra(lesson.extraActivityId!);
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div
+                            className={`flex h-full min-h-[44px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200/90 bg-slate-50/30 px-0.5 text-center transition sm:min-h-[48px] ${
+                              canFillFreeSlot
+                                ? 'group-hover:border-primary/40 group-hover:bg-primary/[0.04]'
+                                : ''
+                            }`}
+                          >
+                            <span className="text-[9px] font-medium text-slate-400 group-hover:hidden sm:text-[10px]">
+                              {copyLesson ? 'Paste' : 'Free'}
+                            </span>
+                            {canFillFreeSlot || (copyLesson && onPasteCopy) ? (
+                              <button
+                                type="button"
+                                className={`items-center gap-0.5 rounded-md px-1.5 py-1 text-[9px] font-semibold text-navy hover:bg-white sm:gap-1 sm:px-2 sm:text-[10px] ${
+                                  isMobile || copyLesson ? 'inline-flex' : 'hidden group-hover:inline-flex'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void openEmptyCell(day, slot);
+                                }}
+                              >
+                                <Plus size={12} /> {copyLesson ? 'Paste' : 'Add'}
+                              </button>
+                            ) : (
+                              <span className="hidden text-[10px] font-medium text-slate-400 group-hover:inline">
+                                Free
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

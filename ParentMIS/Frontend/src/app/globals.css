@@ -1,6 +1,24 @@
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+
+:root {
+  --font-montserrat: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  /* yoShule Parent App (reference: yoshule-parent-app_2.html) */
+  --yo-navy: #13213d;
+  --yo-navy-2: #1b2d52;
+  --yo-amber: #f5a623;
+  --yo-amber-soft: #fff3dc;
+  --yo-bg: #f4f5f8;
+  --yo-line: #e5e8ef;
+  --yo-muted: #6b7385;
+  --yo-green: #1fa971;
+  --yo-red: #e5484d;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -68,10 +86,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@media (max-width: 1023px) {
+  .parent-mobile-sidebar[data-mobile-open='false'] {
+    transform: translateX(-100%) !important;
+    translate: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .parent-mobile-sidebar[data-mobile-open='true'] {
+    transform: translateX(0) !important;
+    translate: none !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+}
+
 /* Glassmorphism Card Style */
 .hr-card {
-  @apply rounded-2xl border border-white bg-white/70 backdrop-blur-md shadow-sm transition-all duration-300;
-  box-shadow: 0 4px 20px -2px rgba(0, 4, 53, 0.03), 0 1px 3px -1px rgba(0, 4, 53, 0.02);
+  @apply rounded-[20px] border border-transparent bg-white transition-all duration-200;
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.04), 0 6px 18px rgba(19, 33, 61, 0.05);
 }
 
 .hr-card-hover {
@@ -138,13 +172,48 @@ select.input {
 }
 
 .dashboard-bg {
-  background-color: #f4f6fb;
+  background-color: var(--yo-bg);
   background-image:
-    radial-gradient(circle at 12% 8%, rgba(252, 176, 56, 0.08), transparent 38%),
-    radial-gradient(circle at 88% 92%, rgba(0, 4, 53, 0.06), transparent 42%);
+    radial-gradient(900px 420px at 10% -5%, rgba(36, 57, 106, 0.12), transparent 55%),
+    radial-gradient(700px 380px at 100% 100%, rgba(245, 166, 35, 0.06), transparent 50%);
   background-attachment: fixed;
-  background-repeat: no-repeat;
-  background-size: cover;
+}
+
+.yo-chip {
+  @apply inline-block rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide;
+}
+.yo-chip-green {
+  background: #e3f6ee;
+  color: #12784f;
+}
+.yo-chip-amber {
+  background: var(--yo-amber-soft);
+  color: #9a5b00;
+}
+.yo-chip-navy {
+  background: #e7ecf7;
+  color: var(--yo-navy-2);
+}
+.yo-kpi {
+  @apply rounded-[20px] border border-transparent bg-white p-3.5 active:scale-[0.98];
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.04), 0 6px 18px rgba(19, 33, 61, 0.05);
+}
+.yo-quick-sq {
+  @apply flex h-14 w-14 items-center justify-center rounded-[18px] bg-white shadow-[0_4px_14px_rgba(19,33,61,0.07)] transition active:scale-95;
+}
+.yo-tabbar {
+  box-shadow: 0 12px 30px rgba(19, 33, 61, 0.35);
+}
+.yo-pulse-dot {
+  animation: yo-pulse 1.8s infinite;
+}
+@keyframes yo-pulse {
+  70% {
+    box-shadow: 0 0 0 8px rgba(31, 169, 113, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 169, 113, 0);
+  }
 }
 
 /* Custom Scrollbar for modern look */
@@ -214,6 +283,44 @@ select.input {
 @supports (-webkit-touch-callout: none) {
   .auth-bg {
     background-attachment: scroll;
+  }
+}
+
+/* yoShule welcome / login (ParentPageByPage reference) */
+.yo-auth-bg {
+  background: var(--yo-bg);
+  color: var(--yo-navy);
+}
+
+.yo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 14px 22px;
+  border-radius: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.yo-btn:hover {
+  transform: translateY(-1px);
+}
+
+.yo-btn-solid {
+  background: var(--yo-navy);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(19, 33, 61, 0.28);
+}
+
+.yo-btn-line {
+  border: 1.5px solid rgba(19, 33, 61, 0.28);
+  color: var(--yo-navy);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yo-btn:hover {
+    transform: none;
   }
 }
 
@@ -343,5 +450,190 @@ select.input {
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Full-screen report viewer — hide portal chrome underneath */
+body.report-viewer-open .dashboard-bg > div > aside,
+body.report-viewer-open .dashboard-bg header,
+body.report-viewer-open .yo-tabbar,
+body.course-detail-open .yo-tabbar,
+body.parent-flow-open .yo-tabbar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.report-viewer-modal .modern-report-card,
+.report-viewer-modal .midterm-report-card {
+  max-width: 100%;
+}
+
+.report-viewer-modal .report-card-page {
+  margin-bottom: 2rem;
+}
+
+/* Report cards — aligned with Academic module (viewer, print, PDF capture) */
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  .no-print,
+  .report-viewer-modal > .no-print,
+  .report-viewer-modal > header {
+    display: none !important;
+  }
+
+  .report-viewer-modal {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .report-viewer-modal > div:last-child {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .report-viewer-modal .report-card-page {
+    transform: none !important;
+  }
+
+  .report-card-page {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .modern-report-card,
+  .report-a4-document {
+    max-width: 794px !important;
+    width: 794px !important;
+    box-shadow: none !important;
+  }
+
+  .report-a4-babyeyi-frame {
+    border: 1.5pt solid #000435 !important;
+    border-radius: 14px !important;
+    padding: 3px !important;
+  }
+
+  .report-a4-babyeyi-frame-inner {
+    border: 1pt solid #fcb038 !important;
+    border-radius: 11px !important;
+  }
+
+  .modern-report-card table thead th,
+  .midterm-report-card table thead th {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .modern-report-card table tfoot td,
+  .midterm-report-card table tfoot td {
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .modern-report-card .section-row td {
+    background: #f1f5f9 !important;
+    print-color-adjust: exact;
+  }
+}
+
+.report-pdf-capture-host,
+.report-pdf-capture.modern-report-card {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.report-pdf-capture.modern-report-card {
+  border: 2px solid #000435 !important;
+  border-radius: 14px !important;
+  padding: 3px !important;
+  background: #fff !important;
+}
+
+.report-pdf-capture .report-a4-babyeyi-frame-inner {
+  border: 1.5px solid #fcb038 !important;
+  border-radius: 11px !important;
+}
+
+.report-pdf-capture table thead th {
+  background: #f8fafc !important;
+  color: #000435 !important;
+}
+
+.report-pdf-capture table tfoot td {
+  background: #f8fafc !important;
+}
+
+.report-pdf-capture .report-overview-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+}
+
+.report-pdf-capture .report-analysis-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+.report-pdf-capture .report-analysis-row > * {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+.report-pdf-capture .report-section-overview,
+.report-pdf-capture .report-section-analysis,
+.report-pdf-capture .report-section-verify {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.report-pdf-capture table {
+  font-size: 0.6875rem !important;
+}
+
+.report-pdf-capture .report-qr-block {
+  border: 1px solid #e2e8f0 !important;
+  background: #fafbfc !important;
+}
+
+.report-pdf-capture .report-section-verify {
+  display: block !important;
+}
+
+.report-pdf-capture .report-section-verify > div {
+  flex-direction: row !important;
+  justify-content: space-between !important;
+}
+
+.modern-report-card .report-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .modern-report-card .report-overview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modern-report-card .report-analysis-row {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .modern-report-card .report-analysis-row > * {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }

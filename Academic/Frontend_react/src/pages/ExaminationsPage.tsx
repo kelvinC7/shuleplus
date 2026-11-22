@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Checkbox, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress, Button, Drawer, Collapse,
+  useMediaQuery,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
@@ -60,6 +61,47 @@ function SectionTitle({ children, sx }: { children: React.ReactNode; sx?: any })
 
 const cellHeaderSx = { fontWeight: 700, fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b', bgcolor: 'white', borderBottom: '1px solid', borderColor: 'divider' };
 
+function formatExamDate(d: string | null) {
+  return d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+}
+
+function ExamProfileContent({ exam, onClose }: { exam: ApiExam; onClose: () => void }) {
+  return (
+    <>
+      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, bgcolor: 'white', zIndex: 1 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Exam Details</Typography>
+        <IconButton size="small" onClick={onClose}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+      </Box>
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+        <Box sx={{ width: 56, height: 56, borderRadius: 1, bgcolor: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
+          <QuizIcon sx={{ fontSize: 28, color: '#f59e0b' }} />
+        </Box>
+        <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2, textAlign: 'center' }}>{exam.name}</Typography>
+        <Box sx={{ mt: 0.5, px: 1, py: 0.25, borderRadius: 0.5, bgcolor: STATUS_COLORS[exam.status]?.bg }}>
+          <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: STATUS_COLORS[exam.status]?.text, textTransform: 'uppercase' }}>{exam.status.replace('_', ' ')}</Typography>
+        </Box>
+      </Box>
+      <Box sx={{ px: 2, py: 1 }}>
+        <SectionTitle>Information</SectionTitle>
+        <ProfileRow icon={<QuizIcon sx={{ fontSize: 16 }} />} label="Type" value={EXAM_TYPES[exam.type] ?? exam.type} />
+        <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Academic Year" value={exam.academicYear} />
+        <ProfileRow icon={<EventIcon sx={{ fontSize: 16 }} />} label="Term" value={exam.term} />
+        <ProfileRow icon={<ScoreIcon sx={{ fontSize: 16 }} />} label="Total Marks" value={exam.totalMarks?.toString()} />
+        <ProfileRow icon={<FlagIcon sx={{ fontSize: 16 }} />} label="Passing Marks" value={exam.passingMarks?.toString()} />
+        <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Start Date" value={formatExamDate(exam.startDate)} />
+        <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="End Date" value={formatExamDate(exam.endDate)} />
+        <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Created" value={formatExamDate(exam.createdAt)} />
+        {exam.description && (
+          <Box sx={{ mt: 1 }}>
+            <SectionTitle>Description</SectionTitle>
+            <Typography sx={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.5 }}>{exam.description}</Typography>
+          </Box>
+        )}
+      </Box>
+    </>
+  );
+}
+
 export default function ExaminationsPage() {
   const navigate = useNavigate();
   const [exams, setExams] = useState<ApiExam[]>([]);
@@ -71,6 +113,7 @@ export default function ExaminationsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [profileExam, setProfileExam] = useState<ApiExam | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width:899.95px)');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -141,8 +184,6 @@ export default function ExaminationsPage() {
   };
 
   const selectedCount = selectedIds.size;
-
-  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'white', border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
@@ -292,44 +333,23 @@ export default function ExaminationsPage() {
           )}
         </TableContainer>
 
-        {/* Profile Panel */}
-        <Collapse in={!!profileExam} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0 } } }}>
-          <Box sx={{ width: { md: 300 }, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, display: { xs: 'none', md: 'block' }, bgcolor: 'white' }}>
-            {profileExam && (<>
-              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Exam Details</Typography>
-                <IconButton size="small" onClick={() => setProfileExam(null)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
-              </Box>
-              <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-                <Box sx={{ width: 56, height: 56, borderRadius: 1, bgcolor: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
-                  <QuizIcon sx={{ fontSize: 28, color: '#f59e0b' }} />
-                </Box>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2, textAlign: 'center' }}>{profileExam.name}</Typography>
-                <Box sx={{ mt: 0.5, px: 1, py: 0.25, borderRadius: 0.5, bgcolor: STATUS_COLORS[profileExam.status]?.bg }}>
-                  <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: STATUS_COLORS[profileExam.status]?.text, textTransform: 'uppercase' }}>{profileExam.status.replace('_', ' ')}</Typography>
-                </Box>
-              </Box>
-              <Box sx={{ px: 2, py: 1 }}>
-                <SectionTitle>Information</SectionTitle>
-                <ProfileRow icon={<QuizIcon sx={{ fontSize: 16 }} />} label="Type" value={EXAM_TYPES[profileExam.type] ?? profileExam.type} />
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Academic Year" value={profileExam.academicYear} />
-                <ProfileRow icon={<EventIcon sx={{ fontSize: 16 }} />} label="Term" value={profileExam.term} />
-                <ProfileRow icon={<ScoreIcon sx={{ fontSize: 16 }} />} label="Total Marks" value={profileExam.totalMarks?.toString()} />
-                <ProfileRow icon={<FlagIcon sx={{ fontSize: 16 }} />} label="Passing Marks" value={profileExam.passingMarks?.toString()} />
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Start Date" value={formatDate(profileExam.startDate)} />
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="End Date" value={formatDate(profileExam.endDate)} />
-                <ProfileRow icon={<CalendarMonthIcon sx={{ fontSize: 16 }} />} label="Created" value={formatDate(profileExam.createdAt)} />
-                {profileExam.description && (
-                  <Box sx={{ mt: 1 }}>
-                    <SectionTitle>Description</SectionTitle>
-                    <Typography sx={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.5 }}>{profileExam.description}</Typography>
-                  </Box>
-                )}
-              </Box>
-            </>)}
+        {/* Desktop Profile Panel */}
+        <Collapse in={!!profileExam} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0, display: { xs: 'none', md: 'block' } } } }}>
+          <Box sx={{ width: 300, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, bgcolor: 'white' }}>
+            {profileExam && <ExamProfileContent exam={profileExam} onClose={() => setProfileExam(null)} />}
           </Box>
         </Collapse>
       </Box>
+
+      {/* Mobile Profile Drawer */}
+      <Drawer
+        anchor="right"
+        open={isMobile && !!profileExam}
+        onClose={() => setProfileExam(null)}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 360 }, maxWidth: '100%' } } }}
+      >
+        {profileExam && <ExamProfileContent exam={profileExam} onClose={() => setProfileExam(null)} />}
+      </Drawer>
     </Box>
   );
 }

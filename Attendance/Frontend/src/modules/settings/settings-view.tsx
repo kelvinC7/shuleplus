@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, MapPin, Save } from 'lucide-react';
-import { attendanceApi, type AttendanceSettings } from '@/services/attendance-api';
+import {
+  attendanceApi,
+  type AcademicContext,
+  type AttendanceSettings,
+} from '@/services/attendance-api';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useToast } from '@/shared/notifications';
 import { ScheduleRulesPanel, type ScheduleTab } from './schedule-rules-panel';
@@ -72,6 +76,59 @@ function SectionCard({
 
 type SettingsMainTab = 'general' | ScheduleTab;
 
+type TimeSettingKey = Extract<
+  keyof AttendanceSettings,
+  | 'schoolStarts'
+  | 'lateStarts'
+  | 'schoolEnds'
+  | 'exitOpensAt'
+  | 'maxExitTime'
+  | 'attendanceClosingTime'
+  | 'weekendStart'
+>;
+
+const TIME_SETTING_KEYS: TimeSettingKey[] = [
+  'schoolStarts',
+  'lateStarts',
+  'schoolEnds',
+  'exitOpensAt',
+  'maxExitTime',
+  'attendanceClosingTime',
+  'weekendStart',
+];
+
+function normalizeTimeForInput(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  const match = String(value).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
+function applySettingsToForm(
+  settings: AttendanceSettings,
+  academic?: AcademicContext | null
+): Partial<AttendanceSettings> {
+  const next: Partial<AttendanceSettings> = {
+    ...settings,
+    academicYear: academic?.currentAcademicYear ?? settings.academicYear,
+    term: academic?.currentTerm ?? settings.term,
+    schoolName: (settings.schoolName || '').replace(/\\+/g, '').trim() || settings.schoolName,
+  };
+  const times = next as Pick<
+    Partial<AttendanceSettings>,
+    Exclude<TimeSettingKey, 'exitOpensAt'>
+  >;
+  for (const key of TIME_SETTING_KEYS) {
+    const normalized = normalizeTimeForInput(settings[key]);
+    if (key === 'exitOpensAt') {
+      next.exitOpensAt = normalized || null;
+      continue;
+    }
+    times[key] = normalized;
+  }
+  return next;
+}
+
 const SETTINGS_TABS: { id: SettingsMainTab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'class', label: 'Classes' },
@@ -95,12 +152,7 @@ export function SettingsView() {
       ]);
       const settings = data.data;
       const academic = academicRes?.data?.data;
-      setForm({
-        ...settings,
-        academicYear: academic?.currentAcademicYear || settings.academicYear,
-        term: academic?.currentTerm || settings.term,
-        schoolName: (settings.schoolName || '').replace(/\\+/g, '').trim() || settings.schoolName,
-      });
+      setForm(applySettingsToForm(settings, academic));
       setDirty(false);
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Failed to load settings'));
@@ -120,10 +172,15 @@ export function SettingsView() {
     if (!form) return;
     setSaving(true);
     try {
-      await attendanceApi.settingsPut(form);
+      const exitOpensRaw = form.exitOpensAt?.trim();
+      const { data: saved } = await attendanceApi.settingsPut({
+        ...form,
+        exitOpensAt: exitOpensRaw ? normalizeTimeForInput(exitOpensRaw) : null,
+      });
+      const academicRes = await attendanceApi.academicContext().catch(() => null);
+      setForm(applySettingsToForm(saved.data, academicRes?.data?.data));
       toast.success('Saved. New taps use these times now.');
       setDirty(false);
-      await load();
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Save failed'));
     } finally {
@@ -156,6 +213,7 @@ export function SettingsView() {
     ['schoolStarts', 'School starts'],
     ['lateStarts', 'Late after'],
     ['schoolEnds', 'School ends'],
+    ['exitOpensAt', 'Exit opens'],
     ['maxExitTime', 'Latest exit'],
     ['attendanceClosingTime', 'Entry closes'],
     ['weekendStart', 'Weekend start'],
@@ -202,9 +260,14 @@ export function SettingsView() {
                 <input
                   className="input font-mono tabular-nums"
                   type="time"
-                  value={String(form[key] ?? '')}
+                  value={String(form[key] ?? '').slice(0, 5)}
                   onChange={(e) => patch({ [key]: e.target.value })}
                 />
+                {key === 'exitOpensAt' ? (
+                  <span className="mt-1 block text-xs text-muted">
+                    Earliest checkout (2nd tap). Leave blank to use School ends.
+                  </span>
+                ) : null}
               </label>
             ))}
           </div>

@@ -12,6 +12,7 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import type { ReportCardDataV2 } from '@/types';
 import ModernStudentReportCard from '@/components/ModernStudentReportCard';
+import MidTermStudentReportCard from '@/components/reports/MidTermStudentReportCard';
 import { downloadReportPdf, printReportPdf } from '@/lib/downloadReportPdf';
 import { toast } from '@/lib/toast';
 
@@ -226,8 +227,13 @@ export default function ReportCardViewerModal({
             width: '100%',
             maxWidth: 794,
           }}
+          className="report-card-page"
         >
-          <ModernStudentReportCard report={report} documentRef={docRef} />
+          {report.reportKind === 'midterm' || report.reportKind === 'beginning' ? (
+            <MidTermStudentReportCard report={report} documentRef={docRef} />
+          ) : (
+            <ModernStudentReportCard report={report} documentRef={docRef} />
+          )}
         </Box>
       </Box>
     </Box>

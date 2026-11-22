@@ -82,10 +82,10 @@ export function BusesView() {
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div><dt className="text-muted">Capacity</dt><dd className="font-semibold">{b.currentStudents ?? 0} / {b.capacity}</dd></div>
-              <div><dt className="text-muted">Driver</dt><dd className="font-semibold">{b.driver?.name ?? '—'}</dd></div>
-              <div><dt className="text-muted">Attendant</dt><dd className="font-semibold">{b.attendant?.name ?? '—'}</dd></div>
-              <div><dt className="text-muted">Route</dt><dd className="font-semibold">{b.route?.name ?? '—'}</dd></div>
-              <div><dt className="text-muted">GPS</dt><dd className="font-semibold">{b.lastLocation ?? '—'}</dd></div>
+              <div><dt className="text-muted">Driver</dt><dd className="font-semibold">{b.driver?.name ?? ''}</dd></div>
+              <div><dt className="text-muted">Attendant</dt><dd className="font-semibold">{b.attendant?.name ?? ''}</dd></div>
+              <div><dt className="text-muted">Route</dt><dd className="font-semibold">{b.route?.name ?? ''}</dd></div>
+              <div><dt className="text-muted">GPS</dt><dd className="font-semibold">{b.lastLocation ?? ''}</dd></div>
               <div><dt className="text-muted">Mileage</dt><dd className="font-semibold">{b.mileageKm?.toLocaleString()} km</dd></div>
             </dl>
           </div>
@@ -163,7 +163,7 @@ export function RoutesView() {
               ))}
             </ol>
             <p className="mt-3 text-xs text-muted">
-              {r._count?.assignments ?? 0} students · {r.distanceKm ?? '—'} km · ETA {r.etaMinutes ?? '—'} min
+              {r._count?.assignments ?? 0} students · {r.distanceKm ?? ''} km · ETA {r.etaMinutes ?? ''} min
             </p>
           </div>
         ))}
@@ -218,10 +218,10 @@ export function StudentsView() {
                   <p className="font-semibold text-navy">{s.studentName}</p>
                   <p className="text-xs text-muted">{s.studentCode} · {s.className}</p>
                 </td>
-                <td className="px-4 py-3">{s.pickupStop?.name ?? '—'}</td>
-                <td className="px-4 py-3">{s.morningBus?.code ?? '—'}</td>
-                <td className="px-4 py-3">{s.afternoonBus?.code ?? '—'}</td>
-                <td className="px-4 py-3">{s.guardianName ?? '—'}</td>
+                <td className="px-4 py-3">{s.pickupStop?.name ?? ''}</td>
+                <td className="px-4 py-3">{s.morningBus?.code ?? ''}</td>
+                <td className="px-4 py-3">{s.afternoonBus?.code ?? ''}</td>
+                <td className="px-4 py-3">{s.guardianName ?? ''}</td>
                 <td className="px-4 py-3"><StatusBadge status={s.liveState} /></td>
               </tr>
             ))}
@@ -410,7 +410,7 @@ export function TripsView() {
   async function prepare() {
     try {
       await transportApi.prepareTrip({ busId });
-      toast.success('Trip prepared — boarding open');
+      toast.success('Trip prepared  -  boarding open');
       await load();
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Prepare failed'));
@@ -439,7 +439,7 @@ export function TripsView() {
             <div>
               <p className="font-extrabold text-navy">{t.bus.code} · {t.direction.replace('_', ' ')}</p>
               <p className="text-xs text-muted">
-                {t.boardedCount}/{t.expectedCount} boarded · {t.missingCount} missing · {t.lastLocation ?? '—'}
+                {t.boardedCount}/{t.expectedCount} boarded · {t.missingCount} missing · {t.lastLocation ?? ''}
               </p>
             </div>
             <StatusBadge status={t.status} />

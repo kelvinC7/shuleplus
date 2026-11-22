@@ -4,7 +4,10 @@
  * Usage: npx tsx scripts/fix-iam-migrations.ts
  */
 import { execSync } from 'node:child_process';
+import { join } from 'node:path';
 import { PrismaClient } from '../src/generated/prisma';
+
+const MANUAL_DEVELOPER_PORTAL = 'manual_developer_portal';
 
 const prisma = new PrismaClient();
 
@@ -33,6 +36,36 @@ async function clearFailedMigration(name: string) {
   }
   console.log(`\nClearing failed migration: ${name}`);
   run(`npx prisma migrate resolve --rolled-back ${name}`);
+}
+
+async function tableExists(table: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = ${table}
+    ) AS exists
+  `;
+  return rows[0]?.exists === true;
+}
+
+/** Developer portal was often applied via psql; Prisma may still show a failed record. */
+async function fixManualDeveloperPortal(appliedSet: Set<string>) {
+  if (appliedSet.has(MANUAL_DEVELOPER_PORTAL)) {
+    console.log(`Already applied: ${MANUAL_DEVELOPER_PORTAL}`);
+    return;
+  }
+
+  const repoRoot = join(process.cwd(), '..', '..');
+  const script = join(repoRoot, 'scripts', 'apply-developer-portal-db.sh');
+
+  console.log(`\nEnsuring developer portal schema (${MANUAL_DEVELOPER_PORTAL})…`);
+  if (await tableExists('developer_partners')) {
+    console.log('developer_partners exists — running incremental portal SQL only');
+  }
+  run(`bash "${script}"`);
+
+  console.log(`\nMarking as applied: ${MANUAL_DEVELOPER_PORTAL}`);
+  run(`npx prisma migrate resolve --applied ${MANUAL_DEVELOPER_PORTAL}`);
 }
 
 async function main() {
@@ -64,6 +97,8 @@ async function main() {
     console.log(`\nMarking as applied (schema already present): ${name}`);
     run(`npx prisma migrate resolve --applied ${name}`);
   }
+
+  await fixManualDeveloperPortal(appliedSet);
 
   const rfidCols = await prisma.$queryRaw<Array<{ column_name: string }>>`
     SELECT column_name FROM information_schema.columns

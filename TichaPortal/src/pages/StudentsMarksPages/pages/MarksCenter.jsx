@@ -1,46 +1,111 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
-import {
-  AlertTriangle, BarChart3, CheckCircle2, Download, FileSpreadsheet, Loader2,
-  Plus, Printer, Search, TrendingUp, User, X,
-} from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Dialog from '@mui/material/Dialog';
+import Drawer from '@mui/material/Drawer';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DownloadIcon from '@mui/icons-material/Download';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import AddIcon from '@mui/icons-material/Add';
+import PrintIcon from '@mui/icons-material/Print';
+import SearchIcon from '@mui/icons-material/Search';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from 'recharts';
 import { fetchMarksCenter, patchMarkCell, requestMarkEdit } from '../../../services/marksApi.js';
-import { buildFilterParams, gradeBadgeClass, markColorClass } from '../utils/marksCenterUtils.js';
+import { buildFilterParams, gradeTone, markTone } from '../utils/marksCenterUtils.js';
 import { exportMarksCenterExcel, exportMarksCenterPdf } from '../utils/marksCenterExport.js';
 import RecordMarksWizard from '../components/RecordMarksWizard.jsx';
 
+const NAVY = '#13213D';
+const AMBER = '#F5A623';
+const MUTED = 'rgba(19,33,61,0.45)';
+const BORDER = 'rgba(19,33,61,0.06)';
+
+const selectSx = {
+  width: '100%',
+  height: 36,
+  borderRadius: 2,
+  border: '1px solid rgba(0,0,0,0.1)',
+  bgcolor: '#fff',
+  px: 1.25,
+  fontSize: 12,
+  fontFamily: 'inherit',
+  color: NAVY,
+  outline: 'none',
+  '&:focus': { boxShadow: '0 0 0 2px rgba(19,33,61,0.15)' },
+  '&:disabled': { opacity: 0.5 },
+};
+
+const fieldLabelSx = { display: 'block', mb: 0.5, fontSize: 10, fontWeight: 500, color: MUTED };
+
 function FilterSelect({ label, value, onChange, options, disabled }) {
   return (
-    <div className="min-w-[130px] flex-1">
-      <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">{label}</label>
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="w-full h-9 rounded-lg border border-black/10 bg-white px-2.5 text-xs text-[#000435] focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none disabled:opacity-50"
-      >
+    <Box sx={{ minWidth: 130, flex: 1 }}>
+      <Box component="label" sx={fieldLabelSx}>{label}</Box>
+      <Box component="select" value={value || ''} onChange={(e) => onChange(e.target.value)} disabled={disabled} sx={selectSx}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
 function KpiCard({ label, value, suffix = '' }) {
   return (
-    <div className="rounded-xl border border-black/6 bg-white px-4 py-3">
-      <p className="text-[10px] font-medium text-[#000435]/45">{label}</p>
-      <p className="text-lg font-semibold text-[#000435] mt-0.5 tabular-nums">
+    <Paper elevation={0} sx={{ borderRadius: { xs: 2.5, lg: 0 }, border: `1px solid ${BORDER}`, bgcolor: '#fff', px: 2, py: 1.5 }}>
+      <Typography sx={{ fontSize: 10, fontWeight: 500, color: MUTED }}>{label}</Typography>
+      <Typography sx={{ mt: 0.25, fontSize: 18, fontWeight: 600, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
         {value ?? '-'}{suffix && value != null ? suffix : ''}
-      </p>
-    </div>
+      </Typography>
+    </Paper>
   );
 }
+
+const cellBaseSx = { borderColor: BORDER, py: 1.5, px: 2, fontSize: 12 };
+const headCellSx = {
+  ...cellBaseSx,
+  bgcolor: 'rgba(19,33,61,0.03)',
+  fontSize: 10,
+  fontWeight: 500,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+  color: MUTED,
+  borderBottom: '1px solid rgba(19,33,61,0.06)',
+};
+
+const toolBtnSx = {
+  gap: 0.75,
+  borderRadius: 2,
+  border: '1px solid rgba(0,0,0,0.1)',
+  px: 1.5,
+  py: 1,
+  fontSize: 12,
+  fontWeight: 500,
+  textTransform: 'none',
+  color: 'rgba(19,33,61,0.7)',
+  '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+};
+
+const toneSx = (tone) => ({ color: tone.color, bgcolor: tone.bgcolor });
 
 export default function MarksCenter() {
   const [loading, setLoading] = useState(true);
@@ -51,6 +116,16 @@ export default function MarksCenter() {
   const [studentSearch, setStudentSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardPreset, setWizardPreset] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep link: /marks/marks-center?record=1 opens the Record Marks wizard
+  useEffect(() => {
+    if (!searchParams.get('record')) return;
+    setWizardOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('record');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [exporting, setExporting] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
@@ -296,48 +371,62 @@ export default function MarksCenter() {
   }, [data]);
 
   return (
-    <div className="space-y-5 pb-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-[#000435]">Marks Center</h3>
-          <p className="text-xs text-[#000435]/50 mt-0.5">Gradebook for your assigned classes only - filters update instantly.</p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {refreshing && <Loader2 size={14} className="animate-spin text-[#000435]/30" />}
-          <button
-            type="button"
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pb: 4 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent={{ sm: 'space-between' }} spacing={1.5}>
+        <Box>
+          <Typography component="h3" sx={{ fontSize: 18, fontWeight: 600, color: NAVY }}>Marks Center</Typography>
+          <Typography sx={{ mt: 0.25, fontSize: 12, color: 'rgba(19,33,61,0.5)' }}>
+            Gradebook for your assigned classes only - filters update instantly.
+          </Typography>
+        </Box>
+        <Stack direction="row" flexWrap="wrap" useFlexGap alignItems="center" spacing={1}>
+          {refreshing && <CircularProgress size={14} sx={{ color: 'rgba(19,33,61,0.3)' }} />}
+          <Button
             onClick={() => openWizard({ className: filters.className, subjectName: filters.course, typeSlug: filters.assessmentType || undefined, startStep: 1 })}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-black/10 text-[#000435]/70 hover:bg-black/5"
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            sx={toolBtnSx}
           >
-            <Plus size={14} /> Add assessment
-          </button>
-          <button type="button" onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 0 })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[#ff8c00] text-[#000435]">
-            <Plus size={14} /> Add marks
-          </button>
-          <button type="button" onClick={handleExportExcel} disabled={!data?.students?.length || exporting} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-black/10 text-[#000435]/70 disabled:opacity-40">
-            {exporting === 'excel' ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Excel
-          </button>
-          <button type="button" onClick={handleExportPdf} disabled={!data?.students?.length || exporting} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-black/10 text-[#000435]/70 disabled:opacity-40">
-            {exporting === 'pdf' ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
-          </button>
-          <button type="button" onClick={handlePrint} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-black/10 text-[#000435]/70">
-            <Printer size={14} /> Print
-          </button>
-        </div>
-      </div>
+            Add assessment
+          </Button>
+          <Button
+            onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 0 })}
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            sx={{ ...toolBtnSx, bgcolor: NAVY, color: '#fff', border: `1px solid ${NAVY}`, '&:hover': { bgcolor: '#1B2D52' } }}
+          >
+            Add marks
+          </Button>
+          <Button
+            onClick={handleExportExcel}
+            disabled={!data?.students?.length || !!exporting}
+            startIcon={exporting === 'excel' ? <CircularProgress size={14} /> : <TableChartIcon sx={{ fontSize: 14 }} />}
+            sx={toolBtnSx}
+          >
+            Excel
+          </Button>
+          <Button
+            onClick={handleExportPdf}
+            disabled={!data?.students?.length || !!exporting}
+            startIcon={exporting === 'pdf' ? <CircularProgress size={14} /> : <DownloadIcon sx={{ fontSize: 14 }} />}
+            sx={toolBtnSx}
+          >
+            PDF
+          </Button>
+          <Button onClick={handlePrint} startIcon={<PrintIcon sx={{ fontSize: 14 }} />} sx={toolBtnSx}>
+            Print
+          </Button>
+        </Stack>
+      </Stack>
 
       {requestSuccess && (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 flex items-center gap-2">
-          <CheckCircle2 size={16} /> {requestSuccess}
-        </div>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ borderRadius: 2.5, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4', px: 2, py: 1.5, fontSize: 14, color: '#166534' }}>
+          <CheckCircleIcon sx={{ fontSize: 16 }} /> {requestSuccess}
+        </Stack>
       )}
 
-      {/* Filter bar */}
-      <div className="rounded-2xl border border-black/6 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap gap-3 items-end">
+      <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 2, boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'flex-end' }}>
           <FilterSelect label="Academic year" value={filters.academicYear} onChange={(v) => setFilter('academicYear', v)}
-            options={yearOptions.length ? yearOptions : [{ value: '', label: 'Loading…' }]} disabled={loading} />
+            options={yearOptions.length ? yearOptions : [{ value: '', label: 'Loading...' }]} disabled={loading} />
           <FilterSelect label="Term" value={filters.term} onChange={(v) => setFilter('term', v)}
             options={(data?.filters?.terms || ['Term 1', 'Term 2', 'Term 3']).map((t) => ({ value: t, label: t }))} disabled={loading} />
           <FilterSelect label="Class" value={filters.className} onChange={(v) => setFilter('className', v)}
@@ -348,293 +437,383 @@ export default function MarksCenter() {
             options={typeOptions} disabled={loading} />
           <FilterSelect label="Assessment" value={filters.assessmentId} onChange={(v) => setFilter('assessmentId', v)}
             options={assessmentOptions} disabled={loading} />
-          <div className="min-w-[160px] flex-1">
-            <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">Search student</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#000435]/30" />
-              <input
+          <Box sx={{ minWidth: 160, flex: 1 }}>
+            <Box component="label" sx={fieldLabelSx}>Search student</Box>
+            <Box sx={{ position: 'relative' }}>
+              <SearchIcon sx={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'rgba(19,33,61,0.3)' }} />
+              <Box
+                component="input"
                 type="search"
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Name or ID…"
-                className="w-full h-9 pl-8 pr-3 rounded-lg border border-black/10 text-xs focus:ring-2 focus:ring-[#ff8c00]/25 focus:outline-none"
+                placeholder="Name or ID..."
+                sx={{ ...selectSx, pl: 4, pr: 1.5 }}
               />
-            </div>
-          </div>
-        </div>
-      </div>
+            </Box>
+          </Box>
+        </Box>
+      </Paper>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-100 text-red-800">
-          <AlertTriangle size={16} /> {error}
-        </div>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ borderRadius: 2.5, bgcolor: '#FEF2F2', border: '1px solid #FEE2E2', px: 2, py: 1.5, fontSize: 14, color: '#991B1B' }}>
+          <WarningAmberIcon sx={{ fontSize: 16 }} /> {error}
+        </Stack>
       )}
 
       {data?.empty_reason && !loading && (
-        <div className="rounded-xl border border-black/6 bg-white p-8 text-center text-sm text-[#000435]/50">{data.empty_reason}</div>
+        <Paper elevation={0} sx={{ borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 4, textAlign: 'center', fontSize: 14, color: 'rgba(19,33,61,0.5)' }}>
+          {data.empty_reason}
+        </Paper>
       )}
 
       {loading && !data ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#000435]/30" size={32} /></div>
-      ) : data && !data.empty_reason && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress size={32} sx={{ color: 'rgba(19,33,61,0.3)' }} />
+        </Box>
+      ) : data && !data.empty_reason ? (
         <>
-          {/* Insights */}
           {(data.missing_marks_count > 0 || (data.insights || []).length > 0) && (
-            <div className="flex flex-wrap gap-2">
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {data.missing_marks_count > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                  <AlertTriangle size={14} /> {data.missing_marks_count} missing marks
-                  <button type="button" onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 2 })} className="ml-1 font-medium underline">Complete missing marks</button>
-                </div>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ borderRadius: 2.5, bgcolor: '#FFFBEB', border: '1px solid #FDE68A', px: 1.5, py: 1, fontSize: 12, color: '#78350F' }}>
+                  <WarningAmberIcon sx={{ fontSize: 14 }} /> {data.missing_marks_count} missing marks
+                  <ButtonBase
+                    onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 2 })}
+                    sx={{ ml: 0.5, fontSize: 12, fontWeight: 500, color: '#78350F', textDecoration: 'underline' }}
+                  >
+                    Complete missing marks
+                  </ButtonBase>
+                </Stack>
               )}
               {(data.insights || []).map((ins, i) => (
-                <div key={i} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs ${ins.type === 'success' ? 'bg-green-50 text-green-800 border border-green-100' : 'bg-amber-50 text-amber-900 border border-amber-100'}`}>
-                  {ins.type === 'success' ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} {ins.text}
-                </div>
+                <Stack
+                  key={i}
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.75}
+                  sx={{
+                    borderRadius: 2.5,
+                    px: 1.5,
+                    py: 1,
+                    fontSize: 12,
+                    ...(ins.type === 'success'
+                      ? { bgcolor: '#F0FDF4', color: '#166534', border: '1px solid #DCFCE7' }
+                      : { bgcolor: '#FFFBEB', color: '#78350F', border: '1px solid #FEF3C7' }),
+                  }}
+                >
+                  {ins.type === 'success' ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <WarningAmberIcon sx={{ fontSize: 14 }} />} {ins.text}
+                </Stack>
               ))}
-            </div>
+            </Box>
           )}
 
           {columns.length === 0 && (
-            <div className="rounded-xl border border-[#ff8c00]/20 bg-[#ff8c00]/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm text-[#000435]/70">
-              <span>No assessments for <strong>{filters.course || data.selected?.subject_name}</strong> in <strong>{filters.className || data.selected?.class_name}</strong> yet.</span>
-              <button type="button" onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 1 })} className="text-xs font-medium text-[#ff8c00] hover:underline">
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              flexWrap="wrap"
+              alignItems={{ sm: 'center' }}
+              justifyContent="space-between"
+              spacing={1.5}
+              sx={{ borderRadius: 2.5, border: '1px solid rgba(19,33,61,0.2)', bgcolor: 'rgba(19,33,61,0.05)', px: 2, py: 1.5, fontSize: 14, color: 'rgba(19,33,61,0.7)' }}
+            >
+              <Box component="span">
+                No assessments for <strong>{filters.course || data.selected?.subject_name}</strong> in{' '}
+                <strong>{filters.className || data.selected?.class_name}</strong> yet.
+              </Box>
+              <ButtonBase
+                onClick={() => openWizard({ className: filters.className, subjectName: filters.course, startStep: 1 })}
+                sx={{ fontSize: 12, fontWeight: 500, color: NAVY, '&:hover': { textDecoration: 'underline' } }}
+              >
                 + Create first assessment
-              </button>
-            </div>
+              </ButtonBase>
+            </Stack>
           )}
 
-          {/* KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, gap: { xs: 1.5, lg: 0 }, '@media (min-width:1200px)': { '& > *:not(:first-of-type)': { borderLeft: 0 } } }}>
             <KpiCard label="Total students" value={data.kpis?.total_students} />
             <KpiCard label="Average mark" value={data.kpis?.average_percent} suffix="%" />
             <KpiCard label="Highest score" value={data.kpis?.highest} suffix="%" />
             <KpiCard label="Lowest score" value={data.kpis?.lowest} suffix="%" />
             <KpiCard label="Pass rate" value={data.kpis?.pass_rate} suffix="%" />
-          </div>
+          </Box>
           {columns.length > 0 && data.kpis?.average_percent == null && (
-            <p className="text-xs text-[#000435]/45 -mt-2">KPIs appear once marks are recorded for the selected class and course.</p>
+            <Typography sx={{ mt: -1, fontSize: 12, color: MUTED }}>
+              KPIs appear once marks are recorded for the selected class and course.
+            </Typography>
           )}
 
-          {/* Tabs */}
-          <div className="flex gap-1 p-1 rounded-xl bg-[#000435]/[0.04] w-fit">
+          <Stack direction="row" spacing={0.5} sx={{ width: 'fit-content', borderRadius: 2.5, bgcolor: 'rgba(19,33,61,0.04)', p: 0.5 }}>
             {[
               { id: 'all', label: 'All assessments' },
               { id: 'categories', label: 'Assessment categories' },
               { id: 'averages', label: 'Student averages' },
             ].map((t) => (
-              <button
+              <ButtonBase
                 key={t.id}
-                type="button"
                 onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${tab === t.id ? 'bg-white text-[#000435] shadow-sm' : 'text-[#000435]/50 hover:text-[#000435]'}`}
+                sx={{
+                  borderRadius: 2,
+                  px: 2,
+                  py: 1,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  transition: 'color .15s',
+                  ...(tab === t.id
+                    ? { bgcolor: '#fff', color: NAVY, boxShadow: '0 1px 2px rgba(19,33,61,0.08)' }
+                    : { color: 'rgba(19,33,61,0.5)', '&:hover': { color: NAVY } }),
+                }}
               >
                 {t.label}
-              </button>
+              </ButtonBase>
             ))}
-          </div>
+          </Stack>
 
-          {/* Main grid: table + assessment panel */}
-          <div className="flex flex-col xl:flex-row gap-4">
-            <div className="flex-1 min-w-0 rounded-2xl border border-black/6 bg-white shadow-sm overflow-hidden">
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', xl: 'row' }, gap: 2 }}>
+            <Paper elevation={0} sx={{ flex: 1, minWidth: 0, borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', overflow: 'hidden', boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
               {tab === 'all' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
-                    <thead>
-                      <tr className="bg-[#000435]/[0.03] text-[10px] font-medium uppercase tracking-wide text-[#000435]/50">
-                        <th className="sticky left-0 z-20 bg-[#f4f5f8] text-left py-3 px-4 min-w-[160px] border-r border-black/6">Student</th>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table sx={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ ...headCellSx, position: 'sticky', left: 0, zIndex: 20, bgcolor: '#f4f5f8', textAlign: 'left', minWidth: 160, borderRight: 0, boxShadow: `inset -1px 0 0 ${BORDER}` }}>
+                          Student
+                        </TableCell>
                         {columns.map((c) => (
-                          <th key={c.id} className="text-center py-3 px-2 min-w-[72px] whitespace-nowrap" title={c.is_locked ? 'Published - request edit to change' : undefined}>
-                            <span className="block truncate max-w-[80px]">{c.short_label || c.assessment_name}</span>
-                            {c.is_locked && <span className="text-[9px] text-amber-600 font-medium">locked</span>}
-                          </th>
+                          <TableCell
+                            key={c.id}
+                            title={c.is_locked ? 'Published - request edit to change' : undefined}
+                            sx={{ ...headCellSx, textAlign: 'center', px: 1, minWidth: 72, whiteSpace: 'nowrap' }}
+                          >
+                            <Box component="span" sx={{ display: 'block', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {c.short_label || c.assessment_name}
+                            </Box>
+                            {c.is_locked && <Box component="span" sx={{ fontSize: 9, fontWeight: 500, color: '#D97706' }}>locked</Box>}
+                          </TableCell>
                         ))}
-                        <th className="text-center py-3 px-3 min-w-[64px]">Avg</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center', px: 1.5, minWidth: 64 }}>Avg</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {students.length === 0 ? (
-                        <tr><td colSpan={columns.length + 2} className="py-12 text-center text-[#000435]/40 text-sm">No students found</td></tr>
+                        <TableRow>
+                          <TableCell colSpan={columns.length + 2} sx={{ py: 6, textAlign: 'center', fontSize: 14, color: 'rgba(19,33,61,0.4)' }}>
+                            No students found
+                          </TableCell>
+                        </TableRow>
                       ) : students.map((row) => (
-                        <tr key={row.student_id} className="border-t border-black/4 hover:bg-[#ff8c00]/[0.03] cursor-pointer" onClick={() => openStudent(row)}>
-                          <td className="sticky left-0 z-10 bg-white border-r border-black/6 py-2.5 px-4 font-medium text-[#000435]">
-                            <p className="truncate max-w-[140px]">{row.name}</p>
-                            <p className="text-[10px] text-[#000435]/35">{row.student_uid}</p>
-                          </td>
+                        <TableRow key={row.student_id} hover onClick={() => openStudent(row)} sx={{ cursor: 'pointer', '& td': { borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' } }}>
+                          <TableCell sx={{ position: 'sticky', left: 0, zIndex: 10, bgcolor: '#fff', 'tr:hover > &': { bgcolor: '#F5F5F5' }, borderRight: 0, boxShadow: `inset -1px 0 0 ${BORDER}`, py: 1.25, px: 2, fontWeight: 500, color: NAVY }}>
+                            <Typography sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 14 }}>{row.name}</Typography>
+                            <Typography sx={{ fontSize: 10, color: 'rgba(19,33,61,0.35)' }}>{row.student_uid}</Typography>
+                          </TableCell>
                           {columns.map((c) => {
                             const cell = row.marks[c.id];
                             const cellKey = `${row.student_id}:${c.id}`;
                             const isEditing = editingCell === cellKey;
                             return (
-                              <td key={c.id} className="text-center py-1.5 px-1" onClick={(e) => e.stopPropagation()}>
+                              <TableCell key={c.id} onClick={(e) => e.stopPropagation()} sx={{ py: 0.75, px: 0.5, textAlign: 'center', borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' }}>
                                 {isEditing ? (
-                                  <input
+                                  <Box
+                                    component="input"
                                     autoFocus
                                     value={editValue}
                                     onChange={(e) => setEditValue(e.target.value)}
                                     onBlur={() => saveEdit(row.student_id, c.id, c.max_score)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(row.student_id, c.id, c.max_score); if (e.key === 'Escape') setEditingCell(null); }}
                                     disabled={savingCell}
-                                    className="w-14 h-8 text-center text-xs rounded-lg border border-[#ff8c00] focus:outline-none"
+                                    sx={{ width: 56, height: 32, textAlign: 'center', fontSize: 12, fontFamily: 'inherit', borderRadius: 2, border: `1px solid ${NAVY}`, outline: 'none' }}
                                   />
                                 ) : (
-                                  <button
-                                    type="button"
+                                  <ButtonBase
                                     onClick={() => startEdit(row.student_id, c.id, cell, c)}
-                                    className={`min-w-[2.5rem] h-8 px-1.5 rounded-lg text-xs font-medium tabular-nums ${markColorClass(cell?.percent)}`}
+                                    sx={{
+                                      minWidth: '2.5rem',
+                                      height: 32,
+                                      px: 0.75,
+                                      borderRadius: 2,
+                                      fontSize: 12,
+                                      fontWeight: 500,
+                                      fontVariantNumeric: 'tabular-nums',
+                                      ...toneSx(markTone(cell?.percent)),
+                                    }}
                                   >
                                     {cell?.mark_code || (cell?.value != null ? cell.value : '-')}
-                                  </button>
+                                  </ButtonBase>
                                 )}
-                              </td>
+                              </TableCell>
                             );
                           })}
-                          <td className="text-center py-2.5 px-2">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${markColorClass(row.average_percent)}`}>
+                          <TableCell sx={{ py: 1.25, px: 1, textAlign: 'center', borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' }}>
+                            <Box component="span" sx={{ borderRadius: 1.5, px: 1, py: 0.25, fontSize: 12, fontWeight: 600, ...toneSx(markTone(row.average_percent)) }}>
                               {row.average_percent != null ? `${row.average_percent}%` : '-'}
-                            </span>
-                          </td>
-                        </tr>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </Box>
               )}
 
               {tab === 'categories' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#000435]/[0.03] text-[10px] font-medium uppercase text-[#000435]/50">
-                        <th className="text-left py-3 px-4">Category</th>
-                        <th className="text-center py-3 px-4">Weight</th>
-                        <th className="text-center py-3 px-4">Class average</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table sx={{ width: '100%' }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'left' }}>Category</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Weight</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Class average</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {categoryRows.length === 0 ? (
-                        <tr><td colSpan={3} className="py-10 text-center text-[#000435]/40">No category data yet</td></tr>
+                        <TableRow>
+                          <TableCell colSpan={3} sx={{ py: 5, textAlign: 'center', color: 'rgba(19,33,61,0.4)' }}>No category data yet</TableCell>
+                        </TableRow>
                       ) : categoryRows.map((c) => (
-                        <tr key={c.slug} className="border-t border-black/4">
-                          <td className="py-3 px-4 font-medium text-[#000435]">{c.name}</td>
-                          <td className="py-3 px-4 text-center text-[#000435]/60">{c.weight_percent}%</td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${markColorClass(c.average_percent)}`}>
+                        <TableRow key={c.slug}>
+                          <TableCell sx={{ ...cellBaseSx, fontWeight: 500, color: NAVY, borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' }}>{c.name}</TableCell>
+                          <TableCell sx={{ ...cellBaseSx, textAlign: 'center', color: 'rgba(19,33,61,0.6)', borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' }}>{c.weight_percent}%</TableCell>
+                          <TableCell sx={{ ...cellBaseSx, textAlign: 'center', borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' }}>
+                            <Box component="span" sx={{ display: 'inline-block', borderRadius: 2, px: 1.25, py: 0.5, fontSize: 12, fontWeight: 600, ...toneSx(markTone(c.average_percent)) }}>
                               {c.average_percent != null ? `${c.average_percent}%` : '-'}
-                            </span>
-                          </td>
-                        </tr>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </Box>
               )}
 
               {tab === 'averages' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#000435]/[0.03] text-[10px] font-medium uppercase text-[#000435]/50">
-                        <th className="text-left py-3 px-4">#</th>
-                        <th className="text-left py-3 px-4">Student</th>
-                        <th className="text-center py-3 px-4">Average</th>
-                        <th className="text-center py-3 px-4">Grade</th>
-                        <th className="text-center py-3 px-4">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table sx={{ width: '100%' }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'left' }}>#</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'left' }}>Student</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Average</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Grade</TableCell>
+                        <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
                       {students.map((row) => (
-                        <tr key={row.student_id} className="border-t border-black/4 hover:bg-[#ff8c00]/[0.03] cursor-pointer" onClick={() => openStudent(row)}>
-                          <td className="py-3 px-4 text-[#000435]/40 text-xs">{row.position ?? '-'}</td>
-                          <td className="py-3 px-4 font-medium text-[#000435]">{row.name}</td>
-                          <td className="py-3 px-4 text-center font-semibold tabular-nums">{row.average_percent != null ? `${row.average_percent}%` : '-'}</td>
-                          <td className="py-3 px-4 text-center">
-                            {row.grade ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${gradeBadgeClass(row.grade)}`}>{row.grade}</span> : '-'}
-                          </td>
-                          <td className="py-3 px-4 text-center text-xs">
+                        <TableRow key={row.student_id} hover onClick={() => openStudent(row)} sx={{ cursor: 'pointer', '& td': { borderTop: `1px solid rgba(0,0,0,0.04)`, borderBottom: 'none' } }}>
+                          <TableCell sx={{ ...cellBaseSx, color: 'rgba(19,33,61,0.4)', fontSize: 12 }}>{row.position ?? '-'}</TableCell>
+                          <TableCell sx={{ ...cellBaseSx, fontWeight: 500, color: NAVY }}>{row.name}</TableCell>
+                          <TableCell sx={{ ...cellBaseSx, textAlign: 'center', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                            {row.average_percent != null ? `${row.average_percent}%` : '-'}
+                          </TableCell>
+                          <TableCell sx={{ ...cellBaseSx, textAlign: 'center' }}>
+                            {row.grade ? (
+                              <Box component="span" sx={{ borderRadius: 99, px: 1, py: 0.25, fontSize: 12, fontWeight: 500, ...toneSx(gradeTone(row.grade)) }}>
+                                {row.grade}
+                              </Box>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell sx={{ ...cellBaseSx, textAlign: 'center', fontSize: 12 }}>
                             {row.missing_count > 0 ? (
-                              <span className="text-amber-700">Missing {row.missing_count}</span>
+                              <Box component="span" sx={{ color: '#B45309' }}>Missing {row.missing_count}</Box>
                             ) : (
-                              <span className="text-green-700">Complete</span>
+                              <Box component="span" sx={{ color: '#15803D' }}>Complete</Box>
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </Box>
               )}
-            </div>
+            </Paper>
 
-            {/* Assessment panel */}
             {data.selected_assessment && (
-              <div className="xl:w-72 shrink-0 rounded-2xl border border-black/6 bg-white p-5 shadow-sm h-fit">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-[#000435]/40 mb-3">Assessment details</p>
-                <h4 className="text-sm font-semibold text-[#000435]">{data.selected_assessment.assessment_name}</h4>
-                <dl className="mt-4 space-y-2.5 text-xs">
-                  <div className="flex justify-between"><dt className="text-[#000435]/50">Type</dt><dd className="font-medium text-[#000435]">{data.selected_assessment.type_name}</dd></div>
-                  <div className="flex justify-between"><dt className="text-[#000435]/50">Maximum marks</dt><dd className="font-medium">{data.selected_assessment.max_score}</dd></div>
-                  <div className="flex justify-between"><dt className="text-[#000435]/50">Created</dt><dd className="font-medium">{data.selected_assessment.created_at ? new Date(data.selected_assessment.created_at).toLocaleDateString() : '-'}</dd></div>
-                  <div className="flex justify-between"><dt className="text-[#000435]/50">Submitted</dt><dd className="font-medium text-[#ff8c00]">{data.selected_assessment.submitted_count}/{data.selected_assessment.total_students}</dd></div>
-                </dl>
-                <button type="button" onClick={() => setFilter('assessmentId', String(data.selected_assessment.id))} className="mt-4 w-full h-9 rounded-lg border border-black/10 text-xs font-medium text-[#000435]/70 hover:bg-black/5">
+              <Paper elevation={0} sx={{ flexShrink: 0, width: { xl: 288 }, height: 'fit-content', borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 2.5, boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
+                <Typography sx={{ mb: 1.5, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(19,33,61,0.4)' }}>
+                  Assessment details
+                </Typography>
+                <Typography component="h4" sx={{ fontSize: 14, fontWeight: 600, color: NAVY }}>{data.selected_assessment.assessment_name}</Typography>
+                <Box component="dl" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.25, fontSize: 12, m: 0 }}>
+                  {[
+                    { dt: 'Type', dd: data.selected_assessment.type_name },
+                    { dt: 'Maximum marks', dd: data.selected_assessment.max_score },
+                    { dt: 'Created', dd: data.selected_assessment.created_at ? new Date(data.selected_assessment.created_at).toLocaleDateString() : '-' },
+                    { dt: 'Submitted', dd: `${data.selected_assessment.submitted_count}/${data.selected_assessment.total_students}` },
+                  ].map((item) => (
+                    <Box key={item.dt} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Box component="dt" sx={{ color: 'rgba(19,33,61,0.5)' }}>{item.dt}</Box>
+                      <Box component="dd" sx={{ m: 0, fontWeight: 500, color: NAVY }}>{item.dd}</Box>
+                    </Box>
+                  ))}
+                </Box>
+                <Button
+                  onClick={() => setFilter('assessmentId', String(data.selected_assessment.id))}
+                  fullWidth
+                  sx={{ ...toolBtnSx, mt: 2, height: 36 }}
+                >
                   Focus this assessment
-                </button>
-              </div>
+                </Button>
+              </Paper>
             )}
-          </div>
+          </Box>
 
-          {/* Analytics */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-black/6 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium text-[#000435]/55 mb-3 flex items-center gap-1.5"><BarChart3 size={14} /> Grade distribution</p>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+            <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 2.5, boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5, fontSize: 12, fontWeight: 500, color: 'rgba(19,33,61,0.55)' }}>
+                <BarChartIcon sx={{ fontSize: 14 }} /> Grade distribution
+              </Stack>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={gradeChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#00043508" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#13213D08" />
                   <XAxis dataKey="grade" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#ff8c00" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill={NAVY} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </Paper>
 
-            <div className="rounded-2xl border border-black/6 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium text-[#000435]/55 mb-3 flex items-center gap-1.5"><TrendingUp size={14} /> Performance trend</p>
+            <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 2.5, boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5, fontSize: 12, fontWeight: 500, color: 'rgba(19,33,61,0.55)' }}>
+                <TrendingUpIcon sx={{ fontSize: 14 }} /> Performance trend
+              </Stack>
               {(data.trend || []).length === 0 ? (
-                <p className="text-xs text-[#000435]/40 py-12 text-center">Record more assessments to see trends</p>
+                <Typography sx={{ py: 6, textAlign: 'center', fontSize: 12, color: 'rgba(19,33,61,0.4)' }}>
+                  Record more assessments to see trends
+                </Typography>
               ) : (
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={data.trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#00043508" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#13213D08" />
                     <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={50} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                     <Tooltip formatter={(v) => `${v}%`} />
-                    <Line type="monotone" dataKey="average" stroke="#000435" strokeWidth={2} dot={{ fill: '#ff8c00' }} />
+                    <Line type="monotone" dataKey="average" stroke={NAVY} strokeWidth={2} dot={{ fill: NAVY }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
-            </div>
+            </Paper>
 
-            <div className="rounded-2xl border border-black/6 bg-white p-5 shadow-sm">
-              <p className="text-xs font-medium text-[#000435]/55 mb-3">Top performers</p>
+            <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: '#fff', p: 2.5, boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}>
+              <Typography sx={{ mb: 1.5, fontSize: 12, fontWeight: 500, color: 'rgba(19,33,61,0.55)' }}>Top performers</Typography>
               {(data.top_performers || []).length === 0 ? (
-                <p className="text-xs text-[#000435]/40 py-8 text-center">No data yet</p>
+                <Typography sx={{ py: 4, textAlign: 'center', fontSize: 12, color: 'rgba(19,33,61,0.4)' }}>No data yet</Typography>
               ) : (
-                <ol className="space-y-2">
+                <Box component="ol" sx={{ display: 'flex', flexDirection: 'column', gap: 1, m: 0, p: 0, listStyle: 'none' }}>
                   {data.top_performers.map((p, i) => (
-                    <li key={p.student_id} className="flex items-center justify-between text-sm">
-                      <span className="text-[#000435]/40 text-xs w-5">{i + 1}</span>
-                      <span className="flex-1 font-medium text-[#000435] truncate">{p.name}</span>
-                      <span className="text-xs font-semibold text-[#ff8c00]">{p.average_percent}%</span>
-                    </li>
+                    <Box key={p.student_id} component="li" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14 }}>
+                      <Box component="span" sx={{ width: 20, fontSize: 12, color: 'rgba(19,33,61,0.4)' }}>{i + 1}</Box>
+                      <Box component="span" sx={{ flex: 1, fontWeight: 500, color: NAVY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</Box>
+                      <Box component="span" sx={{ fontSize: 12, fontWeight: 600, color: NAVY }}>{p.average_percent}%</Box>
+                    </Box>
                   ))}
-                </ol>
+                </Box>
               )}
-            </div>
-          </div>
+            </Paper>
+          </Box>
         </>
-      )}
+      ) : null}
 
       <RecordMarksWizard
         open={wizardOpen}
@@ -643,109 +822,116 @@ export default function MarksCenter() {
         onPublished={() => load()}
       />
 
-      {editRequest && createPortal(
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-          <button type="button" aria-label="Close" className="absolute inset-0 bg-[#000435]/50" onClick={() => setEditRequest(null)} />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 space-y-4">
-            <div>
-              <h3 className="text-base font-semibold text-[#000435]">Request mark edit</h3>
-              <p className="text-xs text-[#000435]/50 mt-1">This assessment is published. Academic must approve your change.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-[#000435]/5 px-3 py-2">
-                <p className="text-[10px] text-[#000435]/40">Current</p>
-                <p className="font-semibold">{editRequest.currentScore ?? '-'}</p>
-              </div>
-              <div>
-                <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">Requested score</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={editRequest.maxScore}
-                  value={editRequestScore}
-                  onChange={(e) => setEditRequestScore(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-black/10 px-3 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] font-medium text-[#000435]/45 block mb-1">Reason *</label>
-              <textarea
-                value={editRequestReason}
-                onChange={(e) => setEditRequestReason(e.target.value)}
-                rows={3}
-                placeholder="Explain why this mark needs to change…"
-                className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm resize-none"
+      <Dialog open={!!editRequest} onClose={() => setEditRequest(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, p: 0 } }}>
+        <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 600, color: NAVY }}>Request mark edit</Typography>
+            <Typography sx={{ mt: 0.5, fontSize: 12, color: 'rgba(19,33,61,0.5)' }}>
+              This assessment is published. Academic must approve your change.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, fontSize: 14 }}>
+            <Box sx={{ borderRadius: 2.5, bgcolor: 'rgba(19,33,61,0.05)', px: 1.5, py: 1 }}>
+              <Typography sx={{ fontSize: 10, color: 'rgba(19,33,61,0.4)' }}>Current</Typography>
+              <Typography sx={{ fontWeight: 600 }}>{editRequest?.currentScore ?? '-'}</Typography>
+            </Box>
+            <Box>
+              <Box component="label" sx={fieldLabelSx}>Requested score</Box>
+              <Box
+                component="input"
+                type="number"
+                min={0}
+                max={editRequest?.maxScore}
+                value={editRequestScore}
+                onChange={(e) => setEditRequestScore(e.target.value)}
+                sx={{ width: '100%', height: 40, borderRadius: 2.5, border: '1px solid rgba(0,0,0,0.1)', px: 1.5, fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
               />
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <button type="button" onClick={() => setEditRequest(null)} className="px-4 py-2 rounded-xl text-xs border border-black/10">Cancel</button>
-              <button
-                type="button"
-                onClick={submitEditRequest}
-                disabled={submittingRequest || !editRequestReason.trim()}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-[#000435] disabled:opacity-40"
-              >
-                {submittingRequest ? 'Sending…' : 'Submit request'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+            </Box>
+          </Box>
+          <Box>
+            <Box component="label" sx={fieldLabelSx}>Reason *</Box>
+            <Box
+              component="textarea"
+              value={editRequestReason}
+              onChange={(e) => setEditRequestReason(e.target.value)}
+              rows={3}
+              placeholder="Explain why this mark needs to change..."
+              sx={{ width: '100%', borderRadius: 2.5, border: '1px solid rgba(0,0,0,0.1)', px: 1.5, py: 1, fontSize: 14, fontFamily: 'inherit', resize: 'none', outline: 'none' }}
+            />
+          </Box>
+          <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ pt: 1 }}>
+            <Button onClick={() => setEditRequest(null)} sx={toolBtnSx}>Cancel</Button>
+            <Button
+              onClick={submitEditRequest}
+              disabled={submittingRequest || !editRequestReason.trim()}
+              sx={{ borderRadius: 2.5, px: 2, py: 1, fontSize: 12, fontWeight: 500, textTransform: 'none', color: '#fff', bgcolor: NAVY, '&:hover': { bgcolor: '#1B2D52' } }}
+            >
+              {submittingRequest ? 'Sending...' : 'Submit request'}
+            </Button>
+          </Stack>
+        </Box>
+      </Dialog>
 
-      {/* Student drawer */}
-      {selectedStudent && createPortal(
-        <div className="fixed inset-0 z-[200] flex justify-end">
-          <button type="button" aria-label="Close" className="absolute inset-0 bg-[#000435]/40" onClick={() => setSelectedStudent(null)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-[slideIn_.25s_ease-out]">
-            <style>{`@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
-            <div className="px-5 py-4 border-b border-black/6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#000435]/5 flex items-center justify-center"><User size={20} className="text-[#ff8c00]" /></div>
-                <div>
-                  <p className="text-sm font-semibold text-[#000435]">{selectedStudent.name}</p>
-                  <p className="text-[10px] text-[#000435]/45">{selectedStudent.student_uid}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setSelectedStudent(null)} className="p-2 rounded-lg hover:bg-black/5"><X size={18} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-black/6 p-3">
-                  <p className="text-[10px] text-[#000435]/40">Average</p>
-                  <p className="text-lg font-semibold text-[#000435]">{selectedStudent.average_percent != null ? `${selectedStudent.average_percent}%` : '-'}</p>
-                </div>
-                <div className="rounded-xl border border-black/6 p-3">
-                  <p className="text-[10px] text-[#000435]/40">Position</p>
-                  <p className="text-lg font-semibold text-[#000435]">{selectedStudent.position ?? '-'}</p>
-                </div>
-              </div>
+      <Drawer anchor="right" open={!!selectedStudent} onClose={() => setSelectedStudent(null)} PaperProps={{ sx: { width: '100%', maxWidth: 448 } }}>
+        {selectedStudent && (
+          <Box sx={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ borderBottom: `1px solid ${BORDER}`, px: 2.5, py: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 2.5, bgcolor: 'rgba(19,33,61,0.05)' }}>
+                  <PersonOutlineIcon sx={{ fontSize: 20, color: NAVY }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: NAVY }}>{selectedStudent.name}</Typography>
+                  <Typography sx={{ fontSize: 10, color: 'rgba(19,33,61,0.45)' }}>{selectedStudent.student_uid}</Typography>
+                </Box>
+              </Stack>
+              <IconButton onClick={() => setSelectedStudent(null)} sx={{ borderRadius: 2, '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' } }}>
+                <CloseIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Stack>
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                <Box sx={{ borderRadius: 2.5, border: `1px solid ${BORDER}`, p: 1.5 }}>
+                  <Typography sx={{ fontSize: 10, color: 'rgba(19,33,61,0.4)' }}>Average</Typography>
+                  <Typography sx={{ fontSize: 18, fontWeight: 600, color: NAVY }}>
+                    {selectedStudent.average_percent != null ? `${selectedStudent.average_percent}%` : '-'}
+                  </Typography>
+                </Box>
+                <Box sx={{ borderRadius: 2.5, border: `1px solid ${BORDER}`, p: 1.5 }}>
+                  <Typography sx={{ fontSize: 10, color: 'rgba(19,33,61,0.4)' }}>Position</Typography>
+                  <Typography sx={{ fontSize: 18, fontWeight: 600, color: NAVY }}>{selectedStudent.position ?? '-'}</Typography>
+                </Box>
+              </Box>
               {selectedStudent.grade && (
-                <div className="rounded-xl border border-black/6 p-3 flex items-center justify-between">
-                  <span className="text-xs text-[#000435]/50">Grade</span>
-                  <span className={`text-sm font-medium px-3 py-1 rounded-full ${gradeBadgeClass(selectedStudent.grade)}`}>{selectedStudent.grade}</span>
-                </div>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ borderRadius: 2.5, border: `1px solid ${BORDER}`, p: 1.5 }}>
+                  <Box component="span" sx={{ fontSize: 12, color: 'rgba(19,33,61,0.5)' }}>Grade</Box>
+                  <Box component="span" sx={{ borderRadius: 99, px: 1.5, py: 0.5, fontSize: 14, fontWeight: 500, ...toneSx(gradeTone(selectedStudent.grade)) }}>
+                    {selectedStudent.grade}
+                  </Box>
+                </Stack>
               )}
-              <div>
-                <p className="text-xs font-medium text-[#000435]/55 mb-2">Subject averages (your classes)</p>
-                <div className="space-y-2">
+              <Box>
+                <Typography sx={{ mb: 1, fontSize: 12, fontWeight: 500, color: 'rgba(19,33,61,0.55)' }}>Subject averages (your classes)</Typography>
+                <Stack spacing={1}>
                   {(selectedStudent.subject_averages || []).length === 0 ? (
-                    <p className="text-xs text-[#000435]/40">No marks recorded in other subjects yet.</p>
+                    <Typography sx={{ fontSize: 12, color: 'rgba(19,33,61,0.4)' }}>No marks recorded in other subjects yet.</Typography>
                   ) : selectedStudent.subject_averages.map((s) => (
-                    <div key={s.subject_name} className="flex items-center justify-between py-2 border-b border-black/4 last:border-0">
-                      <span className="text-sm text-[#000435]">{s.subject_name}</span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${markColorClass(s.average_percent)}`}>{s.average_percent}%</span>
-                    </div>
+                    <Stack key={s.subject_name} direction="row" alignItems="center" justifyContent="space-between" sx={{ borderBottom: '1px solid rgba(0,0,0,0.04)', py: 1, '&:last-of-type': { borderBottom: 0 } }}>
+                      <Box component="span" sx={{ fontSize: 14, color: NAVY }}>{s.subject_name}</Box>
+                      <Box component="span" sx={{ borderRadius: 1.5, px: 1, py: 0.25, fontSize: 12, fontWeight: 600, ...toneSx(markTone(s.average_percent)) }}>
+                        {s.average_percent}%
+                      </Box>
+                    </Stack>
                   ))}
-                </div>
-              </div>
-              <Link to="/marks/student-profiles" className="block text-center text-xs font-medium text-[#ff8c00] hover:underline">View full student profile →</Link>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </div>
+                </Stack>
+              </Box>
+              <Box component={Link} to="/marks/student-profiles" sx={{ display: 'block', textAlign: 'center', fontSize: 12, fontWeight: 500, color: NAVY, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+                View full student profile &rarr;
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Drawer>
+    </Box>
   );
 }

@@ -161,7 +161,7 @@ export default function FeesPage() {
               onClick={() => void downloadStatement()}
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-semibold text-navy disabled:opacity-60"
             >
-              <Download className="size-4" /> {busy ? 'Preparing…' : 'Download statement'}
+              <Download className="size-4" /> {busy ? 'Preparing…' : 'Download file'}
             </button>
           </div>
         }

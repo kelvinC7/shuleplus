@@ -27,6 +27,10 @@ export interface DashboardData {
   spendingByCategory: CategorySpending[];
   topPurchasedItems: TopPurchasedItem[];
   statusDistribution: StatusDistribution[];
+  requestStatusDistribution: StatusDistribution[];
+  recentRequests: RecentRequestSummary[];
+  recentOrders: RecentOrderSummary[];
+  totalOrderValue: number;
   recentActivities: ActivityLog[];
 }
 
@@ -54,6 +58,25 @@ export interface TopPurchasedItem {
 export interface StatusDistribution {
   status: string;
   count: number;
+}
+
+export interface RecentRequestSummary {
+  id: string;
+  prNumber: string;
+  status: string;
+  priority: string;
+  requestedByName: string | null;
+  department: string | null;
+  createdAt: string;
+}
+
+export interface RecentOrderSummary {
+  id: string;
+  poNumber: string;
+  status: string;
+  supplier: string | null;
+  totalAmount: number;
+  createdAt: string;
 }
 
 export interface ActivityLog {
@@ -92,7 +115,7 @@ export interface PurchaseRequest {
   organizationId: string;
   prNumber: string;
   requestType: string;
-  departmentId: string;
+  departmentId: string | null;
   departmentOther?: string | null;
   academicYear?: string | null;
   term?: string | null;
@@ -102,16 +125,17 @@ export interface PurchaseRequest {
   project: string | null;
   budgetLine: string | null;
   priority: string;
-  neededDate: string;
+  neededDate: string | null;
   status: string;
   totalEstimate: number | null;
   currentApprover: string | null;
   rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
-  department?: { id: string; name: string };
+  department?: { id: string; name: string } | null;
   items?: PurchaseRequestItem[];
   approvals?: PRApproval[];
+  purchaseOrders?: PurchaseOrder[];
   _count?: { items: number };
 }
 
@@ -170,6 +194,8 @@ export interface PurchaseOrder {
   purchaseRequest?: {
     id: string;
     prNumber: string;
+    academicYear?: string | null;
+    term?: string | null;
     requestedByName?: string | null;
     department?: { id: string; name: string };
   };
@@ -438,4 +464,140 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Excel import                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface ImportItemOption {
+  id: string;
+  name: string;
+  sku: string | null;
+  unit: string;
+  source: 'inventory' | 'procurement';
+}
+
+export interface PurchaseRequestImportBody {
+  departmentIds?: string[];
+  academicYear?: string;
+  term?: string;
+  priority?: string;
+  neededDate?: string;
+  purpose?: string;
+  requestType?: string;
+  departmentHeadId?: string;
+  items: { itemName: string; quantity: number; unit?: string }[];
+}
+
+export interface PurchaseRequestImportResult {
+  requests: {
+    id: string;
+    prNumber: string;
+    departmentId: string;
+    departmentName: string;
+    itemCount: number;
+  }[];
+  itemCount: number;
+  departmentCount: number;
+}
+
+export interface PurchaseOrderImportBody {
+  supplierId: string;
+  expectedDelivery?: string;
+  deliveryAddress?: string;
+  paymentTerms?: string;
+  notes?: string;
+  rows: {
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    prCode: string;
+    rowNumber?: number;
+  }[];
+}
+
+export interface PurchaseOrderImportResult {
+  purchaseOrders: {
+    id: string;
+    poNumber: string;
+    prNumber: string;
+    totalAmount: number;
+    itemCount: number;
+    totalQuantity: number;
+  }[];
+  totalAmount: number;
+  itemCount: number;
+  totalQuantity: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Document verification (QR)                                          */
+/* ------------------------------------------------------------------ */
+
+export type VerificationDocumentType =
+  | 'PURCHASE_REQUEST'
+  | 'PURCHASE_ORDER'
+  | 'REQUISITION'
+  | 'GOODS_RECEIVING'
+  | 'GOODS_RETURN'
+  | 'REPORT';
+
+export type VerificationAuthenticity =
+  | 'VERIFIED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'INVALID';
+
+export interface DocumentVerification {
+  documentType: VerificationDocumentType;
+  documentTypeLabel: string;
+  reference: string;
+  token: string;
+  url: string;
+  qrDataUrl: string;
+}
+
+export interface VerificationItem {
+  itemName: string;
+  unit?: string | null;
+  quantity?: number | null;
+  orderedQty?: number | null;
+  receivedQty?: number | null;
+  returnQty?: number | null;
+  unitPrice?: number | null;
+  totalPrice?: number | null;
+  reason?: string | null;
+}
+
+export interface VerificationRelated {
+  type: string;
+  label: string;
+  reference: string;
+}
+
+export interface PublicVerificationResult {
+  authenticity: VerificationAuthenticity;
+  authenticityLabel: string;
+  documentType: VerificationDocumentType;
+  documentTypeLabel: string;
+  reference: string | null;
+  status: string | null;
+  statusLabel: string | null;
+  organization: { name: string; logoUrl: string | null };
+  createdAt: string | null;
+  createdBy: string | null;
+  department: string | null;
+  fields: { label: string; value: string }[];
+  items: VerificationItem[];
+  related: VerificationRelated[];
+  verifiedAt: string;
+}
+
+export interface EnsureDocumentVerificationBody {
+  documentType: VerificationDocumentType;
+  documentId?: string;
+  reference?: string;
+  metadata?: Record<string, unknown>;
 }

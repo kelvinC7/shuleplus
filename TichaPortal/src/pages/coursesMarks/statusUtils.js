@@ -1,12 +1,44 @@
 export const UI_STATUS = {
-  draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80' },
-  scheduled: { label: 'Scheduled', color: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80' },
-  submitted: { label: 'Submitted', color: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200/80' },
-  under_review: { label: 'Under review', color: 'bg-violet-50 text-violet-800 ring-1 ring-violet-200/80' },
-  needs_correction: { label: 'Needs correction', color: 'bg-orange-50 text-orange-900 ring-1 ring-orange-200/80' },
-  approved: { label: 'Approved', color: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80' },
-  locked: { label: 'Locked', color: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/80' },
-  edit_pending: { label: 'Edit pending', color: 'bg-yellow-50 text-yellow-900 ring-1 ring-yellow-200/80' },
+  draft: {
+    label: 'Draft',
+    color: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200/80',
+    tone: { color: '#334155', bg: '#F1F5F9', ring: '#E2E8F0' },
+  },
+  scheduled: {
+    label: 'Scheduled',
+    color: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80',
+    tone: { color: '#065F46', bg: '#ECFDF5', ring: '#A7F3D0' },
+  },
+  submitted: {
+    label: 'Submitted',
+    color: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200/80',
+    tone: { color: '#78350F', bg: '#FFFBEB', ring: '#FDE68A' },
+  },
+  under_review: {
+    label: 'Under review',
+    color: 'bg-violet-50 text-violet-800 ring-1 ring-violet-200/80',
+    tone: { color: '#5B21B6', bg: '#F5F3FF', ring: '#DDD6FE' },
+  },
+  needs_correction: {
+    label: 'Needs correction',
+    color: 'bg-[#F3F5FA] text-[#0B1220] ring-1 ring-[#CBD5E8]/80',
+    tone: { color: '#0B1220', bg: '#F3F5FA', ring: '#CBD5E8' },
+  },
+  approved: {
+    label: 'Approved',
+    color: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80',
+    tone: { color: '#065F46', bg: '#ECFDF5', ring: '#A7F3D0' },
+  },
+  locked: {
+    label: 'Locked',
+    color: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/80',
+    tone: { color: '#475569', bg: '#F1F5F9', ring: '#E2E8F0' },
+  },
+  edit_pending: {
+    label: 'Edit pending',
+    color: 'bg-yellow-50 text-yellow-900 ring-1 ring-yellow-200/80',
+    tone: { color: '#713F12', bg: '#FEFCE8', ring: '#FEF08A' },
+  },
 };
 
 export function mapUiStatus(status, correctionRequest) {
@@ -31,6 +63,18 @@ export function canEditMarks(status, correctionRequest) {
   if (['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(s)) return true;
   if (correctionRequest?.status === 'APPROVED') return true;
   return false;
+}
+
+/** True once marks have been submitted for review (or the assessment is past that point). */
+export function isAssessmentSubmitted(assessment) {
+  if (!assessment) return false;
+  const status = String(assessment.status || '').toUpperCase();
+  const uiStatus = String(assessment.ui_status || '').toLowerCase();
+  return (
+    isLockedStatus(status) ||
+    ['submitted', 'under_review', 'approved', 'locked'].includes(uiStatus) ||
+    Boolean(assessment.submittedAt || assessment.submitted_at)
+  );
 }
 
 export function assessmentMaxMark(assessment) {

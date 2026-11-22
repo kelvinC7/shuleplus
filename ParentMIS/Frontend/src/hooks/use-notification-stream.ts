@@ -10,9 +10,10 @@ export type LiveNotification = {
   createdAt: string;
   isRead: boolean;
   link: string | null;
+  sourceModule?: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3048/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://parentsapi.shuleplus.rw/api';
 
 function showBrowserPush(n: LiveNotification) {
   if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -24,8 +25,12 @@ function showBrowserPush(n: LiveNotification) {
   }
 }
 
-export function useNotificationStream(onNotification: (n: LiveNotification) => void) {
+export function useNotificationStream(
+  onNotification: (n: LiveNotification) => void,
+  enabled = true,
+) {
   useEffect(() => {
+    if (!enabled) return;
     const token = getToken();
     if (!token) return;
 
@@ -79,5 +84,5 @@ export function useNotificationStream(onNotification: (n: LiveNotification) => v
       cancelled = true;
       controller.abort();
     };
-  }, [onNotification]);
+  }, [enabled, onNotification]);
 }

@@ -1,34 +1,49 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Users, Loader2 } from 'lucide-react';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
-const AMBER = '#f59e0b';
+const NAVY = brand.navy;
+const AMBER = brand.primary;
 
 export default function ClassPerformance() {
   const [params, setParams] = useState({});
   const { loading, error, classPerformance, filters, selected } = useTeacherMarksAnalytics(params);
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: AMBER }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
+
+  const stat = (label: string, value: ReactNode, valueColor?: string) => (
+    <Box sx={{ borderRadius: 2, bgcolor: '#F9FAFB', p: 1.5 }}>
+      <Typography sx={{ fontSize: 10, color: '#6B7280', textTransform: 'uppercase' }}>{label}</Typography>
+      <Typography sx={{ fontSize: 20, fontWeight: 700, color: valueColor || NAVY }}>{value}</Typography>
+    </Box>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Class Performance</h1>
-          <p className="text-gray-500 text-sm mt-1">Compare classes you teach</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Class Performance</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Compare classes you teach</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
       {classPerformance.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-12">No class performance data yet</p>
+        <Typography sx={{ py: 6, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>No class performance data yet</Typography>
       ) : (
         <>
-          <div className="bg-white rounded-xl p-5 border border-gray-200">
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 }}>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={classPerformance}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -40,24 +55,25 @@ export default function ClassPerformance() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Paper>
 
           {classPerformance.map((c) => (
-            <div key={c.name} className="bg-white rounded-xl p-5 border border-gray-200 space-y-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: NAVY }}>
-                <Users size={18} /> {c.name}
-                <span className="text-xs font-normal text-gray-400">#{c.rank}</span>
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-[10px] text-gray-500 uppercase">Average</p><p className="text-xl font-bold" style={{ color: NAVY }}>{c.average ?? '-'}%</p></div>
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-[10px] text-gray-500 uppercase">Pass rate</p><p className="text-xl font-bold text-amber-600">{c.passRate ?? '-'}%</p></div>
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-[10px] text-gray-500 uppercase">Students</p><p className="text-xl font-bold" style={{ color: NAVY }}>{c.student_count}</p></div>
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-[10px] text-gray-500 uppercase">Subjects</p><p className="text-xl font-bold" style={{ color: NAVY }}>{c.subject_count}</p></div>
-              </div>
-            </div>
+            <Paper key={c.name} variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                <GroupsIcon sx={{ fontSize: 18, color: NAVY }} />
+                <Typography sx={{ fontSize: 18, fontWeight: 600, color: NAVY }}>{c.name}</Typography>
+                <Typography sx={{ fontSize: 12, color: '#9CA3AF' }}>#{c.rank}</Typography>
+              </Stack>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+                {stat('Average', `${c.average ?? '-'}%`)}
+                {stat('Pass rate', `${c.passRate ?? '-'}%`, '#D97706')}
+                {stat('Students', c.student_count)}
+                {stat('Subjects', c.subject_count)}
+              </Box>
+            </Paper>
           ))}
         </>
       )}
-    </div>
+    </Stack>
   );
 }

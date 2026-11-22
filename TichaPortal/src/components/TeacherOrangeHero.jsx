@@ -1,49 +1,100 @@
-import React from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { brand } from '../theme/theme';
 
 /**
- * Welcome hero - clean flat amber (no photo overlay / shadow).
+ * Mock-aligned page hero: deep navy with amber glow and eyebrow label.
  */
 export default function TeacherOrangeHero({
   title,
   subtitle,
-  badgeLabel = 'ShuleTicha · Secure',
+  badgeLabel = 'ShuleTicha',
   rightSlot = null,
   children = null,
-  className = '',
 }) {
   return (
-    <section
-      className={`relative flex min-h-[200px] items-center overflow-hidden text-white md:min-h-[220px] ${className}`}
-      style={{ background: 'linear-gradient(135deg, #e8940a 0%, #f59e0b 42%, #d97706 100%)' }}
+    <Box
+      component="section"
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: brand.navy,
+        color: '#fff',
+        pt: 1.75,
+        pb: 7,
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          right: -60,
+          top: -70,
+          width: 200,
+          height: 200,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(245,166,35,0.2), transparent 65%)',
+          pointerEvents: 'none',
+        },
+      }}
     >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage: 'radial-gradient(circle at 20% 30%, #fff 0%, transparent 45%), radial-gradient(circle at 80% 70%, #fff 0%, transparent 40%)',
-        }}
-        aria-hidden
-      />
-
-      {badgeLabel ? (
-        <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[9px] font-medium tracking-wide text-white sm:left-5 sm:top-5 sm:px-3.5 sm:text-[10px]">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-          {badgeLabel}
-        </div>
-      ) : null}
-
       {rightSlot ? (
-        <div className="absolute right-5 top-5 z-30 hidden md:flex flex-wrap items-center justify-end gap-2 max-w-[min(100%-12rem,28rem)]">
+        <Box
+          sx={{
+            position: 'absolute',
+            right: 20,
+            top: 20,
+            zIndex: 30,
+            display: { xs: 'none', md: 'flex' },
+            maxWidth: 'min(100% - 12rem, 28rem)',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 1,
+          }}
+        >
           {rightSlot}
-        </div>
+        </Box>
       ) : null}
 
-      <div className="relative z-10 w-full max-w-4xl px-5 pb-7 pt-14 sm:px-6 sm:pb-8 sm:pt-12 md:px-10 md:pb-10 md:pt-10 pointer-events-none">
-        <h1 className="mb-1.5 text-xl font-medium tracking-tight text-white sm:text-2xl md:text-[1.65rem] pointer-events-auto">{title}</h1>
-        {subtitle ? (
-          <p className="max-w-2xl text-sm font-normal text-white/90 md:text-base leading-relaxed pointer-events-auto">{subtitle}</p>
+      <Box
+        sx={{
+          position: 'relative',
+          zIndex: 10,
+          mx: 'auto',
+          width: '100%',
+          maxWidth: 1300,
+          px: { xs: 2.5, sm: 3, md: 4 },
+          pt: 0.5,
+        }}
+      >
+        {badgeLabel ? (
+          <Typography
+            sx={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.18em',
+              color: brand.primary,
+            }}
+          >
+            {badgeLabel}
+          </Typography>
         ) : null}
-        {children ? <div className="mt-4 flex flex-wrap gap-2 pointer-events-auto">{children}</div> : null}
-      </div>
-    </section>
+        <Typography
+          component="h1"
+          sx={{ mt: 0.5, fontSize: { xs: 22, sm: 24 }, fontWeight: 600, letterSpacing: '-0.02em', color: '#fff' }}
+        >
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography
+            sx={{ mt: 0.5, maxWidth: 672, fontSize: { xs: 12, md: 14 }, lineHeight: 1.6, color: '#9FB0D3' }}
+          >
+            {subtitle}
+          </Typography>
+        ) : null}
+        {children ? (
+          <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>{children}</Box>
+        ) : null}
+      </Box>
+    </Box>
   );
 }

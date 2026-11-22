@@ -1,6 +1,6 @@
 import { notificationClient } from '../clients/notification.client';
 import { fetchSmParents } from '../clients/student-management.client';
-import type { PermissionRequest } from '@prisma/client';
+import type { PermissionRequest } from '../generated/prisma';
 
 function formatTime12h(time: string) {
   const [hStr, mStr] = time.split(':');
@@ -51,6 +51,53 @@ export async function notifyOverdueStudent(
     title: 'Student overdue at gate',
     body: `${studentName} has exceeded the approved return time by ${overdueMinutes} minutes.`,
     metadata: { type: 'gate_overdue_admin', permissionId: permission.id, studentId: permission.studentId },
+  });
+}
+
+export async function notifyPermissionExit(
+  organizationId: string,
+  permission: PermissionRequest,
+  gateName: string,
+  departedAt: Date
+) {
+  if (!notificationClient.isEnabled()) return;
+
+  const studentName = permission.studentName;
+  const ref = permission.referenceNumber;
+  const timeStr = departedAt.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const gate = gateName?.trim() || 'school gate';
+
+  const parents = await fetchSmParents(organizationId, permission.studentId).catch(() => []);
+  for (const parent of parents) {
+    if (parent.phone) {
+      void notificationClient.sendSms({
+        to: parent.phone,
+        body:
+          `ShulePlus: ${studentName} left school at ${timeStr} via approved permission (${ref}) at ${gate}. ` +
+          `English: Your child ${studentName} checked out with permission at ${timeStr}.`,
+        metadata: { type: 'permission_exit', permissionId: permission.id, studentId: permission.studentId },
+      });
+    }
+    if (parent.email) {
+      void notificationClient.sendEmail({
+        to: parent.email,
+        subject: `Permission exit — ${studentName}`,
+        text:
+          `Dear ${parent.fullName},\n\nYour child ${studentName} left school at ${timeStr} under approved permission ${ref} (${gate}).\n\nShulePlus`,
+        metadata: { type: 'permission_exit', permissionId: permission.id },
+      });
+    }
+  }
+
+  void notificationClient.sendInApp({
+    userId: organizationId,
+    title: 'Student left (permission)',
+    body: `${studentName} exited at ${timeStr} — ${ref}.`,
+    metadata: { type: 'permission_exit', permissionId: permission.id, studentId: permission.studentId },
   });
 }
 

@@ -93,7 +93,7 @@ export default function AssessmentDetailPage() {
         )}
       </Box>
 
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 3 }}>
           <Box sx={{ p: 2.5, border: '1px solid #e2e8f0', borderRadius: '14px', bgcolor: '#ffffff' }}>
             <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5 }}>Assessment Details</Typography>
@@ -208,7 +208,7 @@ export default function AssessmentDetailPage() {
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, p: 2.5, px: 3, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, p: { xs: 2, md: 2.5 }, px: { xs: 2, md: 3 }, bgcolor: '#ffffff', borderTop: '1px solid #e2e8f0', flexShrink: 0, flexWrap: 'wrap' }}>
         {prevStatus && (
           <Button variant="outlined" onClick={() => handleStatusChange(prevStatus)} sx={{ textTransform: 'none', fontWeight: 600, borderColor: '#e2e8f0', color: '#475569' }}>
             Move to {prevStatus.replace('_', ' ')}

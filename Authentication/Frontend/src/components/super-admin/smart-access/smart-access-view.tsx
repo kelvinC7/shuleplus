@@ -21,6 +21,7 @@ import {
   SmartAccessSchoolToolbar,
   type SchoolFilterValues,
 } from '@/components/super-admin/smart-access/smart-access-school-toolbar';
+import { SmartAccessTabs } from '@/components/super-admin/smart-access/smart-access-tabs';
 import { SchoolLogo } from '@/components/super-admin/smart-access/school-logo';
 import { staffSourceLabel } from '@/lib/staff-source-label';
 import {
@@ -768,7 +769,13 @@ export function SmartAccessView() {
   return (
     <WebSerialRfidProvider>
     <div className="space-y-5 pb-8">
-      <h1 className="text-2xl font-bold tracking-tight text-navy sm:text-3xl">Smart Access</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-navy sm:text-3xl">Smart Access</h1>
+          <p className="mt-1 text-sm text-muted">Assign RFID and fingerprint credentials per school.</p>
+        </div>
+        <SmartAccessTabs active="access" />
+      </div>
 
       <SmartAccessSchoolToolbar
         values={draftFilters}

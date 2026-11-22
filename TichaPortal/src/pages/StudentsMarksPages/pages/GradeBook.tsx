@@ -1,19 +1,46 @@
 import { useState, useEffect } from 'react';
-import { Search, Download, Loader2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import SearchIcon from '@mui/icons-material/Search';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import { fetchGradebookMatrix } from '../../../services/marksApi';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
+
+type Params = { class_name?: string; subject_name?: string };
+type Matrix = { columns: { slug: string; label: string }[]; students: { name: string; scores: Record<string, number> }[] };
+
+const scoreColor = (val: number | null | undefined) => {
+  if (val == null) return '#D1D5DB';
+  if (val >= 80) return '#16A34A';
+  if (val >= 60) return '#2563EB';
+  if (val >= 50) return '#D97706';
+  return '#DC2626';
+};
 
 export default function GradeBook() {
-  const [params, setParams] = useState<{ class_name?: string; subject_name?: string }>({});
-  const [matrix, setMatrix] = useState<{ columns: { slug: string; label: string }[]; students: { name: string; scores: Record<string, number> }[] } | null>(null);
+  const [params, setParams] = useState<Params>({});
+  const [matrix, setMatrix] = useState<Matrix | null>(null);
   const [loadingMatrix, setLoadingMatrix] = useState(false);
   const [search, setSearch] = useState('');
   const { filters, selected } = useTeacherMarksAnalytics(params);
 
-  const loadMatrix = async (p: typeof params) => {
+  const loadMatrix = async (p: Params) => {
     if (!p.class_name) {
       setMatrix(null);
       return;
@@ -29,7 +56,7 @@ export default function GradeBook() {
     }
   };
 
-  const onFilterChange = (p: typeof params) => {
+  const onFilterChange = (p: Params) => {
     setParams(p);
     loadMatrix(p);
   };
@@ -48,82 +75,84 @@ export default function GradeBook() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Grade Book</h1>
-          <p className="text-gray-500 text-sm mt-1">Live scores from Academic assessments</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Grade Book</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Live scores from Academic assessments</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={onFilterChange} showSubject />
-      </div>
+      </Stack>
 
       {!params.class_name ? (
-        <p className="text-sm text-gray-400 text-center py-12 rounded-xl border border-dashed border-gray-200">
+        <Box sx={{ py: 6, textAlign: 'center', borderRadius: 2, border: '1px dashed #E5E7EB', fontSize: 14, color: '#9CA3AF' }}>
           Select a class to load the grade book.
-        </p>
+        </Box>
       ) : loadingMatrix ? (
-        <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>
+        <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>
       ) : (
         <>
-          <div className="bg-white rounded-xl p-4 border border-gray-200 flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search students…"
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-200"
-              />
-            </div>
-            <button type="button" className="flex items-center gap-2 px-4 py-2 bg-[#000435] text-white rounded-lg text-sm">
-              <Download size={16} /> Export
-            </button>
-          </div>
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+            <TextField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search students..."
+              size="small"
+              sx={{ flex: 1, minWidth: 200, maxWidth: 360 }}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#9CA3AF' }} /></InputAdornment> }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />}
+              sx={{ bgcolor: NAVY, color: '#fff', textTransform: 'none', '&:hover': { bgcolor: '#24396A' } }}
+            >
+              Export
+            </Button>
+          </Paper>
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left px-3 py-3 font-medium text-gray-600 sticky left-0 bg-gray-50">Student</th>
+          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', overflow: 'hidden' }}>
+            <TableContainer>
+              <Table sx={{ minWidth: 640 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#F9FAFB' }}>
+                    <TableCell sx={{ fontWeight: 500, color: '#4B5563', position: 'sticky', left: 0, zIndex: 3, bgcolor: '#F9FAFB' }}>Student</TableCell>
                     {columns.map((c) => (
-                      <th key={c.slug} className="text-center px-2 py-3 font-medium text-gray-600 whitespace-nowrap">{c.label}</th>
+                      <TableCell key={c.slug} align="center" sx={{ fontWeight: 500, color: '#4B5563', whiteSpace: 'nowrap' }}>{c.label}</TableCell>
                     ))}
-                    <th className="text-center px-3 py-3 font-medium text-gray-600 bg-gray-50">Avg</th>
-                  </tr>
-                </thead>
-                <tbody>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: '#4B5563', bgcolor: '#F9FAFB' }}>Avg</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {students.length === 0 ? (
-                    <tr><td colSpan={columns.length + 2} className="py-12 text-center text-gray-400">No students or marks yet</td></tr>
+                    <TableRow>
+                      <TableCell colSpan={columns.length + 2} align="center" sx={{ py: 6, color: '#9CA3AF' }}>No students or marks yet</TableCell>
+                    </TableRow>
                   ) : (
                     students.map((row, i) => {
                       const vals = columns.map((c) => row.scores?.[c.slug]).filter((v) => v != null) as number[];
                       const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
                       return (
-                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50/50">
-                          <td className="px-3 py-3 font-medium sticky left-0 bg-white" style={{ color: NAVY }}>{row.name}</td>
+                        <TableRow key={i} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                          <TableCell sx={{ fontWeight: 500, color: NAVY, position: 'sticky', left: 0, zIndex: 2, bgcolor: '#fff', 'tr:hover > &': { bgcolor: '#F5F5F5' } }}>{row.name}</TableCell>
                           {columns.map((c) => {
                             const val = row.scores?.[c.slug];
                             return (
-                              <td key={c.slug} className={`text-center px-2 py-3 font-medium ${
-                                val == null ? 'text-gray-300' :
-                                val >= 80 ? 'text-green-600' : val >= 60 ? 'text-blue-600' : val >= 50 ? 'text-amber-600' : 'text-red-600'
-                              }`}>
+                              <TableCell key={c.slug} align="center" sx={{ fontWeight: 500, color: scoreColor(val) }}>
                                 {val != null ? `${val}%` : '-'}
-                              </td>
+                              </TableCell>
                             );
                           })}
-                          <td className="text-center px-3 py-3 font-bold bg-gray-50">{avg != null ? `${avg}%` : '-'}</td>
-                        </tr>
+                          <TableCell align="center" sx={{ fontWeight: 700, bgcolor: '#F9FAFB' }}>{avg != null ? `${avg}%` : '-'}</TableCell>
+                        </TableRow>
                       );
                     })
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
         </>
       )}
-    </div>
+    </Stack>
   );
 }

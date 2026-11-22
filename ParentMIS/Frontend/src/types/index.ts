@@ -4,6 +4,8 @@ export interface JwtUser {
   organizationId: string;
   roles: string[];
   modules: string[];
+  phone?: string;
+  parentId?: string;
 }
 
 export interface SchoolAcademicSettings {
@@ -11,6 +13,11 @@ export interface SchoolAcademicSettings {
   terms: string[];
   currentAcademicYear: string | null;
   currentTerm: string | null;
+}
+
+export interface PortalFeatures {
+  studentManagement: boolean;
+  shuleTrip: boolean;
 }
 
 export interface DashboardData {
@@ -23,6 +30,7 @@ export interface DashboardData {
   recentActivities: ActivityLog[];
   organization?: { name: string };
   schoolAcademic?: SchoolAcademicSettings;
+  portalFeatures?: PortalFeatures;
 }
 
 export interface LinkedStudent {

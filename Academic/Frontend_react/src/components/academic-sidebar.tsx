@@ -110,6 +110,10 @@ function NavIcon({ item }: { item: AcademicNavItem }) {
 }
 
 function ChildIcon({ href }: { href: string }) {
+  if (href === '/examination-timetable') return <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />;
+  if (href === '/examination-lists') return <SummarizeOutlinedIcon sx={{ fontSize: 18 }} />;
+  if (href === '/examination-invigilators') return <SupervisorAccountOutlinedIcon sx={{ fontSize: 18 }} />;
+  if (href === '/examination-attendance') return <FactCheckOutlinedIcon sx={{ fontSize: 18 }} />;
   if (href.startsWith('/marks') || href.startsWith('/mark-entry')) {
     return <GradingOutlinedIcon sx={{ fontSize: 18 }} />;
   }

@@ -260,7 +260,11 @@ export class ClassConfigService {
         courseCode: cfg?.courseCode ?? courseCode(a.subjectName),
         periodsPerWeek: a.periodsPerWeek,
         defaultCourseMarks:
-          a.defaultCourseMarks != null ? Number(a.defaultCourseMarks) : null,
+          a.defaultCourseMarks != null
+            ? Number(a.defaultCourseMarks)
+            : cfg?.defaultCourseMarks != null
+              ? Number(cfg.defaultCourseMarks)
+              : null,
         teacherUserId: a.teacherUserId,
         teacherName: a.teacherName,
         room: a.room,
@@ -504,6 +508,11 @@ export class ClassConfigService {
       courseConfigs.map((c) => [c.subjectName, c.courseCode ?? courseCode(c.subjectName)]),
     );
     const coreBySubject = new Map(courseConfigs.map((c) => [c.subjectName, c.isCore !== false]));
+    const marksBySubject = new Map(
+      courseConfigs
+        .filter((c) => c.defaultCourseMarks != null)
+        .map((c) => [c.subjectName, Number(c.defaultCourseMarks)]),
+    );
     const byClass = new Map<string, typeof assignments>();
     for (const assignment of assignments) {
       const list = byClass.get(assignment.className) ?? [];
@@ -524,7 +533,9 @@ export class ClassConfigService {
           courseCode: codeBySubject.get(a.subjectName) ?? courseCode(a.subjectName),
           periodsPerWeek: a.periodsPerWeek,
           defaultCourseMarks:
-            a.defaultCourseMarks != null ? Number(a.defaultCourseMarks) : null,
+            a.defaultCourseMarks != null
+              ? Number(a.defaultCourseMarks)
+              : marksBySubject.get(a.subjectName) ?? null,
           teacherName: a.teacherName,
           room: a.room ?? null,
           isCore: coreBySubject.get(a.subjectName) ?? true,

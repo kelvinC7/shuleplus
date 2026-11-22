@@ -137,7 +137,7 @@ function HomeworkCard({ homework: h }: { homework: Homework }) {
 
   return (
     <Link
-      href={`/homework/${h.id}`}
+      href={`/homework/detail?id=${encodeURIComponent(h.id)}`}
       className={cn(
         'group flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md',
         isOverdue && 'border-red-200'

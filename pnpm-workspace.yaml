@@ -1,18 +1,27 @@
+overrides:
+  esbuild: "0.28.1"
+  "@esbuild/win32-x64": "0.28.1"
+
 packages:
   - "packages/*"
   - "**/Frontend"
   - "**/Frontend_react"
+  - "**/ParentApp"
   - "**/Backend"
   - "!SchoolFeesPortal/Backend"
   - "!InternalChat/Backend"
   - "!BabyeyiWizard/Backend"
   - "**/Notification-Service"
 allowBuilds:
+  '@esbuild/win32-x64': true
+  '@firebase/util': true
   '@prisma/client': true
   '@prisma/engines': true
   '@scarf/scarf': true
   core-js: true
   esbuild: true
+  msgpackr-extract: true
   prisma: true
+  protobufjs: true
   sharp: true
   unrs-resolver: true

@@ -101,6 +101,10 @@ select.input {
   @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-navy transition-all duration-300 cursor-pointer hover:border-slate-300 hover:bg-slate-50/70 hover:translate-y-[-1px] active:translate-y-[0px];
 }
 
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger px-5 py-3 text-sm font-semibold text-white transition-all duration-300 cursor-pointer hover:bg-danger/90 disabled:opacity-50;
+}
+
 .badge {
   @apply inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold;
 }
@@ -191,3 +195,69 @@ select.input {
   animation: toast-progress-shrink var(--toast-duration, 20s) linear forwards;
 }
 
+.scan-frame {
+  box-shadow: 0 0 0 9999px rgba(0, 4, 53, 0.42);
+}
+
+.scan-video-host video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 220px;
+  object-fit: cover;
+}
+
+.transport-mobile-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.live-console .btn-primary,
+.live-console .btn-secondary {
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .hr-card {
+    @apply rounded-xl;
+  }
+
+  .page-header {
+    @apply rounded-xl px-4 py-3;
+  }
+}
+
+/* Leaflet defaults (z-index 400+) sit above modals unless scoped */
+.route-map-shell {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+
+.route-map-shell .leaflet-pane,
+.route-map-shell .leaflet-map-pane,
+.route-map-shell .leaflet-tile-pane,
+.route-map-shell .leaflet-overlay-pane,
+.route-map-shell .leaflet-shadow-pane,
+.route-map-shell .leaflet-marker-pane,
+.route-map-shell .leaflet-tooltip-pane,
+.route-map-shell .leaflet-popup-pane {
+  z-index: 1 !important;
+}
+
+.route-map-shell .leaflet-top,
+.route-map-shell .leaflet-bottom,
+.route-map-shell .leaflet-control {
+  z-index: 2 !important;
+}
+
+.transport-modal-root .route-map-shell .leaflet-pane,
+.transport-modal-root .route-map-shell .leaflet-control {
+  z-index: 1 !important;
+}
+
+.route-stop-tooltip.leaflet-tooltip {
+  @apply rounded-lg border border-border bg-white px-2 py-1 text-[11px] font-semibold text-navy shadow-md;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

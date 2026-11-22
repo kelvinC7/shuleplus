@@ -1,7 +1,61 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { parentMisAcademicClient } from '../clients/parent-mis.client';
 
 export class MarkService {
+  private async notifyMarksSaved(
+    organizationId: string,
+    savedMarks: Array<{ id: string; studentId: string; score: number; remarks?: string | null }>,
+    meta: { examId: string; subjectId: string; classId: string }
+  ) {
+    try {
+      if (!parentMisAcademicClient.isEnabled() || !savedMarks.length) return;
+      const [exam, subject, classRecord, students] = await Promise.all([
+        prisma.exam.findFirst({ where: { id: meta.examId, organizationId }, select: { id: true, name: true, term: true } }),
+        prisma.subject.findFirst({ where: { id: meta.subjectId, organizationId }, select: { id: true, name: true, code: true } }),
+        prisma.class.findFirst({ where: { id: meta.classId, organizationId }, select: { id: true, name: true, stream: true } }),
+        prisma.student.findMany({
+          where: { organizationId, id: { in: savedMarks.map((m) => m.studentId) } },
+          select: { id: true, firstName: true, lastName: true, studentUid: true, studentCode: true },
+        }),
+      ]);
+      const studentById = new Map(students.map((s) => [s.id, s]));
+      const examName = exam?.name || 'Exam';
+      const subjectName = subject?.name || 'Subject';
+      const classLabel = [classRecord?.name, classRecord?.stream].filter(Boolean).join(' ');
+      await parentMisAcademicClient.notifyMany(
+        savedMarks.map((m) => {
+          const s = studentById.get(m.studentId);
+          const studentName = s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : 'Student';
+          const studentCode = s?.studentUid || s?.studentCode || s?.id || m.studentId;
+          return {
+            organizationId,
+            studentId: s?.id || m.studentId,
+            studentCode,
+            studentName,
+            title: `New marks recorded: ${subjectName}`,
+            body: `${studentName}'s ${subjectName} mark (${m.score}) has been recorded for ${examName}${classLabel ? ` in ${classLabel}` : ''}.`,
+            eventType: 'MARK_RECORDED',
+            priority: 'NORMAL' as const,
+            link: '/academics',
+            metadata: {
+              module: 'academic',
+              action: 'mark_saved',
+              examId: meta.examId,
+              examName,
+              subjectId: meta.subjectId,
+              subjectName,
+              classId: meta.classId,
+              className: classLabel || null,
+              score: m.score,
+            },
+          };
+        })
+      );
+    } catch (err) {
+      console.warn('[Academic] Failed to notify parents for saved marks:', err);
+    }
+  }
   async getStudentsForEntry(organizationId: string, classId: string, academicYear: string) {
     const enrollments = await prisma.enrollment.findMany({
       where: {
@@ -81,6 +135,13 @@ export class MarkService {
         });
       })
     );
+
+    // Announce parents for every student whose marks were saved/updated
+    void this.notifyMarksSaved(organizationId, results as any, {
+      examId: data.examId,
+      subjectId: data.subjectId,
+      classId: data.classId,
+    });
 
     return { saved: results.length, marks: results };
   }

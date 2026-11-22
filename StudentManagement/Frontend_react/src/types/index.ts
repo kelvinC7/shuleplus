@@ -127,7 +127,8 @@ export interface ApiClass {
   headTeacherRefId?: string | null;
   headTeacherName?: string | null;
   headTeacherEmail?: string | null;
-  headTeacherSource?: 'TIMETABLE' | 'HR' | 'MANUAL' | null;
+  headTeacherSource?: 'IAM' | 'TIMETABLE' | 'HR' | 'MANUAL' | null;
+  headTeacherCanEditStudents?: boolean;
   createdAt: string;
   updatedAt: string;
 }

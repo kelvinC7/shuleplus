@@ -1,10 +1,66 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { ensureAcademicStudent } from './sm-resolve.service';
+import { parentMisAcademicClient } from '../clients/parent-mis.client';
 
 const LOCKED_ASSESSMENT_STATUSES = new Set(['SUBMITTED', 'REVIEWED', 'APPROVED', 'LOCKED']);
 
 export class AssessmentMarkService {
+  private async notifyAssessmentMarksSaved(
+    organizationId: string,
+    assessmentId: string,
+    marks: Array<{ studentId: string; score?: number | null }>
+  ) {
+    try {
+      if (!parentMisAcademicClient.isEnabled() || !marks.length) return;
+      const assessment = await prisma.assessment.findFirst({
+        where: { id: assessmentId, organizationId },
+        include: {
+          subject: { select: { name: true } },
+          class: { select: { name: true, stream: true } },
+          component: { select: { name: true } },
+        },
+      });
+      const students = await prisma.student.findMany({
+        where: { organizationId, id: { in: marks.map((m) => m.studentId) } },
+        select: { id: true, firstName: true, lastName: true, studentUid: true, studentCode: true },
+      });
+      const byId = new Map(students.map((s) => [s.id, s]));
+      const subjectName = assessment?.subject?.name || 'Assessment';
+      const classLabel = [assessment?.class?.name, (assessment?.class as any)?.stream].filter(Boolean).join(' ');
+      const componentName = (assessment as any)?.component?.name || assessment?.title || 'Assessment';
+      await parentMisAcademicClient.notifyMany(
+        marks.map((m) => {
+          const s = byId.get(m.studentId);
+          const studentName = s ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : 'Student';
+          const studentCode = s?.studentUid || s?.studentCode || s?.id || m.studentId;
+          const scoreText = m.score == null ? 'updated' : `recorded (${m.score})`;
+          return {
+            organizationId,
+            studentId: s?.id || m.studentId,
+            studentCode,
+            studentName,
+            title: `${subjectName} assessment marks ${m.score == null ? 'updated' : 'recorded'}`,
+            body: `${studentName}'s ${subjectName} (${componentName}) mark has been ${scoreText}${classLabel ? ` in ${classLabel}` : ''}.`,
+            eventType: 'ASSESSMENT_MARK_RECORDED',
+            priority: 'NORMAL' as const,
+            link: '/academics',
+            metadata: {
+              module: 'academic',
+              action: 'assessment_mark_saved',
+              assessmentId,
+              assessmentTitle: assessment?.title || null,
+              subjectName,
+              className: classLabel || null,
+              score: m.score ?? null,
+            },
+          };
+        })
+      );
+    } catch (err) {
+      console.warn('[Academic] Failed to notify parents for assessment marks:', err);
+    }
+  }
   async enterMarks(assessmentId: string, organizationId: string, data: {
     marks: Array<{
       studentId: string;
@@ -86,6 +142,13 @@ export class AssessmentMarkService {
       )
     );
 
+    // Announce parents for every student whose assessment marks were saved/updated
+    void this.notifyAssessmentMarksSaved(
+      organizationId,
+      assessmentId,
+      resolved.map((r) => ({ studentId: r.studentId, score: r.score ?? null }))
+    );
+
     return { message: `${results.length} marks saved`, count: results.length };
   }
 
@@ -164,28 +227,59 @@ export class AssessmentMarkService {
       throw new AppError(400, 'This request has already been reviewed');
     }
 
-    const updated = await prisma.markCorrectionRequest.update({
-      where: { id: requestId },
-      data: {
-        status: data.approved ? 'APPROVED' : 'REJECTED',
-        reviewedBy: data.reviewedBy ?? null,
-        reviewedAt: new Date(),
-        reviewNotes: data.reviewNotes ?? null,
-      },
+    const assessment = await prisma.assessment.findFirst({
+      where: { id: request.assessmentId, organizationId },
+      select: { id: true, maxMark: true },
     });
+    if (!assessment) throw new AppError(404, 'The assessment for this request no longer exists');
 
-    if (data.approved) {
-      await prisma.assessmentMark.update({
-        where: { assessmentId_studentId: { assessmentId: request.assessmentId, studentId: request.studentId } },
+    const reviewedAt = new Date();
+
+    // Keep the review decision and the applied mark atomic. The mark row may not
+    // exist (e.g. correction requested for a student whose mark was never
+    // saved), so upsert instead of update to avoid a P2025 → HTTP 500.
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.markCorrectionRequest.update({
+        where: { id: requestId },
         data: {
-          score: request.requestedScore,
-          lastModifiedBy: data.reviewedBy ?? null,
-          lastModifiedAt: new Date(),
+          status: data.approved ? 'APPROVED' : 'REJECTED',
+          reviewedBy: data.reviewedBy ?? null,
+          reviewedAt,
+          reviewNotes: data.reviewNotes ?? null,
         },
       });
-    }
 
-    return updated;
+      if (data.approved) {
+        await tx.assessmentMark.upsert({
+          where: {
+            assessmentId_studentId: {
+              assessmentId: request.assessmentId,
+              studentId: request.studentId,
+            },
+          },
+          update: {
+            score: request.requestedScore,
+            maxMark: assessment.maxMark,
+            lastModifiedBy: data.reviewedBy ?? null,
+            lastModifiedAt: reviewedAt,
+          },
+          create: {
+            organizationId,
+            assessmentId: request.assessmentId,
+            studentId: request.studentId,
+            score: request.requestedScore,
+            maxMark: assessment.maxMark,
+            markStatus: 'PRESENT',
+            enteredBy: data.reviewedBy ?? null,
+            enteredAt: reviewedAt,
+            lastModifiedBy: data.reviewedBy ?? null,
+            lastModifiedAt: reviewedAt,
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 
   async listCorrections(organizationId: string, status?: string) {

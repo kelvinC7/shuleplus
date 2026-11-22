@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  ArrowLeft, ArrowRight, Award, CheckCircle2, GraduationCap, Loader2, Save, X,
-} from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Dialog from '@mui/material/Dialog';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import SaveIcon from '@mui/icons-material/Save';
+import CloseIcon from '@mui/icons-material/Close';
+import { brand } from '../../../theme/theme';
 import {
   fetchTeachingAssignments,
   fetchCompetencyCategories,
@@ -137,140 +145,145 @@ export default function RecordCompetenciesWizard({ open, onClose, onSaved }) {
     }
   };
 
-  if (!open) return null;
+  const selectSx = { width: '100%', px: 1.5, py: 1, borderRadius: 1.5, border: '1px solid #E2E8F0', fontSize: 14, fontFamily: 'inherit', color: '#0F172A', bgcolor: '#fff', outline: 'none' };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Competency analysis</p>
-            <h2 className="text-lg font-semibold text-[#000435]">{STEPS[step]}</h2>
-          </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100"><X size={18} /></button>
-        </div>
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2, maxHeight: '90vh' } }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 2, borderBottom: '1px solid #F1F5F9' }}>
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.6 }}>Competency analysis</Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 600, color: brand.navy }}>{STEPS[step]}</Typography>
+        </Box>
+        <IconButton onClick={onClose} aria-label="Close" sx={{ borderRadius: 1, '&:hover': { bgcolor: '#F1F5F9' } }}>
+          <CloseIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Stack>
 
-        <div className="flex-1 overflow-y-auto p-5">
-          {error && <p className="mb-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-          {loading && step < 2 && (
-            <div className="py-16 flex justify-center"><Loader2 className="animate-spin text-slate-400" /></div>
-          )}
+      <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>
+        {error && <Box sx={{ mb: 2, borderRadius: 1.5, bgcolor: '#FEF2F2', px: 1.5, py: 1, fontSize: 14, color: '#DC2626' }}>{error}</Box>}
+        {loading && step < 2 && (
+          <Box sx={{ py: 8, display: 'flex', justifyContent: 'center' }}><CircularProgress size={28} sx={{ color: '#94A3B8' }} /></Box>
+        )}
 
-          {step === 0 && !loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {classOptions.map((cn) => (
-                <button
-                  key={cn}
-                  type="button"
-                  onClick={() => setSelectedClass(cn)}
-                  className={`text-left p-4 rounded-xl border-2 transition-colors ${selectedClass === cn ? 'border-[#ff8c00] bg-amber-50' : 'border-slate-100 hover:border-slate-200'}`}
-                >
-                  <p className="font-semibold text-[#000435]">{cn}</p>
-                  <p className="text-xs text-slate-500 mt-1">Your assigned class</p>
-                </button>
-              ))}
-              {!classOptions.length && <p className="text-sm text-slate-500 col-span-2">No class assignments found.</p>}
-            </div>
-          )}
+        {step === 0 && !loading && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
+            {classOptions.map((cn) => (
+              <Box
+                component="button"
+                type="button"
+                key={cn}
+                onClick={() => setSelectedClass(cn)}
+                sx={{
+                  textAlign: 'left',
+                  p: 2,
+                  borderRadius: 2,
+                  border: '2px solid',
+                  borderColor: selectedClass === cn ? brand.navy : '#F1F5F9',
+                  bgcolor: selectedClass === cn ? '#FFFBEB' : 'transparent',
+                  cursor: 'pointer',
+                  transition: 'border-color .15s, background-color .15s',
+                  '&:hover': { borderColor: selectedClass === cn ? brand.navy : '#E2E8F0' },
+                }}
+              >
+                <Typography sx={{ fontWeight: 600, color: brand.navy }}>{cn}</Typography>
+                <Typography sx={{ mt: 0.5, fontSize: 12, color: '#64748B' }}>Your assigned class</Typography>
+              </Box>
+            ))}
+            {!classOptions.length && <Typography sx={{ gridColumn: '1 / -1', fontSize: 14, color: '#64748B' }}>No class assignments found.</Typography>}
+          </Box>
+        )}
 
-          {step === 1 && (
-            <div className="max-w-md space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-500">Academic year</label>
-                <select
-                  value={academicYear}
-                  onChange={(e) => setAcademicYear(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
-                >
-                  {(academicYearOptions.length ? academicYearOptions : [academicYear]).filter(Boolean).map((y) => (
-                    <option key={y} value={y}>{y}</option>
+        {step === 1 && (
+          <Stack spacing={2} sx={{ maxWidth: 448 }}>
+            <Box>
+              <Typography component="label" sx={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>Academic year</Typography>
+              <Box component="select" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} sx={{ ...selectSx, mt: 0.5 }}>
+                {(academicYearOptions.length ? academicYearOptions : [academicYear]).filter(Boolean).map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </Box>
+            </Box>
+            <Box>
+              <Typography component="label" sx={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>Term</Typography>
+              <Box component="select" value={term} onChange={(e) => setTerm(e.target.value)} sx={{ ...selectSx, mt: 0.5 }}>
+                {(termOptions.length ? termOptions : [term]).filter(Boolean).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </Box>
+            </Box>
+            <Typography sx={{ fontSize: 12, color: '#64748B' }}>Class: <Box component="strong" sx={{ color: brand.navy }}>{selectedClass}</Box></Typography>
+          </Stack>
+        )}
+
+        {step === 2 && (
+          <Box sx={{ overflowX: 'auto' }}>
+            <Box component="table" sx={{ width: '100%', minWidth: 640, fontSize: 14, borderCollapse: 'collapse' }}>
+              <Box component="thead">
+                <Box component="tr" sx={{ borderBottom: '1px solid #F1F5F9', fontSize: 10, textTransform: 'uppercase', color: '#94A3B8' }}>
+                  <Box component="th" sx={{ textAlign: 'left', py: 1, pr: 1.5, fontWeight: 500 }}>Student</Box>
+                  {categories.map((c) => (
+                    <Box component="th" key={c.id} sx={{ textAlign: 'center', px: 1, py: 1, whiteSpace: 'nowrap', fontWeight: 500 }}>{c.name}</Box>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500">Term</label>
-                <select
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
-                >
-                  {(termOptions.length ? termOptions : [term]).filter(Boolean).map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-slate-500">Class: <strong>{selectedClass}</strong></p>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[10px] uppercase text-slate-400">
-                    <th className="text-left py-2 pr-3">Student</th>
+                </Box>
+              </Box>
+              <Box component="tbody">
+                {students.map((s) => (
+                  <Box component="tr" key={s.id} sx={{ borderBottom: '1px solid #F8FAFC' }}>
+                    <Box component="td" sx={{ py: 1, pr: 1.5, fontWeight: 500, color: brand.navy }}>
+                      {s.first_name} {s.last_name}
+                    </Box>
                     {categories.map((c) => (
-                      <th key={c.id} className="text-center px-2 py-2 whitespace-nowrap">{c.name}</th>
+                      <Box component="td" key={c.id} sx={{ px: 1, py: 1 }}>
+                        <Box
+                          component="select"
+                          value={ratings[s.id]?.[c.id] || RATING_DEFAULT}
+                          onChange={(e) => setRating(s.id, c.id, e.target.value)}
+                          sx={{ width: '100%', fontSize: 12, px: 1, py: 0.75, borderRadius: 1.5, border: '1px solid #E2E8F0', bgcolor: '#fff', outline: 'none' }}
+                        >
+                          {ratingLevels.map((l) => <option key={l} value={l}>{l}</option>)}
+                        </Box>
+                      </Box>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => (
-                    <tr key={s.id} className="border-b border-slate-50">
-                      <td className="py-2 pr-3 font-medium text-[#000435]">
-                        {s.first_name} {s.last_name}
-                      </td>
-                      {categories.map((c) => (
-                        <td key={c.id} className="px-2 py-2">
-                          <select
-                            value={ratings[s.id]?.[c.id] || RATING_DEFAULT}
-                            onChange={(e) => setRating(s.id, c.id, e.target.value)}
-                            className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-200"
-                          >
-                            {ratingLevels.map((l) => <option key={l} value={l}>{l}</option>)}
-                          </select>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Box>
 
-        <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 bg-slate-50/50">
-          <button
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 2, borderTop: '1px solid #F1F5F9', bgcolor: 'rgba(248,250,252,0.5)' }}>
+        <Button
+          type="button"
+          disabled={step === 0}
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
+          sx={{ px: 2, py: 1, fontSize: 14, color: '#475569', textTransform: 'none', '&.Mui-disabled': { opacity: 0.4 } }}
+        >
+          Back
+        </Button>
+        {step < 2 ? (
+          <Button
             type="button"
-            disabled={step === 0}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            className="inline-flex items-center gap-1 px-4 py-2 text-sm text-slate-600 disabled:opacity-40"
+            disabled={step === 0 && !selectedClass}
+            onClick={() => (step === 0 ? setStep(1) : loadRatingsGrid())}
+            endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+            sx={{ px: 2.5, py: 1.25, borderRadius: 1.5, bgcolor: brand.navy, color: '#fff', fontSize: 14, fontWeight: 500, textTransform: 'none', '&:hover': { bgcolor: '#24396A' }, '&.Mui-disabled': { opacity: 0.5 } }}
           >
-            <ArrowLeft size={16} /> Back
-          </button>
-          {step < 2 ? (
-            <button
-              type="button"
-              disabled={step === 0 && !selectedClass}
-              onClick={() => (step === 0 ? setStep(1) : loadRatingsGrid())}
-              className="inline-flex items-center gap-1 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-[#ff8c00] hover:bg-[#e67e00] disabled:opacity-50"
-            >
-              Next <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-[#000435] hover:bg-[#0a116b] disabled:opacity-50"
-            >
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Save competencies
-            </button>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
+            Next
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
+            sx={{ px: 2.5, py: 1.25, borderRadius: 1.5, bgcolor: brand.navy, color: '#fff', fontSize: 14, fontWeight: 500, textTransform: 'none', '&:hover': { bgcolor: '#24396A' }, '&.Mui-disabled': { opacity: 0.5 } }}
+          >
+            Save competencies
+          </Button>
+        )}
+      </Stack>
+    </Dialog>
   );
 }

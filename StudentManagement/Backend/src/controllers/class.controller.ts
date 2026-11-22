@@ -16,12 +16,14 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial();
 
+const studentAccessSchema = z.object({ canEditStudents: z.boolean() });
+
 const headTeacherSchema = z.object({
   headTeacherUserId: z.string().nullable().optional(),
   headTeacherRefId: z.string().nullable().optional(),
   headTeacherName: z.string().nullable().optional(),
   headTeacherEmail: z.union([z.string().email(), z.literal(''), z.null()]).optional(),
-  headTeacherSource: z.enum(['TIMETABLE', 'HR', 'MANUAL']).nullable().optional(),
+  headTeacherSource: z.enum(['IAM', 'TIMETABLE', 'HR', 'MANUAL']).nullable().optional(),
 });
 
 export class ClassController {
@@ -73,6 +75,16 @@ export class ClassController {
         ...body,
         headTeacherEmail: body.headTeacherEmail === '' ? null : body.headTeacherEmail,
       });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setStudentAccess(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = studentAccessSchema.parse(req.body);
+      const data = await classService.setStudentAccess(req.params.id as string, req.organizationRef!, body.canEditStudents);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

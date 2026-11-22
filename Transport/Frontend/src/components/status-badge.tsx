@@ -2,6 +2,7 @@
 
 const VARIANTS: Record<string, { bg: string; dot: string }> = {
   ACTIVE: { bg: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+  DRAFT: { bg: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
   PRESENT: { bg: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
   ONLINE: { bg: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
   APPROVED: { bg: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
@@ -48,6 +49,16 @@ const VARIANTS: Record<string, { bg: string; dot: string }> = {
   DAMAGED: { bg: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
   TO_SCHOOL: { bg: 'bg-sky-50 text-sky-700', dot: 'bg-sky-500' },
   TO_HOME: { bg: 'bg-violet-50 text-violet-700', dot: 'bg-violet-500' },
+  BOTH: { bg: 'bg-sky-50 text-sky-700', dot: 'bg-sky-500' },
+  MORNING_ONLY: { bg: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+  AFTERNOON_ONLY: { bg: 'bg-violet-50 text-violet-700', dot: 'bg-violet-500' },
+  BOARDING_TO_SCHOOL: { bg: 'bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
+  ARRIVED_AT_SCHOOL: { bg: 'bg-sky-50 text-sky-800', dot: 'bg-sky-500' },
+  BOARDING_TO_HOME: { bg: 'bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+  DROPPED_OFF_HOME: { bg: 'bg-violet-50 text-violet-800', dot: 'bg-violet-500' },
+  RETRYING: { bg: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' },
+  DELIVERED: { bg: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
+  ENDED: { bg: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400' },
 };
 
 export function StatusBadge({ status }: { status: string }) {

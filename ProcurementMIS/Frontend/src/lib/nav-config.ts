@@ -3,15 +3,11 @@ import {
   FileText,
   ShoppingCart,
   Truck,
-  BarChart3,
   ClipboardList,
+  ClipboardCheck,
   Package,
   RotateCcw,
   Settings,
-  Building2,
-  Users,
-  FileSignature,
-  Wallet,
   Bell,
   TrendingUp,
 } from 'lucide-react';
@@ -43,8 +39,8 @@ export const SUPERVISOR_NAV: NavItem[] = [
     icon: ShoppingCart,
     sections: [
       {
-        label: 'Overview',
-        items: [{ href: '/dashboard', label: 'Overview', icon: LayoutDashboard }],
+        label: 'Home',
+        items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
       },
       {
         label: 'Requests',
@@ -54,10 +50,9 @@ export const SUPERVISOR_NAV: NavItem[] = [
         label: 'Purchasing',
         items: [
           { href: '/purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
+          { href: '/requisitions', label: 'Requisition', icon: ClipboardCheck },
           { href: '/goods-receivings', label: 'Goods Received', icon: Package },
           { href: '/returns', label: 'Returns', icon: RotateCcw },
-          { href: '/contracts', label: 'Contracts', icon: FileSignature },
-          { href: '/budgets', label: 'Budgets', icon: Wallet },
         ],
       },
       {
@@ -67,20 +62,9 @@ export const SUPERVISOR_NAV: NavItem[] = [
           { href: '/suppliers/performance', label: 'Supplier Performance', icon: TrendingUp },
         ],
       },
-      {
-        label: 'Reports & Analytics',
-        items: [
-          { href: '/reports/analytics', label: 'Procurement Analytics', icon: BarChart3 },
-          { href: '/reports/department-spending', label: 'Department Spending', icon: Building2 },
-          { href: '/reports/requester-analysis', label: 'Requester Analysis', icon: Users },
-        ],
-      },
-      {
-        label: 'Alerts',
-        items: [{ href: '/notifications', label: 'Notifications', icon: Bell }],
-      },
     ],
   },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -135,10 +119,15 @@ export function getNavItemsForUser(
   return MANAGE_USER_NAV;
 }
 
-export function navHasActivePath(item: NavItem, pathname: string): boolean {
+export function navHasActivePath(item: NavItem | null | undefined, pathname: string): boolean {
+  if (!item) return false;
   if (item.href && isNavActive(pathname, item.href)) return true;
-  if (item.children?.some((c) => isNavActive(pathname, c.href))) return true;
-  if (item.sections?.some((s) => s.items.some((c) => isNavActive(pathname, c.href)))) {
+  if (item.children?.some((c) => c?.href && isNavActive(pathname, c.href))) return true;
+  if (
+    item.sections?.some((s) =>
+      s?.items?.some((c) => c?.href && isNavActive(pathname, c.href))
+    )
+  ) {
     return true;
   }
   return false;

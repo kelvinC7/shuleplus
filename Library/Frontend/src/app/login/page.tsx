@@ -147,7 +147,7 @@ export default function LibraryLoginPage() {
   const subtitle = useMemo(() => {
     if (step === 'set-password') return 'Set a password for this phone to access the Library Module.';
     if (step === 'login') return 'Enter your password to continue.';
-    return 'Use the phone number registered with your school account.';
+    return '';
   }, [step]);
 
   async function checkPhone(e: FormEvent) {

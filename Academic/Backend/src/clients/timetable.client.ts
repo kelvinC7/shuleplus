@@ -199,3 +199,19 @@ export async function fetchTimetableCourseCoreFlags(organizationId: string): Pro
     return new Map();
   }
 }
+
+export type TimetableClassroom = {
+  id: string;
+  name: string;
+  building?: string | null;
+  floor?: string | null;
+  roomNumber: string;
+  classLabel?: string | null;
+  capacity?: number | null;
+  active: boolean;
+};
+
+export async function fetchTimetableClassrooms(organizationId: string): Promise<TimetableClassroom[]> {
+  const data = await ttFetch<TimetableClassroom[]>('/internal/classrooms', organizationId);
+  return Array.isArray(data) ? data : [];
+}

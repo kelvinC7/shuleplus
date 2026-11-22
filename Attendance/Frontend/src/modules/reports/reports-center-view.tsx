@@ -12,7 +12,9 @@ import {
   type AttendanceRecord,
 } from '@/services/attendance-api';
 import { formatAttendanceTime, formatDurationMins } from '@/utils/format-attendance-time';
-import { attendanceRowsToCsv, downloadCsv, printReportTable } from '@/utils/export-table';
+import { attendanceRowsToCsv, downloadCsv } from '@/utils/export-table';
+import { exportAttendancePdf } from '@/utils/export-attendance-pdf';
+import { buildSchoolPdfBranding, fetchSchoolOrganizationProfile } from '@/utils/school-pdf-branding';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useToast } from '@/shared/notifications';
 
@@ -103,8 +105,36 @@ export function ReportsCenterView() {
     }
   };
 
-  const exportPdf = () => {
-    printReportTable('Attendance report', periodLabel);
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      const query = {
+        ...params,
+        status: status || undefined,
+        personType: personType === 'ALL' ? undefined : personType,
+      };
+      const all = await fetchAllRecords(query);
+      const profile = await fetchSchoolOrganizationProfile();
+      await exportAttendancePdf(
+        buildSchoolPdfBranding(profile, periodLabel, {
+          title: 'Attendance report',
+          subtitle: `Generated ${new Date().toLocaleString()} · Shule+ Attendance`,
+          audienceLabel:
+            personType === 'STAFF'
+              ? 'Staff'
+              : personType === 'STUDENT'
+                ? 'Students'
+                : 'All persons',
+        }),
+        all,
+        { staffColumns: personType === 'STAFF' }
+      );
+      toast.success(`PDF downloaded · ${all.length} row(s)`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'PDF export failed'));
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -119,7 +149,7 @@ export function ReportsCenterView() {
           <button type="button" className="btn-secondary" disabled={exporting} onClick={() => void exportExcel()}>
             <FileSpreadsheet size={16} /> Excel
           </button>
-          <button type="button" className="btn-primary" onClick={exportPdf}>
+          <button type="button" className="btn-primary" disabled={exporting} onClick={() => void exportPdf()}>
             <FileDown size={16} /> PDF
           </button>
         </>

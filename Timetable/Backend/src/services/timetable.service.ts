@@ -212,6 +212,70 @@ export class TimetableService {
 
     return { day: today, count: rows.length, lessons: rows };
   }
+
+  /** Remove all timetable/config data for a class (all terms/years) when it is deleted upstream. */
+  async purgeClass(organizationId: string, className: string) {
+    const target = String(className || '').trim();
+    if (!target) {
+      return {
+        className: target,
+        deleted: { timetables: 0, assignments: 0, publishes: 0, extraActivities: 0 },
+      };
+    }
+
+    const normalize = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+    const normTarget = normalize(target);
+
+    const [ttNames, asNames, pubNames, exNames] = await Promise.all([
+      prisma.academicTimetable.findMany({
+        where: { organizationId },
+        select: { className: true },
+        distinct: ['className'],
+      }),
+      prisma.teacherAssignment.findMany({
+        where: { organizationId },
+        select: { className: true },
+        distinct: ['className'],
+      }),
+      prisma.classTimetablePublish.findMany({
+        where: { organizationId },
+        select: { className: true },
+        distinct: ['className'],
+      }),
+      prisma.timetableExtraActivity.findMany({
+        where: { organizationId, className: { not: null } },
+        select: { className: true },
+        distinct: ['className'],
+      }),
+    ]);
+
+    const names = new Set<string>([target]);
+    for (const rows of [ttNames, asNames, pubNames, exNames]) {
+      for (const row of rows) {
+        const name = row.className;
+        if (name && normalize(name) === normTarget) names.add(name);
+      }
+    }
+    const inNames = [...names];
+
+    const [timetables, assignments, publishes, extraActivities] = await prisma.$transaction([
+      prisma.academicTimetable.deleteMany({ where: { organizationId, className: { in: inNames } } }),
+      prisma.teacherAssignment.deleteMany({ where: { organizationId, className: { in: inNames } } }),
+      prisma.classTimetablePublish.deleteMany({ where: { organizationId, className: { in: inNames } } }),
+      prisma.timetableExtraActivity.deleteMany({ where: { organizationId, className: { in: inNames } } }),
+    ]);
+
+    return {
+      className: target,
+      matchedClassNames: inNames,
+      deleted: {
+        timetables: timetables.count,
+        assignments: assignments.count,
+        publishes: publishes.count,
+        extraActivities: extraActivities.count,
+      },
+    };
+  }
 }
 
 export const timetableService = new TimetableService();

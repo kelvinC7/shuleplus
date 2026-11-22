@@ -60,12 +60,14 @@ export function ProcurementSidebarTopLink({
   label,
   icon: Icon,
   active,
+  badge,
   onNavigate,
 }: {
   href: string;
   label: string;
   icon: ComponentType<{ size?: number; strokeWidth?: number }>;
   active: boolean;
+  badge?: number;
   onNavigate?: () => void;
 }) {
   return (
@@ -85,6 +87,15 @@ export function ProcurementSidebarTopLink({
         <Icon size={18} strokeWidth={1.75} />
       </span>
       <span className="truncate">{label}</span>
+      {badge && badge > 0 ? (
+        <span
+          className={`ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold ${
+            active ? 'bg-[#000435] text-[#fcb038]' : 'bg-[#fcb038] text-[#000435]'
+          }`}
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }

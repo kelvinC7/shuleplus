@@ -49,6 +49,7 @@ jobs:
       studentmanagement: ${{ steps.out.outputs.studentmanagement }}
       miniwebsite: ${{ steps.out.outputs.miniwebsite }}
       webpagebabyeyi: ${{ steps.out.outputs.webpagebabyeyi }}
+      shuletrip: ${{ steps.out.outputs.shuletrip }}
       scripts: ${{ steps.out.outputs.scripts }}
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +86,7 @@ jobs:
             studentmanagement: ['StudentManagement/**']
             miniwebsite: ['MiniWebsite/**']
             webpagebabyeyi: ['WebpageBabyeyi/**']
+            shuletrip: ['ShuleTrip/**']
             scripts: ['scripts/redeploy-module.sh', 'scripts/redeploy-authentication.sh', 'scripts/restart-auth-web.sh', 'scripts/generate-shuleplus-apex-nginx.sh', 'scripts/verify-auth-apex-static.sh', 'scripts/deploy-all-modules.sh', 'scripts/ci-deploy-changed.sh', 'scripts/deploy-babyeyi-rw.sh', 'scripts/fix-babyeyi-shuleplus.sh', 'scripts/verify-babyeyi-host.sh', 'scripts/generate-nginx-modules.sh', 'scripts/ensure-shuleplus-tls.sh', 'scripts/run-ticha-portal.sh', 'scripts/check-ticha-portal-links.mjs', 'config/subdomains.json']
 
       - id: out
@@ -118,6 +120,7 @@ jobs:
           F_STUDENTMANAGEMENT: ${{ steps.filter.outputs.studentmanagement }}
           F_MINIWEBSITE: ${{ steps.filter.outputs.miniwebsite }}
           F_WEBPAGEBABYEYI: ${{ steps.filter.outputs.webpagebabyeyi }}
+          F_SHULETRIP: ${{ steps.filter.outputs.shuletrip }}
           F_SCRIPTS: ${{ steps.filter.outputs.scripts }}
         run: |
           set_mod() {
@@ -155,6 +158,7 @@ jobs:
           set_mod studentmanagement "$F_STUDENTMANAGEMENT"
           set_mod miniwebsite "$F_MINIWEBSITE"
           set_mod webpagebabyeyi "$F_WEBPAGEBABYEYI"
+          set_mod shuletrip "$F_SHULETRIP"
           set_mod scripts "$F_SCRIPTS"
 
   deploy:
@@ -192,6 +196,7 @@ jobs:
           CHANGED_STUDENTMANAGEMENT: ${{ needs.detect-changes.outputs.studentmanagement }}
           CHANGED_MINIWEBSITE: ${{ needs.detect-changes.outputs.miniwebsite }}
           CHANGED_WEBPAGEBABYEYI: ${{ needs.detect-changes.outputs.webpagebabyeyi }}
+          CHANGED_SHULETRIP: ${{ needs.detect-changes.outputs.shuletrip }}
           CHANGED_SCRIPTS: ${{ needs.detect-changes.outputs.scripts }}
         run: |
           REPO=/root/apps/shuleplus/ShulePlus

@@ -98,6 +98,8 @@ model Tenant {
   notifications     Notification[]
   goodsReceivings   GoodsReceiving[]
   goodsReturns      GoodsReturn[]
+  documentVerifications      DocumentVerification[]
+  documentVerificationEvents DocumentVerificationEvent[]
 
   @@map("tenants")
 }
@@ -154,7 +156,7 @@ model PurchaseRequest {
   organizationId    String   @map("organization_id")
   prNumber          String   @map("pr_number")
   requestType       String   @map("request_type")
-  departmentId      String   @map("department_id")
+  departmentId      String?  @map("department_id")
   departmentOther   String?  @map("department_other")
   academicYear      String?  @map("academic_year")
   term              String?  @map("term")
@@ -164,7 +166,7 @@ model PurchaseRequest {
   project           String?
   budgetLine        String?  @map("budget_line")
   priority          Priority @default(MEDIUM)
-  neededDate        DateTime @map("needed_date")
+  neededDate        DateTime? @map("needed_date")
   status            PRStatus @default(DRAFT)
   totalEstimate     Decimal? @map("total_estimate") @db.Decimal(14, 2)
   currentApprover   String?  @map("current_approver")
@@ -172,7 +174,7 @@ model PurchaseRequest {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  department        Department      @relation(fields: [departmentId], references: [id])
+  department        Department?     @relation(fields: [departmentId], references: [id])
   items             PurchaseRequestItem[]
   approvals         PRApproval[]
   purchaseOrders     PurchaseOrder[]
@@ -550,4 +552,46 @@ model ActivityLog {
   @@index([organizationId])
   @@index([entity, entityId])
   @@map("activity_logs")
+}
+
+model DocumentVerification {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  documentType   String   @map("document_type")
+  documentId     String   @map("document_id")
+  reference      String
+  token          String   @unique
+  pdfHash        String?  @map("pdf_hash")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+  events DocumentVerificationEvent[]
+
+  @@unique([organizationId, documentType, documentId], map: "document_verifications_org_type_doc_key")
+  @@index([organizationId])
+  @@index([documentType, documentId])
+  @@map("document_verifications")
+}
+
+model DocumentVerificationEvent {
+  id             String   @id @default(uuid())
+  verificationId String?  @map("verification_id")
+  organizationId String?  @map("organization_id")
+  documentType   String?  @map("document_type")
+  reference      String?
+  token          String
+  outcome        String
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  verification DocumentVerification? @relation(fields: [verificationId], references: [id], onDelete: SetNull)
+  tenant       Tenant?               @relation(fields: [organizationId], references: [organizationId])
+
+  @@index([token])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("document_verification_events")
 }

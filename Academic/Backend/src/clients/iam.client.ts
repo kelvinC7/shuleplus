@@ -15,6 +15,13 @@ export interface AcademicSettings {
   currentAcademicYear: string | null;
   currentTerm: string | null;
   reportCard?: ReportCardSettingsPayload;
+  reportFooter?: {
+    mode: 'head_teacher' | 'custom';
+    roleLabel: string;
+    selectedUserId?: string | null;
+    selectedUserName?: string | null;
+    selectedUserEmail?: string | null;
+  } | null;
 }
 
 async function iamFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
@@ -93,6 +100,12 @@ export type InvigilatorAccount = {
 export async function fetchIamOrgUsers(organizationId: string): Promise<IamOrgUser[]> {
   const data = await iamFetch<IamOrgUser[]>(`/internal/organizations/${organizationId}/users`);
   return data ?? [];
+}
+
+export async function fetchIamOrgUsersForFooter(organizationId: string): Promise<IamOrgUser[]> {
+  return iamFetchOrThrow<IamOrgUser[]>(
+    `/internal/organizations/${encodeURIComponent(organizationId)}/users`,
+  );
 }
 
 export type IamUserBrief = {

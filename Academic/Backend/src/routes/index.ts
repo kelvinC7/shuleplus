@@ -31,8 +31,15 @@ import studentManagementRoutes from './student-management.routes';
 import timetableRoutes from './timetable.routes';
 import examPlanningRoutes from './exam-planning.routes';
 import examInvigilatorRoutes from './exam-invigilator.routes';
+import examinationTimetableRoutes from './examination-timetable.routes';
+import examinationListRoutes from './examination-list.routes';
+import examinationInvigilatorManagementRoutes from './examination-invigilator-management.routes';
+import { examinationInvigilatorService } from '../services/examination-invigilator.service';
 import teacherPermissionRoutes from './teacher-permission.routes';
 import roundRollCallRoutes from './round-roll-call.routes';
+import marksDemoRoutes from './marks-demo.routes';
+import marksSubmissionRoutes from './marks-submission.routes';
+import academicAuditRoutes from './academic-audit.routes';
 
 const router = Router();
 
@@ -57,11 +64,54 @@ router.get('/service/classes', requireServiceAuth, requireServiceTenant, (req, r
 router.get('/service/students', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.listStudents(req, res, next)
 );
+router.get('/service/marks-overview', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.marksOverview(req, res, next)
+);
+router.get('/service/examination-invigilator-assignments', requireServiceAuth, requireServiceTenant, async (req, res, next) => {
+  try {
+    const organizationId = (req as any).organizationRef || String(req.query.organizationId || '');
+    const teacherUserId = String(req.query.teacherUserId || '');
+    if (!organizationId || !teacherUserId) {
+      res.status(400).json({ success: false, message: 'organizationId and teacherUserId are required' });
+      return;
+    }
+    const data = await examinationInvigilatorService.teacherAssignments(organizationId, teacherUserId, {
+      date: typeof req.query.date === 'string' ? req.query.date : undefined,
+      examinationListId: typeof req.query.examinationListId === 'string' ? req.query.examinationListId : undefined,
+    });
+    res.json({ success: true, data });
+  } catch (e) {
+    next(e);
+  }
+});
+router.get('/service/examination-attendance', requireServiceAuth, requireServiceTenant, async (req, res, next) => {
+  try {
+    const organizationId = (req as any).organizationRef || String(req.query.organizationId || '');
+    const data = await examinationInvigilatorService.getExamAttendance(organizationId, {
+      examinationListId: String(req.query.examinationListId || ''),
+      roomId: String(req.query.roomId || ''),
+      examDate: String(req.query.examDate || ''),
+      session: String(req.query.session || '') as any,
+    });
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+});
+router.post('/service/examination-attendance', requireServiceAuth, requireServiceTenant, async (req, res, next) => {
+  try {
+    const organizationId = (req as any).organizationRef || String(req.query.organizationId || '');
+    const actor = { id: String(req.body?.markedByUserId || ''), name: String(req.body?.markedByName || '') };
+    const data = await examinationInvigilatorService.markExamAttendance(organizationId, actor, req.body);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+});
 router.get('/service/parents', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.listParents(req, res, next)
 );
 router.get('/service/parent-academics', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   serviceController.parentAcademics(req, res, next)
+);
+router.get('/service/parent-course-performance', requireServiceAuth, requireServiceTenant, (req, res, next) =>
+  serviceController.parentCoursePerformance(req, res, next)
 );
 router.put('/service/course-default-marks', requireServiceAuth, requireServiceTenant, (req, res, next) =>
   gradingEngineController.upsertCourseDefaultMarksService(req, res, next)
@@ -97,6 +147,11 @@ router.use('/sm', studentManagementRoutes);
 router.use('/timetable', timetableRoutes);
 router.use('/exam-sessions', examPlanningRoutes);
 router.use('/exam-invigilator', examInvigilatorRoutes);
+router.use('/examination-timetables', examinationTimetableRoutes);
+router.use('/examination-lists', examinationListRoutes);
+router.use('/examination-invigilators', examinationInvigilatorManagementRoutes);
+router.use('/marks-submissions', marksSubmissionRoutes);
+router.use('/academic-audit', academicAuditRoutes);
 
 const protectedRouter = Router();
 protectedRouter.use(authenticate, requireModuleLicense, requireTenant);
@@ -104,6 +159,7 @@ protectedRouter.use(authenticate, requireModuleLicense, requireTenant);
 protectedRouter.get('/dashboard', (req, res, next) => dashboardController.summary(req, res, next));
 protectedRouter.use('/teacher-permissions', teacherPermissionRoutes);
 protectedRouter.use('/round-roll-call', roundRollCallRoutes);
+protectedRouter.use('/dev/marks-demo', marksDemoRoutes);
 
 router.use(protectedRouter);
 

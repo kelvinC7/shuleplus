@@ -254,6 +254,8 @@ export const orgAdminApi = {
     api.get<{ success: boolean; data: AccessAuditItem[] }>(
       `/iam/org/access-audit?limit=${limit}`
     ),
+  uploadReportRightLogo: (body: { fileName: string; contentBase64: string; mimeType: string }) =>
+    api.post<{ data: { url: string } }>('/public/branding/upload', { assetType: 'logo', ...body }),
   getAcademicSettings: () =>
     api.get<{ success: boolean; data: AcademicSettings }>('/iam/org/academic-settings'),
   updateAcademicSettings: (body: AcademicSettings) =>
@@ -297,6 +299,8 @@ export interface ReportCardSettings {
   enableHeadTeacherComments?: boolean;
   defaultHeadTeacherComment?: string | null;
   classTeacherCommentHint?: string | null;
+  reportHeaderLines?: string[];
+  reportRightLogoUrl?: string | null;
 }
 
 export interface AcademicSettings {

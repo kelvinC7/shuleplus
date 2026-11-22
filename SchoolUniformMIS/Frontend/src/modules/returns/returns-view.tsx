@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Arroweight,
+  ArrowRight,
   Package,
   Plus,
-  eefreshCw,
+  RefreshCw,
   Shirt,
   TrendingDown,
   Wallet,
@@ -23,17 +23,17 @@ import {
   StatusBadge,
   timeAgo,
 } from "@/components/list-ui";
-import { usePagedeows } from "@/hooks/use-paged-rows";
+import { usePagedRows } from "@/hooks/use-paged-rows";
 import { cn } from "@/lib/utils";
 import { uniformApi } from "@/services/uniform-api";
 import type {
-  Distributioneeceipt,
-  eeturnAnalytics,
-  eeturnCondition,
-  Uniformeeturn,
+  DistributionReceipt,
+  ReturnAnalytics,
+  ReturnCondition,
+  UniformReturn,
 } from "@/types";
 
-const eEASONS = [
+const REASONS = [
   "Wrong Size",
   "Wrong Item",
   "Damaged",
@@ -41,11 +41,11 @@ const eEASONS = [
   "Duplicate",
   "Other",
 ];
-const CONDITIONS: eeturnCondition[] = [
+const CONDITIONS: ReturnCondition[] = [
   "NEW",
   "GOOD",
   "DAMAGED",
-  "WOeN",
+  "WORN",
   "DEFECTIVE",
 ];
 
@@ -59,12 +59,12 @@ function num(v: string | number | null | undefined) {
 
 type WizardStep = 0 | 1 | 2 | 3 | 4;
 
-export function eeturnsView() {
-  const [rows, seteows] = useState<Uniformeeturn[]>([]);
-  const [analytics, setAnalytics] = useState<eeturnAnalytics | null>(null);
-  const [receipts, seteeceipts] = useState<Distributioneeceipt[]>([]);
+export function ReturnsView() {
+  const [rows, setRows] = useState<UniformReturn[]>([]);
+  const [analytics, setAnalytics] = useState<ReturnAnalytics | null>(null);
+  const [receipts, setReceipts] = useState<DistributionReceipt[]>([]);
   const [search, setSearch] = useState("");
-  const [reasonFilter, seteeasonFilter] = useState("");
+  const [reasonFilter, setReasonFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -73,11 +73,11 @@ export function eeturnsView() {
       const [r, a, receiptsList] = await Promise.all([
         uniformApi.returns.list(),
         uniformApi.returns.analytics(),
-        uniformApi.distributions.listeeceipts(),
+        uniformApi.distributions.listReceipts(),
       ]);
-      seteows(r);
+      setRows(r);
       setAnalytics(a);
-      seteeceipts(receiptsList);
+      setReceipts(receiptsList);
     } catch {
       toast.error("Failed to load returns");
     } finally {
@@ -104,33 +104,33 @@ export function eeturnsView() {
     () => [
       {
         label: "Today's returns",
-        value: analytics?.todayeeturns ?? 0,
+        value: analytics?.todayReturns ?? 0,
         tone: "danger" as const,
         icon: <TrendingDown />,
       },
       {
         label: "Most returned item",
-        value: analytics?.mosteeturnedItem
-          ? `${analytics.mosteeturnedItem.name} (${analytics.mosteeturnedItem.count})`
+        value: analytics?.mostReturnedItem
+          ? `${analytics.mostReturnedItem.name} (${analytics.mostReturnedItem.count})`
           : "",
         tone: "info" as const,
         icon: <Shirt />,
       },
       {
         label: "Most common reason",
-        value: analytics?.mostCommoneeason?.reason ?? "",
+        value: analytics?.mostCommonReason?.reason ?? "",
         tone: "warning" as const,
-        icon: <eefreshCw />,
+        icon: <RefreshCw />,
       },
       {
-        label: "eefund amount",
+        label: "Refund amount",
         value: money(analytics?.refundAmount ?? 0),
         tone: "primary" as const,
         icon: <Wallet />,
       },
       {
-        label: "eeturned to stock",
-        value: analytics?.itemseeturnedToStock ?? 0,
+        label: "Returned to stock",
+        value: analytics?.itemsReturnedToStock ?? 0,
         tone: "success" as const,
         icon: <Package />,
       },
@@ -138,13 +138,13 @@ export function eeturnsView() {
     [analytics],
   );
 
-  const { page, pageSize, totalPages, pageeows, setPage, setPageSize } =
-    usePagedeows(filtered);
+  const { page, pageSize, totalPages, pageRows, setPage, setPageSize } =
+    usePagedRows(filtered);
 
-  const columns: PlatformTableColumn<Uniformeeturn>[] = [
+  const columns: PlatformTableColumn<UniformReturn>[] = [
     {
       key: "no",
-      header: "eeturn no",
+      header: "Return no",
       render: (r) => (
         <span className="font-mono text-xs font-bold text-navy">
           {r.returnNumber}
@@ -162,7 +162,7 @@ export function eeturnsView() {
     },
     {
       key: "receipt",
-      header: "eeceipt",
+      header: "Receipt",
       render: (r) => (
         <span className="font-mono text-xs text-muted">
           {r.receipt?.receiptNumber ?? ""}
@@ -189,7 +189,7 @@ export function eeturnsView() {
     },
     {
       key: "reason",
-      header: "eeason",
+      header: "Reason",
       render: (r) => (
         <span className="text-sm text-muted">{r.reason ?? ""}</span>
       ),
@@ -205,7 +205,7 @@ export function eeturnsView() {
     },
     {
       key: "refund",
-      header: "eefund",
+      header: "Refund",
       render: (r) => (
         <span className="tabular-nums text-sm font-medium text-navy">
           {money(num(r.refundAmount))}
@@ -223,8 +223,8 @@ export function eeturnsView() {
       key: "status",
       header: "Status",
       render: (r) => (
-        <StatusBadge tone={r.status === "eEFUNDED" ? "info" : "success"} pill>
-          {r.status === "eEFUNDED" ? "eefunded" : "Completed"}
+        <StatusBadge tone={r.status === "REFUNDED" ? "info" : "success"} pill>
+          {r.status === "REFUNDED" ? "Refunded" : "Completed"}
         </StatusBadge>
       ),
     },
@@ -232,8 +232,8 @@ export function eeturnsView() {
 
   return (
     <PlatformPageLayout
-      title="eeturns"
-      subtitle="eeturn items against a distribution receipt - stock updates automatically."
+      title="Returns"
+      subtitle="Return items against a distribution receipt. Stock updates automatically."
       actions={
         <button
           type="button"
@@ -252,15 +252,15 @@ export function eeturnsView() {
           filters={[
             {
               key: "reason",
-              label: "eeason",
+              label: "Reason",
               value: reasonFilter,
-              onChange: seteeasonFilter,
-              options: eEASONS.map((r) => ({ value: r, label: r })),
+              onChange: setReasonFilter,
+              options: REASONS.map((r) => ({ value: r, label: r })),
             },
           ]}
-          oneeset={() => {
+          onReset={() => {
             setSearch("");
-            seteeasonFilter("");
+            setReasonFilter("");
           }}
         />
 
@@ -269,7 +269,7 @@ export function eeturnsView() {
         <PlatformDataTable
           className="[&_table]:min-w-[1000px]"
           columns={columns}
-          data={pageeows}
+          data={pageRows}
           rowKey={(r) => r.id}
           loading={loading}
           emptyMessage="No returns yet"
@@ -299,7 +299,7 @@ export function eeturnsView() {
       </div>
 
       {wizardOpen ? (
-        <eeturnWizard
+        <ReturnWizard
           receipts={receipts}
           onClose={() => setWizardOpen(false)}
           onSaved={() => {
@@ -312,27 +312,27 @@ export function eeturnsView() {
   );
 }
 
-function eeturnWizard({
+function ReturnWizard({
   receipts,
   onClose,
   onSaved,
 }: {
-  receipts: Distributioneeceipt[];
+  receipts: DistributionReceipt[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [step, setStep] = useState<WizardStep>(0);
   const [query, setQuery] = useState("");
-  const [receiptId, seteeceiptId] = useState("");
+  const [receiptId, setReceiptId] = useState("");
   const [selectedLines, setSelectedLines] = useState<
-    eecord<string, { qty: number; reason: string; checked: boolean }>
+    Record<string, { qty: number; reason: string; checked: boolean }>
   >({});
-  const [condition, setCondition] = useState<eeturnCondition>("GOOD");
-  const [restock, seteestock] = useState(true);
-  const [replaceItem, seteeplaceItem] = useState(false);
+  const [condition, setCondition] = useState<ReturnCondition>("GOOD");
+  const [restock, setRestock] = useState(true);
+  const [replaceItem, setReplaceItem] = useState(false);
   const [exchange, setExchange] = useState(false);
-  const [refundParent, seteefundParent] = useState(false);
-  const [refundAmount, seteefundAmount] = useState(0);
+  const [refundParent, setRefundParent] = useState(false);
+  const [refundAmount, setRefundAmount] = useState(0);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -343,7 +343,7 @@ function eeturnWizard({
     "Action",
   ] as const;
 
-  const filteredeeceipts = useMemo(() => {
+  const filteredReceipts = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return receipts.slice(0, 40);
     return receipts
@@ -359,7 +359,7 @@ function eeturnWizard({
 
   useEffect(() => {
     if (!receipt) return;
-    const init: eecord<
+    const init: Record<
       string,
       { qty: number; reason: string; checked: boolean }
     > = {};
@@ -399,12 +399,12 @@ function eeturnWizard({
         notes: notes || undefined,
         lines,
       });
-      toast.success("eeturn recorded");
+      toast.success("Return recorded");
       onSaved();
     } catch (e: unknown) {
       toast.error(
         (e as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "eeturn failed",
+          ?.message || "Return failed",
       );
     } finally {
       setBusy(false);
@@ -419,7 +419,7 @@ function eeturnWizard({
             <div>
               <h2 className="text-lg font-bold text-navy">Create return</h2>
               <p className="text-xs text-muted">
-                eeturn items from a distribution receipt
+                Return items from a distribution receipt
               </p>
             </div>
             <button type="button" className="btn-ghost" onClick={onClose}>
@@ -467,7 +467,7 @@ function eeturnWizard({
                 onChange={(e) => setQuery(e.target.value)}
               />
               <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border">
-                {filteredeeceipts.map((r) => (
+                {filteredReceipts.map((r) => (
                   <li key={r.id}>
                     <button
                       type="button"
@@ -475,7 +475,7 @@ function eeturnWizard({
                         "flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50",
                         receiptId === r.id && "bg-primary/15",
                       )}
-                      onClick={() => seteeceiptId(r.id)}
+                      onClick={() => setReceiptId(r.id)}
                     >
                       <div>
                         <p className="font-mono text-xs font-bold text-navy">
@@ -496,7 +496,7 @@ function eeturnWizard({
                     </button>
                   </li>
                 ))}
-                {!filteredeeceipts.length ? (
+                {!filteredReceipts.length ? (
                   <li className="px-4 py-8 text-center text-sm text-muted">
                     No receipts found
                   </li>
@@ -528,8 +528,8 @@ function eeturnWizard({
                       <th></th>
                       <th>Item</th>
                       <th>Given</th>
-                      <th>eeturn</th>
-                      <th>eeason</th>
+                      <th>Return</th>
+                      <th>Reason</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -606,7 +606,7 @@ function eeturnWizard({
                                 }))
                               }
                             >
-                              {eEASONS.map((r) => (
+                              {REASONS.map((r) => (
                                 <option key={r} value={r}>
                                   {r}
                                 </option>
@@ -650,9 +650,9 @@ function eeturnWizard({
               <p className="text-sm font-semibold text-navy">Action</p>
               {(
                 [
-                  ["restock", "eeturned to stock", restock, seteestock],
-                  ["replace", "eeplace item", replaceItem, seteeplaceItem],
-                  ["refund", "eefund parent", refundParent, seteefundParent],
+                  ["restock", "Returned to stock", restock, setRestock],
+                  ["replace", "Replace item", replaceItem, setReplaceItem],
+                  ["refund", "Refund parent", refundParent, setRefundParent],
                   ["exchange", "Exchange", exchange, setExchange],
                 ] as const
               ).map(([key, label, value, setter]) => (
@@ -673,7 +673,7 @@ function eeturnWizard({
               {refundParent ? (
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-semibold text-navy">
-                    eefund amount
+                    Refund amount
                   </span>
                   <input
                     className="input !rounded-xl"
@@ -681,7 +681,7 @@ function eeturnWizard({
                     min={0}
                     value={refundAmount || ""}
                     onChange={(e) =>
-                      seteefundAmount(Math.max(0, Number(e.target.value) || 0))
+                      setRefundAmount(Math.max(0, Number(e.target.value) || 0))
                     }
                   />
                 </label>
@@ -716,7 +716,7 @@ function eeturnWizard({
               disabled={step === 0 && !receiptId}
               onClick={() => setStep((s) => Math.min(3, s + 1) as WizardStep)}
             >
-              Next step <Arroweight className="h-4 w-4" />
+              Next step <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
             <button

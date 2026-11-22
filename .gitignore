@@ -92,3 +92,9 @@ package-lock.json
 uploads/
 dups.sql
 **/.env.production
+
+# TichaPortal teacher web-push runtime data (VAPID keys & subscriptions)
+TichaPortal/backend/data/vapid.json
+TichaPortal/backend/data/push-subscriptions.json
+TichaPortal/Backend/data/vapid.json
+TichaPortal/Backend/data/push-subscriptions.json

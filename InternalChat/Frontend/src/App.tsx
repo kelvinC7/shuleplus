@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -7,11 +6,10 @@ import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import { theme } from '@/shared/theme';
 import { TokenBootstrap } from '@/components/token-bootstrap';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
-import { ChatProvider } from '@/contexts/chat-context';
 import { MainLayout } from '@/layouts/main-layout';
 import { SESSION_EXPIRED_EVENT } from '@/shared/auth-token';
 
-function Gate({ children }: { children: ReactNode }) {
+function Gate() {
   const { ready, authorized, error } = useAuth();
 
   if (!ready) {
@@ -40,19 +38,13 @@ function Gate({ children }: { children: ReactNode }) {
     );
   }
 
-  return (
-    <MainLayout>
-      <ChatProvider>{children}</ChatProvider>
-    </MainLayout>
-  );
+  return <MainLayout />;
 }
 
 export function ModuleLayout() {
   return (
     <AuthProvider>
-      <Gate>
-        <Outlet />
-      </Gate>
+      <Gate />
     </AuthProvider>
   );
 }

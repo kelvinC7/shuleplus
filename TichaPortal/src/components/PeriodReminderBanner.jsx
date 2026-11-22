@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Clock, MapPin, X } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import PlaceIcon from '@mui/icons-material/Place';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { brand } from '../theme/theme';
 import { useNavigate } from 'react-router-dom';
 import useTpAcademic from '../hooks/useTpAcademic';
 import { fetchTeacherToday } from '../services/teacherPortalApi';
@@ -15,6 +22,11 @@ import {
   subscribeTeacherPortalPush,
 } from '../utils/webPushTeacherPortal';
 
+// Show each reminder once per lesson per day — never again on refresh or page switch.
+const dayStamp = () => new Date().toDateString();
+const hasFlag = (k) => { try { return !!localStorage.getItem(k); } catch { return false; } };
+const setFlag = (k) => { try { localStorage.setItem(k, '1'); } catch { /* ignore */ } };
+
 export default function PeriodReminderBanner() {
   const navigate = useNavigate();
   const { ready } = useTpAcademic();
@@ -23,7 +35,6 @@ export default function PeriodReminderBanner() {
   const lastKey = useRef('');
   const lastNotifiedKey = useRef('');
   const [pushBusy, setPushBusy] = useState(false);
-  const [pushHint, setPushHint] = useState(null);
   const [pushState, setPushState] = useState({ supported: false, permission: 'default', subscribed: false });
 
   useEffect(() => {
@@ -70,13 +81,21 @@ export default function PeriodReminderBanner() {
           const key = periodNotificationKey(d.lesson);
           if (key !== lastKey.current) {
             lastKey.current = key;
-            setDismissed(false);
+            const seenKey = `tp_period_seen:${dayStamp()}:${key}`;
+            if (hasFlag(seenKey)) {
+              setDismissed(true);
+            } else {
+              setFlag(seenKey);
+              setDismissed(false);
+            }
           }
           setLesson(d);
 
           const notifyKey = `${key}:${mins <= 0 ? 0 : mins <= 5 ? 5 : 15}`;
-          if (notifyKey !== lastNotifiedKey.current) {
+          const notifiedFlag = `tp_period_notified:${dayStamp()}:${notifyKey}`;
+          if (notifyKey !== lastNotifiedKey.current && !hasFlag(notifiedFlag)) {
             lastNotifiedKey.current = notifyKey;
+            setFlag(notifiedFlag);
             showPeriodBrowserNotification(d.lesson, isCurrent ? 0 : mins);
           }
         })
@@ -96,97 +115,115 @@ export default function PeriodReminderBanner() {
     };
   }, [ready]);
 
-  async function enableAlerts() {
+  const alertsOn =
+    pushState.subscribed ||
+    (canUseBrowserNotifications() && Notification.permission === 'granted');
+
+  const enableAlerts = async () => {
     setPushBusy(true);
-    setPushHint(null);
     try {
       await ensurePeriodNotificationPermission();
-      if (isWebPushEnvironmentSupported()) {
-        await subscribeTeacherPortalPush();
-      }
+      if (isWebPushEnvironmentSupported()) await subscribeTeacherPortalPush();
       setPushState(await getTeacherPortalPushState());
-      setPushHint('Alerts enabled. You will get period reminders even when this tab is in the background.');
-    } catch (err) {
-      setPushHint(err?.message || 'Could not enable alerts');
+    } catch {
+      /* permission denied or push unavailable - leave the button visible */
     } finally {
       setPushBusy(false);
     }
-  }
+  };
 
   if (!lesson?.warn_soon || dismissed) return null;
 
-  const mins = lesson.minutes_until;
   const l = lesson.lesson;
-  const alertsOn =
-    canUseBrowserNotifications() &&
-    Notification.permission === 'granted' &&
-    (!isWebPushEnvironmentSupported() || pushState.subscribed);
+  const mins = lesson.minutes_until ?? 0;
+  const when = mins <= 0 ? 'Now' : `In ${mins} min`;
 
   return (
-    <div className="fixed top-[72px] left-1/2 z-[100] w-[calc(100%-1rem)] max-w-lg -translate-x-1/2 animate-[slideDown_.35s_ease-out] sm:w-[calc(100%-1.5rem)]">
-      <style>{`@keyframes slideDown{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}`}</style>
-      <div className="overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-r from-[#fff7ed] to-white shadow-2xl">
-        <div className="flex items-start gap-3 p-3 sm:p-4">
-          <div className="shrink-0 rounded-xl bg-orange-500 p-2.5 text-white">
-            <Bell size={20} className="animate-pulse" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-orange-600">
-              Period starting soon
-            </p>
-            <p className="text-sm font-black leading-snug text-[#000435]">
-              {mins <= 0
-                ? 'Your lesson is starting now'
-                : `${mins} minute${mins === 1 ? '' : 's'} until ${l?.subject_name}`}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-slate-500">
-              <span className="inline-flex items-center gap-1">
-                <MapPin size={12} className="text-orange-500" />
-                {l?.class_name}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Clock size={12} className="text-orange-500" />
-                {l?.start_time} – {l?.end_time}
-              </span>
-            </div>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <button
-                type="button"
-                onClick={() => navigate('/class-room-scan')}
-                className="rounded-lg bg-[#000435] px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white hover:bg-[#0a116b]"
-              >
-                Scan class monitor QRCode
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/attendance')}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-600 hover:border-orange-300"
-              >
-                Mark attendance
-              </button>
-              {!alertsOn && canUseBrowserNotifications() ? (
-                <button
-                  type="button"
-                  disabled={pushBusy}
-                  onClick={() => void enableAlerts()}
-                  className="rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-orange-800 hover:bg-orange-100 disabled:opacity-60"
-                >
-                  {pushBusy ? 'Enabling…' : 'Enable alert notifications'}
-                </button>
-              ) : null}
-            </div>
-            {pushHint ? <p className="mt-2 text-[11px] font-medium text-slate-600">{pushHint}</p> : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => setDismissed(true)}
-            className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-            aria-label="Dismiss period notification"
+    <Box
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="period-sheet-title"
+      sx={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+    >
+      <Box
+        component="button"
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => setDismissed(true)}
+        sx={{ position: 'absolute', inset: 0, border: 0, p: 0, cursor: 'default', bgcolor: 'rgba(11,18,32,0.55)', backdropFilter: 'blur(2px)' }}
+      />
+      <Box sx={{ position: 'relative', width: '100%', maxWidth: 520, bgcolor: '#fff', borderRadius: '24px 24px 0 0', px: 2.5, pt: 4, pb: 3, boxShadow: '0 -12px 40px rgba(11,18,32,0.25)' }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box sx={{ width: 44, height: 44, flexShrink: 0, borderRadius: 2, bgcolor: brand.navy, color: '#fff', display: 'grid', placeItems: 'center' }}>
+            <NotificationsActiveIcon sx={{ fontSize: 20 }} />
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Period starting soon</Typography>
+            <Typography id="period-sheet-title" noWrap sx={{ fontSize: 18, fontWeight: 700, color: brand.navy }}>
+              {l?.subject_name || 'Your lesson'}
+            </Typography>
+          </Box>
+          <Box
+            component="span"
+            sx={{
+              flexShrink: 0,
+              borderRadius: 999,
+              px: 1.5,
+              py: 0.5,
+              fontSize: 12,
+              fontWeight: 600,
+              bgcolor: mins <= 0 ? brand.navy : '#FFF3DC',
+              color: mins <= 0 ? '#fff' : '#9A5B00',
+            }}
           >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
+            {when}
+          </Box>
+        </Stack>
+
+        <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25 }}>
+          <Box sx={{ borderRadius: 2, bgcolor: '#F4F5F8', px: 1.75, py: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>
+              <PlaceIcon sx={{ fontSize: 13 }} /> <Box component="span">Class</Box>
+            </Stack>
+            <Typography noWrap sx={{ mt: 0.5, fontSize: 14, fontWeight: 600, color: brand.navy }}>{l?.class_name || '-'}</Typography>
+          </Box>
+          <Box sx={{ borderRadius: 2, bgcolor: '#F4F5F8', px: 1.75, py: 1.5 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>
+              <AccessTimeIcon sx={{ fontSize: 13 }} /> <Box component="span">Time</Box>
+            </Stack>
+            <Typography sx={{ mt: 0.5, fontSize: 14, fontWeight: 600, color: brand.navy }}>{l?.start_time} - {l?.end_time}</Typography>
+          </Box>
+        </Box>
+
+        <Button
+          type="button"
+          fullWidth
+          onClick={() => { setDismissed(true); navigate('/class-room-scan'); }}
+          sx={{ mt: 2.5, height: 48, borderRadius: 2, bgcolor: brand.navy, color: '#fff', fontSize: 14, fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: '#24396A' }, '&:active': { bgcolor: '#24396A' } }}
+        >
+          Scan class QR code
+        </Button>
+        <Button
+          type="button"
+          fullWidth
+          onClick={() => setDismissed(true)}
+          sx={{ mt: 1.25, height: 44, borderRadius: 2, bgcolor: '#F4F5F8', color: '#64748B', fontSize: 14, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: '#ECEEF3' } }}
+        >
+          Later
+        </Button>
+
+        {!alertsOn && canUseBrowserNotifications() ? (
+          <Button
+            type="button"
+            fullWidth
+            disabled={pushBusy}
+            onClick={() => void enableAlerts()}
+            sx={{ mt: 2, fontSize: 12, fontWeight: 600, color: '#24396A', textTransform: 'none', '&.Mui-disabled': { opacity: 0.6 } }}
+          >
+            {pushBusy ? 'Enabling...' : 'Turn on period alerts'}
+          </Button>
+        ) : null}
+      </Box>
+    </Box>
   );
 }

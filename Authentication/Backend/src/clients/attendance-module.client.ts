@@ -21,6 +21,7 @@ export type AttendanceModuleRecord = {
 
 export type AttendanceGateDevice = {
   id: string;
+  organizationId?: string;
   deviceCode: string;
   name: string;
   location: string;
@@ -35,6 +36,21 @@ export type AttendanceGateDevice = {
   studentsToday?: number;
   lastSeenAt?: string | null;
   firmwareVersion?: string | null;
+  primaryOrganizationId?: string;
+  linkedOrganizationIds?: string[];
+  linkedSchoolsCount?: number;
+  isShared?: boolean;
+  accessRole?: 'PRIMARY' | 'SHARED' | string;
+};
+
+export type AttendanceDeviceSchoolLink = {
+  id?: string;
+  deviceId: string;
+  organizationId: string;
+  isPrimary: boolean;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 async function attendanceFetch<T>(
@@ -151,6 +167,51 @@ export const attendanceModuleClient = {
       `/service/devices/${deviceId}`,
       organizationId,
       { method: 'DELETE', body: JSON.stringify({ organizationId }) }
+    );
+  },
+
+  listDeviceSchools(organizationId: string, deviceId: string) {
+    return attendanceFetch<AttendanceDeviceSchoolLink[]>(`/service/devices/${deviceId}/schools`, organizationId);
+  },
+
+  linkDeviceSchool(organizationId: string, deviceId: string, targetOrganizationId: string) {
+    return attendanceFetch<AttendanceDeviceSchoolLink[] | unknown>(`/service/devices/${deviceId}/schools`, organizationId, {
+      method: 'POST',
+      body: JSON.stringify({ organizationId, targetOrganizationId }),
+    });
+  },
+
+  unlinkDeviceSchool(organizationId: string, deviceId: string, schoolId: string) {
+    return attendanceFetch<AttendanceDeviceSchoolLink[] | unknown>(
+      `/service/devices/${deviceId}/schools/${encodeURIComponent(schoolId)}`,
+      organizationId,
+      { method: 'DELETE', body: JSON.stringify({ organizationId }) }
+    );
+  },
+
+  syncStaffSchoolAccess(
+    organizationId: string,
+    records: Array<{
+      staffKey: string;
+      iamUserId?: string | null;
+      email?: string | null;
+      externalId?: string | null;
+      source?: string | null;
+      status?: 'ACTIVE' | 'INACTIVE' | string;
+    }>
+  ) {
+    return attendanceFetch<{ organizationId: string; upserted: number }>(
+      '/service/staff-school-access/sync',
+      organizationId,
+      { method: 'POST', body: JSON.stringify({ organizationId, records }) }
+    );
+  },
+
+  removeStaffSchoolAccess(organizationId: string, staffKeys: string[]) {
+    return attendanceFetch<{ organizationId: string; removed: number }>(
+      '/service/staff-school-access/remove',
+      organizationId,
+      { method: 'POST', body: JSON.stringify({ organizationId, staffKeys }) }
     );
   },
 

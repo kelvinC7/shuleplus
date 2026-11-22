@@ -1,0 +1,231 @@
+name: Build APKs
+
+on:
+  push:
+    branches:
+      - main
+      - feature/parentApp
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apks:
+    name: Build APKs (Parent App)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Write .env files
+        run: |
+          mkdir -p ParentMIS/ParentApp
+          ENV="VITE_API_URL=${{ secrets.VITE_API_URL || 'https://parents.shuleplus.rw/api' }}
+          VITE_STUDENT_API_URL=${{ secrets.VITE_STUDENT_API_URL || 'https://studentmanagement-api.shuleplus.rw/api' }}
+          VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_PLATFORM=mobile"
+          echo "$ENV" > ParentMIS/ParentApp/.env
+
+          if [ -d "sulecanteen_driver_app" ]; then
+            echo "$ENV" > sulecanteen_driver_app/.env
+          fi
+          if [ -d "shule_canteen_seller_app" ]; then
+            echo "$ENV" > shule_canteen_seller_app/.env
+          fi
+
+      # ── PARENT APP ─────────────────────────────────────────
+      - name: "[ParentApp] Install + Capacitor"
+        working-directory: ParentMIS/ParentApp
+        run: |
+          npm install
+          npm install --save @capacitor/core @capacitor/android
+          npm install --save-dev @capacitor/cli @capacitor/assets
+
+      - name: "[ParentApp] Build + Capacitor sync"
+        working-directory: ParentMIS/ParentApp
+        env:
+          VITE_PLATFORM: mobile
+        run: |
+          npm run build
+          npx cap add android 2>/dev/null || true
+          npx cap sync android
+
+      - name: "[ParentApp] Add Required Permissions to AndroidManifest"
+        working-directory: ParentMIS/ParentApp/android
+        run: |
+          MANIFEST="app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+              awk '/<manifest/{print; print "    <uses-permission android:name=\"android.permission.CAMERA\" />"; print "    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />"; next}1' "$MANIFEST" > "$MANIFEST.tmp"
+              mv "$MANIFEST.tmp" "$MANIFEST"
+            fi
+            if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+              awk '/<manifest/{print; print "    <uses-permission android:name=\"android.permission.INTERNET\" />"; next}1' "$MANIFEST" > "$MANIFEST.tmp"
+              mv "$MANIFEST.tmp" "$MANIFEST"
+            fi
+            echo "Manifest permissions:"
+            cat "$MANIFEST" | grep -E "permission|feature" || true
+          fi
+
+      - name: "[ParentApp] Bump version + decode keystore"
+        working-directory: ParentMIS/ParentApp/android
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
+          KEYSTORE="${{ secrets.PARENT_KEYSTORE_BASE64 || secrets.DRIVER_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}"
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 -d > app/release.keystore
+          fi
+
+      - name: "[ParentApp] Build APK"
+        working-directory: ParentMIS/ParentApp/android
+        run: |
+          KEYSTORE_FILE="app/release.keystore"
+          if [ -f "$KEYSTORE_FILE" ]; then
+            ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+              -Pandroid.injected.signing.store.password="${{ secrets.PARENT_KEYSTORE_PASSWORD || secrets.DRIVER_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}" \
+              -Pandroid.injected.signing.key.alias="${{ secrets.PARENT_KEY_ALIAS || secrets.DRIVER_KEY_ALIAS || secrets.KEY_ALIAS }}" \
+              -Pandroid.injected.signing.key.password="${{ secrets.PARENT_KEY_PASSWORD || secrets.DRIVER_KEY_PASSWORD || secrets.KEY_PASSWORD }}"
+          else
+            echo "No keystore provided, building assembleDebug..."
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      - name: "[ParentApp] Stage APK"
+        run: |
+          mkdir -p apk-out
+          if [ -f "ParentMIS/ParentApp/android/app/build/outputs/apk/release/app-release.apk" ]; then
+            cp ParentMIS/ParentApp/android/app/build/outputs/apk/release/app-release.apk apk-out/yoShule-Parent-release.apk
+            cp ParentMIS/ParentApp/android/app/build/outputs/apk/release/app-release.apk apk-out/yoShule-Parent-latest.apk
+          fi
+          if [ -f "ParentMIS/ParentApp/android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            cp ParentMIS/ParentApp/android/app/build/outputs/apk/debug/app-debug.apk apk-out/yoShule-Parent-debug.apk
+            [ ! -f "apk-out/yoShule-Parent-latest.apk" ] && cp ParentMIS/ParentApp/android/app/build/outputs/apk/debug/app-debug.apk apk-out/yoShule-Parent-latest.apk
+          fi
+          ls -la apk-out/
+
+      # ── DRIVER (if present) ────────────────────────────────
+      - name: "[Driver] Build & Stage APK"
+        if: hashFiles('sulecanteen_driver_app/package.json') != ''
+        working-directory: sulecanteen_driver_app
+        env:
+          VITE_PLATFORM: mobile
+        run: |
+          npm install
+          npm install --save @capacitor/core @capacitor/android
+          npm install --save-dev @capacitor/cli @capacitor/assets
+          npm install @capacitor/camera @capacitor-mlkit/barcode-scanning 2>/dev/null || true
+          cat > capacitor.config.json << 'CAP'
+          {
+            "appId": "rw.babyeyi.shulecanteen.driver",
+            "appName": "ShuleCanteen Driver",
+            "webDir": "dist",
+            "server": { "androidScheme": "https" }
+          }
+          CAP
+          npm run build
+          npx cap add android 2>/dev/null || true
+          npx cap sync android
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ] && ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            awk '/<manifest/{print; print "    <uses-permission android:name=\"android.permission.CAMERA\" />"; print "    <uses-feature android:name=\"android.hardware.camera\" />"; print "    <uses-feature android:name=\"android.hardware.camera.autofocus\" />"; next}1' "$MANIFEST" > "$MANIFEST.tmp"
+            mv "$MANIFEST.tmp" "$MANIFEST"
+          fi
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          if [ -n "${{ secrets.DRIVER_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.DRIVER_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+            cd android && ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+              -Pandroid.injected.signing.store.password="${{ secrets.DRIVER_KEYSTORE_PASSWORD }}" \
+              -Pandroid.injected.signing.key.alias="${{ secrets.DRIVER_KEY_ALIAS }}" \
+              -Pandroid.injected.signing.key.password="${{ secrets.DRIVER_KEY_PASSWORD }}"
+            cd ..
+            cp android/app/build/outputs/apk/release/app-release.apk ../apk-out/ShuleCanteen-Driver-latest.apk
+          else
+            cd android && ./gradlew assembleDebug --no-daemon && cd ..
+            cp android/app/build/outputs/apk/debug/app-debug.apk ../apk-out/ShuleCanteen-Driver-latest.apk
+          fi
+
+      # ── SELLER (if present) ────────────────────────────────
+      - name: "[Seller] Build & Stage APK"
+        if: hashFiles('shule_canteen_seller_app/package.json') != ''
+        working-directory: shule_canteen_seller_app
+        env:
+          VITE_PLATFORM: mobile
+        run: |
+          npm install
+          npm install --save @capacitor/core @capacitor/android
+          npm install --save-dev @capacitor/cli @capacitor/assets
+          npm install @capacitor/camera @capacitor-mlkit/barcode-scanning 2>/dev/null || true
+          cat > capacitor.config.json << 'CAP'
+          {
+            "appId": "rw.babyeyi.shulecanteen.seller",
+            "appName": "ShuleCanteen Seller",
+            "webDir": "dist",
+            "server": { "androidScheme": "https" }
+          }
+          CAP
+          npm run build
+          npx cap add android 2>/dev/null || true
+          npx cap sync android
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ] && ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            awk '/<manifest/{print; print "    <uses-permission android:name=\"android.permission.CAMERA\" />"; print "    <uses-feature android:name=\"android.hardware.camera\" />"; print "    <uses-feature android:name=\"android.hardware.camera.autofocus\" />"; next}1' "$MANIFEST" > "$MANIFEST.tmp"
+            mv "$MANIFEST.tmp" "$MANIFEST"
+          fi
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          if [ -n "${{ secrets.SELLER_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.SELLER_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+            cd android && ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+              -Pandroid.injected.signing.store.password="${{ secrets.SELLER_KEYSTORE_PASSWORD }}" \
+              -Pandroid.injected.signing.key.alias="${{ secrets.SELLER_KEY_ALIAS }}" \
+              -Pandroid.injected.signing.key.password="${{ secrets.SELLER_KEY_PASSWORD }}"
+            cd ..
+            cp android/app/build/outputs/apk/release/app-release.apk ../apk-out/ShuleCanteen-Seller-latest.apk
+          else
+            cd android && ./gradlew assembleDebug --no-daemon && cd ..
+            cp android/app/build/outputs/apk/debug/app-debug.apk ../apk-out/ShuleCanteen-Seller-latest.apk
+          fi
+
+      # ── Release APKs on GitHub ────────────────────────────
+      - name: Release APKs on GitHub
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: apks-build-${{ github.run_number }}
+          name: "ShulePlus Apps Build #${{ github.run_number }}"
+          body: |
+            Automated APK builds for ShulePlus mobile applications.
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Run: #${{ github.run_number }}
+          files: apk-out/*-latest.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Save all APKs as Artifact ─────────────────────────
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: apks-build-${{ github.run_number }}
+          path: apk-out/*-latest.apk
+          if-no-files-found: error
+          retention-days: 1

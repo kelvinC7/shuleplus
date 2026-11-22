@@ -1,0 +1,4 @@
+pymupdf>=1.24.0
+# Optional OCR for scanned pages:
+# pytesseract pillow
+# Install Tesseract OCR on the host OS as well.

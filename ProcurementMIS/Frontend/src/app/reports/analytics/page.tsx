@@ -64,7 +64,7 @@ export default function ProcurementAnalyticsPage() {
   return (
     <MainLayout>
       <PlatformPageLayout
-        subtitle="Procurement Analytics — complete overview of procurement activity for your selected filters."
+        subtitle="Procurement Analytics: complete overview of procurement activity for your selected filters."
       >
         <ReportFilterBar
           filters={filters}

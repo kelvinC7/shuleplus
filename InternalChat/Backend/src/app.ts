@@ -9,11 +9,30 @@ import { router } from './routes';
 export const app = express();
 
 app.use(helmet());
+const configuredOrigins = env.CORS_ORIGIN.split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const shuleplusOrigin = /^https:\/\/([a-z0-9-]+\.)*shuleplus\.rw(?::\d+)?$/i;
+const capacitorOrigin =
+  /^(capacitor:\/\/localhost|ionic:\/\/localhost|https?:\/\/localhost(:\d+)?)$/i;
 app.use(
   cors({
-    origin: env.CORS_ORIGIN.split(',')
-      .map((o) => o.trim())
-      .filter(Boolean),
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (configuredOrigins.includes('*') || configuredOrigins.includes(origin)) {
+        return callback(null, origin);
+      }
+      if (shuleplusOrigin.test(origin) || capacitorOrigin.test(origin)) {
+        return callback(null, origin);
+      }
+      if (
+        env.NODE_ENV !== 'production' &&
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
+        return callback(null, origin);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   })
 );

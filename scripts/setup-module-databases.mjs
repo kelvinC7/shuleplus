@@ -18,11 +18,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '..');
 
-const EXTRA_BACKENDS = ['Authentication/Notification-Service'];
+const EXTRA_BACKENDS = ['Authentication/Notification-Service', 'TichaPortal/backend'];
 
 const args = process.argv.slice(2);
 const onlyFilter = args.find((a) => a.startsWith('--only='))?.split('=')[1]?.toLowerCase();
 const skipMigrate = args.includes('--skip-migrate');
+
+let pgPassword = process.env.PGPASSWORD || null;
 
 function discoverBackends() {
   const backends = [];
@@ -61,6 +63,16 @@ function readDatabaseUrl(backendDir) {
     if (match) return match[1].trim().replace(/^["']|["']$/g, '');
   }
   return null;
+}
+
+function resolvePgPassword(backends) {
+  if (pgPassword) return pgPassword;
+  for (const backend of backends) {
+    const url = readDatabaseUrl(backend.dir);
+    const match = url?.match(/^postgres(?:ql)?:\/\/[^:/@]+:([^@]*)@/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+  return 'postgres';
 }
 
 function parsePostgresDbName(url) {
@@ -132,13 +144,17 @@ function createPostgresDatabase(dbName) {
   }
 
   try {
-    const env = { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'postgres' };
+    const env = { ...process.env, PGPASSWORD: pgPassword };
     const out = execSync(`psql -U postgres -h localhost -tAc "${checkSql}"`, { encoding: 'utf8', env });
     if (out.trim() === '1') {
       console.log(`  ✓ database exists: ${dbName}`);
       return;
     }
-    run(`psql -U postgres -h localhost -c "CREATE DATABASE \\"${quoted}\\""`, REPO_ROOT);
+    execSync(`psql -U postgres -h localhost -c "CREATE DATABASE \\"${quoted}\\""`, {
+      stdio: 'inherit',
+      env,
+      shell: true,
+    });
     console.log(`  + created database: ${dbName}`);
   } catch (err) {
     throw new Error(`Could not create database "${dbName}". Start Postgres (docker compose up -d) and retry.`);
@@ -153,7 +169,7 @@ function applyInitSqlFile() {
     console.log('Applied init-module-databases.sql via Docker.');
   } catch {
     try {
-      const env = { ...process.env, PGPASSWORD: process.env.PGPASSWORD || 'postgres' };
+      const env = { ...process.env, PGPASSWORD: pgPassword };
       execSync(`psql -U postgres -h localhost -f "${sqlPath}"`, { stdio: 'inherit', env, shell: true });
       console.log('Applied init-module-databases.sql via local psql.');
     } catch {
@@ -172,6 +188,8 @@ if (backends.length === 0) {
 }
 
 console.log(`\nShulePlus — setup ${backends.length} module database(s)\n`);
+
+pgPassword = resolvePgPassword(backends);
 
 applyInitSqlFile();
 
@@ -231,7 +249,17 @@ for (const backend of backends) {
     if (!skipMigrate && shouldApplySchema) {
       if (hasMigrations(backend.dir)) {
         console.log('  prisma migrate deploy');
-        runPrisma('migrate deploy', backend.dir);
+        try {
+          runPrisma('migrate deploy', backend.dir);
+        } catch {
+          console.warn('  ⚠ migrate deploy failed — falling back to prisma db push');
+          try {
+            runPrisma('db push --skip-generate', backend.dir);
+          } catch {
+            console.warn('  ⚠ db push needs to bypass data-loss warnings for this local database');
+            runPrisma('db push --skip-generate --accept-data-loss', backend.dir);
+          }
+        }
       } else {
         console.log('  prisma db push (no migrations folder)');
         runPrisma('db push --skip-generate', backend.dir);

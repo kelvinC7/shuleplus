@@ -126,7 +126,7 @@ export function formatProvinceDistrict(school: {
   province: string;
   district: string;
 }): string {
-  return [school.district, school.province].filter((part) => part && part !== '—').join(', ');
+  return [school.district, school.province].filter((part) => part && part !== '-').join(', ');
 }
 
 /** Boarding or Day  exactly what the school chose at registration. */
@@ -148,8 +148,8 @@ export function schoolLocationParts(school: {
   postalAddress?: string | null;
 }): LocationParts {
   return {
-    provinceName: school.province !== '—' ? school.province : undefined,
-    districtName: school.district !== '—' ? school.district : undefined,
+    provinceName: school.province !== '-' ? school.province : undefined,
+    districtName: school.district !== '-' ? school.district : undefined,
     sectorName: school.sector ?? undefined,
     cellName: school.cell ?? undefined,
     villageName: school.village ?? undefined,
@@ -166,6 +166,6 @@ export function formatSchoolLocationLine(school: {
   village?: string | null;
 }): string {
   return [school.village, school.cell, school.sector, school.district, school.province]
-    .filter((part) => part && part !== '—')
+    .filter((part) => part && part !== '-')
     .join(', ');
 }

@@ -93,11 +93,274 @@ model FinancialYear {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  categoryBalances YearCategoryBalance[]
+  categoryBalances    YearCategoryBalance[]
+  landSetups          LandSetup[]
+  landRecords         LandRecord[]
+  landImportBatches   LandImportBatch[]
+  vehicleSetups        VehicleSetup[]
+  vehicleRecords       VehicleRecord[]
+  vehicleImportBatches VehicleImportBatch[]
 
   @@unique([organizationId, year])
   @@index([organizationId, status])
   @@map("financial_years")
+}
+
+// Per-module active financial year. Land and Vehicles can each point at a
+// different year than the organization-wide active financial year, so working
+// in one module never changes what another module has selected.
+model ModuleYearSetting {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  module         String
+  activeYear     Int      @map("active_year")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, module])
+  @@index([organizationId])
+  @@map("module_year_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Independent Land asset module. Land is deliberately isolated from the
+// generic asset register so it can have its own setup, balances and reporting
+// without touching depreciation for other categories.
+// ---------------------------------------------------------------------------
+
+model LandSetup {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  financialYearId String   @map("financial_year_id")
+  year            Int
+  openingAmount   Float    @default(0) @map("opening_amount")
+  createdByUserId String?  @map("created_by_user_id")
+  createdByEmail  String?  @map("created_by_email")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, financialYearId])
+  @@index([organizationId, year])
+  @@map("land_setup")
+}
+
+model LandRecord {
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  financialYearId   String    @map("financial_year_id")
+  year              Int
+  sequence          Int
+  province          String?
+  district          String?
+  sector            String?
+  cellule           String?
+  village           String?
+  landType          String?   @map("land_type")
+  category          String?
+  supplier          String?
+  tax               String?
+  upi               String?
+  sku               String?
+  size              String?
+  sizeValue         Float?    @map("size_value")
+  material          String?
+  purchaseYear      Int?      @map("purchase_year")
+  purchaseMonth     Int?      @map("purchase_month")
+  purchaseDay       Int?      @map("purchase_day")
+  purchaseDate      DateTime? @map("purchase_date")
+  purchaseUnitPrice Float     @default(0) @map("purchase_unit_price")
+  openingAmount     Float     @default(0) @map("opening_amount")
+  totalBalance      Float     @default(0) @map("total_balance")
+  importBatchId     String?   @map("import_batch_id")
+  createdByUserId   String?   @map("created_by_user_id")
+  createdByEmail    String?   @map("created_by_email")
+  updatedByUserId   String?   @map("updated_by_user_id")
+  updatedByEmail    String?   @map("updated_by_email")
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  financialYear FinancialYear    @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  importBatch   LandImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  auditLogs     LandAuditLog[]
+
+  @@index([organizationId, year, deletedAt])
+  @@index([organizationId, financialYearId, sequence])
+  @@index([organizationId, province, district])
+  @@map("land_records")
+}
+
+model LandImportBatch {
+  id                 String   @id @default(cuid())
+  organizationId     String   @map("organization_id")
+  financialYearId    String   @map("financial_year_id")
+  year               Int
+  fileName           String?  @map("file_name")
+  fingerprint        String?
+  rowCount           Int      @default(0) @map("row_count")
+  openingAmount      Float    @default(0) @map("opening_amount")
+  totalPurchaseValue Float    @default(0) @map("total_purchase_value")
+  closingBalance     Float    @default(0) @map("closing_balance")
+  status             String   @default("Completed")
+  createdByUserId    String?  @map("created_by_user_id")
+  createdByEmail     String?  @map("created_by_email")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  records       LandRecord[]
+
+  @@index([organizationId, year])
+  @@index([organizationId, fingerprint])
+  @@map("land_import_batches")
+}
+
+model LandAuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  landRecordId   String?  @map("land_record_id")
+  financialYearId String? @map("financial_year_id")
+  year           Int?
+  action         String
+  detail         String?
+  metadata       Json?
+  actorUserId    String?  @map("actor_user_id")
+  actorEmail     String?  @map("actor_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  landRecord LandRecord? @relation(fields: [landRecordId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, year])
+  @@map("land_audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Independent Vehicle asset module. Vehicles have their own setup, sequential
+// balance chain, sale balance adjustments, depreciation configuration and
+// audit trail. Nothing here mutates the generic asset register.
+// ---------------------------------------------------------------------------
+
+model VehicleSetup {
+  id                      String   @id @default(cuid())
+  organizationId          String   @map("organization_id")
+  financialYearId         String   @map("financial_year_id")
+  year                    Int
+  openingAmount           Float    @default(0) @map("opening_amount")
+  accumulatedDepreciation Float    @default(0) @map("accumulated_depreciation")
+  depreciationMode        String   @default("Diminishing") @map("depreciation_mode")
+  depreciationRate        Float    @default(0) @map("depreciation_rate")
+  usefulYears             Int      @default(0) @map("useful_years")
+  createdByUserId         String?  @map("created_by_user_id")
+  createdByEmail          String?  @map("created_by_email")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  financialYear FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, financialYearId])
+  @@index([organizationId, year])
+  @@map("vehicle_setup")
+}
+
+model VehicleRecord {
+  id                      String    @id @default(cuid())
+  organizationId          String    @map("organization_id")
+  financialYearId         String    @map("financial_year_id")
+  year                    Int
+  sequence                Int
+  location                String?
+  name                    String?
+  label                   String?
+  vehicleType             String?   @map("vehicle_type")
+  category                String?
+  supplier                String?
+  tax                     String?
+  upi                     String?
+  sku                     String?
+  size                    String?
+  material                String?
+  purchaseYear            Int?      @map("purchase_year")
+  purchaseMonth           Int?      @map("purchase_month")
+  purchaseDay             Int?      @map("purchase_day")
+  purchaseDate            DateTime? @map("purchase_date")
+  purchaseUnitPrice       Float     @default(0) @map("purchase_unit_price")
+  saleBalance             Float     @default(0) @map("sale_balance")
+  openingAmount           Float     @default(0) @map("opening_amount")
+  totalBalance            Float     @default(0) @map("total_balance")
+  accumulatedDepreciation Float     @default(0) @map("accumulated_depreciation")
+  annualDep               Float     @default(0) @map("annual_dep")
+  totalDep                Float     @default(0) @map("total_dep")
+  netBookValue            Float     @default(0) @map("net_book_value")
+  depRate                 Float     @default(0) @map("dep_rate")
+  depMode                 String    @default("Diminishing") @map("dep_mode")
+  usefulYears             Int       @default(0) @map("useful_years")
+  useSetupDepreciation    Boolean   @default(true) @map("use_setup_depreciation")
+  quantity                Int       @default(1)
+  importBatchId           String?   @map("import_batch_id")
+  createdByUserId         String?   @map("created_by_user_id")
+  createdByEmail          String?   @map("created_by_email")
+  updatedByUserId         String?   @map("updated_by_user_id")
+  updatedByEmail          String?   @map("updated_by_email")
+  deletedAt               DateTime? @map("deleted_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  financialYear FinancialYear      @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  importBatch   VehicleImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  auditLogs     VehicleAuditLog[]
+
+  @@index([organizationId, year, deletedAt])
+  @@index([organizationId, financialYearId, sequence])
+  @@index([organizationId, location])
+  @@map("vehicle_records")
+}
+
+model VehicleImportBatch {
+  id                 String   @id @default(cuid())
+  organizationId     String   @map("organization_id")
+  financialYearId    String   @map("financial_year_id")
+  year               Int
+  fileName           String?  @map("file_name")
+  fingerprint        String?
+  rowCount           Int      @default(0) @map("row_count")
+  openingAmount      Float    @default(0) @map("opening_amount")
+  totalPurchaseValue Float    @default(0) @map("total_purchase_value")
+  totalSaleBalance   Float    @default(0) @map("total_sale_balance")
+  closingBalance     Float    @default(0) @map("closing_balance")
+  status             String   @default("Completed")
+  createdByUserId    String?  @map("created_by_user_id")
+  createdByEmail     String?  @map("created_by_email")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  financialYear FinancialYear   @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  records       VehicleRecord[]
+
+  @@index([organizationId, year])
+  @@index([organizationId, fingerprint])
+  @@map("vehicle_import_batches")
+}
+
+model VehicleAuditLog {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  vehicleRecordId String?  @map("vehicle_record_id")
+  financialYearId String?  @map("financial_year_id")
+  year            Int?
+  action          String
+  detail          String?
+  metadata        Json?
+  actorUserId     String?  @map("actor_user_id")
+  actorEmail      String?  @map("actor_email")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  vehicleRecord VehicleRecord? @relation(fields: [vehicleRecordId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, year])
+  @@index([organizationId, vehicleRecordId])
+  @@map("vehicle_audit_logs")
 }
 
 model YearCategoryBalance {

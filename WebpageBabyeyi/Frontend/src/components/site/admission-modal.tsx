@@ -252,9 +252,9 @@ export function AdmissionModal({ school, open, onClose }: AdmissionModalProps) {
   }, [admissionLevel, levelClasses, aLevelOptions, tvetOptions, classApplying, preferredCombination]);
 
   const applyingSummary = useMemo(() => {
-    if (levelUsesCombinationPicker(admissionLevel)) return preferredCombination || '—';
-    if (levelUsesTvetPicker(admissionLevel)) return classApplying || '—';
-    return classApplying || '—';
+    if (levelUsesCombinationPicker(admissionLevel)) return preferredCombination || '-';
+    if (levelUsesTvetPicker(admissionLevel)) return classApplying || '-';
+    return classApplying || '-';
   }, [admissionLevel, classApplying, preferredCombination]);
 
   useEffect(() => {

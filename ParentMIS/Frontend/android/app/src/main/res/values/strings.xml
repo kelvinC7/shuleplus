@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">yoShule Parent</string>
+    <string name="title_activity_main">yoShule Parent</string>
+    <string name="package_name">rw.shuleplus.parents</string>
+    <string name="custom_url_scheme">rw.shuleplus.parents</string>
+</resources>

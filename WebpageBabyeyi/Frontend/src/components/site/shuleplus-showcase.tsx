@@ -95,7 +95,7 @@ export function ShuleplusShowcase() {
               />
 
               <div className="relative z-[2] flex h-full items-center gap-6 px-9 max-sm:flex-col max-sm:justify-center max-sm:gap-4 max-sm:px-5 max-sm:py-7 max-sm:pb-14 sm:px-7">
-                {/* Image — large and centered on mobile */}
+                {/* Image - large and centered on mobile */}
                 <div
                   className={cn(
                     'relative shrink-0 overflow-hidden bg-white shadow-xl transition-all delay-100 duration-500',

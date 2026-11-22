@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { TransportPageLayout } from '@/components/transport-page-layout';
+import { NotificationTemplatesPanel } from '@/modules/settings/notification-templates-panel';
 import { transportApi, type ReportsSummary, type TransportSettings, type ParentNotification } from '@/services/transport-api';
 import { getApiErrorMessage } from '@/utils/api-error';
 import { useToast } from '@/shared/notifications';
@@ -120,6 +121,20 @@ export function SettingsView() {
               <input type="checkbox" checked={Boolean(s[k])} onChange={() => toggle(k)} />
             </label>
           ))}
+          <label className="block text-xs">
+            Default parent message language
+            <select
+              className="input mt-1"
+              value={s.defaultNotifyLanguage ?? 'RW'}
+              onChange={(e) =>
+                setS({ ...s, defaultNotifyLanguage: e.target.value as TransportSettings['defaultNotifyLanguage'] })
+              }
+            >
+              <option value="RW">Kinyarwanda</option>
+              <option value="EN">English</option>
+              <option value="FR">French</option>
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs">Morning start<input className="input mt-1" value={s.morningStart} onChange={(e) => setS({ ...s, morningStart: e.target.value })} /></label>
             <label className="text-xs">School arrival<input className="input mt-1" value={s.schoolArrival} onChange={(e) => setS({ ...s, schoolArrival: e.target.value })} /></label>
@@ -128,8 +143,9 @@ export function SettingsView() {
           </div>
           <button type="button" className="btn-primary" onClick={() => void save()}>Save rules</button>
         </div>
-        <div className="hr-card p-5">
-          <h2 className="mb-3 text-sm font-bold uppercase text-navy">Parent notifications</h2>
+        <NotificationTemplatesPanel />
+        <div className="hr-card p-5 lg:col-span-2">
+          <h2 className="mb-3 text-sm font-bold uppercase text-navy">Recent notification log</h2>
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
             {notes.map((n) => (
               <div key={n.id} className="rounded-xl border border-border px-3 py-2 text-sm">

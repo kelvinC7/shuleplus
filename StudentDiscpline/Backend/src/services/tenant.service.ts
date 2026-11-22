@@ -1,4 +1,4 @@
-import { TenantStatus } from '@prisma/client';
+import { TenantStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 

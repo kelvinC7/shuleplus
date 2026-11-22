@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Check, Loader2, User } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CheckIcon from '@mui/icons-material/Check';
+import PersonIcon from '@mui/icons-material/Person';
 import {
   HrDrawer, HrBtnPrimary, HrBtnOutline, HrField, HrInput, HrTextarea, HrSelect,
 } from './hrDrawerUi';
+import { brand } from '../theme/theme';
 
 export const PERMISSION_TYPES = [
   { value: 'SICK_LEAVE', label: 'Sick Leave' },
@@ -40,24 +49,32 @@ const emptyForm = () => ({
 
 function Stepper({ step }) {
   return (
-    <div className="flex gap-1 mb-6 overflow-x-auto pb-1">
+    <Stack direction="row" spacing={0.5} sx={{ mb: 3, overflowX: 'auto', pb: 0.5 }}>
       {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center shrink-0">
-          <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] ${
-              i === step ? 'bg-[#c87800] text-white' : i < step ? 'bg-amber-50 text-[#c87800]' : 'bg-slate-100 text-slate-400'
-            }`}
-            style={{ fontWeight: 500 }}
+        <Stack key={label} direction="row" alignItems="center" sx={{ flexShrink: 0 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{
+              px: 1,
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: 10,
+              fontWeight: 500,
+              bgcolor: i === step ? '#B26A00' : i < step ? '#FFFBEB' : '#F1F5F9',
+              color: i === step ? '#fff' : i < step ? '#B26A00' : '#94A3B8',
+            }}
           >
-            <span className="w-4 h-4 rounded-full border flex items-center justify-center text-[9px]">
-              {i < step ? <Check size={10} /> : i + 1}
-            </span>
-            <span className="hidden sm:inline">{label}</span>
-          </div>
-          {i < STEPS.length - 1 && <ChevronRight size={12} className="text-slate-300 mx-0.5 shrink-0" />}
-        </div>
+            <Box sx={{ width: 16, height: 16, borderRadius: '50%', border: '1px solid currentColor', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9 }}>
+              {i < step ? <CheckIcon sx={{ fontSize: 10 }} /> : i + 1}
+            </Box>
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{label}</Box>
+          </Stack>
+          {i < STEPS.length - 1 && <ChevronRightIcon sx={{ fontSize: 12, color: '#CBD5E1', mx: 0.25, flexShrink: 0 }} />}
+        </Stack>
       ))}
-    </div>
+    </Stack>
   );
 }
 
@@ -149,25 +166,25 @@ export default function PermissionRequestModal({
     switch (step) {
       case 0:
         return (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/50 flex gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#c87800] text-white flex items-center justify-center shrink-0 text-sm" style={{ fontWeight: 500 }}>
+          <Stack spacing={2}>
+            <Stack direction="row" spacing={1.5} sx={{ p: 2, borderRadius: 2, border: '1px solid #FEF3C7', bgcolor: '#FFFBEB' }}>
+              <Box sx={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, bgcolor: '#B26A00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 500 }}>
                 {teacherInitial}
-              </div>
-              <div>
-                <p className="text-sm text-[#000435]" style={{ fontWeight: 500 }}>{teacherName}</p>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 14, fontWeight: 500, color: brand.navy }}>{teacherName}</Typography>
                 {teacherMeta.position || teacherMeta.department ? (
-                  <p className="text-xs text-slate-500">
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>
                     {[teacherMeta.position, teacherMeta.department].filter(Boolean).join(' · ')}
-                  </p>
+                  </Typography>
                 ) : (
-                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                    <User size={12} /> Teacher
-                  </p>
+                  <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25, fontSize: 12, color: '#64748B' }}>
+                    <PersonIcon sx={{ fontSize: 12 }} /> <Box component="span">Teacher</Box>
+                  </Stack>
                 )}
-                <p className="text-xs text-[#c87800] mt-1">Submitting on your behalf</p>
-              </div>
-            </div>
+                <Typography sx={{ mt: 0.5, fontSize: 12, color: '#B26A00' }}>Submitting on your behalf</Typography>
+              </Box>
+            </Stack>
 
             <HrField label="Permission type" required>
               <HrSelect
@@ -177,7 +194,7 @@ export default function PermissionRequestModal({
                   if (e.target.value !== 'OTHER') set('permission_type_other', '');
                 }}
               >
-                <option value="">Select…</option>
+                <option value="">Select...</option>
                 {PERMISSION_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
@@ -189,40 +206,40 @@ export default function PermissionRequestModal({
                 <HrInput
                   value={form.permission_type_other}
                   onChange={(e) => set('permission_type_other', e.target.value)}
-                  placeholder="e.g. Medical appointment, workshop…"
+                  placeholder="e.g. Medical appointment, workshop..."
                 />
               </HrField>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
               <HrField label="Start date" required>
                 <HrInput type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
               </HrField>
               <HrField label="End date" required>
                 <HrInput type="date" value={form.end_date} onChange={(e) => set('end_date', e.target.value)} />
               </HrField>
-            </div>
+            </Box>
 
             {form.start_date && form.end_date && (
-              <div className="p-3 rounded-xl bg-sky-50 border border-sky-100 text-sm">
-                <span className="text-slate-500">Total days requested: </span>
-                <span className="text-[#000435]" style={{ fontWeight: 500 }}>{totalDays}</span>
-              </div>
+              <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: '#F0F9FF', border: '1px solid #E0F2FE', fontSize: 14 }}>
+                <Box component="span" sx={{ color: '#64748B' }}>Total days requested: </Box>
+                <Box component="span" sx={{ fontWeight: 500, color: brand.navy }}>{totalDays}</Box>
+              </Box>
             )}
-          </div>
+          </Stack>
         );
       case 1:
         return (
-          <div className="space-y-4">
+          <Stack spacing={2}>
             <HrField label="Reason for permission" required>
               <HrTextarea
                 rows={5}
                 value={form.reason}
                 onChange={(e) => set('reason', e.target.value)}
-                placeholder="Explain the reason for your permission request…"
+                placeholder="Explain the reason for your permission request..."
                 maxLength={500}
               />
-              <p className="text-[10px] text-slate-400 mt-1 text-right">{form.reason.length}/500</p>
+              <Typography sx={{ mt: 0.5, fontSize: 10, color: '#94A3B8', textAlign: 'right' }}>{form.reason.length}/500</Typography>
             </HrField>
             <HrField label="Emergency phone">
               <HrInput
@@ -234,34 +251,34 @@ export default function PermissionRequestModal({
             <HrField label="Alternative contact">
               <HrInput value={form.alt_contact} onChange={(e) => set('alt_contact', e.target.value)} placeholder="Name or number" />
             </HrField>
-          </div>
+          </Stack>
         );
       case 2:
         return (
-          <div className="space-y-3 text-sm">
-            <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50">
-              <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Request summary</p>
-              <p className="text-xs text-slate-600">
-                Duration: <span style={{ fontWeight: 600 }}>{totalDays} day{totalDays !== 1 ? 's' : ''}</span>
+          <Stack spacing={1.5} sx={{ fontSize: 14 }}>
+            <Box sx={{ p: 1.5, borderRadius: 2, border: '1px solid #A7F3D0', bgcolor: '#ECFDF5' }}>
+              <Typography sx={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748B', mb: 0.5 }}>Request summary</Typography>
+              <Typography sx={{ fontSize: 12, color: '#475569' }}>
+                Duration: <Box component="span" sx={{ fontWeight: 600 }}>{totalDays} day{totalDays !== 1 ? 's' : ''}</Box>
                 {' · '}
                 Awaiting manager approval
-              </p>
-            </div>
+              </Typography>
+            </Box>
             {[
               ['Teacher', teacherName],
               ['Permission type', displayType],
-              ['Dates', `${form.start_date} → ${form.end_date}`],
+              ['Dates', `${form.start_date} -> ${form.end_date}`],
               ['Total days', totalDays],
               ['Reason', form.reason || '-'],
               ['Emergency phone', form.emergency_phone || '-'],
               ['Alternative contact', form.alt_contact || '-'],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4 py-2 border-b border-slate-50">
-                <span className="text-slate-400 text-xs uppercase">{k}</span>
-                <span className="text-slate-700 text-right max-w-[60%]" style={{ fontWeight: 500 }}>{v}</span>
-              </div>
+              <Stack key={k} direction="row" justifyContent="space-between" spacing={2} sx={{ py: 1, borderBottom: '1px solid #F8FAFC' }}>
+                <Box component="span" sx={{ fontSize: 12, textTransform: 'uppercase', color: '#94A3B8' }}>{k}</Box>
+                <Box component="span" sx={{ fontSize: 14, textAlign: 'right', maxWidth: '60%', color: '#334155', fontWeight: 500 }}>{v}</Box>
+              </Stack>
             ))}
-          </div>
+          </Stack>
         );
       default:
         return null;
@@ -276,28 +293,26 @@ export default function PermissionRequestModal({
       footer={
         <>
           {step > 0 ? (
-            <HrBtnOutline className="flex-1" onClick={prev} disabled={submitting}>
-              <ChevronLeft size={14} /> Previous
+            <HrBtnOutline sx={{ flex: 1 }} onClick={prev} disabled={submitting}>
+              <ChevronLeftIcon sx={{ fontSize: 14 }} /> Previous
             </HrBtnOutline>
           ) : (
-            <HrBtnOutline className="flex-1" onClick={onClose} disabled={submitting}>Cancel</HrBtnOutline>
+            <HrBtnOutline sx={{ flex: 1 }} onClick={onClose} disabled={submitting}>Cancel</HrBtnOutline>
           )}
           {step < STEPS.length - 1 ? (
-            <HrBtnPrimary className="flex-1" onClick={next}>
-              Next <ChevronRight size={14} />
+            <HrBtnPrimary sx={{ flex: 1 }} onClick={next}>
+              Next <ChevronRightIcon sx={{ fontSize: 14 }} />
             </HrBtnPrimary>
           ) : (
-            <HrBtnPrimary className="flex-1" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Submit
+            <HrBtnPrimary sx={{ flex: 1 }} onClick={handleSubmit} disabled={submitting}>
+              {submitting ? <CircularProgress size={14} color="inherit" /> : <CheckIcon sx={{ fontSize: 14 }} />} Submit
             </HrBtnPrimary>
           )}
         </>
       }
     >
       <Stepper step={step} />
-      {error ? (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>
-      ) : null}
+      {error ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2, fontSize: 14 }}>{error}</Alert> : null}
       {renderStep()}
     </HrDrawer>
   );

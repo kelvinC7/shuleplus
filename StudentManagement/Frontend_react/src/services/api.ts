@@ -314,10 +314,15 @@ export async function assignClassHeadTeacher(
     headTeacherRefId?: string | null;
     headTeacherName?: string | null;
     headTeacherEmail?: string | null;
-    headTeacherSource?: 'TIMETABLE' | 'HR' | 'MANUAL' | null;
+    headTeacherSource?: 'IAM' | 'TIMETABLE' | 'HR' | 'MANUAL' | null;
   }
 ) {
   const res = await api.patch(`/classes/${classId}/head-teacher`, data);
+  return res.data.data;
+}
+
+export async function setClassStudentAccess(classId: string, canEditStudents: boolean) {
+  const res = await api.patch(`/classes/${classId}/student-access`, { canEditStudents });
   return res.data.data;
 }
 

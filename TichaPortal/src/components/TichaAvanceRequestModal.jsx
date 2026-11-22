@@ -1,15 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import {
-  AlertCircle,
-  Calendar,
-  CalendarDays,
-  CalendarRange,
-  Check,
-  Loader2,
-  X,
-} from "lucide-react";
-import { kaziSubmitRequest } from "../services/kaziApi";
+import { useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Drawer from '@mui/material/Drawer';
+import Dialog from '@mui/material/Dialog';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import CloseIcon from '@mui/icons-material/Close';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import CheckIcon from '@mui/icons-material/Check';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { kaziSubmitRequest } from '../services/kaziApi';
 import {
   computeAvancePlan,
   formatFrw,
@@ -17,18 +21,31 @@ import {
   frequencyLabel,
   periodUnitLabel,
   toApiMonths,
-} from "../utils/avanceRepayment";
+} from '../utils/avanceRepayment';
+import { brand } from '../theme/theme';
 
 const FREQUENCIES = [
-  { id: "daily", label: "Daily", Icon: Calendar },
-  { id: "weekly", label: "Weekly", Icon: CalendarDays },
-  { id: "monthly", label: "Monthly", Icon: CalendarRange },
+  { id: 'daily', label: 'Daily', Icon: CalendarTodayIcon },
+  { id: 'weekly', label: 'Weekly', Icon: CalendarMonthIcon },
+  { id: 'monthly', label: 'Monthly', Icon: CalendarViewMonthIcon },
 ];
 
+const fieldSx = {
+  width: '100%',
+  borderRadius: 1.5,
+  border: '1px solid rgba(0,0,0,0.1)',
+  bgcolor: '#fff',
+  px: 2,
+  color: brand.navy,
+  fontFamily: 'inherit',
+  outline: 'none',
+  '&:focus': { borderColor: brand.primary },
+};
+
 export default function TichaAvanceRequestModal({ open, eligibility, onClose, onSubmitted }) {
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState('');
   const [periodCount, setPeriodCount] = useState(3);
-  const [frequency, setFrequency] = useState("monthly");
+  const [frequency, setFrequency] = useState('monthly');
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -36,30 +53,28 @@ export default function TichaAvanceRequestModal({ open, eligibility, onClose, on
   const available = Number(eligibility?.remaining_cap_rwf || eligibility?.monthly_cap_rwf || 0);
 
   const plan = useMemo(
-    () => computeAvancePlan({ amount, periodCount, periodUnit: "months", frequency, serviceFee: 0, interest: 0 }),
+    () => computeAvancePlan({ amount, periodCount, periodUnit: 'months', frequency, serviceFee: 0, interest: 0 }),
     [amount, periodCount, frequency]
   );
 
-  const entered = Number(String(amount).replace(/[^\d.]/g, "")) || 0;
+  const entered = Number(String(amount).replace(/[^\d.]/g, '')) || 0;
   const overLimit = available > 0 && entered > available;
-  const blocked = Boolean(eligibility?.status && eligibility.status !== "Eligible");
+  const blocked = Boolean(eligibility?.status && eligibility.status !== 'Eligible');
   const canSubmit = entered > 0 && periodCount >= 1 && plan.payments > 0 && !overLimit && !blocked && !submitting;
 
   useEffect(() => {
     if (!open) return;
-    setAmount("");
+    setAmount('');
     setPeriodCount(3);
-    setFrequency("monthly");
+    setFrequency('monthly');
     setScheduleOpen(false);
     setError(null);
     const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
   }, [open]);
-
-  if (!open) return null;
 
   async function submitAdvance() {
     if (!canSubmit) return;
@@ -67,232 +82,260 @@ export default function TichaAvanceRequestModal({ open, eligibility, onClose, on
     setError(null);
     try {
       const desc = [
-        `Loan period: ${plan.periodCount} ${periodUnitLabel("months", plan.periodCount)}`,
+        `Loan period: ${plan.periodCount} ${periodUnitLabel('months', plan.periodCount)}`,
         `Frequency: ${frequencyLabel(frequency)}`,
         `${plan.payments} payments of ${formatFrw(plan.perPayment)}`,
-      ].join(" · ");
+      ].join(' · ');
       const result = await kaziSubmitRequest({
         amount: entered,
-        months: toApiMonths(periodCount, "months"),
-        purpose: "Salary advance",
+        months: toApiMonths(periodCount, 'months'),
+        purpose: 'Salary advance',
         description: desc,
       });
       if (result?.id || result?.requestNumber) {
         onSubmitted?.(result);
         onClose();
       } else {
-        setError(result?.message || "Submit failed.");
+        setError(result?.message || 'Submit failed.');
       }
     } catch (e) {
-      setError(e.response?.data?.message || "Submit failed.");
+      setError(e.response?.data?.message || 'Submit failed.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-end justify-center bg-black/75 sm:items-center sm:p-4">
-      <button type="button" className="absolute inset-0" aria-label="Close" onClick={onClose} />
-      <div className="relative z-[301] flex max-h-[min(96svh,100dvh)] w-full flex-col overflow-hidden rounded-t-[28px] bg-white sm:max-h-[92vh] sm:max-w-[520px] sm:rounded-[24px]">
-        <div className="shrink-0 bg-[linear-gradient(145deg,#0E1F35,#1B3354)] px-4 pb-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90">New Request</p>
-              <h2 className="mt-0.5 text-lg font-black text-white">Request a salary advance</h2>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white/80"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Available</p>
-            <p className="text-xl font-black text-white">{available > 0 ? formatFrw(available) : "-"}</p>
-            <p className="mt-0.5 text-[11px] font-semibold text-white/50">Maximum amount you can currently request.</p>
-          </div>
-        </div>
+  return (
+    <>
+      <Drawer
+        anchor="bottom"
+        open={Boolean(open)}
+        onClose={onClose}
+        PaperProps={{
+          sx: {
+            width: '100%',
+            maxWidth: 520,
+            mx: 'auto',
+            maxHeight: '92vh',
+            borderTopLeftRadius: 3,
+            borderTopRightRadius: 3,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            bgcolor: '#fff',
+          },
+        }}
+      >
+        <Box sx={{ flexShrink: 0, background: 'linear-gradient(145deg,#0E1F35,#1B3354)', px: { xs: 2, sm: 3 }, pt: { xs: 'max(0.75rem, env(safe-area-inset-top))', sm: 3 }, pb: 2 }}>
+          <Box sx={{ width: 40, height: 4, borderRadius: 999, bgcolor: 'rgba(255,255,255,0.2)', mx: 'auto', mb: 2, display: { sm: 'none' } }} />
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+            <Box>
+              <Typography sx={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.6, color: 'rgba(251,191,36,0.9)' }}>New Request</Typography>
+              <Typography sx={{ mt: 0.25, fontSize: 18, fontWeight: 900, color: '#fff' }}>Request a salary advance</Typography>
+            </Box>
+            <IconButton onClick={onClose} aria-label="Close" sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)', '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } }}>
+              <CloseIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Stack>
+          <Box sx={{ mt: 1.5, borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)', bgcolor: 'rgba(255,255,255,0.05)', px: 2, py: 1.5 }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'rgba(255,255,255,0.5)' }}>Available</Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{available > 0 ? formatFrw(available) : '-'}</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Maximum amount you can currently request.</Typography>
+          </Box>
+        </Box>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-          <label className="block">
-            <span className="text-sm font-semibold text-[#000435]">Amount Requested</span>
-            <div className="relative mt-2">
-              <input
+        <Box sx={{ minHeight: 0, flex: 1, overflowY: 'auto', px: { xs: 2, sm: 3 }, py: 2.5 }}>
+          <Box component="label" sx={{ display: 'block' }}>
+            <Typography component="span" sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>Amount Requested</Typography>
+            <Box sx={{ position: 'relative', mt: 1 }}>
+              <Box
+                component="input"
                 type="number"
                 min={0}
                 inputMode="numeric"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="h-14 w-full rounded-2xl border border-black/10 bg-white px-4 pr-16 text-xl font-bold text-[#000435] outline-none focus:border-[#fcb038]"
+                sx={{ ...fieldSx, height: 56, pr: 8, fontSize: 20, fontWeight: 700 }}
               />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">Frw</span>
-            </div>
-          </label>
+              <Box component="span" sx={{ pointerEvents: 'none', position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: '#94A3B8' }}>Frw</Box>
+            </Box>
+          </Box>
           {overLimit ? (
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">
-              <AlertCircle size={13} /> Amount is above your available advance.
-            </p>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1, fontSize: 12, fontWeight: 500, color: '#B45309' }}>
+              <WarningAmberIcon sx={{ fontSize: 13 }} /> <Box component="span">Amount is above your available advance.</Box>
+            </Stack>
           ) : blocked ? (
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">
-              <AlertCircle size={13} /> {eligibility?.message || "You are not currently eligible for an advance."}
-            </p>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1, fontSize: 12, fontWeight: 500, color: '#B45309' }}>
+              <WarningAmberIcon sx={{ fontSize: 13 }} /> <Box component="span">{eligibility?.message || 'You are not currently eligible for an advance.'}</Box>
+            </Stack>
           ) : null}
 
-          <div className="mt-5">
-            <p className="text-sm font-semibold text-[#000435]">Loan Period</p>
-            <select
-              value={periodCount}
-              onChange={(e) => setPeriodCount(Number(e.target.value))}
-              className="mt-2 h-12 w-full rounded-2xl border border-black/10 bg-white px-4 text-sm font-semibold text-[#000435] outline-none focus:border-[#fcb038]"
-            >
+          <Box sx={{ mt: 2.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>Loan Period</Typography>
+            <Box component="select" value={periodCount} onChange={(e) => setPeriodCount(Number(e.target.value))} sx={{ ...fieldSx, mt: 1, height: 48, fontSize: 14, fontWeight: 600 }}>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
-                  {m} {m === 1 ? "Month" : "Months"}
-                </option>
+                <option key={m} value={m}>{m} {m === 1 ? 'Month' : 'Months'}</option>
               ))}
-            </select>
-          </div>
+            </Box>
+          </Box>
 
-          <div className="mt-5">
-            <p className="text-sm font-semibold text-[#000435]">Payment Frequency</p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+          <Box sx={{ mt: 2.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>Payment Frequency</Typography>
+            <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
               {FREQUENCIES.map(({ id, label, Icon }) => {
                 const active = frequency === id;
                 return (
-                  <button
-                    key={id}
+                  <Box
+                    component="button"
                     type="button"
+                    key={id}
                     onClick={() => setFrequency(id)}
-                    className={`relative flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 py-3 text-sm font-semibold ${
-                      active ? "border-[#000435] bg-[#000435] text-white" : "border-black/10 bg-white text-[#000435]"
-                    }`}
+                    sx={{
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 1,
+                      minHeight: 88,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: active ? brand.navy : 'rgba(0,0,0,0.1)',
+                      bgcolor: active ? brand.navy : '#fff',
+                      color: active ? '#fff' : brand.navy,
+                      px: 1,
+                      py: 1.5,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
                   >
-                    <Icon size={18} />
+                    <Icon sx={{ fontSize: 18 }} />
                     {label}
-                    {active ? <Check size={14} className="absolute right-2 top-2 text-[#fcb038]" /> : null}
-                  </button>
+                    {active ? <CheckIcon sx={{ position: 'absolute', right: 8, top: 8, fontSize: 14, color: brand.primary }} /> : null}
+                  </Box>
                 );
               })}
-            </div>
-          </div>
+            </Box>
+          </Box>
 
-          <div className="mt-5 rounded-2xl border border-black/5 bg-[#f8f9fc] p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Repayment Summary</p>
-            <dl className="mt-3 space-y-2.5 text-sm">
-              <Row label="Advance Amount" value={entered ? formatFrw(entered) : "-"} />
-              <Row label="Loan Period" value={`${plan.periodCount || "-"} ${periodUnitLabel("months", plan.periodCount)}`} />
+          <Box sx={{ mt: 2.5, borderRadius: 2, border: '1px solid rgba(0,0,0,0.05)', bgcolor: '#f8f9fc', p: 2 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>Repayment Summary</Typography>
+            <Box component="dl" sx={{ mt: 1.5, m: 0, display: 'flex', flexDirection: 'column', gap: 1.25, fontSize: 14 }}>
+              <Row label="Advance Amount" value={entered ? formatFrw(entered) : '-'} />
+              <Row label="Loan Period" value={`${plan.periodCount || '-'} ${periodUnitLabel('months', plan.periodCount)}`} />
               <Row label="Payment Frequency" value={frequencyLabel(frequency)} />
-              <Row label="Number of Payments" value={plan.payments || "-"} />
-              <Row label="Payment Per Period" value={plan.payments ? formatFrw(plan.perPayment) : "-"} accent />
+              <Row label="Number of Payments" value={plan.payments || '-'} />
+              <Row label="Payment Per Period" value={plan.payments ? formatFrw(plan.perPayment) : '-'} accent />
               {plan.serviceFee > 0 ? <Row label="Service Fee" value={formatFrw(plan.serviceFee)} /> : null}
-              <div className="border-t border-dashed border-black/10 pt-2.5">
-                <Row label="Total Repayment" value={entered ? formatFrw(plan.totalRepayment) : "-"} bold />
-              </div>
-            </dl>
-          </div>
+              <Box sx={{ borderTop: '1px dashed rgba(0,0,0,0.1)', pt: 1.25 }}>
+                <Row label="Total Repayment" value={entered ? formatFrw(plan.totalRepayment) : '-'} bold />
+              </Box>
+            </Box>
+          </Box>
 
-          <div className="mt-4 rounded-2xl border border-black/5 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Repayment Preview</p>
-              <button
+          <Box sx={{ mt: 2, borderRadius: 2, border: '1px solid rgba(0,0,0,0.05)', p: 2 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1.5}>
+              <Typography sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>Repayment Preview</Typography>
+              <Button
                 type="button"
                 disabled={!plan.schedule.length}
                 onClick={() => setScheduleOpen(true)}
-                className="text-xs font-semibold text-[#000435] disabled:opacity-40"
+                sx={{ p: 0, minWidth: 0, fontSize: 12, fontWeight: 600, color: brand.navy, textTransform: 'none', '&.Mui-disabled': { opacity: 0.4 } }}
               >
                 View Schedule
-              </button>
-            </div>
-            <dl className="mt-3 space-y-2 text-sm">
-              <Row label="First Payment" value={plan.firstPayment ? formatPlanDate(plan.firstPayment) : "-"} />
+              </Button>
+            </Stack>
+            <Box component="dl" sx={{ mt: 1.5, m: 0, display: 'flex', flexDirection: 'column', gap: 1, fontSize: 14 }}>
+              <Row label="First Payment" value={plan.firstPayment ? formatPlanDate(plan.firstPayment) : '-'} />
               <Row label="Frequency" value={frequencyLabel(frequency)} />
-              <Row label="Number of Payments" value={plan.payments || "-"} />
-              <Row label="Payment Amount" value={plan.payments ? formatFrw(plan.perPayment) : "-"} />
-              <Row label="Last Payment" value={plan.lastPayment ? formatPlanDate(plan.lastPayment) : "-"} />
-            </dl>
-          </div>
+              <Row label="Number of Payments" value={plan.payments || '-'} />
+              <Row label="Payment Amount" value={plan.payments ? formatFrw(plan.perPayment) : '-'} />
+              <Row label="Last Payment" value={plan.lastPayment ? formatPlanDate(plan.lastPayment) : '-'} />
+            </Box>
+          </Box>
 
-          {error ? <p className="mt-4 text-sm font-medium text-red-600">{error}</p> : null}
-        </div>
+          {error ? <Typography sx={{ mt: 2, fontSize: 14, fontWeight: 500, color: '#DC2626' }}>{error}</Typography> : null}
+        </Box>
 
-        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-black/5 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
-          <button type="button" onClick={onClose} className="h-12 rounded-xl border border-black/10 px-6 text-[11px] font-black uppercase tracking-widest text-slate-500">
+        <Stack
+          direction={{ xs: 'column-reverse', sm: 'row' }}
+          justifyContent={{ sm: 'flex-end' }}
+          spacing={1}
+          sx={{ flexShrink: 0, borderTop: '1px solid rgba(0,0,0,0.05)', bgcolor: '#fff', px: { xs: 2, sm: 3 }, py: 2, pb: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
+          <Button
+            type="button"
+            onClick={onClose}
+            sx={{ height: 48, borderRadius: 1.5, border: '1px solid rgba(0,0,0,0.1)', px: 3, fontSize: 11, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase', color: '#64748B' }}
+          >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={!canSubmit}
             onClick={() => void submitAdvance()}
-            className="h-12 rounded-xl bg-re-orange px-6 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+            startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : null}
+            sx={{ height: 48, borderRadius: 1.5, bgcolor: brand.navy, px: 3, fontSize: 11, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase', color: '#fff', '&:hover': { bgcolor: brand.navy2 }, '&.Mui-disabled': { opacity: 0.4 } }}
           >
-            {submitting ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> Submitting…
-              </span>
-            ) : (
-              "Request Advance"
-            )}
-          </button>
-        </div>
-      </div>
+            {submitting ? 'Submitting...' : 'Request Advance'}
+          </Button>
+        </Stack>
+      </Drawer>
 
-      {scheduleOpen
-        ? createPortal(
-            <div className="fixed inset-0 z-[320] flex justify-end bg-black/40">
-              <button type="button" className="absolute inset-0" aria-label="Close schedule" onClick={() => setScheduleOpen(false)} />
-              <div className="relative z-[321] flex h-full w-full max-w-md flex-col bg-white">
-                <div className="flex items-center justify-between border-b border-black/5 px-5 py-4">
-                  <h3 className="text-base font-bold text-[#000435]">Repayment schedule</h3>
-                  <button type="button" className="rounded-full p-2 hover:bg-slate-50" onClick={() => setScheduleOpen(false)}>
-                    <X size={18} />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                        <th className="pb-3">#</th>
-                        <th className="pb-3">Due Date</th>
-                        <th className="pb-3">Amount</th>
-                        <th className="pb-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {plan.schedule.map((row) => (
-                        <tr key={row.n} className="border-t border-black/5">
-                          <td className="py-3 font-semibold text-[#000435]">{row.n}</td>
-                          <td className="py-3 text-slate-600">{formatPlanDate(row.due)}</td>
-                          <td className="py-3 font-semibold text-[#000435]">{formatFrw(row.amount)}</td>
-                          <td className="py-3">
-                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-800">{row.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
-    </div>,
-    document.body
+      <Dialog open={scheduleOpen} onClose={() => setScheduleOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ borderBottom: '1px solid rgba(0,0,0,0.05)', px: 2.5, py: 2 }}>
+          <Typography sx={{ fontSize: 16, fontWeight: 700, color: brand.navy }}>Repayment schedule</Typography>
+          <IconButton onClick={() => setScheduleOpen(false)} aria-label="Close schedule" sx={{ borderRadius: '50%', '&:hover': { bgcolor: '#F8FAFC' } }}>
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Stack>
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 2.5 }}>
+          <Box component="table" sx={{ width: '100%', textAlign: 'left', fontSize: 14, borderCollapse: 'collapse' }}>
+            <Box component="thead">
+              <Box component="tr" sx={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>
+                {['#', 'Due Date', 'Amount', 'Status'].map((h) => (
+                  <Box component="th" key={h} sx={{ pb: 1.5, fontWeight: 600 }}>{h}</Box>
+                ))}
+              </Box>
+            </Box>
+            <Box component="tbody">
+              {plan.schedule.map((row) => (
+                <Box component="tr" key={row.n} sx={{ borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                  <Box component="td" sx={{ py: 1.5, fontWeight: 600, color: brand.navy }}>{row.n}</Box>
+                  <Box component="td" sx={{ py: 1.5, color: '#475569' }}>{formatPlanDate(row.due)}</Box>
+                  <Box component="td" sx={{ py: 1.5, fontWeight: 600, color: brand.navy }}>{formatFrw(row.amount)}</Box>
+                  <Box component="td" sx={{ py: 1.5 }}>
+                    <Box component="span" sx={{ borderRadius: 999, bgcolor: '#F0F9FF', px: 1, py: 0.25, fontSize: 10, fontWeight: 600, color: '#075985' }}>{row.status}</Box>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      </Dialog>
+    </>
   );
 }
 
 function Row({ label, value, accent, bold }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className={`text-right ${bold ? "font-bold text-[#000435]" : accent ? "font-bold text-[#fcb038]" : "font-semibold text-[#000435]"}`}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+      <Typography component="dt" sx={{ fontSize: 'inherit', color: '#64748B' }}>{label}</Typography>
+      <Typography
+        component="dd"
+        sx={{
+          m: 0,
+          textAlign: 'right',
+          fontSize: 'inherit',
+          fontWeight: bold ? 700 : accent ? 700 : 600,
+          color: accent ? brand.primary : brand.navy,
+        }}
+      >
         {value}
-      </dd>
-    </div>
+      </Typography>
+    </Box>
   );
 }

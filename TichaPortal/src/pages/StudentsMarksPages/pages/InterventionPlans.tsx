@@ -1,51 +1,71 @@
 import { useState } from 'react';
-import { Target, Loader2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
 
 export default function InterventionPlans() {
   const [params, setParams] = useState({});
   const { loading, error, interventionPlans, atRiskStudents, filters, selected } = useTeacherMarksAnalytics(params);
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Intervention Plans</h1>
-          <p className="text-gray-500 text-sm mt-1">{atRiskStudents.length} students below 40% average</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Intervention Plans</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>{atRiskStudents.length} students below 40% average</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="space-y-3">
-        {interventionPlans.map((plan) => (
-          <div key={plan.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Target size={18} className="text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold" style={{ color: NAVY }}>{plan.student}</p>
-                <p className="text-xs text-gray-500">{plan.class} · {plan.issue}</p>
-                <p className="text-sm text-gray-600 mt-1">{plan.action}</p>
-              </div>
-            </div>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
-              plan.priority === 'High' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'
-            }`}>
-              {plan.priority}
-            </span>
-          </div>
-        ))}
+      <Stack spacing={1.5}>
+        {interventionPlans.map((plan) => {
+          const high = plan.priority === 'High';
+          return (
+            <Paper key={plan.id} variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+              <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                <TrackChangesIcon sx={{ fontSize: 18, color: '#F59E0B', mt: 0.25 }} />
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: NAVY }}>{plan.student}</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{plan.class} - {plan.issue}</Typography>
+                  <Typography sx={{ mt: 0.5, fontSize: 14, color: '#4B5563' }}>{plan.action}</Typography>
+                </Box>
+              </Stack>
+              <Box
+                component="span"
+                sx={{
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  px: 1.25,
+                  py: 0.5,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  bgcolor: high ? '#FEF2F2' : '#FFFBEB',
+                  color: high ? '#DC2626' : '#B45309',
+                }}
+              >
+                {plan.priority}
+              </Box>
+            </Paper>
+          );
+        })}
         {!interventionPlans.length && (
-          <p className="text-sm text-gray-400 text-center py-12 rounded-xl border border-dashed border-gray-200">
+          <Box sx={{ py: 6, textAlign: 'center', borderRadius: 2, border: '1px dashed #E5E7EB', fontSize: 14, color: '#9CA3AF' }}>
             No intervention plans needed right now.
-          </p>
+          </Box>
         )}
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

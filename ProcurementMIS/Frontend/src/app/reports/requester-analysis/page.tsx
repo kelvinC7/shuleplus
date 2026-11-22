@@ -95,7 +95,7 @@ export default function RequesterAnalysisPage() {
   return (
     <MainLayout>
       <PlatformPageLayout
-        subtitle="Requester Analysis — who is requesting the most, what are they requesting, and how much?"
+        subtitle="Requester Analysis: who is requesting the most, what are they requesting, and how much?"
       >
         <ReportFilterBar
           filters={filters}
@@ -194,7 +194,7 @@ export default function RequesterAnalysisPage() {
           </ReportSection>
 
           {data?.anomalies.length ? (
-            <ReportSection title="Requester Anomaly Detection" subtitle="Flags for review — not automatic wrongdoing">
+            <ReportSection title="Requester Anomaly Detection" subtitle="Flags for review, not automatic wrongdoing">
               <div className="space-y-2">
                 {data.anomalies.map((a, i) => (
                   <div
@@ -210,7 +210,7 @@ export default function RequesterAnalysisPage() {
           ) : null}
 
           {profile && selectedId ? (
-            <ReportSection title={`${profile.name} — Requester Profile`}>
+            <ReportSection title={`${profile.name}: Requester Profile`}>
               <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-xl bg-slate-50 p-3">
                   <p className="text-xs text-muted">Requests</p>

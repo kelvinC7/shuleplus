@@ -49,4 +49,16 @@ export const gateDevicesService = {
   deleteDevice(organizationId: string, deviceId: string) {
     return attendanceModuleClient.deleteDevice(organizationId, deviceId);
   },
+
+  listDeviceSchools(organizationId: string, deviceId: string) {
+    return attendanceModuleClient.listDeviceSchools(organizationId, deviceId);
+  },
+
+  linkDeviceSchool(organizationId: string, deviceId: string, targetOrganizationId: string) {
+    return attendanceModuleClient.linkDeviceSchool(organizationId, deviceId, targetOrganizationId);
+  },
+
+  unlinkDeviceSchool(organizationId: string, deviceId: string, schoolId: string) {
+    return attendanceModuleClient.unlinkDeviceSchool(organizationId, deviceId, schoolId);
+  },
 };

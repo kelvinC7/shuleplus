@@ -50,8 +50,8 @@
 // DEVICE CREDENTIALS
 // ============================================================
 
-const char* DEVICE_ID = "21002_003";
-const char* API_KEY   = "att_84c5bdae72660e83c6b9b2cfdf3019f4";
+const char* DEVICE_ID = "28002_003";
+const char* API_KEY = "att_7a23b497de864d4de9419f26e00356eb";
 
 // ============================================================
 // SERVER

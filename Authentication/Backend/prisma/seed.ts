@@ -79,6 +79,18 @@ const PLATFORM_MODULES = [
   { slug: 'attendance', name: 'Digital Attendance', shortName: 'Digital', category: 'Education', version: '1.0.0', description: 'Entry and exit logs, devices, and live presence.', isCore: false, frontendUrl: 'http://localhost:3025', backendUrl: 'http://localhost:3024/api', healthCheckUrl: '/health' },
   { slug: 'transport', name: 'Smart Transport', shortName: 'Transport', category: 'Operations', version: '1.0.0', description: 'RFID boarding, live trips, GPS, parent alerts and student safety', isCore: false, frontendUrl: 'http://localhost:3065', backendUrl: 'http://localhost:3064/api', healthCheckUrl: '/health' },
   {
+    slug: 'shule-trip',
+    name: 'ShuleTrip',
+    shortName: 'Trips',
+    category: 'Education',
+    version: '1.0.0',
+    description: 'School trip registration, government approval, and trip-day safety',
+    isCore: false,
+    frontendUrl: 'http://localhost:3077',
+    backendUrl: 'http://localhost:3076/api',
+    healthCheckUrl: '/api/health',
+  },
+  {
     slug: 'school-fees',
     name: 'School Fees',
     shortName: 'Fees',

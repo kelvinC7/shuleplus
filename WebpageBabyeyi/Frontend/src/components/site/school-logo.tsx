@@ -21,7 +21,7 @@ type SchoolLogoProps = {
   fallbackClassName?: string;
 };
 
-/** School branding — plain img so /uploads hits nginx (Next/Image optimizer cannot reach IAM). */
+/** School branding - plain img so /uploads hits nginx (Next/Image optimizer cannot reach IAM). */
 export function SchoolLogo({
   name,
   initials,

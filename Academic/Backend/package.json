@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "node scripts/ensure-prisma.js && tsx watch src/server.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc && node -e \"require('fs').cpSync('src/generated/prisma','dist/generated/prisma',{recursive:true,force:true})\"",
     "start": "node dist/server.js",
     "postinstall": "prisma generate",
     "setup:env": "node -e \"require('fs').copyFileSync('.env.example','.env')\"",
@@ -14,7 +14,11 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
     "dev:login": "tsx scripts/dev-login.ts",
-    "test:report-card": "tsx src/utils/report-card-component-calc.test.ts"
+    "marks:demo": "node scripts/marksdemo.js",
+    "marks:demo:off": "node scripts/marksdemo.js disable",
+    "test:report-card": "tsx src/utils/report-card-component-calc.test.ts",
+    "test:report-stages": "tsx src/utils/report-stage-filter.test.ts",
+    "test:access-policy": "tsx src/utils/report-card-access-policy.test.ts"
   },
   "license": "UNLICENSED",
   "dependencies": {

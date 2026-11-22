@@ -1,9 +1,42 @@
-'use client';
-
-import { useMemo, useRef } from 'react';
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Fragment, useMemo, useRef, type ReactNode } from 'react';
+import { Box, Typography } from '@mui/material';
 import ReportQrCode from '@/components/report-card/report-qr-code';
+import ReportSchoolHeader from '@/components/report-card/report-school-header';
 import type { ReportCardDataV2 } from '@/types/report-card';
+import { NOT_RECORDED, resolveReportVerifyUrl } from '@/lib/report-cards-utils';
+import { REPORT_A4_WIDTH_PX as A4_WIDTH_PX } from '@/lib/report-a4';
+
+const NAVY = '#000435';
+const AMBER = '#FCB038';
+
+function defaultDisplay(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(n) || n <= 0) return NOT_RECORDED;
+  return String(Math.round(n * 10) / 10);
+}
+
+function classStreamLabel(report: ReportCardDataV2) {
+  const name = report.class?.name?.trim();
+  const stream = report.class?.stream?.trim();
+  if (name && stream) return `${name} · ${stream}`;
+  return name || NOT_RECORDED;
+}
+
+function SectionTitle({ children, centered }: { children: ReactNode; centered?: boolean }) {
+  return (
+    <Typography
+      sx={{
+        fontSize: '0.6875rem',
+        fontWeight: 800,
+        color: NAVY,
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        textAlign: centered ? 'center' : 'left',
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '';
@@ -69,6 +102,189 @@ function TermBarChart({ points, currentTerm }: { points: Array<{ label: string; 
   );
 }
 
+type ReportSubject = ReportCardDataV2['subjects'][number];
+
+type TermCell = { marks: string; grade: string; hasMarks: boolean; percentage: number };
+
+function formatMarkFraction(score: number, max: number): string {
+  if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return NOT_RECORDED;
+  const rounded = Math.round(score * 10) / 10;
+  const scoreText = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return `${scoreText}/${max}`;
+}
+
+function parseReportTermColumns(report: ReportCardDataV2): string[] {
+  if (report.combinedTerms?.length) return report.combinedTerms;
+  const t = (report.term ?? '').trim();
+  if (!t) return ['Term'];
+  if (t.includes('+')) return t.split('+').map((x) => x.trim()).filter(Boolean);
+  return [t];
+}
+
+function getSubjectTermCell(
+  subject: ReportSubject,
+  termLabel: string,
+  termColumns: string[],
+  useTermResults: boolean
+): TermCell {
+  const empty: TermCell = { marks: NOT_RECORDED, grade: NOT_RECORDED, hasMarks: false, percentage: 0 };
+
+  if (useTermResults) {
+    const tr = subject.termResults?.find((r) => normTerm(r.term) === normTerm(termLabel));
+    if (!tr?.marksEntered) return empty;
+    const max = tr.totalMax ?? subject.defaultCourseMarks ?? 100;
+    return {
+      marks: formatMarkFraction(tr.totalScore, max),
+      grade: tr.grade ?? NOT_RECORDED,
+      hasMarks: true,
+      percentage: tr.percentage,
+    };
+  }
+
+  if (termColumns.length > 1 && normTerm(termColumns[0]) !== normTerm(termLabel)) return empty;
+  if (!subject.marksEntered) return empty;
+  const max = subject.totalMax ?? subject.defaultCourseMarks ?? 100;
+  return {
+    marks: formatMarkFraction(subject.totalScore, max),
+    grade: subject.grade ?? NOT_RECORDED,
+    hasMarks: true,
+    percentage: subject.percentage,
+  };
+}
+
+function resolveComponentColumns(report: ReportCardDataV2): Array<{ name: string; weight: number }> {
+  const template = report.assessmentTemplate?.components;
+  if (template?.length) {
+    return template.map((c) => ({
+      name: c.name,
+      weight: Number(c.weightPercentage) || 0,
+    }));
+  }
+  if (report.componentOrder?.length) {
+    const sample = report.subjects.find((s) => Object.keys(s.categoryScores).length > 0);
+    return report.componentOrder.map((name) => ({
+      name,
+      weight: Number(sample?.categoryScores[name]?.weight) || 0,
+    }));
+  }
+  const withMarks = report.subjects.find((s) => s.marksEntered && Object.keys(s.categoryScores).length > 0);
+  if (withMarks) {
+    return Object.entries(withMarks.categoryScores).map(([name, cs]) => ({
+      name,
+      weight: Number(cs.weight) || 0,
+    }));
+  }
+  return [];
+}
+
+function gradeFromLegend(
+  pct: number,
+  legend: Array<{ grade: string; minPercentage: number; maxPercentage: number }>
+): string | null {
+  if (!legend.length || !Number.isFinite(pct) || pct <= 0) return null;
+  const p = Math.round(pct * 100) / 100;
+  const sorted = [...legend].sort((a, b) => b.minPercentage - a.minPercentage);
+  for (const g of sorted) {
+    if (p + 0.001 >= g.minPercentage && p - 0.001 <= g.maxPercentage) return g.grade;
+  }
+  const lowest = sorted[sorted.length - 1];
+  if (lowest && p >= lowest.minPercentage) return lowest.grade;
+  return null;
+}
+
+function formatConvertedMark(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return NOT_RECORDED;
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function componentCellDisplay(
+  subject: ReportSubject,
+  compName: string,
+): { text: string; hasData: boolean } {
+  const cs = subject.categoryScores[compName];
+  const recorded =
+    cs?.marksRecorded === true ||
+    (cs?.marksRecorded === undefined && Boolean(cs && subject.marksEntered));
+  if (!recorded) return { text: NOT_RECORDED, hasData: false };
+  const score = cs!.normalizedScore ?? cs!.contribution ?? 0;
+  if (!Number.isFinite(Number(score))) return { text: NOT_RECORDED, hasData: false };
+  const max = cs!.normalizedMax;
+  const scoreText = formatConvertedMark(Number(score));
+  const text =
+    max != null && Number.isFinite(Number(max)) && Number(max) > 0
+      ? `${scoreText}/${formatConvertedMark(Number(max))}`
+      : scoreText;
+  return { text, hasData: true };
+}
+
+function displayMetric(value: string | number | null | undefined, fallback = NOT_RECORDED): string {
+  if (value == null || value === '' || value === NOT_RECORDED) return fallback;
+  return String(value);
+}
+
+function subjectDefaultMarks(subject: ReportSubject, report: ReportCardDataV2): string {
+  const v =
+    subject.defaultCourseMarks ??
+    subject.totalMax ??
+    report.assessmentTemplate?.defaultCourseMarks ??
+    null;
+  return defaultDisplay(v != null ? Number(v) : null);
+}
+
+function subjectStudentMarks(subject: ReportSubject, report: ReportCardDataV2): string {
+  if (!subject.marksEntered) return NOT_RECORDED;
+  const raw = subject.studentMarksOnDefault ?? subject.totalScore;
+  const score = Number(raw);
+  if (!Number.isFinite(score) || score < 0) return NOT_RECORDED;
+  const def = Number(subject.defaultCourseMarks ?? subject.totalMax ?? report.assessmentTemplate?.defaultCourseMarks);
+  if (Number.isFinite(def) && def > 0) {
+    return `${formatConvertedMark(score)}/${formatConvertedMark(def)}`;
+  }
+  return formatConvertedMark(score);
+}
+
+function getSubjectTotalCell(
+  subject: ReportSubject,
+  termColumns: string[],
+  useTermResults: boolean
+): { marks: string; grade: string } {
+  if (termColumns.length === 1) {
+    const cell = getSubjectTermCell(subject, termColumns[0], termColumns, useTermResults);
+    return { marks: cell.marks, grade: cell.grade };
+  }
+  const cells = termColumns
+    .map((t) => getSubjectTermCell(subject, t, termColumns, useTermResults))
+    .filter((c) => c.hasMarks);
+  if (!cells.length) return { marks: NOT_RECORDED, grade: NOT_RECORDED };
+  if (cells.length === 1) return { marks: cells[0].marks, grade: cells[0].grade };
+  const avg = cells.reduce((s, c) => s + c.percentage, 0) / cells.length;
+  return {
+    marks: `${Math.round(avg * 10) / 10}%`,
+    grade: subject.grade ?? cells[cells.length - 1].grade,
+  };
+}
+
+function OverviewStatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Box
+      sx={{
+        textAlign: 'center',
+        px: 0.75,
+        py: 1,
+        bgcolor: '#f8fafc',
+        borderRadius: 1,
+        border: '1px solid #e2e8f0',
+      }}
+    >
+      <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+        {label}
+      </Typography>
+      <Typography sx={{ fontSize: '0.875rem', fontWeight: 800, color: NAVY, mt: 0.25 }}>{value}</Typography>
+    </Box>
+  );
+}
+
 function CourseList({
   title,
   items,
@@ -84,8 +300,8 @@ function CourseList({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 140,
-        p: 1.5,
+        minHeight: 100,
+        p: 1.25,
         borderRadius: '8px',
         border: '1px solid #e2e8f0',
         bgcolor: '#fafbfc',
@@ -117,7 +333,7 @@ function CourseList({
             </Box>
           ))
         ) : (
-          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 1 }}>—</Typography>
+          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 1 }}>{NOT_RECORDED}</Typography>
         )}
       </Box>
     </Box>
@@ -134,42 +350,67 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
   const rootRef = documentRef ?? internalRef;
 
   const school = report.school;
-  const studentName = [report.student?.firstName, report.student?.lastName].filter(Boolean).join(' ');
-  const componentCols = useMemo(() => {
-    if (report.assessmentTemplate?.components?.length) {
-      return report.assessmentTemplate.components.map((c) => c.name);
-    }
-    if (report.componentOrder?.length) return report.componentOrder;
-    const keys = new Set<string>();
-    report.subjects.forEach((s) => Object.keys(s.categoryScores || {}).forEach((k) => keys.add(k)));
-    return [...keys];
-  }, [report]);
-
-  const componentWeights = useMemo(() => {
-    const map = new Map<string, number>();
-    report.assessmentTemplate?.components?.forEach((c) => map.set(c.name, c.weightPercentage));
-    report.subjects.forEach((s) => {
-      Object.entries(s.categoryScores || {}).forEach(([name, data]) => {
-        if (data.weight != null && !map.has(name)) map.set(name, data.weight);
-      });
-    });
-    return map;
-  }, [report]);
-
-  const templateDefaultMarks =
-    report.assessmentTemplate?.defaultCourseMarks ??
-    report.subjects.find((s) => s.defaultCourseMarks)?.defaultCourseMarks ??
-    100;
-
-  const coursesWithMarks = useMemo(
-    () => report.subjects.filter((s) => s.marksEntered).length,
-    [report.subjects]
+  const studentName =
+    [report.student?.firstName, report.student?.lastName].filter(Boolean).join(' ') ||
+    (report.student as { fullName?: string })?.fullName ||
+    'Student';
+  const studentIdLabel =
+    (report.student as { admissionNumber?: string | null })?.admissionNumber ||
+    (report.student as { studentCode?: string | null })?.studentCode ||
+    report.student?.studentUid ||
+    NOT_RECORDED;
+  const termColumns = useMemo(() => parseReportTermColumns(report), [report]);
+  const isSingleTermReport = termColumns.length === 1;
+  const useTermResults = useMemo(
+    () =>
+      termColumns.length > 1 &&
+      report.subjects.some((s) => (s.termResults?.length ?? 0) > 0),
+    [report.subjects, termColumns.length]
   );
-
+  const componentColumns = useMemo(() => resolveComponentColumns(report), [report]);
   const termPoints = useMemo(() => {
     const avgs = report.growth?.termAverages ?? [];
-    return avgs.map((t) => ({ label: t.period, value: Math.round(t.averagePercentage * 10) / 10 }));
+    return avgs
+      .filter((t) => (t.subjectCount ?? 0) > 0 && Number.isFinite(t.averagePercentage))
+      .map((t) => ({ label: t.period, value: Math.round(t.averagePercentage * 10) / 10 }));
   }, [report.growth]);
+
+  const termAverageBars = useMemo(() => {
+    if (termPoints.length > 0) return termPoints;
+    if (report.overallScore > 0) {
+      const label = (report.term ?? 'Term').trim() || 'Term';
+      return [{ label, value: Math.round(report.overallScore * 10) / 10 }];
+    }
+    return [];
+  }, [termPoints, report.overallScore, report.term]);
+
+  const sortedSubjects = useMemo(() => {
+    const list = [...report.subjects];
+    list.sort((a, b) => {
+      const ac = a.isCore !== false;
+      const bc = b.isCore !== false;
+      if (ac !== bc) return ac ? -1 : 1;
+      return a.subject.localeCompare(b.subject);
+    });
+    return list;
+  }, [report.subjects]);
+
+  const coreSubjects = useMemo(
+    () => sortedSubjects.filter((s) => s.isCore !== false),
+    [sortedSubjects],
+  );
+  const nonCoreSubjects = useMemo(
+    () => sortedSubjects.filter((s) => s.isCore === false),
+    [sortedSubjects],
+  );
+
+  const singleTermColCount = useMemo(
+    () => 2 + 1 + componentColumns.length + 2,
+    [componentColumns.length],
+  );
+
+  const positionDisplay =
+    report.position && report.classSize ? `${report.position}/${report.classSize}` : NOT_RECORDED;
 
   const strong = report.strongCourses ?? [];
   const improve = report.improvementCourses ?? [];
@@ -184,357 +425,499 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     });
   }, [report.gradingLegend]);
 
-  const enteredSubjects = useMemo(() => report.subjects.filter((s) => s.marksEntered), [report.subjects]);
-  const totalMarks =
-    report.summary?.totalMarks ?? enteredSubjects.reduce((s, x) => s + x.totalScore, 0);
-  const totalMax =
-    report.summary?.totalMax ?? enteredSubjects.reduce((s, x) => s + (x.totalMax ?? 0), 0);
   const reportDate = fmtDate(report.meta?.generatedAt);
-  const verifyUrl = report.meta?.verifyUrl || '';
-  const classStream = [report.class?.name, report.class?.stream].filter(Boolean).join(' ');
-  const contactLine = [school?.phone, school?.email, school?.website].filter(Boolean).join(' · ');
+  const verifyUrl = resolveReportVerifyUrl(report);
   const classTeacherComment = report.comments?.classTeacher?.trim();
   const headTeacherComment = report.comments?.headTeacher?.trim();
-  const overallGradeDisplay = report.overallGrade || '—';
+  const overallGradeDisplay =
+    report.overallGrade?.trim() ||
+    gradeFromLegend(report.overallScore, gradingLegend) ||
+    NOT_RECORDED;
+
+  const profileCells = useMemo(() => {
+    const cells: Array<{ label: string; value: string }> = [
+      { label: 'Student ID', value: studentIdLabel },
+      { label: 'Class', value: classStreamLabel(report) },
+      { label: 'Gender', value: displayMetric(report.student?.gender) },
+    ];
+    const dob = fmtDate(report.student?.dateOfBirth);
+    if (dob) cells.push({ label: 'Date of birth', value: dob });
+    cells.push({ label: 'Term', value: displayMetric(report.term) });
+    return cells;
+  }, [report, studentIdLabel]);
+
+  const photoUrl = (report.student as { photoUrl?: string | null })?.photoUrl;
+
+  function renderTermPairCells(subject: ReportSubject, termLabel: string) {
+    const cell = getSubjectTermCell(subject, termLabel, termColumns, useTermResults);
+    return (
+      <Fragment key={termLabel}>
+        <td style={{ textAlign: 'center', fontWeight: cell.hasMarks ? 700 : 400, color: cell.hasMarks ? '#0f172a' : '#94a3b8' }}>
+          {cell.marks}
+        </td>
+        <td style={{ textAlign: 'center', fontWeight: 800, color: cell.hasMarks ? '#000435' : '#94a3b8' }}>
+          {cell.grade}
+        </td>
+      </Fragment>
+    );
+  }
+
+  function subjectGradeDisplay(s: ReportSubject): string {
+    if (!s.marksEntered) return NOT_RECORDED;
+    if (s.grade?.trim()) return s.grade.trim();
+    const fromLegend = gradeFromLegend(s.percentage, gradingLegend);
+    return fromLegend ?? NOT_RECORDED;
+  }
+
+  function renderTemplateComponentCells(s: ReportSubject) {
+    return componentColumns.map((col) => {
+      const cell = componentCellDisplay(s, col.name);
+      return (
+        <td
+          key={`${s.subjectId}-${col.name}`}
+          style={{
+            textAlign: 'center',
+            fontWeight: cell.hasData ? 800 : 400,
+            color: cell.hasData ? NAVY : '#94a3b8',
+          }}
+        >
+          {cell.text}
+        </td>
+      );
+    });
+  }
+
+  function renderSectionHeader(label: string) {
+    return (
+      <tr key={label} className="section-row">
+        <td colSpan={singleTermColCount}>{label}</td>
+      </tr>
+    );
+  }
+
+  function renderSubjectRow(s: ReportSubject) {
+    if (isSingleTermReport) {
+      const avgPct = s.marksEntered ? `${Math.round(s.percentage * 10) / 10}%` : NOT_RECORDED;
+      const gradeCell = subjectGradeDisplay(s);
+      return (
+        <tr key={s.subjectId} className="course-row">
+          <td className="course-col">{s.subject}</td>
+          <td style={{ textAlign: 'center', fontWeight: 700, color: '#475569' }}>{subjectDefaultMarks(s, report)}</td>
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>
+            {subjectStudentMarks(s, report)}
+          </td>
+          {renderTemplateComponentCells(s)}
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>{avgPct}</td>
+          <td style={{ textAlign: 'center', fontWeight: 800, color: s.marksEntered ? NAVY : '#94a3b8' }}>{gradeCell}</td>
+        </tr>
+      );
+    }
+    const total = getSubjectTotalCell(s, termColumns, useTermResults);
+    const avgPct =
+      total.marks !== NOT_RECORDED && total.marks.includes('%')
+        ? total.marks
+        : s.marksEntered
+          ? `${Math.round(s.percentage * 10) / 10}%`
+          : NOT_RECORDED;
+    return (
+      <tr key={s.subjectId} className="course-row">
+        <td className="course-col">{s.subject}</td>
+        {termColumns.map((termLabel) => renderTermPairCells(s, termLabel))}
+        <td style={{ textAlign: 'center', fontWeight: 800, color: avgPct !== NOT_RECORDED ? NAVY : '#94a3b8' }}>{avgPct}</td>
+        <td style={{ textAlign: 'center', fontWeight: 800, color: total.grade !== NOT_RECORDED ? NAVY : '#94a3b8' }}>{total.grade}</td>
+      </tr>
+    );
+  }
+
+  const overallAverageDisplay = report.subjects.some((s) => s.marksEntered)
+    ? `${Math.round(report.overallScore * 10) / 10}%`
+    : NOT_RECORDED;
 
   return (
-    <Box
-      ref={rootRef}
-      className="modern-report-card report-a4-document"
-      sx={{
-        width: '100%',
-        maxWidth: 794,
-        mx: 'auto',
-        bgcolor: '#fff',
-        color: '#0f172a',
-        fontFamily: "'Montserrat', system-ui, sans-serif",
-        boxShadow: { xs: 'none', md: '0 8px 40px rgba(0,4,53,0.08)' },
-        border: { xs: 'none', md: '1px solid #e2e8f0' },
-        borderRadius: { xs: 0, md: '4px' },
-        overflow: 'hidden',
-      }}
-    >
-      <Box sx={{ px: { xs: 2, md: 3 }, pt: 2.5, pb: 2, borderBottom: '3px solid #000435' }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-          {school?.logoUrl ? (
-            <Box component="img" src={school.logoUrl} alt="" sx={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
-          ) : null}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontSize: '1.125rem', fontWeight: 800, color: '#000435' }}>{school?.name || 'School'}</Typography>
-            {school?.motto ? (
-              <Typography sx={{ fontSize: '0.6875rem', color: '#64748b', fontStyle: 'italic', mt: 0.25 }}>{school.motto}</Typography>
-            ) : null}
-            {school?.address ? <Typography sx={{ fontSize: '0.6875rem', color: '#475569', mt: 0.75 }}>{school.address}</Typography> : null}
-            {contactLine ? <Typography sx={{ fontSize: '0.625rem', color: '#64748b', mt: 0.25 }}>{contactLine}</Typography> : null}
-          </Box>
-          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-            <Typography sx={{ fontSize: '0.625rem', fontWeight: 800, letterSpacing: '0.12em', color: '#000435' }}>REPORT CARD</Typography>
-            <Typography sx={{ fontSize: '0.6875rem', color: '#334155', mt: 0.5 }}>
-              {report.academicYear} · {report.term || 'Term'}
-            </Typography>
-            <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>{reportDate}</Typography>
-          </Box>
-        </Box>
-      </Box>
-
+    <Box sx={{ width: '100%', maxWidth: A4_WIDTH_PX, mx: 'auto', p: { xs: 0, md: 1 }, '@media print': { p: 0 } }}>
       <Box
+        ref={rootRef}
+        data-report-verify-url={verifyUrl || undefined}
+        className="modern-report-card midterm-report-card report-a4-document report-a4-babyeyi-frame"
         sx={{
-          px: { xs: 2, md: 3 },
-          py: 2,
-          display: 'grid',
-          gridTemplateColumns: { xs: '72px 1fr', sm: '88px 1fr auto' },
-          gap: 2,
-          alignItems: 'center',
-          bgcolor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          width: '100%',
+          maxWidth: A4_WIDTH_PX,
+          mx: 'auto',
+          boxSizing: 'border-box',
+          bgcolor: '#fff',
+          color: '#0f172a',
+          fontFamily: "'Montserrat', system-ui, sans-serif",
+          border: `2px solid ${NAVY}`,
+          borderRadius: '14px',
+          p: '3px',
+          boxShadow: { xs: 'none', md: '0 2px 12px rgba(0, 4, 53, 0.06)' },
+          '@media print': { boxShadow: 'none' },
         }}
       >
-        {(report.student as { photoUrl?: string })?.photoUrl ? (
-          <Box
-            component="img"
-            src={(report.student as { photoUrl?: string }).photoUrl!}
-            alt=""
-            sx={{ width: { xs: 72, sm: 88 }, height: { xs: 88, sm: 104 }, objectFit: 'cover', borderRadius: '6px', border: '2px solid #fff' }}
+        <Box
+          className="report-a4-babyeyi-frame-inner"
+          sx={{ border: `1.5px solid ${AMBER}`, borderRadius: '11px', boxSizing: 'border-box', overflow: 'hidden' }}
+        >
+          <ReportSchoolHeader
+            compact
+            school={school}
+            reportTitle="STUDENT ACADEMIC REPORT"
+            reportSubtitle={`${report.academicYear}${report.term ? ` · ${report.term}` : ''}`}
           />
-        ) : (
-          <Box sx={{ width: { xs: 72, sm: 88 }, height: { xs: 88, sm: 104 }, borderRadius: '6px', bgcolor: '#e2e8f0' }} />
-        )}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.75, fontSize: '0.75rem' }}>
-          <Typography sx={{ gridColumn: '1 / -1', fontSize: '1.0625rem', fontWeight: 800, color: '#000435' }}>{studentName}</Typography>
-          <span><strong style={{ color: '#94a3b8', fontWeight: 600 }}>ID</strong> {report.student?.studentUid}</span>
-          <span><strong style={{ color: '#94a3b8', fontWeight: 600 }}>Class</strong> {classStream}</span>
-          <span><strong style={{ color: '#94a3b8', fontWeight: 600 }}>Gender</strong> {report.student?.gender || '—'}</span>
-          {(report.student as { parentGuardian?: string })?.parentGuardian ? (
-            <span><strong style={{ color: '#94a3b8', fontWeight: 600 }}>Guardian</strong> {(report.student as { parentGuardian?: string }).parentGuardian}</span>
-          ) : null}
-        </Box>
-        <Box sx={{ display: { xs: 'none', sm: 'grid' }, gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, minWidth: 280 }}>
-          {[
-            { l: 'Position', v: `${report.position}/${report.classSize}`, accent: '#000435' },
-            { l: 'Average', v: `${report.overallScore}%`, accent: '#FCB038' },
-            { l: 'Total', v: totalMax ? `${totalMarks}/${totalMax}` : '—', accent: '#000435' },
-            { l: 'Attendance', v: report.attendance?.rate != null ? `${report.attendance.rate}%` : '—', accent: '#000435' },
-            { l: 'Courses', v: `${coursesWithMarks}/${report.subjects.length}`, accent: '#000435' },
-            { l: 'Grade', v: overallGradeDisplay, accent: '#FCB038' },
-          ].map((k) => (
-            <Box key={k.l} sx={{ textAlign: 'center', px: 1, py: 0.75, bgcolor: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-              <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{k.l}</Typography>
-              <Typography sx={{ fontSize: '0.9375rem', fontWeight: 800, color: k.accent ?? '#000435' }}>{k.v}</Typography>
-            </Box>
-          ))}
-        </Box>
-      </Box>
 
-      <Box sx={{ px: { xs: 1, md: 2 }, py: 2 }}>
-        <Box sx={{ overflowX: 'auto' }}>
+          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderBottom: '1px solid #e2e8f0' }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '88px 1fr' },
+                gap: 2,
+                alignItems: 'center',
+              }}
+            >
+              <Box
+                sx={{
+                  width: 72,
+                  height: 86,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  border: '1px solid #cbd5e1',
+                  bgcolor: '#e2e8f0',
+                  mx: { xs: 'auto', sm: 0 },
+                }}
+              >
+                {photoUrl ? (
+                  <Box component="img" src={photoUrl} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: NAVY,
+                      fontWeight: 800,
+                      fontSize: '1.25rem',
+                    }}
+                  >
+                    {studentName
+                      .split(/\s+/)
+                      .map((w) => w[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </Box>
+                )}
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Learner
+                </Typography>
+                <Typography sx={{ fontWeight: 800, fontSize: '1.125rem', color: NAVY, lineHeight: 1.25, mt: 0.25 }}>
+                  {studentName}
+                </Typography>
+                <Box
+                  component="table"
+                  sx={{
+                    width: '100%',
+                    mt: 0.75,
+                    borderCollapse: 'collapse',
+                    fontSize: '0.6875rem',
+                    '& td': { py: 0.45, verticalAlign: 'top' },
+                    '& td:first-of-type': { color: '#64748b', fontWeight: 700, width: '38%', pr: 1, whiteSpace: 'nowrap' },
+                    '& td:last-of-type': { fontWeight: 600, color: NAVY },
+                  }}
+                >
+                  <tbody>
+                    {profileCells.map((cell) => (
+                      <tr key={cell.label}>
+                        <td>{cell.label}</td>
+                        <td>{cell.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+
+      <Box sx={{ px: { xs: 1.5, md: 2.5 }, py: 1.25 }}>
+        <SectionTitle centered>Subject performance</SectionTitle>
+        <Box sx={{ overflowX: 'auto', mt: 1 }}>
           <Box
             component="table"
             sx={{
               width: '100%',
-              minWidth: 640,
+              minWidth: { xs: 0, sm: 520 },
+              tableLayout: 'fixed',
               borderCollapse: 'collapse',
               fontSize: '0.75rem',
-              '& th': { bgcolor: '#000435', color: '#fff', fontWeight: 700, fontSize: '0.625rem', textTransform: 'uppercase', py: 0.75, px: 0.75 },
-              '& td': { py: 0.75, px: 0.75, borderBottom: '1px solid #eef2f6' },
-              '& tbody tr:nth-of-type(even) td': { bgcolor: '#fafbfc' },
-              '& .course-col': { position: 'sticky', left: 0, bgcolor: '#fff', fontWeight: 700, color: '#000435', zIndex: 1 },
-              '& tbody tr:nth-of-type(even) .course-col': { bgcolor: '#fafbfc' },
+              '& th': {
+                bgcolor: '#f8fafc',
+                color: NAVY,
+                py: 0.65,
+                px: 1,
+                fontWeight: 700,
+                fontSize: '0.625rem',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #e2e8f0',
+              },
+              '& td': { py: 0.45, px: 1, borderBottom: '1px solid #eef2f6' },
+              '& tfoot td': {
+                py: 0.55,
+                px: 1,
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                bgcolor: '#f8fafc',
+                color: '#0f172a',
+                borderTop: '1px solid #cbd5e1',
+                borderBottom: 'none',
+              },
+              '& .course-col': { textAlign: 'left', fontWeight: 700, color: NAVY, minWidth: 120 },
+              '& .section-row td': {
+                bgcolor: '#f1f5f9',
+                color: NAVY,
+                fontWeight: 800,
+                fontSize: '0.625rem',
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                borderBottom: '1px solid #cbd5e1',
+                py: 0.55,
+              },
             }}
           >
             <thead>
-              <tr>
-                <th className="course-col" rowSpan={2} style={{ textAlign: 'left', verticalAlign: 'bottom' }}>
-                  Course
-                </th>
-                <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'bottom' }}>
-                  Default
-                </th>
-                <th colSpan={componentCols.length || 1} style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
-                  Assessment components
-                </th>
-                <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'bottom' }}>
-                  Course result
-                </th>
-                <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'bottom' }}>
-                  Total %
-                </th>
-                <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'bottom' }}>
-                  Position
-                </th>
-                <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'bottom' }}>
-                  Grade
-                </th>
-              </tr>
-              <tr>
-                {componentCols.length ? (
-                  componentCols.map((c) => (
-                    <th key={`${c}-w`} style={{ textAlign: 'center', fontSize: '0.5625rem', fontWeight: 600 }}>
-                      {c}
-                      {componentWeights.get(c) != null ? (
-                        <span style={{ display: 'block', opacity: 0.85 }}>{componentWeights.get(c)}%</span>
-                      ) : null}
+              {isSingleTermReport ? (
+                <>
+                  <tr>
+                    <th className="course-col" rowSpan={2} style={{ textAlign: 'left', verticalAlign: 'middle' }}>
+                      Subject
                     </th>
-                  ))
-                ) : (
-                  <th style={{ textAlign: 'center' }}>—</th>
-                )}
-              </tr>
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 52, verticalAlign: 'middle' }}>
+                      Default
+                    </th>
+                    <th
+                      rowSpan={2}
+                      style={{ textAlign: 'center', width: 88, verticalAlign: 'middle' }}
+                      title="All TichaPortal marks converted to course DEFAULT"
+                    >
+                      Student marks
+                    </th>
+                    {componentColumns.length > 0 ? (
+                      <th
+                        colSpan={componentColumns.length}
+                        style={{ textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}
+                      >
+                        Component marks
+                      </th>
+                    ) : null}
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 64, verticalAlign: 'middle' }}>
+                      Average
+                    </th>
+                    <th rowSpan={2} style={{ textAlign: 'center', width: 52, verticalAlign: 'middle' }}>
+                      Grade
+                    </th>
+                  </tr>
+                  <tr>
+                    {componentColumns.map((col) => (
+                      <th key={col.name} style={{ textAlign: 'center', fontSize: '0.5625rem' }}>
+                        {col.name}
+                      </th>
+                    ))}
+                  </tr>
+                </>
+              ) : (
+                <tr>
+                  <th className="course-col" style={{ textAlign: 'left' }}>
+                    Subject
+                  </th>
+                  {termColumns.map((term) => (
+                    <Fragment key={term}>
+                      <th style={{ textAlign: 'center' }}>{term}</th>
+                      <th style={{ textAlign: 'center', width: 52 }}>Gr</th>
+                    </Fragment>
+                  ))}
+                  <th style={{ textAlign: 'center', width: 72 }}>Average</th>
+                  <th style={{ textAlign: 'center', width: 56 }}>Grade</th>
+                </tr>
+              )}
             </thead>
             <tbody>
-              {report.subjects.map((s) => {
-                const hasMarks = Boolean(s.marksEntered);
-                const slash = '/';
-                const dcm = s.defaultCourseMarks ?? templateDefaultMarks;
-                return (
-                  <tr key={s.subjectId}>
-                    <td className="course-col">{s.subject}</td>
-                    <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{dcm}</td>
-                    {componentCols.length ? (
-                      componentCols.map((cat) => {
-                        const data = s.categoryScores?.[cat];
-                        const cell = !hasMarks ? slash : data?.marksDisplay || slash;
-                        const tip =
-                          data?.rawMarksDisplay && data?.weight != null
-                            ? `Performance: ${data.rawMarksDisplay}\nWeight: ${data.weight}% of course default\nComponent cap: ${data.normalizedMax ?? '—'} (= default × weight)\nContribution: ${data.marksDisplay ?? cell} (toward course total)`
-                            : data?.rawMarksDisplay
-                              ? `Performance: ${data.rawMarksDisplay}`
-                              : '';
-                        return (
-                          <td key={cat} style={{ textAlign: 'center', color: data ? '#0f172a' : '#94a3b8' }}>
-                            {tip ? (
-                              <Tooltip title={<span style={{ whiteSpace: 'pre-line', fontSize: '0.6875rem' }}>{tip}</span>} arrow>
-                                <span style={{ cursor: 'help', borderBottom: '1px dotted #94a3b8' }}>{cell}</span>
-                              </Tooltip>
-                            ) : (
-                              cell
-                            )}
-                          </td>
-                        );
-                      })
-                    ) : (
-                      <td style={{ textAlign: 'center', color: '#94a3b8' }}>{slash}</td>
-                    )}
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: '#000435' }}>
-                      {!hasMarks ? slash : `${s.totalScore}/${s.totalMax ?? dcm}`}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{!hasMarks ? slash : `${s.percentage}%`}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {!hasMarks ? slash : s.rank && s.classSize ? `${s.rank}/${s.classSize}` : slash}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 800, color: hasMarks && s.grade ? '#000435' : '#94a3b8' }}>
-                      {!hasMarks ? slash : s.grade || slash}
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr>
-                <td className="course-col" style={{ fontWeight: 800, backgroundColor: '#000435', color: '#fff' }}>
-                  Overall
-                </td>
-                <td style={{ textAlign: 'center', backgroundColor: '#000435', color: '#fff' }}>—</td>
-                {componentCols.map((c) => (
-                  <td key={c} style={{ backgroundColor: '#000435' }} />
-                ))}
-                <td style={{ textAlign: 'center', fontWeight: 800, backgroundColor: '#000435', color: '#fff' }}>
-                  {totalMax ? `${totalMarks}/${totalMax}` : '—'}
-                </td>
-                <td style={{ textAlign: 'center', fontWeight: 800, backgroundColor: '#000435', color: '#fff' }}>{report.overallScore}%</td>
-                <td style={{ textAlign: 'center', fontWeight: 800, backgroundColor: '#000435', color: '#fff' }}>
-                  {report.position}/{report.classSize}
-                </td>
-                <td style={{ textAlign: 'center', fontWeight: 800, backgroundColor: '#FCB038', color: '#000435' }}>{overallGradeDisplay}</td>
-              </tr>
+              {isSingleTermReport ? (
+                <>
+                  {coreSubjects.length ? renderSectionHeader('CORE COURSES') : null}
+                  {coreSubjects.map((s) => renderSubjectRow(s))}
+                  {nonCoreSubjects.length ? renderSectionHeader('NON-CORE COURSES') : null}
+                  {nonCoreSubjects.map((s) => renderSubjectRow(s))}
+                  {!coreSubjects.length && !nonCoreSubjects.length
+                    ? sortedSubjects.map((s) => renderSubjectRow(s))
+                    : null}
+                </>
+              ) : (
+                sortedSubjects.map((s) => renderSubjectRow(s))
+              )}
             </tbody>
+            <tfoot>
+              <tr>
+                {isSingleTermReport ? (
+                  <>
+                    <td style={{ textAlign: 'left' }}>Total</td>
+                    <td style={{ textAlign: 'center' }}>{NOT_RECORDED}</td>
+                    <td style={{ textAlign: 'center', color: '#94a3b8' }}>{NOT_RECORDED}</td>
+                    {componentColumns.map((col) => (
+                      <td key={`foot-${col.name}`} style={{ textAlign: 'center', color: '#94a3b8' }}>
+                        {NOT_RECORDED}
+                      </td>
+                    ))}
+                    <td style={{ textAlign: 'center' }}>{overallAverageDisplay}</td>
+                    <td style={{ textAlign: 'center' }}>{overallGradeDisplay}</td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{ textAlign: 'left' }}>Total</td>
+                    {termColumns.map((term) => (
+                      <Fragment key={`${term}-foot`}>
+                        <td style={{ textAlign: 'center', color: '#94a3b8' }}>{NOT_RECORDED}</td>
+                        <td style={{ textAlign: 'center', color: '#94a3b8' }}>{NOT_RECORDED}</td>
+                      </Fragment>
+                    ))}
+                    <td style={{ textAlign: 'center' }}>{overallAverageDisplay}</td>
+                    <td style={{ textAlign: 'center' }}>{overallGradeDisplay}</td>
+                  </>
+                )}
+              </tr>
+            </tfoot>
           </Box>
         </Box>
-      </Box>
-
-      {gradingLegend.length > 0 && (
-        <Box sx={{ px: { xs: 2, md: 3 }, pb: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {gradingLegend.map((g) => (
-            <Typography key={g.grade} sx={{ fontSize: '0.5625rem', color: '#64748b' }}>
-              <strong>{g.grade}</strong> {g.minPercentage}–{g.maxPercentage}%
-            </Typography>
-          ))}
-        </Box>
-      )}
-
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderTop: '1px solid #e2e8f0', bgcolor: '#fafbfc' }}>
-        <Typography sx={{ fontSize: '0.625rem', fontWeight: 800, color: '#000435', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
-          Term performance
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr' },
-            gap: 2,
-            alignItems: 'stretch',
-          }}
-        >
-          <Box sx={{ display: 'flex', flexDirection: 'column', bgcolor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', p: 2 }}>
-            {termPoints.length ? (
-              <>
-                <TermBarChart points={termPoints} currentTerm={report.term} />
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${Math.min(termPoints.length, 3)}, 1fr)`,
-                    gap: 1,
-                    mt: 2,
-                  }}
-                >
-                  {termPoints.map((t) => {
-                    const current = isCurrentTerm(t.label, report.term);
-                    return (
-                      <Box
-                        key={t.label}
-                        sx={{
-                          textAlign: 'center',
-                          py: 1,
-                          px: 0.5,
-                          borderRadius: '6px',
-                          border: current ? '2px solid #FCB038' : '1px solid #e2e8f0',
-                          bgcolor: current ? 'rgba(252,176,56,0.08)' : '#fff',
-                        }}
-                      >
-                        <Typography sx={{ fontSize: '0.5625rem', fontWeight: 700, color: '#94a3b8' }}>{t.label}</Typography>
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#000435' }}>{t.value}%</Typography>
-                        {current ? (
-                          <Typography sx={{ fontSize: '0.5rem', fontWeight: 700, color: '#c87800' }}>Current</Typography>
-                        ) : null}
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </>
-            ) : (
-              <Typography sx={{ fontSize: '0.8125rem', color: '#94a3b8', py: 2, textAlign: 'center' }}>
-                Term trend appears when marks exist for more than one term.
+        {gradingLegend.length > 0 ? (
+          <Box sx={{ mt: 1, px: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {gradingLegend.slice(0, 12).map((g) => (
+              <Typography key={g.grade} sx={{ fontSize: '0.5625rem', color: '#64748b' }}>
+                <Box component="span" sx={{ fontWeight: 800, color: NAVY }}>
+                  {g.grade}
+                </Box>{' '}
+                {g.minPercentage}–{g.maxPercentage}%
               </Typography>
-            )}
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: { md: 220 } }}>
-            <CourseList title="Performed well" items={strong} variant="strong" />
-            <CourseList title="Needs improvement" items={improve} variant="improve" />
-          </Box>
-        </Box>
-      </Box>
-
-      <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderTop: '1px solid #e2e8f0' }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, alignItems: 'stretch' }}>
-          <Box sx={{ border: '1px solid #e2e8f0', borderRadius: '8px', p: 2, minHeight: 160, display: 'flex', flexDirection: 'column' }}>
-            <Typography sx={{ fontSize: '0.5625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>Class teacher</Typography>
-            <Typography sx={{ fontSize: '0.8125rem', lineHeight: 1.55, color: '#334155', flex: 1, minHeight: 72 }}>
-              {classTeacherComment || ' '}
-            </Typography>
-            <Box sx={{ mt: 2, pt: 1, borderTop: '1px solid #e2e8f0' }}>
-              <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>Signature</Typography>
-            </Box>
-          </Box>
-          <Box sx={{ border: '1px solid #e2e8f0', borderRadius: '8px', p: 2, minHeight: 160, display: 'flex', flexDirection: 'column' }}>
-            <Typography sx={{ fontSize: '0.5625rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>Head teacher</Typography>
-            <Typography sx={{ fontSize: '0.8125rem', lineHeight: 1.55, color: '#334155', flex: 1, minHeight: 72 }}>
-              {headTeacherComment || ' '}
-            </Typography>
-            <Box sx={{ mt: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, borderTop: '1px solid #e2e8f0', pt: 1 }}>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>Signature</Typography>
-                {school?.signatureUrl ? (
-                  <Box component="img" src={school.signatureUrl} alt="" sx={{ maxHeight: 40, maxWidth: 120, objectFit: 'contain', mt: 0.5 }} />
-                ) : null}
-              </Box>
-              {school?.stampUrl ? (
-                <Box component="img" src={school.stampUrl} alt="" sx={{ maxHeight: 48, maxWidth: 48, objectFit: 'contain', opacity: 0.9 }} />
-              ) : null}
-            </Box>
-          </Box>
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          px: { xs: 2, md: 3 },
-          py: 1.5,
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-        }}
-      >
-        <Typography sx={{ fontSize: '0.625rem', color: '#64748b' }}>Parent / guardian · signature · date</Typography>
-        {verifyUrl ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ReportQrCode value={verifyUrl} size={64} />
-            <Typography sx={{ fontSize: '0.5rem', color: '#94a3b8', maxWidth: 80 }}>Scan to verify</Typography>
+            ))}
           </Box>
         ) : null}
       </Box>
 
-      <Box sx={{ px: 3, py: 1.25, bgcolor: '#000435', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ fontSize: '0.625rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>Generated by Shule+</Typography>
-        <Typography sx={{ fontSize: '0.5625rem', color: 'rgba(255,255,255,0.65)' }}>{reportDate}</Typography>
+      <Box className="report-section-overview" sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+        <SectionTitle>Academic performance overview</SectionTitle>
+        <Box
+          className="report-overview-grid"
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+            gap: 1.5,
+            mt: 1,
+            alignItems: 'stretch',
+          }}
+        >
+          <Box className="report-overview-stats" sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, alignContent: 'start' }}>
+            <OverviewStatCard label="Class position" value={positionDisplay} />
+            <OverviewStatCard label="Percentage" value={overallAverageDisplay} />
+          </Box>
+          <Box
+            className="report-overview-chart"
+            sx={{
+              bgcolor: '#f8fafc',
+              borderRadius: 1,
+              border: '1px solid #e2e8f0',
+              p: 1.5,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minHeight: 140,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '0.5625rem',
+                fontWeight: 800,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                mb: 1,
+                textAlign: 'center',
+              }}
+            >
+              Percentage marks
+            </Typography>
+            {termAverageBars.length ? (
+              <TermBarChart points={termAverageBars} currentTerm={report.term} />
+            ) : (
+              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', py: 1 }}>{NOT_RECORDED}</Typography>
+            )}
+          </Box>
+        </Box>
+      </Box>
+
+      {(strong.length > 0 || improve.length > 0) && (
+        <Box className="report-section-analysis" sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+          <SectionTitle>Subject performance analysis</SectionTitle>
+          <Box className="report-analysis-row" sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.25, mt: 1 }}>
+            <CourseList title="Best performing" items={strong} variant="strong" />
+            <CourseList title="Needs improvement" items={improve} variant="improve" />
+          </Box>
+        </Box>
+      )}
+
+      <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+        <SectionTitle>Teacher comments &amp; signatures</SectionTitle>
+                        <Box className="report-teacher-signatures" sx={{ mt: 1.25 }}>
+          <Box sx={{ border: '1px solid #94a3b8', borderRadius: 0.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid #94a3b8', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Class teacher comment</Box>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.75rem', color: '#334155' }}>{classTeacherComment || '\u00A0'}</Box>
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid #94a3b8', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Class teacher signature</Box>
+              <Box sx={{ px: 1, py: 0.75 }} />
+            </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 1fr', minHeight: 44 }}>
+              <Box sx={{ px: 1, py: 0.75, fontSize: '0.625rem', fontWeight: 700, color: NAVY, borderRight: '1px solid #94a3b8', display: 'flex', alignItems: 'center' }}>Parent signature</Box>
+              <Box sx={{ px: 1, py: 0.75 }} />
+            </Box>
+          </Box>
+          {headTeacherComment ? (
+            <Box sx={{ mt: 1, fontSize: '0.6875rem', color: '#334155' }}>
+              <Box component="span" sx={{ fontWeight: 800, color: NAVY }}>Head teacher comment: </Box>{headTeacherComment}
+            </Box>
+          ) : null}
+        </Box>
+</Box>
+
+              <Box
+          className="report-section-verify"
+          sx={{ px: { xs: 2, md: 2.5 }, py: 1.25, borderTop: '1px solid #e2e8f0' }}
+        >
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' }, alignItems: 'center', gap: 2 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '0.625rem', fontWeight: 800, color: NAVY }}>Head Teacher Signature &amp; Stamp</Typography>
+              <Box sx={{ minHeight: 40, borderBottom: '1px solid #94a3b8', mt: 0.5, maxWidth: 320, mx: 'auto' }} />
+              {reportDate ? (
+                <Typography sx={{ fontSize: '0.5625rem', color: '#94a3b8', mt: 0.5 }}>Generated {reportDate}</Typography>
+              ) : null}
+            </Box>
+            {verifyUrl ? (
+              <Box
+                className="report-qr-block"
+                data-verify-url={verifyUrl}
+                sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
+              >
+                <ReportQrCode value={verifyUrl} size={68} />
+                <Typography sx={{ fontSize: '0.5625rem', fontWeight: 600, color: NAVY }}>Scan to verify</Typography>
+              </Box>
+            ) : null}
+          </Box>
+        </Box>
+
+      <Box sx={{ py: 0.65, textAlign: 'center', borderTop: '1px solid #e2e8f0' }}>
+        <Typography sx={{ fontSize: '0.5625rem', color: '#94a3b8', fontWeight: 600 }}>Shule+ · Term report</Typography>
+      </Box>
+        </Box>
       </Box>
     </Box>
   );

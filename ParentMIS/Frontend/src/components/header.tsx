@@ -54,8 +54,8 @@ export function Header() {
   const handleLogout = async () => {
     const token = getToken()
     const iamApiUrl =
-      process.env.NEXT_PUBLIC_IAM_API_URL ?? "http://localhost:3001/api/v1"
-    const iamUrl = process.env.NEXT_PUBLIC_IAM_URL ?? "http://localhost:3000"
+      process.env.NEXT_PUBLIC_IAM_API_URL ?? "https://shuleplus.rw/api/v1"
+    const iamUrl = process.env.NEXT_PUBLIC_IAM_URL ?? "https://app.shuleplus.rw"
     try {
       if (token) {
         await axios.post(

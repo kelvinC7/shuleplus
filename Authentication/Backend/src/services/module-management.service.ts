@@ -846,6 +846,7 @@ export class ModuleManagementService {
 
     let logAction = action.toUpperCase();
     const data: Prisma.OrganizationModuleUncheckedUpdateInput = {};
+    const activates = action === 'activate' || action === 'unlock';
 
     switch (action) {
       case 'activate':
@@ -881,17 +882,46 @@ export class ModuleManagementService {
 
     await prisma.organizationModule.update({ where: { id: assignment.id }, data });
     await this.syncOrganizationModulesJson(organizationId);
+
+    // Activating / unlocking a module must also create its tenant workspace.
+    // Otherwise the org launcher shows the tile as "Setting up" forever.
+    let provisioning:
+      | { attempted: boolean; provisioned: boolean; error?: string }
+      | undefined;
+    if (activates && !assignment.tenantProvisioned) {
+      try {
+        const result = await this.tryProvisionTenant(assignment.id, actorId);
+        provisioning = {
+          attempted: true,
+          provisioned: result.ok,
+          ...(result.ok ? {} : { error: result.error }),
+        };
+      } catch (error) {
+        // Activation itself already succeeded; never fail the request because
+        // tenant creation hiccuped. The org can retry via Provision.
+        provisioning = {
+          attempted: true,
+          provisioned: false,
+          error: error instanceof Error ? error.message : 'Tenant provisioning failed',
+        };
+      }
+    }
+
     await this.writeProvisionLog({
       organizationId,
       moduleId,
       moduleSlug: assignment.module.slug,
       action: logAction,
       success: true,
-      message: `${assignment.module.name}: ${logAction.toLowerCase()}`,
+      message:
+        provisioning && !provisioning.provisioned
+          ? `${assignment.module.name}: ${logAction.toLowerCase()} — tenant setup pending${provisioning.error ? ` (${provisioning.error})` : ''}`
+          : `${assignment.module.name}: ${logAction.toLowerCase()}`,
       actorId,
     });
 
-    return this.getModuleControl(organizationId);
+    const control = await this.getModuleControl(organizationId);
+    return provisioning ? { ...control, provisioning } : control;
   }
 
   async provisionOrganizationModule(

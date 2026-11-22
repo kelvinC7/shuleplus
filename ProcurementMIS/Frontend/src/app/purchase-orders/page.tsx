@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/layouts/main-layout';
 import { procurementApi } from '@/services/procurement-api';
 import type { PurchaseOrder, Supplier } from '@/types';
-import { Plus, Eye, Truck, Package, Trash2, ShoppingCart, DollarSign, FileDown } from 'lucide-react';
+import { Plus, Eye, Truck, Package, Trash2, ShoppingCart, DollarSign, FileDown, Filter, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 import {
   AddItemButton,
   FormField,
@@ -19,25 +20,34 @@ import {
 import { formatFrw as formatMoney } from '@/utils/currency';
 import { useAuth } from '@/contexts/auth-context';
 import { downloadPurchaseOrderPdf } from '@/modules/documents/po-order-pdf';
+import { PurchaseOrderImportWizard } from '@/components/purchase-order-import-wizard';
+import { PurchaseOrderDetailDrawer } from '@/components/purchase-order-detail-drawer';
 import { PlatformPageLayout } from '@/components/platform-page-layout';
+import { defaultAcademicSettings, type AcademicSettings } from '@/lib/academic-settings';
 import {
   DataTable,
   DataTableCard,
   DataTableEmpty,
   DataTableHead,
+  DataTableRow,
+  DataTableTd,
   DataTableTh,
   ListFilterBar,
   PageLoading,
   StatusBadge,
+  TablePagination,
+  useTablePagination,
 } from '@/components/list-ui';
-
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700', SENT: 'bg-blue-100 text-blue-700',
-  ACCEPTED: 'bg-indigo-100 text-indigo-700', PREPARING: 'bg-purple-100 text-purple-700',
-  IN_TRANSIT: 'bg-orange-100 text-orange-700', DELIVERED: 'bg-teal-100 text-teal-700',
-  PARTIALLY_DELIVERED: 'bg-amber-100 text-amber-700', CANCELLED: 'bg-red-100 text-red-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-};
+import {
+  ReportFilterDrawer,
+  EMPTY_REPORT_FILTERS,
+  countActiveReportFilters,
+  reportFilterParams,
+  reportPeriodMeta,
+  reportPeriodLabel,
+  type ReportFilterValues,
+} from '@/components/report-filter-drawer';
+import { downloadProcurementReport } from '@/modules/documents/report-pdf';
 
 const PAYMENT_COLORS: Record<string, string> = {
   UNPAID: 'bg-red-100 text-red-700', PARTIALLY_PAID: 'bg-amber-100 text-amber-700',
@@ -55,7 +65,8 @@ const initialFormState = {
 };
 
 export default function PurchaseOrdersPage() {
-  const { isSupervisor } = useAuth();
+  const router = useRouter();
+  const { user, isSupervisor } = useAuth();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,10 +78,15 @@ export default function PurchaseOrdersPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [academicSettings, setAcademicSettings] = useState<AcademicSettings>(defaultAcademicSettings());
+  const [reportFilters, setReportFilters] = useState<ReportFilterValues>(EMPTY_REPORT_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const params: any = {};
+      const params: any = { ...reportFilterParams(reportFilters) };
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (search) params.search = search;
       const [o, s] = await Promise.all([
@@ -79,9 +95,13 @@ export default function PurchaseOrdersPage() {
       ]);
       setOrders(o); setSuppliers(s);
     } catch {} finally { setLoading(false); }
-  }, [statusFilter, search]);
+  }, [statusFilter, search, reportFilters]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    procurementApi.settings.getAcademic().then(setAcademicSettings).catch(() => {});
+  }, []);
 
   const resetForm = () => setForm(initialFormState);
 
@@ -105,8 +125,16 @@ export default function PurchaseOrdersPage() {
     if (form.items.some(i => !i.itemName || !i.quantity || !i.unitPrice)) { toast.error('Please fill all item details'); return; }
     setSubmitting(true);
     try {
-      await procurementApi.purchaseOrders.create(form);
-      toast.success('Purchase order created'); setFormOpen(false); resetForm(); load();
+      const created = await procurementApi.purchaseOrders.create(form);
+      const requisitionId = (created as any)?.purchaseRequest?.id || (created as any)?.prId;
+      toast.success('Purchase order created');
+      setFormOpen(false);
+      resetForm();
+      if (requisitionId) {
+        router.push(`/requisitions?open=${encodeURIComponent(requisitionId)}`);
+        return;
+      }
+      void load();
     } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to create PO'); }
     finally { setSubmitting(false); }
   };
@@ -152,6 +180,10 @@ export default function PurchaseOrdersPage() {
       await downloadPurchaseOrderPdf(detail, {
         schoolName: profile?.schoolName ?? 'School',
         logoUrl: profile?.logoUrl,
+        province: profile?.province,
+        district: profile?.district,
+        sector: profile?.sector,
+        website: profile?.website,
         receiptSettings,
         supplier,
       });
@@ -159,6 +191,74 @@ export default function PurchaseOrdersPage() {
       toast.error('Failed to generate PDF');
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleDownloadReport = async (values: ReportFilterValues) => {
+    setReportLoading(true);
+    try {
+      const params: Record<string, string> = { ...reportFilterParams(values) };
+      if (statusFilter !== 'ALL') params.status = statusFilter;
+
+      const [profile, rows] = await Promise.all([
+        procurementApi.settings.getOrgProfile(),
+        procurementApi.purchaseOrders.list(params),
+      ]);
+
+      const meta = [...reportPeriodMeta(values)];
+      if (statusFilter !== 'ALL') {
+        meta.push({ label: 'Status', value: statusFilter.replace(/_/g, ' ') });
+      }
+
+      const totalValue = rows.reduce((sum, row) => sum + Number(row.totalAmount), 0);
+      const inTransit = rows.filter((row) => row.status === 'IN_TRANSIT').length;
+      const completed = rows.filter((row) => row.status === 'COMPLETED').length;
+
+      await downloadProcurementReport({
+        info: {
+          schoolName: profile?.schoolName ?? 'School',
+          logoUrl: profile?.logoUrl,
+          province: profile?.province,
+          district: profile?.district,
+          sector: profile?.sector,
+          website: profile?.website,
+        },
+        title: 'PURCHASE ORDERS REPORT',
+        columns: [
+          { header: 'PO Number', dataKey: 'poNumber' },
+          { header: 'Date', dataKey: 'date' },
+          { header: 'Supplier', dataKey: 'supplier' },
+          { header: 'PR Ref', dataKey: 'prRef' },
+          { header: 'Amount (Frw)', dataKey: 'amount', align: 'right' },
+          { header: 'Status', dataKey: 'status', align: 'center' },
+          { header: 'Payment', dataKey: 'payment', align: 'center' },
+        ],
+        rows: rows.map((row) => ({
+          poNumber: row.poNumber,
+          date: new Date(row.orderDate).toLocaleDateString(),
+          supplier: row.supplier?.companyName ?? '—',
+          prRef: row.purchaseRequest?.prNumber ?? '—',
+          amount: Number(row.totalAmount).toLocaleString(),
+          status: row.status.replace(/_/g, ' '),
+          payment: row.paymentStatus.replace(/_/g, ' '),
+        })),
+        meta,
+        summary: [
+          { label: 'Records', value: String(rows.length) },
+          { label: 'Total value', value: formatMoney(totalValue) },
+          { label: 'In transit', value: String(inTransit) },
+          { label: 'Completed', value: String(completed) },
+        ],
+        fileBase: 'purchase-orders-report',
+        verification: {
+          period: reportPeriodLabel(values),
+          generatedBy: user?.email ?? 'Procurement MIS User',
+        },
+      });
+    } catch {
+      toast.error('Failed to generate report');
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -180,6 +280,10 @@ export default function PurchaseOrdersPage() {
 
   const inTransitCount = orders.filter((o) => o.status === 'IN_TRANSIT').length;
   const completedCount = orders.filter((o) => o.status === 'COMPLETED').length;
+
+  const pagination = useTablePagination(orders, {
+    resetKey: `${search}|${statusFilter}|${reportFilters.academicYear}|${reportFilters.term}|${reportFilters.dateFrom}|${reportFilters.dateTo}`,
+  });
 
   const paymentTone = (status: string) => {
     if (status === 'PAID') return 'success';
@@ -209,16 +313,25 @@ export default function PurchaseOrdersPage() {
         subtitle="Manage and track all purchase orders from draft to delivery."
         actions={
           isSupervisor ? (
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setFormOpen(true);
-              }}
-              className="btn-primary"
-            >
-              <Plus className="h-4 w-4" /> New Order
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" /> Import Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  setFormOpen(true);
+                }}
+                className="btn-primary"
+              >
+                <Plus className="h-4 w-4" /> New Order
+              </button>
+            </div>
           ) : undefined
         }
         kpis={[
@@ -268,7 +381,22 @@ export default function PurchaseOrdersPage() {
           onReset={() => {
             setSearch('');
             setStatusFilter('ALL');
+            setReportFilters(EMPTY_REPORT_FILTERS);
           }}
+          actions={
+            <button
+              type="button"
+              onClick={() => setFilterOpen(true)}
+              className="btn-ghost !rounded-xl inline-flex items-center gap-2 ring-1 ring-slate-200"
+            >
+              <Filter className="h-4 w-4" /> Filter
+              {countActiveReportFilters(reportFilters) > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#fcb038] px-1.5 text-[10px] font-extrabold text-navy">
+                  {countActiveReportFilters(reportFilters)}
+                </span>
+              ) : null}
+            </button>
+          }
         />
 
         <DataTableCard>
@@ -283,22 +411,22 @@ export default function PurchaseOrdersPage() {
               <DataTableTh className="text-center">Actions</DataTableTh>
             </DataTableHead>
             <tbody>
-              {orders.map((po) => (
-                <tr key={po.id} className="border-b border-border/70 transition hover:bg-[#f8fafc]">
-                  <td className="px-4 py-3 font-semibold text-navy">{po.poNumber}</td>
-                  <td className="px-4 py-3">{po.supplier?.companyName || '—'}</td>
-                  <td className="px-4 py-3 text-muted">
+              {pagination.rows.map((po) => (
+                <DataTableRow key={po.id}>
+                  <DataTableTd className="font-semibold text-navy">{po.poNumber}</DataTableTd>
+                  <DataTableTd>{po.supplier?.companyName || '—'}</DataTableTd>
+                  <DataTableTd className="text-muted">
                     {new Date(po.orderDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                  </DataTableTd>
+                  <DataTableTd className="text-right font-semibold tabular-nums">
                     {formatMoney(Number(po.totalAmount))}
-                  </td>
-                  <td className="px-4 py-3 text-center">
+                  </DataTableTd>
+                  <DataTableTd className="text-center">
                     <StatusBadge tone={orderTone(po.status)}>
                       {po.status.replace(/_/g, ' ')}
                     </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3 text-center">
+                  </DataTableTd>
+                  <DataTableTd className="text-center">
                     {isSupervisor ? (
                       <select
                         value={po.paymentStatus}
@@ -315,8 +443,8 @@ export default function PurchaseOrdersPage() {
                         {po.paymentStatus.replace(/_/g, ' ')}
                       </StatusBadge>
                     )}
-                  </td>
-                  <td className="px-4 py-3">
+                  </DataTableTd>
+                  <DataTableTd>
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => viewDetail(po)} className="rounded-lg p-1.5 hover:bg-navy/[0.04]" title="View"><Eye className="h-4 w-4" /></button>
                       <button
@@ -335,14 +463,24 @@ export default function PurchaseOrdersPage() {
                       )}
                       <button onClick={() => handleDelete(po)} className="rounded-lg p-1.5 hover:bg-red-50 text-red-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </div>
-                  </td>
-                </tr>
+                  </DataTableTd>
+                </DataTableRow>
               ))}
               {orders.length === 0 ? (
                 <DataTableEmpty colSpan={7} message="No purchase orders found" />
               ) : null}
             </tbody>
           </DataTable>
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            rangeStart={pagination.rangeStart}
+            rangeEnd={pagination.rangeEnd}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </DataTableCard>
       </PlatformPageLayout>
 
@@ -478,88 +616,35 @@ export default function PurchaseOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{selectedPO?.poNumber} - Purchase Order Details</DialogTitle></DialogHeader>
-          {selectedPO && (
-            <div className="space-y-4">
-              <div className="grid gap-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Supplier:</span><span>{selectedPO.supplier?.companyName || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Order Date:</span><span>{new Date(selectedPO.orderDate).toLocaleDateString()}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Status:</span><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[selectedPO.status]}`}>{selectedPO.status.replace(/_/g, ' ')}</span></div>
-                <div className="flex justify-between items-center gap-3">
-                  <span className="text-muted-foreground">Payment:</span>
-                  {isSupervisor ? (
-                    <select
-                      value={selectedPO.paymentStatus}
-                      onChange={(e) => handlePaymentChange(selectedPO.id, e.target.value)}
-                      className={`rounded-full border-0 px-2.5 py-1 text-xs font-semibold outline-none ${PAYMENT_COLORS[selectedPO.paymentStatus]}`}
-                    >
-                      {PAYMENT_STATUSES.map((s) => (
-                        <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_COLORS[selectedPO.paymentStatus]}`}>{selectedPO.paymentStatus.replace(/_/g, ' ')}</span>
-                  )}
-                </div>
-                {selectedPO.purchaseRequest?.prNumber ? (
-                  <div className="flex justify-between"><span className="text-muted-foreground">PR Reference:</span><span>{selectedPO.purchaseRequest.prNumber}</span></div>
-                ) : null}
-              </div>
+      <PurchaseOrderDetailDrawer
+        open={detailOpen}
+        po={selectedPO}
+        isSupervisor={isSupervisor}
+        pdfLoading={pdfLoading}
+        onClose={() => setDetailOpen(false)}
+        onDownloadPdf={(po) => { void handleDownloadPdf(po); }}
+        onStatusChange={(id, status) => { void handleStatusChange(id, status); }}
+        onPaymentChange={(id, status) => { void handlePaymentChange(id, status); }}
+      />
 
-              {selectedPO.items && selectedPO.items.length > 0 && (
-                <div className="rounded-lg border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead><tr className="bg-gray-50 border-b">
-                      <th className="text-left px-3 py-2 font-medium">Item</th>
-                      <th className="text-center px-3 py-2 font-medium">Qty</th>
-                      <th className="text-right px-3 py-2 font-medium">Unit Price</th>
-                      <th className="text-right px-3 py-2 font-medium">Total</th>
-                    </tr></thead>
-                    <tbody>
-                      {selectedPO.items.map(item => (
-                        <tr key={item.id} className="border-b last:border-0">
-                          <td className="px-3 py-2">{item.itemName}</td>
-                          <td className="px-3 py-2 text-center">{item.quantity} {item.unit}</td>
-                          <td className="px-3 py-2 text-right">{formatMoney(Number(item.unitPrice))}</td>
-                          <td className="px-3 py-2 text-right font-medium">{formatMoney(Number(item.totalPrice))}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+      <PurchaseOrderImportWizard
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { void load(); }}
+        suppliers={suppliers}
+      />
 
-              <div className="rounded-lg bg-gray-50 p-4 text-sm space-y-1">
-                <div className="flex justify-between"><span>Subtotal:</span><span>{formatMoney(Number(selectedPO.subtotal))}</span></div>
-                <div className="flex justify-between"><span>Discount:</span><span>-{formatMoney(Number(selectedPO.discount))}</span></div>
-                <div className="flex justify-between"><span>Tax:</span><span>{formatMoney(Number(selectedPO.tax))}</span></div>
-                <div className="flex justify-between"><span>Shipping:</span><span>{formatMoney(Number(selectedPO.shippingCost))}</span></div>
-                <div className="flex justify-between border-t pt-2 font-bold text-base"><span>Total:</span><span>{formatMoney(Number(selectedPO.totalAmount))}</span></div>
-              </div>
-
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPdf(selectedPO)}
-                  disabled={pdfLoading}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#fcb038]/40 bg-[#fcb038]/10 px-4 py-2 text-sm font-semibold text-navy hover:bg-[#fcb038]/20 disabled:opacity-50"
-                >
-                  <FileDown className="h-4 w-4" /> Download PDF
-                </button>
-                {selectedPO.status === 'DRAFT' && <button onClick={() => { handleStatusChange(selectedPO.id, 'SENT'); setDetailOpen(false); }} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Send to Supplier</button>}
-                {selectedPO.status === 'SENT' && <button onClick={() => { handleStatusChange(selectedPO.id, 'ACCEPTED'); setDetailOpen(false); }} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Mark Accepted</button>}
-                {selectedPO.status === 'ACCEPTED' && <button onClick={() => { handleStatusChange(selectedPO.id, 'PREPARING'); setDetailOpen(false); }} className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">Mark Preparing</button>}
-                {selectedPO.status === 'PREPARING' && <button onClick={() => { handleStatusChange(selectedPO.id, 'IN_TRANSIT'); setDetailOpen(false); }} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700">Mark In Transit</button>}
-                {selectedPO.status === 'IN_TRANSIT' && <button onClick={() => { handleStatusChange(selectedPO.id, 'DELIVERED'); setDetailOpen(false); }} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Mark Delivered</button>}
-                {selectedPO.status === 'DELIVERED' && <button onClick={() => { handleStatusChange(selectedPO.id, 'COMPLETED'); setDetailOpen(false); }} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Mark Completed</button>}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ReportFilterDrawer
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        title="Filter purchase orders"
+        description="Narrow orders by academic period or date, then download a branded PDF report."
+        academicSettings={academicSettings}
+        value={reportFilters}
+        onApply={setReportFilters}
+        onDownload={handleDownloadReport}
+        downloading={reportLoading}
+      />
     </MainLayout>
   );
 }

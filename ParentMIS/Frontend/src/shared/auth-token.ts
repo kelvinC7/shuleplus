@@ -28,6 +28,7 @@ export type ParentSessionParent = {
 export type ParentSession = {
   parent: ParentSessionParent;
   students: LinkedStudent[];
+  portalFeatures?: { studentManagement: boolean; shuleTrip: boolean };
 };
 
 export function storeToken(token: string) {

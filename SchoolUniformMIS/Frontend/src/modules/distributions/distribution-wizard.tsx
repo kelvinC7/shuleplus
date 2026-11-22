@@ -141,7 +141,7 @@ export function DistributionWizard({
     setReceipt(null);
   }, [open, preselectStudentId, periodYear, periodTerm]);
 
-  const classfptions = useMemo(
+  const classOptions = useMemo(
     () =>
       Array.from(
         new Set(students.map((s) => s.className).filter(Boolean) as string[]),
@@ -151,9 +151,9 @@ export function DistributionWizard({
 
   const visibleClasses = useMemo(() => {
     const q = classQuery.trim().toLowerCase();
-    if (!q) return classfptions;
-    return classfptions.filter((c) => c.toLowerCase().includes(q));
-  }, [classfptions, classQuery]);
+    if (!q) return classOptions;
+    return classOptions.filter((c) => c.toLowerCase().includes(q));
+  }, [classOptions, classQuery]);
 
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
@@ -427,7 +427,7 @@ export function DistributionWizard({
                           Class
                         </p>
                         <p className="text-[11px] text-muted">
-                          {classfptions.length} total
+                          {classOptions.length} total
                         </p>
                       </div>
 
@@ -456,7 +456,7 @@ export function DistributionWizard({
                             }}
                           >
                             <option value="">All classes</option>
-                            {classfptions.map((cls) => (
+                            {classOptions.map((cls) => (
                               <option key={cls} value={cls}>
                                 {cls}
                               </option>
@@ -506,7 +506,7 @@ export function DistributionWizard({
                             No class matches “{classQuery}”.
                           </p>
                         ) : null}
-                        {!classfptions.length ? (
+                        {!classOptions.length ? (
                           <p className="mt-2 text-xs text-muted">
                             No classes found on student list.
                           </p>
@@ -1049,7 +1049,7 @@ export function DistributionWizard({
                         className="input min-h-[72px] !rounded-xl"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="fptional note for this distribution"
+                        placeholder="Optional note for this sell"
                       />
                     </label>
                   </div>

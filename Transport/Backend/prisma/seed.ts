@@ -5,18 +5,18 @@ const prisma = new PrismaClient();
 const ORG_ID = process.env.SEED_ORG_ID ?? "org-demo-school";
 
 async function main() {
-  console.log("Seeding Smart Transport demo data…");
+  console.log("Ensuring transport tenant settings (no demo fleet)…");
   await prisma.tenant.upsert({
     where: { organizationId: ORG_ID },
-    update: { organizationName: "Kigali Green Hills School", organizationCode: "KGS" },
+    update: { organizationName: "Organization", organizationCode: "ORG" },
     create: {
       organizationId: ORG_ID,
-      organizationCode: "KGS",
-      organizationName: "Kigali Green Hills School",
+      organizationCode: "ORG",
+      organizationName: "Organization",
     },
   });
   await seedTenantData(ORG_ID);
-  console.log("Seed complete. Demo card RFID-004821 (Jean Claude) on BUS-014-RFID");
+  console.log("Done. Add buses, routes, and learners via the Transport UI.");
 }
 
 main()

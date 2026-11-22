@@ -13,6 +13,7 @@ router.post('/', (req, res, next) => classController.create(req, res, next));
 router.get('/:id', (req, res, next) => classController.getById(req, res, next));
 router.put('/:id', (req, res, next) => classController.update(req, res, next));
 router.patch('/:id/head-teacher', (req, res, next) => classController.assignHeadTeacher(req, res, next));
+router.patch('/:id/student-access', (req, res, next) => classController.setStudentAccess(req, res, next));
 router.delete('/:id', (req, res, next) => classController.delete(req, res, next));
 
 export default router;

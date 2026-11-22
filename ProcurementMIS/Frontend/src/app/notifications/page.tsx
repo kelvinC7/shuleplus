@@ -76,6 +76,7 @@ export default function NotificationsPage() {
     try {
       await procurementApi.notifications.markAsRead(id);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      window.dispatchEvent(new Event('procurement:notifications-updated'));
     } catch {
       /* empty */
     }
@@ -85,6 +86,7 @@ export default function NotificationsPage() {
     try {
       await procurementApi.notifications.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      window.dispatchEvent(new Event('procurement:notifications-updated'));
       toast.success('All notifications marked as read');
     } catch {
       /* empty */

@@ -68,9 +68,9 @@ export function buildReceiptHtml({ advance, teacher, payment = null, schoolLogoU
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
     * { box-sizing: border-box; }
-    body { font-family: Montserrat, sans-serif; color: #000435; background: #f8fafc; margin: 0; padding: 24px; }
+    body { font-family: Montserrat, sans-serif; color: #13213D; background: #f8fafc; margin: 0; padding: 24px; }
     .sheet { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid #e8ecf2; overflow: hidden; }
-    .head { background: #000435; color: #fff; padding: 22px 28px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .head { background: #13213D; color: #fff; padding: 22px 28px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
     .head h1 { font-size: 18px; margin: 0 0 4px; font-weight: 800; }
     .head p { margin: 0; color: rgba(255,255,255,.62); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
     .logos { display: flex; gap: 10px; align-items: center; }
@@ -80,7 +80,7 @@ export function buildReceiptHtml({ advance, teacher, payment = null, schoolLogoU
     .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; font-weight: 600; }
     .value { font-size: 13px; font-weight: 700; margin-top: 2px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { background: #000435; color: #fff; text-align: left; padding: 10px 12px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+    th { background: #13213D; color: #fff; text-align: left; padding: 10px 12px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
     td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; }
     .ok { margin-top: 22px; padding: 14px 16px; background: #ecfdf5; color: #047857; font-weight: 700; font-size: 13px; }
     .foot { display: flex; justify-content: space-between; gap: 24px; margin-top: 28px; align-items: flex-end; }
@@ -170,7 +170,7 @@ export async function downloadReceiptPdf({ advance, teacher, payment = null, sch
   const margin = 14;
   let y = 14;
 
-  doc.setFillColor(0, 4, 53);
+  doc.setFillColor(19, 33, 61);
   doc.roundedRect(margin, y, pageW - margin * 2, 28, 2, 2, "F");
   if (school) doc.addImage(school, "PNG", margin + 4, y + 4, 20, 20);
   if (ticha) doc.addImage(ticha, "PNG", pageW - margin - 24, y + 4, 20, 20);
@@ -183,7 +183,7 @@ export async function downloadReceiptPdf({ advance, teacher, payment = null, sch
   doc.text(`Receipt ${receiptNo}  ·  Generated ${generated}`, margin + (school ? 28 : 8), y + 19);
 
   y = 50;
-  doc.setTextColor(0, 4, 53);
+  doc.setTextColor(19, 33, 61);
   const info = [
     ["Advance ID", id],
     ["Teacher", teacher?.fullName || teacher?.name || "-"],
@@ -197,7 +197,7 @@ export async function downloadReceiptPdf({ advance, teacher, payment = null, sch
     doc.setTextColor(100, 116, 139);
     doc.text(row[0].toUpperCase(), x, yy);
     doc.setFontSize(11);
-    doc.setTextColor(0, 4, 53);
+    doc.setTextColor(19, 33, 61);
     doc.setFont("helvetica", "bold");
     doc.text(String(row[1]), x, yy + 5);
     doc.setFont("helvetica", "normal");
@@ -223,14 +223,14 @@ export async function downloadReceiptPdf({ advance, teacher, payment = null, sch
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 116, 139);
     doc.text(row[0], x, yy);
-    doc.setTextColor(0, 4, 53);
+    doc.setTextColor(19, 33, 61);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text(String(row[1]), x + 42, yy);
   });
 
   y += 38;
-  doc.setFillColor(0, 4, 53);
+  doc.setFillColor(19, 33, 61);
   doc.rect(margin, y, pageW - margin * 2, 8, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(8);
@@ -239,7 +239,7 @@ export async function downloadReceiptPdf({ advance, teacher, payment = null, sch
   doc.text("Amount", margin + 78, y + 5.5);
   doc.text("Reference", margin + 120, y + 5.5);
   y += 8;
-  doc.setTextColor(0, 4, 53);
+  doc.setTextColor(19, 33, 61);
   rows.forEach((r, i) => {
     if (i % 2 === 0) {
       doc.setFillColor(248, 250, 252);

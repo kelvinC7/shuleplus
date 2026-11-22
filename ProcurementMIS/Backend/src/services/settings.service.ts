@@ -85,6 +85,22 @@ export class SettingsService {
 
   async getAcademicSettings(organizationId: string): Promise<AcademicSettings> {
     const fromIam = await fetchIamAcademicSettings(organizationId);
+    if (fromIam && (fromIam.academicYears?.length || fromIam.currentAcademicYear)) {
+      return fromIam;
+    }
+
+    // Fallback: the organization profile embeds the same academic settings.
+    const profile = await fetchIamSchoolProfile(organizationId);
+    const fromProfile = profile?.academicSettings;
+    if (fromProfile && (fromProfile.academicYears?.length || fromProfile.currentAcademicYear)) {
+      return {
+        academicYears: fromProfile.academicYears ?? [],
+        terms: fromProfile.terms ?? [],
+        currentAcademicYear: fromProfile.currentAcademicYear ?? null,
+        currentTerm: fromProfile.currentTerm ?? null,
+      };
+    }
+
     return (
       fromIam ?? {
         academicYears: [],

@@ -90,3 +90,32 @@ export function requireServiceAuth(req: Request, _res: Response, next: NextFunct
 
   next();
 }
+
+const PUBLISH_APPROVE_ROLES = new Set([
+  'organization_admin',
+  'school_admin',
+  'director',
+  'head_teacher',
+  'headteacher',
+  'dos',
+  'dod',
+  'academic_admin',
+  'academics_admin',
+  'principal',
+]);
+
+export function hasAcademicPublishRole(user?: JwtPayload): boolean {
+  if (!user) return false;
+  if ((user.roles ?? []).some((r) => PUBLISH_APPROVE_ROLES.has(String(r).toLowerCase()))) return true;
+  return false;
+}
+
+export function requireAcademicPublishAccess(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
+  const user = req.user;
+  if (!user) throw new AppError(401, 'Authentication required');
+  if (hasAcademicPublishRole(user)) {
+    next();
+    return;
+  }
+  throw new AppError(403, 'You do not have permission to publish or approve academic results');
+}

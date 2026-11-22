@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { env } from '../config/env';
 import {
   getReportCardComments,
   getReportCardSettings,
@@ -7,6 +8,7 @@ import {
   verifyReportCard,
 } from '../services/report-card.service';
 import { reportCardPublicationService } from '../services/report-card-publication.service';
+import { normalizeReportKind, type ReportKind } from '../utils/report-kind';
 
 function orgIdOf(req: Request) {
   const r = req as AuthenticatedRequest;
@@ -101,6 +103,21 @@ export class ReportCardController {
     }
   }
 
+  async listPublicationBatches(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orgId = orgIdOf(req)!;
+      const q = req.query as Record<string, string>;
+      const data = await reportCardPublicationService.listBatches(orgId, {
+        academicYear: q.academicYear,
+        term: q.term,
+        classId: q.classId,
+      });
+      res.json({ data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async publishOne(req: Request, res: Response, next: NextFunction) {
     try {
       const orgId = orgIdOf(req)!;
@@ -110,11 +127,23 @@ export class ReportCardController {
         classId: string;
         academicYear: string;
         term: string;
+        reportKind?: ReportKind;
+        accessPolicy?: 'PAID_ONLY' | 'ALL_PARENTS';
+        notifyInApp?: boolean;
+        notifyPush?: boolean;
+        includeReportLink?: boolean;
+        publicationType?: string;
       };
       const data = await reportCardPublicationService.publishOne(orgId, {
         ...body,
+        reportKind: normalizeReportKind(body.reportKind),
+        accessPolicy: body.accessPolicy,
+        notifyInApp: body.notifyInApp,
+        notifyPush: body.notifyPush,
+        includeReportLink: body.includeReportLink,
         publishedBy: r.user?.sub ?? null,
         publishedByName: r.user?.email ?? null,
+        actorRoles: r.user?.roles ?? [],
       });
       res.json({ data });
     } catch (err) {
@@ -126,11 +155,32 @@ export class ReportCardController {
     try {
       const orgId = orgIdOf(req)!;
       const r = req as AuthenticatedRequest;
-      const body = req.body as { classId: string; academicYear: string; term: string };
+      const body = req.body as {
+        classId: string;
+        academicYear: string;
+        term: string;
+        reportKind?: ReportKind;
+        studentIds?: string[];
+        selectedStudentIds?: string[];
+        accessPolicy?: 'PAID_ONLY' | 'ALL_PARENTS';
+        notifyInApp?: boolean;
+        notifyPush?: boolean;
+        includeReportLink?: boolean;
+        publicationType?: string;
+      };
       const data = await reportCardPublicationService.publishClass(orgId, {
         ...body,
+        reportKind: normalizeReportKind(body.reportKind),
+        accessPolicy: body.accessPolicy,
+        studentIds: Array.isArray(body.studentIds) ? body.studentIds : undefined,
+        selectedStudentIds: Array.isArray(body.selectedStudentIds) ? body.selectedStudentIds : undefined,
+        notifyInApp: body.notifyInApp,
+        notifyPush: body.notifyPush,
+        includeReportLink: body.includeReportLink,
+        publicationType: body.publicationType,
         publishedBy: r.user?.sub ?? null,
         publishedByName: r.user?.email ?? null,
+        actorRoles: r.user?.roles ?? [],
       });
       res.json({ data });
     } catch (err) {
@@ -142,6 +192,20 @@ export class ReportCardController {
     try {
       const ref = String(req.query.ref || req.params.ref || '');
       const org = typeof req.query.org === 'string' ? req.query.org : undefined;
+
+      const accept = req.headers.accept ?? '';
+      const wantsHtml =
+        typeof accept === 'string' &&
+        accept.includes('text/html') &&
+        !accept.includes('application/json');
+      if (wantsHtml && ref.trim()) {
+        const fe = env.ACADEMIC_PUBLIC_FRONTEND_URL.replace(/\/$/, '');
+        const q = new URLSearchParams({ ref: ref.trim() });
+        if (org) q.set('org', org);
+        res.redirect(302, `${fe}/verify/report?${q.toString()}`);
+        return;
+      }
+
       const data = await verifyReportCard(ref, org);
       res.json({ data });
     } catch (err) {

@@ -9,6 +9,8 @@ export interface ReportCardSchoolInfo {
   website?: string | null;
   motto?: string | null;
   organizationCode?: string | null;
+  reportHeaderLines?: string[];
+  rightLogoUrl?: string | null;
 }
 
 export interface ReportCardDataV2 {
@@ -18,6 +20,7 @@ export interface ReportCardDataV2 {
     firstName: string;
     lastName: string;
     studentUid: string;
+    studentCode?: string | null;
     gender: string | null;
     dateOfBirth: string | null;
     photoUrl?: string | null;
@@ -29,6 +32,9 @@ export interface ReportCardDataV2 {
   class: { id: string; name: string; stream: string | null } | null;
   academicYear: string;
   term: string | null;
+  reportView?: 'single' | 'combined';
+  combinedTerms?: string[];
+  termComponentOrders?: Array<{ term: string; components: string[] }>;
   componentOrder?: string[];
   assessmentTemplate?: {
     id: string;
@@ -49,9 +55,12 @@ export interface ReportCardDataV2 {
         rawMarksDisplay?: string;
         normalizedScore?: number;
         normalizedMax?: number;
+        marksRecorded?: boolean;
+        consolidatedOnDefault?: number;
       }
     >;
     totalScore: number;
+    studentMarksOnDefault?: number;
     totalMax?: number;
     defaultCourseMarks?: number;
     percentage: number;
@@ -60,6 +69,31 @@ export interface ReportCardDataV2 {
     rank: number | null;
     classSize: number | null;
     marksEntered?: boolean;
+    courseComplete?: boolean;
+    missingComponents?: string[];
+    isCore?: boolean;
+    termResults?: Array<{
+      term: string;
+      categoryScores: Record<
+        string,
+        {
+          percentage: number;
+          weight: number;
+          contribution: number;
+          marksDisplay?: string;
+          rawMarksDisplay?: string;
+          normalizedMax?: number;
+        }
+      >;
+      totalScore: number;
+      totalMax?: number;
+      percentage: number;
+      grade: string | null;
+      rank: number | null;
+      classSize: number | null;
+      marksEntered?: boolean;
+      componentOrder: string[];
+    }>;
   }>;
   overallScore: number;
   overallGrade: string | null;
@@ -90,7 +124,23 @@ export interface ReportCardDataV2 {
   } | null;
   gradingLegend?: Array<{ grade: string; minPercentage: number; maxPercentage: number; description: string | null }>;
   attendance?: { available: boolean; message?: string; rate?: number; present?: number; days?: number };
-  discipline?: { record: string; comment: string | null; incidents: number; message?: string };
+  discipline?: {
+    available?: boolean;
+    record: string;
+    comment: string | null;
+    incidents: number;
+    message?: string;
+    score?: number;
+    maxScore?: number;
+  };
   comments?: { classTeacher: string; headTeacher: string };
   meta?: { reportNumber: string; generatedAt: string; verifyUrl: string | null };
+  reportKind?: 'standard' | 'midterm' | 'beginning';
+  midTermSummary?: {
+    catQuizAverage?: number | null;
+    assessmentsCompleted?: number;
+    assessmentsTotal?: number;
+    position?: number | null;
+    classSize?: number | null;
+  };
 }

@@ -236,7 +236,7 @@ export default function StudentImportWizard({ open, onClose, onImported }: Props
     invalid: number;
     autoGenerateSdms: number;
   } | null>(null);
-  const [duplicateMode, setDuplicateMode] = useState<'skip' | 'update'>('skip');
+  const [duplicateMode, setDuplicateMode] = useState<'skip' | 'update'>('update');
   const [filter, setFilter] = useState<'all' | 'ready' | 'duplicates' | 'invalid'>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -817,11 +817,11 @@ export default function StudentImportWizard({ open, onClose, onImported }: Props
 
             <Typography sx={{ fontWeight: 700, color: NAVY, mb: 1 }}>Duplicate handling</Typography>
             <RadioGroup value={duplicateMode} onChange={(e) => setDuplicateMode(e.target.value as 'skip' | 'update')}>
-              <FormControlLabel value="skip" control={<Radio sx={{ color: AMBER, '&.Mui-checked': { color: AMBER } }} />} label="Skip Duplicates (Recommended)" />
-              <FormControlLabel value="update" control={<Radio sx={{ color: AMBER, '&.Mui-checked': { color: AMBER } }} />} label="Update Existing Students" />
+              <FormControlLabel value="update" control={<Radio sx={{ color: AMBER, '&.Mui-checked': { color: AMBER } }} />} label="Update existing students (fill missing parent & profile fields)" />
+              <FormControlLabel value="skip" control={<Radio sx={{ color: AMBER, '&.Mui-checked': { color: AMBER } }} />} label="Skip duplicates" />
             </RadioGroup>
             <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 1 }}>
-              Invalid rows are skipped. SDMS (government) stays empty when missing. ShuleCode (DD+ORG+SEQ+YY) is always generated for new students.
+              Matches existing students by SDMS, Shule code, name+DOB, or name+class when names repeat. Update mode merges Excel parent phones/names and address fields without wiping data already in the system.
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>

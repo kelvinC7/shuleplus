@@ -34,6 +34,26 @@ export type ExamEligibilityLookup = {
   }>;
 };
 
+export type ReportCardAccessLookup = {
+  published: boolean;
+  allowed: boolean;
+  message?: string | null;
+  publication?: {
+    id?: string;
+    studentId?: string;
+    classId?: string;
+    className?: string | null;
+    studentCode?: string | null;
+    academicYear?: string;
+    term?: string;
+    reportKind?: string;
+    accessPolicy?: string | null;
+  } | null;
+  balance?: number;
+  paymentStatus?: string;
+  hasActiveLoan?: boolean;
+};
+
 const OPEN: ExamEligibilityLookup = {
   published: false,
   allowed: true,
@@ -90,4 +110,34 @@ export async function lookupExamEligibility(params: {
 export function examEligibilityAllowed(row: { allowed?: boolean; status?: string } | undefined) {
   if (!row) return true;
   return row.allowed === true;
+}
+
+export async function lookupReportCardAccess(params: {
+  organizationId: string;
+  academicYear: string;
+  term: string;
+  studentId?: string;
+  studentCode?: string;
+  className?: string;
+  classId?: string;
+  reportKind?: 'standard' | 'midterm';
+}): Promise<ReportCardAccessLookup> {
+  try {
+    return await feesFetch<ReportCardAccessLookup>('/service/report-card-access', {
+      organizationId: params.organizationId,
+      academicYear: params.academicYear,
+      term: params.term,
+      studentId: params.studentId ?? '',
+      studentCode: params.studentCode ?? '',
+      className: params.className ?? '',
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'School Fees lookup unavailable';
+    // Safe default: if fees policy cannot be evaluated, do not expose report content.
+    return {
+      published: false,
+      allowed: false,
+      message: `Unable to verify report access at this time. ${message}`,
+    };
+  }
 }

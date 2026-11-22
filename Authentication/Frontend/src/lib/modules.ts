@@ -96,6 +96,12 @@ export interface ModuleControlResponse {
     status: string;
     subscriptionTier: string | null;
   };
+  /** Present only on activate/unlock responses. */
+  provisioning?: {
+    attempted: boolean;
+    provisioned: boolean;
+    error?: string;
+  };
   modules: ModuleControlRow[];
   stats: {
     total: number;

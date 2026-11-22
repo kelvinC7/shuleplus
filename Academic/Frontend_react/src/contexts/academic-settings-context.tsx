@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { getAcademicSettings, type AcademicSettings } from '@/services/api';
+import { getAcademicSettings, getStoredReportFooterSettings, type AcademicSettings } from '@/services/api';
 
 interface AcademicSettingsContextValue {
   settings: AcademicSettings | null;
@@ -53,9 +53,14 @@ export function AcademicSettingsProvider({ children }: { children: ReactNode }) 
     if (!opts?.silent) setLoading(true);
     try {
       const data = await getAcademicSettings();
-      setSettings(data);
+      const stored = getStoredReportFooterSettings();
+      setSettings({
+        ...data,
+        reportFooter: data?.reportFooter ?? stored ?? null,
+      });
     } catch {
-      setSettings(null);
+      const stored = getStoredReportFooterSettings();
+      setSettings(stored ? { academicYears: [], terms: [], currentAcademicYear: null, currentTerm: null, reportFooter: stored } : null);
     } finally {
       setLoading(false);
       setReady(true);

@@ -1,42 +1,98 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, LayoutList, Loader2, Plus, Search } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import Drawer from '@mui/material/Drawer';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
+import useAutoRefresh from '../../hooks/useAutoRefresh';
 import useTpAcademic from '../../hooks/useTpAcademic';
 import { fetchCoursesMarksDashboard } from '../../services/coursesMarksApi.js';
 import { tpApiError } from '../../services/teacherPortalApi';
 import RecordMarksWizard from '../StudentsMarksPages/components/RecordMarksWizard.jsx';
 import RequestEditModal from './RequestEditModal.jsx';
-import { UI_STATUS, formatCourseProgress } from './statusUtils.js';
+import AssessmentRowMenu from './AssessmentRowMenu.jsx';
+import { UI_STATUS } from './statusUtils.js';
+import { brand } from '../../theme/theme';
+
+const NAVY = brand.navy;
+const MUTED = 'rgba(19,33,61,0.45)';
+const BORDER = 'rgba(19,33,61,0.08)';
 
 function StatusBadge({ status }) {
   const cfg = UI_STATUS[status] || UI_STATUS.draft;
+  const tone = cfg.tone;
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cfg.color}`}>
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        borderRadius: 99,
+        px: 1.25,
+        py: 0.25,
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        color: tone.color,
+        bgcolor: tone.bg,
+        boxShadow: `inset 0 0 0 1px ${tone.ring}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
       {cfg.label}
-    </span>
+    </Box>
   );
 }
 
 function StatPill({ label, value, active, onClick }) {
   return (
-    <button
-      type="button"
+    <ButtonBase
       onClick={onClick}
-      className={`flex min-w-[9.5rem] shrink-0 snap-start flex-col rounded-xl border px-4 py-3 text-left transition sm:min-w-0 ${
-        active
-          ? 'border-[#FCB038] bg-[#FCB038]/10 shadow-sm'
-          : 'border-slate-200/80 bg-white hover:border-slate-300'
-      }`}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        minWidth: { xs: '9.5rem', sm: 0 },
+        flexShrink: 0,
+        scrollSnapAlign: 'start',
+        borderRadius: 1.5,
+        border: `1px solid ${active ? brand.primary : 'rgba(226,232,240,0.8)'}`,
+        bgcolor: active ? 'rgba(245,166,35,0.10)' : '#fff',
+        px: 2,
+        py: 1.5,
+        textAlign: 'left',
+        boxShadow: active ? 1 : 0,
+        '&:hover': { borderColor: active ? brand.primary : '#CBD5E1' },
+      }}
     >
-      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-      <span className="mt-1 text-2xl font-bold tabular-nums text-[#000435]">{value}</span>
-    </button>
+      <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8' }}>
+        {label}
+      </Typography>
+      <Typography sx={{ mt: 0.5, fontSize: 24, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: NAVY }}>
+        {value}
+      </Typography>
+    </ButtonBase>
   );
-}
-
-function progressPercent(prog) {
-  if (!prog?.total) return 0;
-  return Math.round((prog.submitted / prog.total) * 100);
 }
 
 function marksActionLabel(a) {
@@ -45,17 +101,47 @@ function marksActionLabel(a) {
   return entered ? 'Edit marks' : 'Enter marks';
 }
 
+const barSelectSx = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: NAVY,
+  bgcolor: 'transparent',
+  '&:before, &:after': { borderBottom: 'none !important' },
+  '& .MuiSelect-select': { py: 0.75, pr: '24px !important', bgcolor: 'transparent !important' },
+  '& .MuiSelect-icon': { fontSize: 18 },
+};
+
+const headCellSx = {
+  py: 1.25,
+  px: 2,
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: '#94A3B8',
+  bgcolor: '#F8F9FC',
+  borderBottom: `1px solid ${BORDER}`,
+  whiteSpace: 'nowrap',
+};
+
+const cellSx = {
+  py: 1.5,
+  px: 2,
+  fontSize: 13,
+  borderBottom: `1px solid rgba(0,0,0,0.04)`,
+};
+
 export default function CoursesAndMarksPage() {
   const { term, academicYear, setTerm, setAcademicYear, ready, settings } = useTpAcademic();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('cards');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardPreset, setWizardPreset] = useState(null);
   const [editModal, setEditModal] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,19 +166,24 @@ export default function CoursesAndMarksPage() {
     if (ready) void load();
   }, [ready, load]);
 
-  const courses = useMemo(() => {
-    const list = data?.courses || [];
+  // Auto-refresh so timetable/config-class course changes appear without manual reload.
+  useAutoRefresh(load, { enabled: ready });
+
+  const yearOptions = data?.filters?.academic_years || settings?.academicYears || [];
+  const termOptions = data?.filters?.terms || settings?.terms || ['Term 1', 'Term 2', 'Term 3'];
+  const summary = data?.summary || {};
+
+  const assessments = useMemo(() => {
+    const list = data?.assessments || [];
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
-      (c) => c.subject_name?.toLowerCase().includes(q) || c.class_name?.toLowerCase().includes(q),
+      (a) =>
+        a.title?.toLowerCase().includes(q) ||
+        a.subject?.toLowerCase().includes(q) ||
+        a.class_name?.toLowerCase().includes(q),
     );
   }, [data, search]);
-
-  const assessments = data?.assessments || [];
-  const summary = data?.summary || {};
-  const yearOptions = data?.filters?.academic_years || settings?.academicYears || [];
-  const termOptions = data?.filters?.terms || settings?.terms || ['Term 1', 'Term 2', 'Term 3'];
 
   const statFilters = [
     { key: '', label: 'Courses', value: summary.assigned_courses ?? 0 },
@@ -102,58 +193,126 @@ export default function CoursesAndMarksPage() {
     { key: 'locked', label: 'Locked', value: summary.locked ?? 0 },
   ];
 
+  const openWizard = () => {
+    setWizardPreset(null);
+    setWizardOpen(true);
+  };
+
+  const statusOf = (a) => (a.correction_request?.status === 'PENDING' ? 'edit_pending' : a.ui_status);
+
   return (
-    <div className="tp-page space-y-5 pb-12 sm:space-y-6">
-      <div className="flex flex-col gap-4 sm:gap-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-[#000435] sm:text-2xl">Courses & Marks</h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500">
-              Your assigned courses, mark entry, and submission status for {academicYear} · {term}.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 xs:flex-row xs:flex-wrap sm:justify-end">
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-              <select
-                value={academicYear}
+    <Box sx={{ minHeight: '100%', pb: 5, display: 'flex', flexDirection: 'column' }}>
+      {/* Sticky filter bar — same pattern as /marks */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          width: '100%',
+          bgcolor: '#fff',
+          borderBottom: `1px solid ${BORDER}`,
+          boxShadow: '0 2px 8px -4px rgba(19,33,61,0.12)',
+        }}
+      >
+        <Stack direction="row" alignItems="center" sx={{ px: 1.5, py: 0.25, gap: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FormControl variant="standard" size="small" fullWidth>
+              <Select
+                variant="standard"
+                disableUnderline
+                displayEmpty
+                value={academicYear || ''}
                 onChange={(e) => setAcademicYear(e.target.value)}
-                className="tp-input h-10 text-sm"
-                aria-label="Academic year"
+                sx={barSelectSx}
+                inputProps={{ 'aria-label': 'Academic year' }}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
               >
-                {(yearOptions.length ? yearOptions : [academicYear]).map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
+                {(yearOptions.length ? yearOptions : [academicYear]).filter(Boolean).map((y) => (
+                  <MenuItem key={y} value={y}>{y}</MenuItem>
                 ))}
-              </select>
-              <select
-                value={term}
+              </Select>
+            </FormControl>
+          </Box>
+          <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+          <Box sx={{ flex: 0.85, minWidth: 0 }}>
+            <FormControl variant="standard" size="small" fullWidth>
+              <Select
+                variant="standard"
+                disableUnderline
+                displayEmpty
+                value={term || ''}
                 onChange={(e) => setTerm(e.target.value)}
-                className="tp-input h-10 text-sm"
-                aria-label="Term"
+                sx={barSelectSx}
+                inputProps={{ 'aria-label': 'Term' }}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
               >
                 {termOptions.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
+                  <MenuItem key={t} value={t}>{t}</MenuItem>
                 ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setWizardPreset(null);
-                setWizardOpen(true);
+              </Select>
+            </FormControl>
+          </Box>
+        </Stack>
+        <Box sx={{ px: 1.5, py: 0.75, borderTop: `1px solid ${BORDER}` }}>
+          <Box sx={{ position: 'relative' }}>
+            <SearchIcon sx={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 16, color: 'rgba(19,33,61,0.3)' }} />
+            <Box
+              component="input"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search course, class or assessment…"
+              sx={{
+                width: '100%',
+                height: 36,
+                borderRadius: 2,
+                border: '1px solid rgba(0,0,0,0.1)',
+                bgcolor: '#fff',
+                pl: 4,
+                pr: 1.5,
+                fontSize: 13,
+                fontFamily: 'inherit',
+                color: NAVY,
+                outline: 'none',
+                '&:focus': { boxShadow: '0 0 0 2px rgba(19,33,61,0.15)' },
               }}
-              className="tp-btn-primary inline-flex h-10 w-full items-center justify-center gap-2 sm:w-auto"
-            >
-              <Plus className="h-4 w-4" />
-              Enter marks
-            </button>
-          </div>
-        </div>
+            />
+          </Box>
+        </Box>
+      </Box>
 
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+      <Stack spacing={2.5} sx={{ maxWidth: 1200, mx: 'auto', width: '100%', px: { xs: 1.5, sm: 2.5 }, pt: 2, pb: 6 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1.5}>
+          <Box>
+            <Typography sx={{ fontSize: 18, fontWeight: 600, color: NAVY }}>Assessments</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, color: MUTED }}>
+              Mark entry, submission status and analytics · {academicYear} · {term}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={openWizard}
+            startIcon={<AddIcon />}
+            sx={{ height: 40, width: { xs: '100%', sm: 'auto' }, flexShrink: 0 }}
+          >
+            Enter marks
+          </Button>
+        </Stack>
+
+        <Box
+          sx={{
+            display: { xs: 'flex', sm: 'grid' },
+            gridTemplateColumns: { sm: 'repeat(5, 1fr)' },
+            gap: 1,
+            overflowX: { xs: 'auto', sm: 'visible' },
+            scrollSnapType: { xs: 'x mandatory', sm: 'none' },
+            mx: -0.5,
+            px: 0.5,
+            pb: { xs: 0.5, sm: 0 },
+            '&::-webkit-scrollbar': { display: 'none' },
+          }}
+        >
           {statFilters.map((s) => (
             <StatPill
               key={s.key || 'all'}
@@ -163,275 +322,317 @@ export default function CoursesAndMarksPage() {
               onClick={() => setStatusFilter(s.key)}
             />
           ))}
-        </div>
-      </div>
+        </Box>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
-      )}
+        {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search course or class…"
-            className="tp-input h-10 w-full pl-10 text-sm"
-          />
-        </div>
-        <div className="flex items-center justify-between gap-2 sm:justify-end">
-          <span className="text-xs text-slate-400 sm:hidden">
-            {courses.length} course{courses.length === 1 ? '' : 's'}
-          </span>
-          <div className="flex rounded-xl bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => setView('cards')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                view === 'cards' ? 'bg-white text-[#000435] shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              Cards
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('table')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                view === 'table' ? 'bg-white text-[#000435] shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              <LayoutList className="h-3.5 w-3.5" />
-              Table
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 py-20 text-sm text-slate-500">
-          <Loader2 className="h-5 w-5 animate-spin text-[#c87800]" />
-          Loading courses…
-        </div>
-      ) : view === 'cards' ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {courses.length === 0 ? (
-            <div className="tp-card col-span-full px-6 py-14 text-center">
-              <p className="text-sm font-medium text-[#000435]">No courses for this term</p>
-              <p className="mt-1 text-xs text-slate-500">Confirm your timetable assignments and academic year.</p>
-              <Link to="/assessments/schedule" className="tp-btn-secondary mt-4 inline-flex">
-                Go to assessments
-              </Link>
-            </div>
-          ) : null}
-          {courses.map((course) => {
-            const prog = course.progress || formatCourseProgress(course.assessments);
-            const pct = progressPercent(prog);
-            const firstAssessment = course.assessments?.[0];
-            return (
-              <article
-                key={course.id}
-                className="tp-card flex flex-col overflow-hidden transition hover:shadow-md hover:ring-1 hover:ring-[#FCB038]/30"
-              >
-                <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-lg font-bold text-[#000435]">{course.subject_name}</h2>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {course.class_name}
-                        <span className="text-slate-300"> · </span>
-                        {course.term}
-                      </p>
-                    </div>
-                    <StatusBadge status={course.ui_status || 'draft'} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-5">
-                  <div className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Students</p>
-                    <p className="mt-0.5 text-lg font-bold tabular-nums text-[#000435]">{course.student_count ?? '-'}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Assessments</p>
-                    <p className="mt-0.5 text-lg font-bold tabular-nums text-[#000435]">
-                      {course.assessments?.length ?? 0}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="px-4 pb-4 sm:px-5">
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{prog.label}</span>
-                    {prog.total > 0 ? <span className="font-semibold tabular-nums text-[#000435]">{pct}%</span> : null}
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-[#FCB038] transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-auto flex flex-col gap-2 border-t border-slate-100 px-4 py-3 sm:flex-row sm:px-5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setWizardPreset({ className: course.class_name, subjectName: course.subject_name });
-                      setWizardOpen(true);
-                    }}
-                    className="tp-btn-primary inline-flex h-10 flex-1 items-center justify-center text-sm"
-                  >
-                    Enter marks
-                  </button>
-                  {firstAssessment ? (
-                    <Link
-                      to={`/assessments/${firstAssessment.id}/marks`}
-                      className="tp-btn-secondary inline-flex h-10 flex-1 items-center justify-center text-sm"
+        {loading ? (
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ py: 10, color: '#64748B' }}>
+            <CircularProgress size={20} sx={{ color: '#B26A00' }} />
+            <Typography sx={{ fontSize: 14 }}>Loading assessments…</Typography>
+          </Stack>
+        ) : (
+          <Paper
+            elevation={0}
+            sx={{
+              borderRadius: 2.5,
+              border: `1px solid ${BORDER}`,
+              bgcolor: '#fff',
+              overflow: 'hidden',
+              boxShadow: '0 1px 2px rgba(19,33,61,0.06)',
+            }}
+          >
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table sx={{ width: '100%', minWidth: 640, borderCollapse: 'collapse' }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{
+                        ...headCellSx,
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 12,
+                        bgcolor: '#F8F9FC',
+                        minWidth: 140,
+                        borderRight: 0,
+                        boxShadow: `inset -1px 0 0 ${BORDER}`,
+                      }}
                     >
-                      View latest
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/assessments/schedule"
-                      className="tp-btn-secondary inline-flex h-10 flex-1 items-center justify-center text-sm"
-                    >
-                      Schedule
-                    </Link>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <>
-          <div className="tp-card hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    {['Course', 'Class', 'Assessment', 'Max', 'Progress', 'Status', 'Actions'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+                      Assessment
+                    </TableCell>
+                    <TableCell sx={headCellSx}>Course</TableCell>
+                    <TableCell sx={headCellSx}>Class</TableCell>
+                    <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Max</TableCell>
+                    <TableCell sx={{ ...headCellSx, textAlign: 'center' }}>Progress</TableCell>
+                    <TableCell sx={headCellSx}>Status</TableCell>
+                    <TableCell sx={{ ...headCellSx, textAlign: 'right', width: 120 }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {assessments.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-500">
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ py: 7, textAlign: 'center', fontSize: 14, color: '#94A3B8' }}>
                         No assessments match this filter.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     assessments.map((a) => (
-                      <tr key={a.id} className="hover:bg-[#FCB038]/[0.04]">
-                        <td className="px-4 py-3 font-semibold text-[#000435]">{a.subject}</td>
-                        <td className="px-4 py-3 text-slate-600">{a.class_name}</td>
-                        <td className="px-4 py-3">{a.title}</td>
-                        <td className="px-4 py-3 tabular-nums">{a.max_mark}</td>
-                        <td className="px-4 py-3 tabular-nums text-slate-600">
+                      <TableRow
+                        key={a.id}
+                        hover
+                        onClick={() => setSelectedRow(a)}
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: 'rgba(245,166,35,0.04)' },
+                          '&:last-child td': { borderBottom: 0 },
+                        }}
+                      >
+                        <TableCell
+                          sx={{
+                            ...cellSx,
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 10,
+                            bgcolor: '#fff',
+                            'tr:hover > &': { bgcolor: '#FFFBF6' },
+                            borderRight: 0,
+                            boxShadow: `inset -1px 0 0 ${BORDER}`,
+                            fontWeight: 600,
+                            color: NAVY,
+                            maxWidth: 180,
+                          }}
+                        >
+                          <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, color: NAVY }}>
+                            {a.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ ...cellSx, color: '#475569' }}>{a.subject}</TableCell>
+                        <TableCell sx={{ ...cellSx, color: '#475569' }}>{a.class_name}</TableCell>
+                        <TableCell sx={{ ...cellSx, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                          {a.max_mark}
+                        </TableCell>
+                        <TableCell sx={{ ...cellSx, textAlign: 'center', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
                           {a.marks_entered}/{a.marks_total || '-'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge
-                            status={a.correction_request?.status === 'PENDING' ? 'edit_pending' : a.ui_status}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            <Link
+                        </TableCell>
+                        <TableCell sx={cellSx}>
+                          <StatusBadge status={statusOf(a)} />
+                        </TableCell>
+                        <TableCell
+                          sx={{ ...cellSx, textAlign: 'right' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Desktop actions */}
+                          <Stack
+                            direction="row"
+                            justifyContent="flex-end"
+                            spacing={0.75}
+                            sx={{ display: { xs: 'none', md: 'flex' } }}
+                          >
+                            <Button
+                              component={Link}
                               to={`/assessments/${a.id}/marks`}
-                              className="inline-flex rounded-lg bg-[#000435] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#000435]/90"
+                              size="small"
+                              variant="contained"
+                              sx={{
+                                bgcolor: NAVY,
+                                color: '#fff',
+                                px: 1.25,
+                                py: 0.5,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                minWidth: 0,
+                                '&:hover': { bgcolor: 'rgba(19,33,61,0.9)' },
+                              }}
                             >
                               {marksActionLabel(a)}
-                            </Link>
+                            </Button>
                             {a.is_locked ? (
-                              <button
-                                type="button"
+                              <Button
+                                size="small"
+                                variant="outlined"
                                 onClick={() => setEditModal(a)}
-                                className="inline-flex rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-50"
+                                sx={{
+                                  borderColor: '#FDE68A',
+                                  color: '#78350F',
+                                  px: 1.25,
+                                  py: 0.5,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  minWidth: 0,
+                                  '&:hover': { bgcolor: '#FFFBEB' },
+                                }}
                               >
                                 Request edit
-                              </button>
+                              </Button>
                             ) : null}
-                          </div>
-                        </td>
-                      </tr>
+                            <AssessmentRowMenu assessment={a} onChanged={load} />
+                          </Stack>
+                          {/* Mobile three-dots actions */}
+                          <AssessmentRowMenu
+                            assessment={a}
+                            onChanged={load}
+                            sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+                          />
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        )}
 
-          <div className="space-y-3 md:hidden">
-            {assessments.length === 0 ? (
-              <div className="tp-card px-4 py-10 text-center text-sm text-slate-500">No assessments match this filter.</div>
-            ) : (
-              assessments.map((a) => (
-                <div key={a.id} className="tp-card overflow-hidden">
-                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[#000435]">{a.title}</p>
-                      <p className="text-xs text-slate-500">
-                        {a.subject} · {a.class_name}
-                      </p>
-                    </div>
-                    <StatusBadge
-                      status={a.correction_request?.status === 'PENDING' ? 'edit_pending' : a.ui_status}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 px-4 py-3 text-xs">
-                    <div>
-                      <p className="text-slate-400">Max mark</p>
-                      <p className="font-semibold text-[#000435]">{a.max_mark}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Entered</p>
-                      <p className="font-semibold tabular-nums text-[#000435]">
-                        {a.marks_entered}/{a.marks_total || '-'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 border-t border-slate-100 px-4 py-3">
-                    <Link
-                      to={`/assessments/${a.id}/marks`}
-                      className="tp-btn-primary inline-flex h-9 flex-1 items-center justify-center text-xs"
-                    >
-                      {marksActionLabel(a)}
-                    </Link>
-                    {a.is_locked ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditModal(a)}
-                        className="tp-btn-secondary inline-flex h-9 flex-1 items-center justify-center text-xs"
-                      >
-                        Request edit
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </>
-      )}
+        <RecordMarksWizard
+          open={wizardOpen}
+          preset={wizardPreset}
+          onClose={() => {
+            setWizardOpen(false);
+            setWizardPreset(null);
+            load();
+          }}
+          onPublished={load}
+        />
+        <RequestEditModal open={!!editModal} assessment={editModal} onClose={() => setEditModal(null)} onSuccess={load} />
 
-      <RecordMarksWizard
-        open={wizardOpen}
-        preset={wizardPreset}
-        onClose={() => {
-          setWizardOpen(false);
-          setWizardPreset(null);
-          load();
+        {/* Row detail: drawer on mobile, dialog on larger screens */}
+        <Drawer
+          anchor="bottom"
+          open={!!selectedRow}
+          onClose={() => setSelectedRow(null)}
+          sx={{ display: { xs: 'block', sm: 'none' } }}
+          PaperProps={{
+            sx: {
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              maxHeight: '85dvh',
+              pb: 2,
+            },
+          }}
+        >
+          {selectedRow && (
+            <RowDetail
+              row={selectedRow}
+              onClose={() => setSelectedRow(null)}
+              onRequestEdit={() => {
+                setSelectedRow(null);
+                setEditModal(selectedRow);
+              }}
+            />
+          )}
+        </Drawer>
+
+        <Dialog
+          open={!!selectedRow}
+          onClose={() => setSelectedRow(null)}
+          maxWidth="sm"
+          fullWidth
+          sx={{ display: { xs: 'none', sm: 'block' } }}
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          {selectedRow && (
+            <RowDetail
+              row={selectedRow}
+              onClose={() => setSelectedRow(null)}
+              onRequestEdit={() => {
+                setSelectedRow(null);
+                setEditModal(selectedRow);
+              }}
+            />
+          )}
+        </Dialog>
+      </Stack>
+    </Box>
+  );
+}
+
+function RowDetail({ row, onClose, onRequestEdit }) {
+  const status = row.correction_request?.status === 'PENDING' ? 'edit_pending' : row.ui_status;
+
+  return (
+    <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ mb: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: 16, fontWeight: 700, color: NAVY }}>{row.title}</Typography>
+          <Typography sx={{ mt: 0.25, fontSize: 13, color: MUTED }}>
+            {row.subject} · {row.class_name}
+          </Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose} aria-label="Close" sx={{ color: MUTED }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5 }}>
+        <StatusBadge status={status} />
+        {row.is_locked ? (
+          <Typography sx={{ fontSize: 12, color: '#D97706', fontWeight: 600 }}>Locked</Typography>
+        ) : null}
+      </Stack>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 1.5,
+          mb: 2.5,
+          p: 1.75,
+          borderRadius: 2,
+          bgcolor: '#F8F9FC',
+          border: `1px solid ${BORDER}`,
         }}
-        onPublished={load}
-      />
-      <RequestEditModal open={!!editModal} assessment={editModal} onClose={() => setEditModal(null)} onSuccess={load} />
-    </div>
+      >
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase' }}>Max mark</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 18, fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
+            {row.max_mark}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase' }}>Progress</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 18, fontWeight: 700, color: NAVY, fontVariantNumeric: 'tabular-nums' }}>
+            {row.marks_entered}/{row.marks_total || '-'}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Stack spacing={1}>
+        <Button
+          component={Link}
+          to={`/assessments/${row.id}/marks`}
+          variant="contained"
+          fullWidth
+          sx={{
+            height: 44,
+            bgcolor: NAVY,
+            color: '#fff',
+            fontWeight: 600,
+            textTransform: 'none',
+            '&:hover': { bgcolor: 'rgba(19,33,61,0.9)' },
+          }}
+        >
+          {marksActionLabel(row)}
+        </Button>
+        {row.is_locked ? (
+          <Button
+            variant="outlined"
+            fullWidth
+            onClick={onRequestEdit}
+            sx={{
+              height: 44,
+              borderColor: '#FDE68A',
+              color: '#78350F',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: '#FFFBEB' },
+            }}
+          >
+            Request edit
+          </Button>
+        ) : null}
+      </Stack>
+    </Box>
   );
 }

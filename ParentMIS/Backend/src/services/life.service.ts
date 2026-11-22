@@ -1,7 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { resolveParentContext, resolveActiveStudent } from './parent-context.service';
-import { listDisciplineCases, listPermissions } from '../clients/discipline.client';
+import { getDisciplineProfile, listDisciplineCases, listPermissions } from '../clients/discipline.client';
 import type { StudentSelector } from '../utils/student-param';
 
 function toIso(value?: string | Date | null): string | null {
@@ -30,22 +30,37 @@ export class LifeService {
   async discipline(organizationId: string, parentId: string, requestedStudentId?: StudentSelector) {
     const student = await resolveActiveStudent(organizationId, parentId, requestedStudentId).catch(() => null);
     if (!student) {
-      return { score: 100, totalPoints: 0, records: [] };
+      return { score: 100, maxScore: 100, totalPoints: 0, records: [] };
     }
 
     try {
-      const cases = await listDisciplineCases(organizationId, student.shuleCode);
+      const [cases, profile] = await Promise.all([
+        listDisciplineCases(organizationId, student.shuleCode),
+        getDisciplineProfile(organizationId, student.shuleCode).catch(() => null),
+      ]);
       const records = cases.map((c) => ({
         id: c.id,
         date: new Date(c.incidentDate || c.createdAt || Date.now()).toISOString(),
-        type: c.markName || 'Conduct',
+        type: c.markName || c.customCaseName || 'Conduct',
         description: c.description || c.incidentNotes || '',
         points: c.appliedPoints ?? 0,
         status: c.status || 'RECORDED',
       }));
       const totalPoints = records.reduce((s, r) => s + r.points, 0);
-      const score = Math.max(0, Math.min(100, 100 + totalPoints));
-      return { score, totalPoints, records };
+
+      // Prefer the learner balance from Student Discipline. It already applies
+      // the school's maximum and starting score, including roll-call deductions.
+      // Fall back to starting score + case points when the profile is missing.
+      const maxScore = Math.max(1, Number(profile?.maxScore) || 100);
+      const startingScore = Math.max(0, Number(profile?.startingScore ?? maxScore) || 0);
+      const hasBalance =
+        profile?.initialized !== false && Number.isFinite(Number(profile?.currentScore));
+      const rawScore = hasBalance
+        ? Number(profile?.currentScore)
+        : startingScore + totalPoints;
+      const score = Math.max(0, Math.min(maxScore, rawScore));
+
+      return { score, maxScore, startingScore, totalPoints, records };
     } catch (error) {
       console.warn(`[discipline] module unreachable (${(error as Error).message}); using local records`);
       const records = await prisma.disciplineRecord.findMany({
@@ -56,6 +71,8 @@ export class LifeService {
       const score = Math.max(0, Math.min(100, 100 - Math.abs(totalPoints)));
       return {
         score,
+        maxScore: 100,
+        startingScore: 100,
         totalPoints,
         records: records.map((r) => ({
           id: r.id,

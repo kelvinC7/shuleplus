@@ -1,4 +1,4 @@
-import { NotificationChannel, NotificationStatus } from '@prisma/client';
+import { NotificationChannel, NotificationStatus, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 
 export const logService = {
@@ -21,7 +21,7 @@ export const logService = {
         subject: data.subject,
         body: data.body,
         templateSlug: data.templateSlug,
-        metadata: data.metadata ?? undefined,
+        metadata: (data.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
         status: data.status ?? NotificationStatus.PENDING,
         sentAt: data.sentAt,
       },

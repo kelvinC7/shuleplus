@@ -40,6 +40,9 @@ router.get('/internal/staff', requireServiceAuth, (req, res, next) =>
 router.get('/internal/staff/rfid-lookup', requireServiceAuth, (req, res, next) =>
   hrController.lookupRfidOwner(req, res, next)
 );
+router.get('/internal/leave/active', requireServiceAuth, (req, res, next) =>
+  hrController.activeLeaveInternal(req, res, next)
+);
 router.get('/public/staff/lookup', (req, res, next) =>
   publicStaffLookupController.lookup(req, res, next)
 );

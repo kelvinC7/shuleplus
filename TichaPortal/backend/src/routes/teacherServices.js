@@ -729,4 +729,52 @@ router.get('/service/round-roll-call/analytics', requireServiceAuth, (req, res) 
   }
 });
 
+// Teacher-facing: own examination invigilation assignments (from Academic)
+router.get('/examinations/invigilator-assignments', async (req, res) => {
+  try {
+    const organizationId = orgId(req);
+    const t = teacher(req);
+    if (!organizationId || !t?.id) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    const payload = await serviceFetch(env.ACADEMIC_API_URL, '/service/examination-invigilator-assignments', {
+      query: {
+        organizationId,
+        teacherUserId: t.id,
+        date: req.query.date,
+        examinationListId: req.query.examinationListId,
+      },
+    });
+    send(res, unwrap(payload));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.get('/examinations/attendance', async (req, res) => {
+  try {
+    const organizationId = orgId(req);
+    const t = teacher(req);
+    if (!organizationId || !t?.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const payload = await serviceFetch(env.ACADEMIC_API_URL, '/service/examination-attendance', {
+      query: { organizationId, examinationListId: req.query.examinationListId, roomId: req.query.roomId, examDate: req.query.examDate, session: req.query.session },
+    });
+    send(res, unwrap(payload));
+  } catch (err) { fail(res, err); }
+});
+
+router.post('/examinations/attendance', async (req, res) => {
+  try {
+    const organizationId = orgId(req);
+    const t = teacher(req);
+    if (!organizationId || !t?.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const payload = await serviceFetch(env.ACADEMIC_API_URL, '/service/examination-attendance', {
+      method: 'POST',
+      query: { organizationId },
+      body: { ...(req.body || {}), markedByUserId: t.id, markedByName: t.name || t.email || '' },
+    });
+    send(res, unwrap(payload));
+  } catch (err) { fail(res, err); }
+});
+
 module.exports = { teacherServicesRouter: router };

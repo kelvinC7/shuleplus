@@ -1,10 +1,16 @@
 import { useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Loader2 } from 'lucide-react';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
 
 export default function AttendanceAnalysis() {
   const [params, setParams] = useState({});
@@ -18,36 +24,38 @@ export default function AttendanceAnalysis() {
       attendance: s.at_risk ? 65 : Math.min(100, (s.average || 0) + 15),
     }));
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Attendance vs Performance</h1>
-          <p className="text-gray-500 text-sm mt-1">Student performance overview (attendance correlation uses period data when available)</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Attendance vs Performance</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>
+            Student performance overview (attendance correlation uses period data when available)
+          </Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
       {chartData.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-12 rounded-xl border border-dashed border-gray-200">
+        <Box sx={{ py: 6, textAlign: 'center', borderRadius: 2, border: '1px dashed #E5E7EB', fontSize: 14, color: '#9CA3AF' }}>
           Not enough marks data for analysis.
-        </p>
+        </Box>
       ) : (
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
+        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 }}>
           <ResponsiveContainer width="100%" height={320}>
             <ScatterChart>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" dataKey="attendance" name="Attendance %" domain={[0, 100]} tick={{ fontSize: 11 }} />
               <YAxis type="number" dataKey="performance" name="Performance %" domain={[0, 100]} tick={{ fontSize: 11 }} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter data={chartData} fill="#f59e0b" />
+              <Scatter data={chartData} fill={brand.primary} />
             </ScatterChart>
           </ResponsiveContainer>
-        </div>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }

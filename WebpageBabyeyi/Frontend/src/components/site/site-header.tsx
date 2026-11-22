@@ -3,10 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Logo } from './logo';
 import { IamSelector } from './iam-selector';
-import { Button, buttonVariants } from '@/components/ui/button';
 import { BookIcon, CloseIcon, MenuIcon } from './icons';
 import { cn } from '@/lib/utils';
-import { REGISTER_SCHOOL_URL } from '@/lib/auth-urls';
 import { useSiteLanguage } from './language-provider';
 
 export function SiteHeader() {
@@ -49,21 +47,9 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
-          <div className="hidden xl:block">
+          <div className="hidden min-[480px]:block">
             <IamSelector />
           </div>
-          <Button variant="outline" size="sm" className="hidden whitespace-nowrap lg:inline-flex">
-            {t.nav.signIn}
-          </Button>
-          <a
-            href={REGISTER_SCHOOL_URL}
-            className={cn(
-              buttonVariants({ size: 'sm' }),
-              'hidden whitespace-nowrap px-3 text-xs lg:inline-flex xl:px-4 xl:text-sm',
-            )}
-          >
-            {t.nav.registerSchool}
-          </a>
           <button
             type="button"
             aria-label={t.nav.menu}
@@ -95,15 +81,9 @@ export function SiteHeader() {
             {item.label}
           </a>
         ))}
-        <div className="flex flex-col gap-2.5 p-6">
+        <div className="flex flex-col gap-2.5 p-6 min-[480px]:hidden">
           <IamSelector />
-          <Button variant="outline" size="sm" className="w-full">
-            {t.nav.signIn}
-          </Button>
-          <Button asChild size="sm" className="w-full">
-            <a href={REGISTER_SCHOOL_URL}>{t.nav.registerSchool}</a>
-          </Button>
-          <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-ink-400">
+          <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] font-medium capitalize tracking-wide text-ink-400">
             <BookIcon className="h-3 w-3" /> {t.nav.tagline}
           </p>
         </div>

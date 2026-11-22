@@ -1,38 +1,63 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import AddIcon from '@mui/icons-material/Add';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import useTpAcademic from '../hooks/useTpAcademic';
 import TablePagination from '../components/TablePagination';
 import PermissionRequestModal, { PERMISSION_TYPES } from '../components/PermissionRequestModal';
+import { PageLoading, EmptyState } from '../components/ui';
 import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  Eye,
-  Loader2,
-  Plus,
-  RefreshCw,
-  RotateCcw,
-  Search,
-  Shield,
-  Trash2,
-  X,
-  XCircle,
-} from 'lucide-react';
-import TeacherOrangeHero from '../components/TeacherOrangeHero';
+  ListPage,
+  StickyTabs,
+  StickyFilterBar,
+  BarSelect,
+  ListPageBody,
+  PageTitleRow,
+  NavyStats,
+  SectionPaper,
+  headCellSx,
+  cellSx,
+  BORDER,
+} from '../components/ListPageKit';
+import { brand } from '../theme/theme';
+
+const STATUS_CHIP = {
+  pending: { bgcolor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' },
+  approved: { bgcolor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' },
+  rejected: { bgcolor: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA' },
+  cancelled: { bgcolor: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' },
+};
+
+function chipSx(status) {
+  return { fontWeight: 700, textTransform: 'capitalize', ...(STATUS_CHIP[status] || STATUS_CHIP.pending) };
+}
 
 function fmtDate(raw) {
   if (!raw) return '-';
   return new Date(raw).toLocaleDateString('en-RW', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
-const STATUS_BADGE = {
-  pending: 'bg-amber-50 text-amber-800 border-amber-200',
-  approved: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  rejected: 'bg-red-50 text-red-700 border-red-200',
-  cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
-};
 
 function typeLabel(value) {
   return PERMISSION_TYPES.find((p) => p.value === value)?.label || String(value || 'Other').replace(/_/g, ' ');
@@ -40,24 +65,6 @@ function typeLabel(value) {
 
 function permissionDays(start, end) {
   return Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1);
-}
-
-const flatField =
-  'w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-re-text outline-none transition-colors placeholder:text-slate-400 focus:border-re-orange/45 focus:ring-2 focus:ring-re-orange/12';
-
-function StatCard({ icon: Icon, label, value, sub, iconClass }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconClass}`}>
-        <Icon size={18} />
-      </div>
-      <div>
-        <p className="text-xl font-bold text-slate-800 tabular-nums">{value}</p>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</p>
-        {sub ? <p className="text-[9px] text-slate-400 mt-0.5">{sub}</p> : null}
-      </div>
-    </div>
-  );
 }
 
 export default function Permissions() {
@@ -104,21 +111,26 @@ export default function Permissions() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const createPerm = async (payload) => {
-      await api.post('/teacher-portal/permissions', {
-        ...payload,
-        term,
-        academicYear,
-      });
+    await api.post('/teacher-portal/permissions', {
+      ...payload,
+      term,
+      academicYear,
+    });
     load();
   };
 
-  const teacherMeta = useMemo(() => ({
-    position: teacher?.position || teacher?.role_title || '',
-    department: teacher?.department || teacher?.subject || '',
-  }), [teacher]);
+  const teacherMeta = useMemo(
+    () => ({
+      position: teacher?.position || teacher?.role_title || '',
+      department: teacher?.department || teacher?.subject || '',
+    }),
+    [teacher]
+  );
 
   const cancelPerm = async (id) => {
     if (!window.confirm('Cancel this permission request?')) return;
@@ -130,24 +142,29 @@ export default function Permissions() {
     }
   };
 
-  const counts = useMemo(() => ({
-    total: rows.length,
-    pending: rows.filter((r) => r.status === 'pending').length,
-    approved: rows.filter((r) => r.status === 'approved').length,
-    rejected: rows.filter((r) => r.status === 'rejected').length,
-  }), [rows]);
+  const counts = useMemo(
+    () => ({
+      total: rows.length,
+      pending: rows.filter((r) => r.status === 'pending').length,
+      approved: rows.filter((r) => r.status === 'approved').length,
+      rejected: rows.filter((r) => r.status === 'rejected').length,
+    }),
+    [rows]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      const tabOk = tab === 'All'
-        || (tab === 'Pending' && r.status === 'pending')
-        || (tab === 'Approved' && r.status === 'approved')
-        || (tab === 'Rejected' && r.status === 'rejected');
+      const tabOk =
+        tab === 'All' ||
+        (tab === 'Pending' && r.status === 'pending') ||
+        (tab === 'Approved' && r.status === 'approved') ||
+        (tab === 'Rejected' && r.status === 'rejected');
       const typeOk = typeFilter === 'All' || r.permission_type === typeFilter;
-      const qOk = !q
-        || typeLabel(r.permission_type).toLowerCase().includes(q)
-        || (r.reason || '').toLowerCase().includes(q);
+      const qOk =
+        !q ||
+        typeLabel(r.permission_type).toLowerCase().includes(q) ||
+        (r.reason || '').toLowerCase().includes(q);
       const fromOk = !dateFrom || String(r.start_date || '').slice(0, 10) >= dateFrom;
       const toOk = !dateTo || String(r.end_date || '').slice(0, 10) <= dateTo;
       return tabOk && typeOk && qOk && fromOk && toOk;
@@ -157,7 +174,9 @@ export default function Permissions() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const paginated = filtered.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  useEffect(() => { setPage(1); }, [search, typeFilter, dateFrom, dateTo, tab, rowsPerPage]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, typeFilter, dateFrom, dateTo, tab, rowsPerPage]);
 
   const clearFilters = () => {
     setSearch('');
@@ -168,240 +187,243 @@ export default function Permissions() {
   };
 
   const tabs = [
-    { id: 'All', label: 'All Requests' },
+    { id: 'All', label: 'All' },
     { id: 'Pending', label: `Pending (${counts.pending})` },
     { id: 'Approved', label: `Approved (${counts.approved})` },
     { id: 'Rejected', label: `Rejected (${counts.rejected})` },
   ];
 
+  const stats = [
+    { label: 'Total requests', value: loading ? '—' : counts.total },
+    { label: 'Pending', value: loading ? '—' : counts.pending },
+    { label: 'Approved', value: loading ? '—' : counts.approved },
+    { label: 'Rejected', value: loading ? '—' : counts.rejected },
+  ];
+
+  const hasFilters = Boolean(search || typeFilter !== 'All' || dateFrom || dateTo || tab !== 'All');
+
+  const dateInputSx = {
+    width: '100%',
+    border: 'none',
+    outline: 'none',
+    bgcolor: 'transparent',
+    py: 0.75,
+    fontSize: 12,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    color: brand.navy,
+  };
+
   return (
-    <div className="min-h-screen bg-re-bg font-sans">
-      <TeacherOrangeHero
-        title="Permission Requests"
-        subtitle="Submit leave, late arrival, or early departure requests. Your manager reviews and approves."
-        rightSlot={
-          <>
-            <button
-              type="button"
-              onClick={load}
-              className="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/10 w-11 h-11 text-white hover:bg-white/20 transition-all"
-              title="Refresh"
-              aria-label="Refresh permissions"
-            >
-              <RefreshCw size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-[11px] border border-white/25 bg-white/15 hover:bg-white/25 transition-all"
-            >
-              <Plus size={16} /> Request Permission
-            </button>
-          </>
-        }
-      >
-        <div className="flex md:hidden gap-2">
-          <button type="button" onClick={load} className="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/10 w-11 h-11 text-white" aria-label="Refresh">
-            <RefreshCw size={16} />
-          </button>
-          <button type="button" onClick={() => setModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-[11px] border border-white/25 bg-white/15">
-            <Plus size={16} /> Request
-          </button>
-        </div>
-      </TeacherOrangeHero>
+    <ListPage>
+      <StickyTabs tabs={tabs} value={tab} onChange={setTab} />
 
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 -mt-8 sm:-mt-10 relative z-30 pb-20 md:pb-16 space-y-4 sm:space-y-5">
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="font-semibold flex-1">{error}</span>
-            <button
-              type="button"
-              onClick={load}
-              className="shrink-0 min-h-[40px] rounded-lg border border-red-300 bg-white px-3 text-xs font-bold uppercase tracking-wide text-red-700"
-            >
-              Retry
-            </button>
-          </div>
-        )}
+      <StickyFilterBar top={42} search={search} onSearch={setSearch} searchPlaceholder="Search type or reason…">
+        <BarSelect
+          label="Type"
+          value={typeFilter === 'All' ? '' : typeFilter}
+          onChange={(v) => setTypeFilter(v || 'All')}
+          options={PERMISSION_TYPES.map((pt) => ({ value: pt.value, label: pt.label }))}
+          allLabel="All types"
+        />
+        <Box key="from" sx={{ flex: 0.9, minWidth: 0 }}>
+          <Box component="input" type="date" aria-label="From date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} sx={dateInputSx} />
+        </Box>
+        <Box key="to" sx={{ flex: 0.9, minWidth: 0 }}>
+          <Box component="input" type="date" aria-label="To date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} sx={dateInputSx} />
+        </Box>
+      </StickyFilterBar>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Shield} label="Total Requests" value={counts.total} sub="Your submissions" iconClass="text-sky-600 bg-sky-50" />
-          <StatCard icon={Clock} label="Pending" value={counts.pending} sub="Awaiting manager" iconClass="text-orange-600 bg-orange-50" />
-          <StatCard icon={CheckCircle} label="Approved" value={counts.approved} sub="Approved requests" iconClass="text-emerald-600 bg-emerald-50" />
-          <StatCard icon={XCircle} label="Rejected" value={counts.rejected} sub="Declined requests" iconClass="text-red-600 bg-red-50" />
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
-          <div className="p-3 sm:p-4 border-b border-slate-100 space-y-3">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by type or reason…"
-                className={`${flatField} !pl-9 text-xs sm:text-sm`}
-              />
-            </div>
-            <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap gap-2 items-stretch sm:items-center">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className={`${flatField} sm:min-w-[140px] sm:w-auto text-xs`}
+      <ListPageBody>
+        <PageTitleRow
+          title="Permission requests"
+          subtitle="Submit leave, late arrival, or early departure requests. Your manager reviews and approves."
+          actions={
+            <>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={load}
+                sx={{ textTransform: 'none', fontWeight: 700, borderColor: brand.border }}
               >
-                <option value="All">All Types</option>
-                {PERMISSION_TYPES.map((pt) => (
-                  <option key={pt.value} value={pt.value}>{pt.label}</option>
-                ))}
-              </select>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${flatField} text-xs`} />
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`${flatField} text-xs`} />
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="min-h-[44px] px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 inline-flex items-center justify-center gap-1 hover:bg-slate-50"
+                Refresh
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setModal(true)}
+                sx={{ textTransform: 'none', fontWeight: 700, bgcolor: brand.navy, color: '#fff', '&:hover': { bgcolor: '#1B2D52' } }}
               >
-                <RotateCcw size={12} /> Reset
-              </button>
-            </div>
-          </div>
+                Request permission
+              </Button>
+            </>
+          }
+        />
 
-          <div className="flex gap-1 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-100 bg-slate-50/60 overflow-x-auto">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`shrink-0 min-h-[40px] px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all ${
-                  tab === t.id ? 'bg-re-orange text-white' : 'text-slate-500 hover:bg-white hover:text-slate-700'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        {error ? (
+          <Alert
+            severity="error"
+            sx={{ borderRadius: 1 }}
+            action={
+              <Button color="inherit" size="small" onClick={load} sx={{ fontWeight: 700 }}>
+                Retry
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        ) : null}
 
+        <NavyStats stats={stats} />
+
+        <SectionPaper
+          title="Requests"
+          count={filtered.length}
+          action={
+            hasFilters ? (
+              <Button size="small" onClick={clearFilters} sx={{ textTransform: 'none', fontWeight: 700, color: brand.muted }}>
+                Reset filters
+              </Button>
+            ) : null
+          }
+        >
           {loading ? (
-            <div className="flex items-center justify-center gap-3 py-20">
-              <Loader2 className="animate-spin text-re-orange" size={22} />
-              <span className="text-sm font-bold text-slate-400">Loading requests…</span>
-            </div>
+            <PageLoading label="Loading requests…" />
           ) : filtered.length === 0 ? (
-            <div className="py-16 text-center px-6">
-              <Shield className="mx-auto text-slate-200 mb-3" size={40} />
-              <p className="text-[11px] font-bold text-slate-400">No permission requests found</p>
-              <button type="button" onClick={() => setModal(true)} className="mt-4 text-[11px] font-bold text-re-orange hover:underline">
-                + Request permission
-              </button>
-            </div>
+            <EmptyState
+              title="No permission requests found"
+              description="Create a request or adjust filters."
+              action={
+                <Button size="small" onClick={() => setModal(true)} sx={{ color: brand.navy, fontWeight: 700, textTransform: 'none' }}>
+                  + Request permission
+                </Button>
+              }
+            />
           ) : (
             <>
-              <ul className="md:hidden divide-y divide-slate-100">
-                {paginated.map((r) => {
+              <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+                {paginated.map((r, idx) => {
                   const days = permissionDays(r.start_date, r.end_date);
                   return (
-                    <li key={r.id} className="p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-bold text-re-text">{typeLabel(r.permission_type)}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">#{r.id}</p>
-                        </div>
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize ${STATUS_BADGE[r.status] || STATUS_BADGE.pending}`}>
-                          {r.status}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs font-semibold text-slate-600">
-                        {fmtDate(r.start_date)} → {fmtDate(r.end_date)} · {days} day{days === 1 ? '' : 's'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500 line-clamp-2">{r.reason || '-'}</p>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setViewPerm(r)}
-                          className="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wide"
-                        >
-                          View
-                        </button>
-                        {r.status === 'pending' && (
-                          <button
-                            type="button"
-                            onClick={() => cancelPerm(r.id)}
-                            className="min-h-[44px] px-4 rounded-xl border border-red-200 text-[10px] font-black uppercase tracking-wide text-red-600"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    </li>
+                    <Box
+                      key={r.id}
+                      sx={{
+                        px: 1.5,
+                        py: 1.35,
+                        bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                        borderBottom: idx < paginated.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none',
+                      }}
+                    >
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>
+                            {typeLabel(r.permission_type)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: brand.muted, mt: 0.25 }}>
+                            {fmtDate(r.start_date)} → {fmtDate(r.end_date)} · {days} day{days === 1 ? '' : 's'}
+                          </Typography>
+                        </Box>
+                        <Chip size="small" label={r.status} sx={{ height: 22, fontSize: 10, ...chipSx(r.status) }} />
+                      </Stack>
+                      {r.reason ? (
+                        <Typography noWrap sx={{ mt: 0.5, fontSize: 12, color: brand.muted }}>
+                          {r.reason}
+                        </Typography>
+                      ) : null}
+                      <Stack direction="row" spacing={0.25} sx={{ mt: 0.5 }}>
+                        <IconButton size="small" onClick={() => setViewPerm(r)} aria-label="View">
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        </IconButton>
+                        {r.status === 'pending' ? (
+                          <IconButton size="small" onClick={() => cancelPerm(r.id)} aria-label="Cancel" sx={{ color: brand.danger }}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        ) : null}
+                      </Stack>
+                    </Box>
                   );
                 })}
-              </ul>
+              </Box>
 
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-black/5">
-                      {['Type', 'Period', 'Days', 'Reason', 'Status', 'Submitted', 'Actions'].map((h) => (
-                        <th key={h} className="px-4 py-3 text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 whitespace-nowrap">{h}</th>
+              <TableContainer sx={{ display: { xs: 'none', md: 'block' }, overflowX: 'auto' }}>
+                <Table size="small" sx={{ width: '100%', minWidth: 560, borderCollapse: 'collapse' }}>
+                  <TableHead>
+                    <TableRow>
+                      {['Type', 'Period', 'Days', 'Reason', 'Status', 'Submitted', ''].map((h, i) => (
+                        <TableCell
+                          key={h || 'actions'}
+                          sx={
+                            i === 0
+                              ? { ...headCellSx, position: 'sticky', left: 0, zIndex: 12, minWidth: 140, boxShadow: `inset -1px 0 0 ${BORDER}` }
+                              : headCellSx
+                          }
+                        >
+                          {h}
+                        </TableCell>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/5">
-                    {paginated.map((r) => {
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {paginated.map((r, idx) => {
                       const days = permissionDays(r.start_date, r.end_date);
+                      const rowBg = idx % 2 === 1 ? '#F8F9FC' : '#fff';
                       return (
-                        <tr key={r.id} className="hover:bg-re-bg/30 transition-colors">
-                          <td className="px-4 py-3">
-                            <p className="text-xs font-bold text-re-text">{typeLabel(r.permission_type)}</p>
-                            <p className="text-[9px] text-slate-400">#{r.id}</p>
-                          </td>
-                          <td className="px-4 py-3 text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                        <TableRow
+                          key={r.id}
+                          hover
+                          sx={{ bgcolor: rowBg, '&:hover': { bgcolor: 'rgba(245,166,35,0.06)' }, '&:last-child td': { borderBottom: 0 } }}
+                        >
+                          <TableCell
+                            sx={{
+                              ...cellSx,
+                              position: 'sticky',
+                              left: 0,
+                              zIndex: 10,
+                              bgcolor: rowBg,
+                              'tr:hover > &': { bgcolor: '#FEFAF2' },
+                              boxShadow: `inset -1px 0 0 ${BORDER}`,
+                            }}
+                          >
+                            <Typography noWrap sx={{ fontSize: 12.5, fontWeight: 600, color: brand.navy }}>
+                              {typeLabel(r.permission_type)}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10, color: '#94A3B8' }}>#{r.id}</Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, color: '#475569', whiteSpace: 'nowrap' }}>
                             {fmtDate(r.start_date)} → {fmtDate(r.end_date)}
-                          </td>
-                          <td className="px-4 py-3 text-xs font-bold text-slate-700">
-                            <span className="inline-flex items-center gap-1"><Clock size={11} /> {days}</span>
-                          </td>
-                          <td className="px-4 py-3 text-[11px] text-slate-600 max-w-[220px]">
-                            <p className="truncate">{r.reason || '-'}</p>
-                            {r.decision_note && (
-                              <p className="text-[9px] text-indigo-600 italic mt-0.5 truncate">Manager: {r.decision_note}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize ${STATUS_BADGE[r.status] || STATUS_BADGE.pending}`}>
-                              {r.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-[10px] font-bold text-slate-500 whitespace-nowrap">
-                            {fmtDate(r.created_at)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                title="View"
-                                onClick={() => setViewPerm(r)}
-                                className="h-7 w-7 rounded-lg border border-blue-200 flex items-center justify-center text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-all"
-                              >
-                                <Eye size={12} />
-                              </button>
-                              {r.status === 'pending' && (
-                                <button
-                                  type="button"
-                                  title="Cancel"
-                                  onClick={() => cancelPerm(r.id)}
-                                  className="h-7 w-7 rounded-lg border border-red-200 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, color: '#475569' }}>{days}</TableCell>
+                          <TableCell sx={{ ...cellSx, color: '#475569', maxWidth: 220 }}>
+                            <Typography noWrap sx={{ fontSize: 12.5 }}>
+                              {r.reason || '—'}
+                            </Typography>
+                            {r.decision_note ? (
+                              <Typography noWrap sx={{ fontSize: 10, color: '#4F46E5', fontStyle: 'italic', mt: 0.25 }}>
+                                Manager: {r.decision_note}
+                              </Typography>
+                            ) : null}
+                          </TableCell>
+                          <TableCell sx={cellSx}>
+                            <Chip size="small" label={r.status} sx={{ height: 22, fontSize: 10, ...chipSx(r.status) }} />
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, color: '#64748B', whiteSpace: 'nowrap' }}>{fmtDate(r.created_at)}</TableCell>
+                          <TableCell sx={{ ...cellSx, whiteSpace: 'nowrap' }}>
+                            <IconButton size="small" onClick={() => setViewPerm(r)} aria-label="View">
+                              <VisibilityOutlinedIcon fontSize="small" />
+                            </IconButton>
+                            {r.status === 'pending' ? (
+                              <IconButton size="small" onClick={() => cancelPerm(r.id)} aria-label="Cancel" sx={{ color: brand.danger }}>
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
               <TablePagination
                 page={page}
                 totalPages={totalPages}
@@ -410,22 +432,15 @@ export default function Permissions() {
                 itemCount={paginated.length}
                 pageStartIndex={(page - 1) * rowsPerPage}
                 onPageChange={setPage}
-                onPageSizeChange={(n) => { setRowsPerPage(n); setPage(1); }}
+                onPageSizeChange={(n) => {
+                  setRowsPerPage(n);
+                  setPage(1);
+                }}
               />
             </>
           )}
-        </div>
-      </div>
-
-      <div className="fixed bottom-[4.5rem] left-0 right-0 z-[80] border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-md md:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={() => setModal(true)}
-          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-re-grad-orange text-[11px] font-black uppercase tracking-[0.15em] text-white"
-        >
-          <Plus size={18} /> Request permission
-        </button>
-      </div>
+        </SectionPaper>
+      </ListPageBody>
 
       <PermissionRequestModal
         open={modal}
@@ -435,79 +450,134 @@ export default function Permissions() {
         onSubmit={createPerm}
       />
 
-      {viewPerm && createPortal(
-        <div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center bg-[#08111F]/60 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200" onClick={() => setViewPerm(null)}>
-          <div className="bg-white w-full sm:max-w-lg rounded-t-[28px] sm:rounded-[28px] shadow-[0_20px_70px_-10px_rgba(0,0,0,0.3)] overflow-hidden animate-in slide-in-from-bottom-6 duration-400" onClick={(e) => e.stopPropagation()}>
-            <div className={`p-5 ${viewPerm.status === 'approved' ? 'bg-gradient-to-br from-emerald-600 to-emerald-800' : viewPerm.status === 'rejected' ? 'bg-gradient-to-br from-red-600 to-red-800' : 'bg-[linear-gradient(135deg,#FF8C00,#FF5E00)]'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-[14px] bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                    <Shield size={18} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Permission Details</h3>
-                    <p className="text-[10px] text-white/60 mt-0.5">#{viewPerm.id} · {viewPerm.status?.toUpperCase()}</p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => setViewPerm(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white/70 hover:text-white transition-all">
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</p>
-                  <p className="text-xs font-bold text-slate-800 mt-1">{typeLabel(viewPerm.permission_type)}</p>
-                </div>
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
-                  <p className="mt-1">
-                    <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full border capitalize ${STATUS_BADGE[viewPerm.status] || STATUS_BADGE.pending}`}>
-                      {viewPerm.status}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Start</p>
-                  <p className="text-xs font-bold text-slate-800 mt-1 flex items-center gap-1"><Calendar size={11} /> {fmtDate(viewPerm.start_date)}</p>
-                </div>
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">End</p>
-                  <p className="text-xs font-bold text-slate-800 mt-1 flex items-center gap-1"><Calendar size={11} /> {fmtDate(viewPerm.end_date)}</p>
-                </div>
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Days</p>
-                  <p className="text-xs font-bold text-slate-800 mt-1 flex items-center gap-1">
-                    <Clock size={11} /> {permissionDays(viewPerm.start_date, viewPerm.end_date)}
-                  </p>
-                </div>
-              </div>
-              {viewPerm.reason && (
-                <div className="bg-re-bg rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Reason</p>
-                  <p className="text-xs text-slate-700 mt-1 whitespace-pre-wrap">{viewPerm.reason}</p>
-                </div>
-              )}
-              {viewPerm.decision_note && (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-                  <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Manager Decision Note</p>
-                  <p className="text-xs text-indigo-700 mt-1 italic whitespace-pre-wrap">{viewPerm.decision_note}</p>
-                </div>
-              )}
-              {viewPerm.created_at && (
-                <p className="text-[9px] text-slate-400 text-right">Submitted: {fmtDate(viewPerm.created_at)}</p>
-              )}
-            </div>
-            <div className="p-4 bg-re-bg border-t border-black/5 flex justify-end">
-              <button type="button" onClick={() => setViewPerm(null)} className="h-10 px-6 rounded-xl bg-white border border-black/5 text-slate-600 font-bold text-[11px] hover:bg-slate-50 transition-all">Close</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
+      <Dialog
+        open={Boolean(viewPerm)}
+        onClose={() => setViewPerm(null)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: { xs: '28px 28px 0 0', sm: 4 }, overflow: 'hidden' } }}
+        slotProps={{ backdrop: { sx: { bgcolor: 'rgba(8,17,31,0.6)', backdropFilter: 'blur(6px)' } } }}
+        sx={{ '& .MuiDialog-container': { alignItems: { xs: 'flex-end', sm: 'center' } } }}
+      >
+        {viewPerm ? (
+          <>
+            <Box
+              sx={{
+                p: 2.5,
+                background:
+                  viewPerm.status === 'approved'
+                    ? 'linear-gradient(135deg,#059669,#065F46)'
+                    : viewPerm.status === 'rejected'
+                      ? 'linear-gradient(135deg,#DC2626,#7F1D1D)'
+                      : `linear-gradient(135deg,${brand.navy},${brand.navy})`,
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 1.75,
+                      bgcolor: 'rgba(255,255,255,0.12)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}
+                  >
+                    <ShieldOutlinedIcon sx={{ fontSize: 18, color: '#fff' }} />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Permission Details</Typography>
+                    <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', mt: 0.25 }}>
+                      #{viewPerm.id} · {viewPerm.status?.toUpperCase()}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <IconButton
+                  onClick={() => setViewPerm(null)}
+                  sx={{ color: 'rgba(255,255,255,0.7)', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            </Box>
+            <DialogContent sx={{ p: 2.5 }}>
+              <Stack spacing={1.5}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                  <Box sx={{ bgcolor: brand.background, borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Type
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1E293B', mt: 0.5 }}>
+                      {typeLabel(viewPerm.permission_type)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ bgcolor: brand.background, borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Status
+                    </Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      <Chip size="small" label={viewPerm.status} sx={chipSx(viewPerm.status)} />
+                    </Box>
+                  </Box>
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5 }}>
+                  {[
+                    { label: 'Start', value: fmtDate(viewPerm.start_date) },
+                    { label: 'End', value: fmtDate(viewPerm.end_date) },
+                    { label: 'Days', value: permissionDays(viewPerm.start_date, viewPerm.end_date) },
+                  ].map((item) => (
+                    <Box key={item.label} sx={{ bgcolor: brand.background, borderRadius: 1.5, p: 1.5 }}>
+                      <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        {item.label}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                        {item.label === 'Days' ? (
+                          <AccessTimeIcon sx={{ fontSize: 11, color: brand.muted }} />
+                        ) : (
+                          <CalendarMonthOutlinedIcon sx={{ fontSize: 11, color: brand.muted }} />
+                        )}
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1E293B' }}>{item.value}</Typography>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Box>
+                {viewPerm.reason ? (
+                  <Box sx={{ bgcolor: brand.background, borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Reason
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: '#334155', mt: 0.5, whiteSpace: 'pre-wrap' }}>
+                      {viewPerm.reason}
+                    </Typography>
+                  </Box>
+                ) : null}
+                {viewPerm.decision_note ? (
+                  <Box sx={{ bgcolor: '#EEF2FF', border: '1px solid #E0E7FF', borderRadius: 1.5, p: 1.5 }}>
+                    <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Manager Decision Note
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: '#4338CA', mt: 0.5, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                      {viewPerm.decision_note}
+                    </Typography>
+                  </Box>
+                ) : null}
+                {viewPerm.created_at ? (
+                  <Typography sx={{ fontSize: 9, color: '#94A3B8', textAlign: 'right' }}>
+                    Submitted: {fmtDate(viewPerm.created_at)}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </DialogContent>
+            <Box sx={{ p: 2, bgcolor: brand.background, borderTop: `1px solid ${brand.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+              <Button variant="outlined" onClick={() => setViewPerm(null)} sx={{ borderColor: brand.border, color: brand.muted }}>
+                Close
+              </Button>
+            </Box>
+          </>
+        ) : null}
+      </Dialog>
+    </ListPage>
   );
 }

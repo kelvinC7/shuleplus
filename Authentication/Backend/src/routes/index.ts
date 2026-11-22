@@ -54,7 +54,7 @@ router.use('/iam', iamRoutes);
 router.use('/auth/mfa', mfaRoutes);
 router.use('/root-admin', rootAdminRoutes);
 router.use('/super-admin', superAdminRoutes);
-// User JWT routes must register before service-key proxy (same paths like GET /in-app).
+// User JWT in-app routes first; service-key proxy handles POST sms/email/in-app for other modules.
 router.use('/notifications', notificationsRoutes);
 router.use('/notifications', notificationProxyRoutes);
 router.use('/internal', internalRoutes);

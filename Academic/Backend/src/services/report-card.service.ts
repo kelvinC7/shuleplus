@@ -21,12 +21,26 @@ function pickDisplayStudentCode(...candidates: (string | null | undefined)[]): s
   return null;
 }
 
+function uniqueLookupKeys(candidates: (string | null | undefined)[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    const t = raw?.trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+
 export type ReportCardSettings = {
   verifyBaseUrl?: string | null;
   enableClassTeacherComments?: boolean;
   enableHeadTeacherComments?: boolean;
   defaultHeadTeacherComment?: string | null;
   classTeacherCommentHint?: string | null;
+  reportHeaderLines?: string[];
+  reportRightLogoUrl?: string | null;
 };
 
 function parseReportCardSettings(raw: unknown): ReportCardSettings {
@@ -40,6 +54,13 @@ function parseReportCardSettings(raw: unknown): ReportCardSettings {
       typeof o.defaultHeadTeacherComment === 'string' ? o.defaultHeadTeacherComment : null,
     classTeacherCommentHint:
       typeof o.classTeacherCommentHint === 'string' ? o.classTeacherCommentHint : null,
+    reportHeaderLines: Array.isArray(o.reportHeaderLines)
+      ? o.reportHeaderLines
+          .map((x) => (typeof x === 'string' ? x.trim() : ''))
+          .filter((x) => x.length > 0)
+      : undefined,
+    reportRightLogoUrl:
+      typeof o.reportRightLogoUrl === 'string' && o.reportRightLogoUrl.trim() ? o.reportRightLogoUrl.trim() : null,
   };
 }
 
@@ -121,10 +142,39 @@ export async function upsertReportCardComments(
   });
 }
 
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i;
+
+function publicOrigin(url: string | undefined | null): string | null {
+  const t = url?.trim().replace(/\/$/, '');
+  if (!t || LOCAL_ORIGIN.test(t)) return null;
+  return t;
+}
+
+function withVerifyReportPath(base: string): string {
+  return base.includes('/verify/report') ? base : `${base}/verify/report`;
+}
+
 function defaultVerifyEndpoint(): string {
-  const base = env.PUBLIC_BASE_URL.replace(/\/$/, '');
-  const prefix = env.API_PREFIX.startsWith('/') ? env.API_PREFIX : `/${env.API_PREFIX}`;
-  return `${base}${prefix.replace(/\/$/, '')}/public/report-card/verify`;
+  const explicit = publicOrigin(env.REPORT_VERIFY_PUBLIC_URL);
+  if (explicit) return withVerifyReportPath(explicit);
+  const parent = publicOrigin(env.PARENT_PORTAL_PUBLIC_URL);
+  if (parent) return withVerifyReportPath(parent);
+  const fe = publicOrigin(env.ACADEMIC_PUBLIC_FRONTEND_URL);
+  if (fe) return withVerifyReportPath(fe);
+
+  if (env.NODE_ENV === 'production') {
+    return 'https://parents.shuleplus.rw/verify/report';
+  }
+  const parentDev = env.PARENT_PORTAL_PUBLIC_URL?.replace(/\/$/, '') || 'http://localhost:3049';
+  return withVerifyReportPath(parentDev);
+}
+
+function resolveVerifyBase(settingsBase: string | null | undefined): string {
+  const fromSettings = settingsBase?.trim().replace(/\/$/, '');
+  if (fromSettings && !LOCAL_ORIGIN.test(fromSettings)) {
+    return withVerifyReportPath(fromSettings);
+  }
+  return defaultVerifyEndpoint();
 }
 
 export async function verifyReportCard(reportNumber: string, organizationCode?: string) {
@@ -242,7 +292,7 @@ export async function enrichReportPayload(
     (report.meta as { reportNumber?: string })?.reportNumber ||
     `RC-${String(ctx.academicYear).replace(/\s/g, '')}-${String(uid || ctx.studentId).slice(-8)}`;
 
-  const verifyBase = settings.verifyBaseUrl?.trim() || defaultVerifyEndpoint();
+  const verifyBase = resolveVerifyBase(settings.verifyBaseUrl);
   const orgCode = profile?.organizationCode ? String(profile.organizationCode) : '';
   const verifyUrl = `${verifyBase}?ref=${encodeURIComponent(reportNumber)}${orgCode ? `&org=${encodeURIComponent(orgCode)}` : ''}`;
 
@@ -300,8 +350,57 @@ export async function enrichReportPayload(
         website: (profile as { website?: string }).website ?? null,
         motto: (profile as { schoolMotto?: string }).schoolMotto ?? null,
         organizationCode: profile.organizationCode ?? null,
+        reportHeaderLines: settings.reportHeaderLines?.length ? settings.reportHeaderLines : undefined,
+        rightLogoUrl: resolveIamAssetUrl(settings.reportRightLogoUrl ?? null),
       }
     : { name: 'School', logoUrl: null };
+
+  const lookupKeys = uniqueLookupKeys([
+    displayStudentCode,
+    acStudent?.studentCode,
+    acStudent?.studentUid,
+    sm?.studentCode,
+    uid,
+    ctx.studentId,
+  ]);
+  const disciplineCode = displayStudentCode || acStudent?.studentCode || sm?.studentCode || uid || ctx.studentId;
+  const reportTerm = typeof report.term === 'string' ? report.term : null;
+  const periodOpts = {
+    academicYear: ctx.academicYear,
+    term: ctx.term?.trim() || reportTerm,
+  };
+  const [attendanceIntegration, disciplineIntegration] = await Promise.all([
+    import('./report-card-integrations.service').then((m) =>
+      m.fetchReportAttendance(organizationId, lookupKeys, periodOpts)
+    ),
+    import('./report-card-integrations.service').then((m) =>
+      m.fetchReportDiscipline(organizationId, String(disciplineCode), periodOpts)
+    ),
+  ]);
+
+  const attendance =
+    attendanceIntegration.available
+      ? {
+          available: true,
+          rate: attendanceIntegration.rate ?? null,
+          days: attendanceIntegration.days ?? null,
+          present: attendanceIntegration.present ?? null,
+          absent: attendanceIntegration.absent ?? null,
+          late: attendanceIntegration.late ?? null,
+        }
+      : (report.attendance as object) ?? { available: false, message: attendanceIntegration.message };
+
+  const discipline =
+    disciplineIntegration.available
+      ? {
+          available: true,
+          record: disciplineIntegration.record ?? null,
+          score: disciplineIntegration.score ?? null,
+          maxScore: disciplineIntegration.maxScore ?? 100,
+          incidents: disciplineIntegration.incidents ?? 0,
+          message: disciplineIntegration.message ?? null,
+        }
+      : (report.discipline as object) ?? { record: null, incidents: 0 };
 
   return {
     ...report,
@@ -320,7 +419,7 @@ export async function enrichReportPayload(
       generatedAt: (report.meta as { generatedAt?: string })?.generatedAt || new Date().toISOString(),
       verifyUrl,
     },
-    attendance: report.attendance ?? { available: false },
-    discipline: report.discipline ?? { record: null, incidents: 0 },
+    attendance,
+    discipline,
   };
 }

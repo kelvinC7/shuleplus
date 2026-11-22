@@ -328,3 +328,206 @@ select.input {
     width: 100% !important;
   }
 }
+
+/* -- Timetable print layout ---------------------------------------------
+   The print preview overlay renders the app UI on screen and a dedicated
+   .timetable-print-root that is the only thing shown when printing. */
+.timetable-print-root {
+  display: none;
+}
+
+.timetable-print-overlay .timetable-print-header,
+.timetable-print-overlay .timetable-print-group,
+.timetable-print-overlay .timetable-print-footer {
+  color: #000435;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* The print root is portaled to <body>; hide the whole app shell. */
+  body > *:not(.timetable-print-root) {
+    display: none !important;
+  }
+
+  .timetable-print-overlay {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .timetable-print-root {
+    display: block !important;
+    width: 100%;
+    font-family: var(--font-montserrat), system-ui, sans-serif;
+    color: #000435;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .timetable-print-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 2px solid #000435;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .timetable-print-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .timetable-print-logo {
+    max-height: 34px;
+    width: auto;
+  }
+
+  .timetable-print-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #000435;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .timetable-print-school {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .timetable-print-doctitle {
+    font-size: 10px;
+    font-weight: 600;
+    color: #334155;
+    line-height: 1.2;
+  }
+
+  .timetable-print-meta {
+    text-align: right;
+    font-size: 9px;
+    line-height: 1.4;
+    color: #334155;
+  }
+
+  .timetable-print-group {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
+  }
+
+  .timetable-print-group-pagebreak {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .timetable-print-grouptitle {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .timetable-print-groupsub {
+    font-size: 8.5px;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .timetable-print-table-wrap {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .timetable-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .timetable-print-table th,
+  .timetable-print-table td {
+    border: 0.5pt solid #94a3b8;
+    padding: 1px 2px;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+
+  .timetable-print-table thead th {
+    background: #000435 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .timetable-print-table .timetable-print-break {
+    background: #f1f5f9 !important;
+    color: #94a3b8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .timetable-print-table .timetable-print-dayhead {
+    background: #e2e8f0 !important;
+    color: #000435 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .timetable-print-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-top: 1px solid #cbd5e1;
+    margin-top: 8px;
+    padding-top: 4px;
+    font-size: 8px;
+    color: #64748b;
+  }
+}
+
+/* -- All-streams class matrix ------------------------------------------- */
+.timetable-print-matrix .timetable-print-dayhead {
+  background: #e2e8f0 !important;
+  color: #000435 !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.timetable-print-matrix thead .timetable-print-dayhead {
+  background: #000435 !important;
+  color: #ffffff !important;
+}
+
+.timetable-print-matrix .timetable-print-daystart th,
+.timetable-print-matrix .timetable-print-daystart td {
+  border-top: 1pt solid #64748b;
+}
+
+.timetable-print-matrix th:first-child,
+.timetable-print-matrix th:nth-child(2) {
+  width: 7%;
+}
+
+.timetable-print-matrix th:first-child {
+  white-space: normal;
+  word-break: break-word;
+}

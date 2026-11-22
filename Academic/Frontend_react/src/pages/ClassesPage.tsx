@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Checkbox, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress, Drawer,
-  Collapse,
+  Collapse, useMediaQuery,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -64,6 +64,53 @@ function classDisplayName(cls: ApiClass): string {
   return parts.join(' ');
 }
 
+type ClassProfileStudent = { studentId: string; student: Student };
+
+function ClassProfileContent({
+  profileClass,
+  profileStudents,
+  onClose,
+}: {
+  profileClass: ApiClass;
+  profileStudents: ClassProfileStudent[];
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, bgcolor: 'white', zIndex: 1 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Class Details</Typography>
+        <IconButton size="small" onClick={onClose}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+      </Box>
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+        <Box sx={{ width: 56, height: 56, borderRadius: 1, bgcolor: 'rgba(25,118,210,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
+          <ClassIcon sx={{ fontSize: 28, color: '#1976d2' }} />
+        </Box>
+        <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>{classDisplayName(profileClass)}</Typography>
+      </Box>
+      <Box sx={{ px: 2, py: 1 }}>
+        <SectionTitle>Information</SectionTitle>
+        <ProfileRow icon={<ClassIcon sx={{ fontSize: 16 }} />} label="Grade" value={profileClass.grade?.name ?? profileClass.name} />
+        <ProfileRow icon={<ClassIcon sx={{ fontSize: 16 }} />} label="Stream" value={profileClass.stream} />
+        <ProfileRow icon={<CategoryIcon sx={{ fontSize: 16 }} />} label="Category" value={profileClass.grade?.category ?? profileClass.category} />
+        <ProfileRow icon={<BookIcon sx={{ fontSize: 16 }} />} label="Combination" value={profileClass.combination?.displayName ?? profileClass.combination?.name} />
+        <SectionTitle sx={{ mt: 2 }}>Students</SectionTitle>
+        {profileStudents.length === 0 ? (
+          <Typography sx={{ fontSize: '0.8125rem', color: '#94a3b8' }}>No students enrolled</Typography>
+        ) : (
+          <Box sx={{ maxHeight: 240, overflow: 'auto' }}>
+            {profileStudents.map((e) => (
+              <Box key={e.studentId} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <PeopleIcon sx={{ fontSize: 14, color: '#94a3b8' }} />
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{e.student.firstName} {e.student.lastName}</Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
+    </>
+  );
+}
+
 const cellHeaderSx = { fontWeight: 700, fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b', bgcolor: 'white', borderBottom: '1px solid', borderColor: 'divider' };
 
 export default function ClassesPage() {
@@ -76,6 +123,7 @@ export default function ClassesPage() {
   const [profileClass, setProfileClass] = useState<ApiClass | null>(null);
   const [profileStudents, setProfileStudents] = useState<{ studentId: string; student: Student }[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width:899.95px)');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -288,44 +336,35 @@ export default function ClassesPage() {
           )}
         </TableContainer>
 
-        {/* Profile Panel */}
-        <Collapse in={!!profileClass} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0 } } }}>
-          <Box sx={{ width: { md: 300 }, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, display: { xs: 'none', md: 'block' }, bgcolor: 'white' }}>
-            {profileClass && (<>
-              <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e293b' }}>Class Details</Typography>
-                <IconButton size="small" onClick={() => setProfileClass(null)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
-              </Box>
-              <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-                <Box sx={{ width: 56, height: 56, borderRadius: 1, bgcolor: 'rgba(25,118,210,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1.5 }}>
-                  <ClassIcon sx={{ fontSize: 28, color: '#1976d2' }} />
-                </Box>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>{classDisplayName(profileClass)}</Typography>
-              </Box>
-              <Box sx={{ px: 2, py: 1 }}>
-                <SectionTitle>Information</SectionTitle>
-                <ProfileRow icon={<ClassIcon sx={{ fontSize: 16 }} />} label="Grade" value={profileClass.grade?.name ?? profileClass.name} />
-                <ProfileRow icon={<ClassIcon sx={{ fontSize: 16 }} />} label="Stream" value={profileClass.stream} />
-                <ProfileRow icon={<CategoryIcon sx={{ fontSize: 16 }} />} label="Category" value={profileClass.grade?.category ?? profileClass.category} />
-                <ProfileRow icon={<BookIcon sx={{ fontSize: 16 }} />} label="Combination" value={profileClass.combination?.displayName ?? profileClass.combination?.name} />
-                <SectionTitle sx={{ mt: 2 }}>Students</SectionTitle>
-                {profileStudents.length === 0 ? (
-                  <Typography sx={{ fontSize: '0.8125rem', color: '#94a3b8' }}>No students enrolled</Typography>
-                ) : (
-                  <Box sx={{ maxHeight: 240, overflow: 'auto' }}>
-                    {profileStudents.map((e: any) => (
-                      <Box key={e.studentId} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                        <PeopleIcon sx={{ fontSize: 14, color: '#94a3b8' }} />
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{e.student.firstName} {e.student.lastName}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            </>)}
+        {/* Desktop Profile Panel */}
+        <Collapse in={!!profileClass} orientation="horizontal" timeout={250} slotProps={{ root: { sx: { height: '100%', flexShrink: 0, display: { xs: 'none', md: 'block' } } } }}>
+          <Box sx={{ width: 300, height: '100%', borderLeft: '1px solid', borderColor: 'divider', overflow: 'auto', flexShrink: 0, bgcolor: 'white' }}>
+            {profileClass && (
+              <ClassProfileContent
+                profileClass={profileClass}
+                profileStudents={profileStudents}
+                onClose={() => setProfileClass(null)}
+              />
+            )}
           </Box>
         </Collapse>
       </Box>
+
+      {/* Mobile Profile Drawer */}
+      <Drawer
+        anchor="right"
+        open={isMobile && !!profileClass}
+        onClose={() => setProfileClass(null)}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 360 }, maxWidth: '100%' } } }}
+      >
+        {profileClass && (
+          <ClassProfileContent
+            profileClass={profileClass}
+            profileStudents={profileStudents}
+            onClose={() => setProfileClass(null)}
+          />
+        )}
+      </Drawer>
     </Box>
   );
 }

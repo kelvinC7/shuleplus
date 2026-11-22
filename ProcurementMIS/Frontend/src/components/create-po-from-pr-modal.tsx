@@ -16,6 +16,7 @@ import {
   SummaryRow,
 } from '@/components/procurement-form-ui';
 import { formatFrw } from '@/utils/currency';
+import { formatPersonName } from '@/utils/person-name';
 
 const PO_WIZARD_STEPS = [
   { title: 'Supplier', description: 'Choose the vendor for this purchase order' },
@@ -179,7 +180,7 @@ export function CreatePOFromPRModal({
             <div className="space-y-5">
               <SummaryPanel title={`From Request ${purchaseRequest.prNumber}`}>
                 <SummaryRow label="Department" value={purchaseRequest.department?.name ?? '—'} />
-                <SummaryRow label="Requested By" value={purchaseRequest.requestedByName ?? '—'} />
+                <SummaryRow label="Requested By" value={formatPersonName(purchaseRequest.requestedByName) || '—'} />
                 <SummaryRow
                   label="Estimate"
                   value={formatFrw(Number(purchaseRequest.totalEstimate || 0))}

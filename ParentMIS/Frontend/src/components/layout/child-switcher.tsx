@@ -15,7 +15,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export function ChildSwitcher({ compact = false }: { compact?: boolean }) {
+export function ChildSwitcher({ compact = false, onDark = false }: { compact?: boolean; onDark?: boolean }) {
   const { linkedStudents, activeStudentId, setActiveStudent } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -38,11 +38,19 @@ export function ChildSwitcher({ compact = false }: { compact?: boolean }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'flex items-center gap-2 rounded-xl border border-border/60 bg-white transition hover:border-primary/40',
+          'flex items-center gap-2 rounded-xl border transition',
+          onDark
+            ? 'border-white/15 bg-white/10 hover:bg-white/15'
+            : 'border-border/60 bg-white hover:border-primary/40',
           compact ? 'py-1 pl-1 pr-2' : 'px-3 py-2'
         )}
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy text-[11px] font-bold text-primary">
+        <span
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-lg text-[11px] font-bold',
+            onDark ? 'bg-[var(--yo-amber)] text-[var(--yo-navy)]' : 'bg-navy text-primary'
+          )}
+        >
           {active ? initials(active.fullName) : <Users size={14} />}
         </span>
         <span className="hidden min-w-0 text-left sm:block">

@@ -27,7 +27,7 @@ export function createApp() {
         // Dev: Babyeyi FE (3013) + IAM / landing (3000) and common local UIs
         if (
           env.NODE_ENV !== 'production' &&
-          /^http:\/\/(localhost|127\.0\.0\.1):(3000|3001|3013)$/.test(origin)
+          /^http:\/\/(localhost|127\.0\.0\.1):(3000|3001|3013|3049)$/.test(origin)
         ) {
           return callback(null, origin);
         }

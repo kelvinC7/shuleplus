@@ -1,103 +1,130 @@
-import { TrendingDown, TrendingUp } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import { brand } from '../theme/theme';
 
-function Kpi({ label, value, accent = '#000435' }) {
+function Kpi({ label, value, bgcolor, color = '#fff' }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-center shadow-sm">
-      <p className="text-2xl font-extrabold tabular-nums leading-none" style={{ color: accent }}>
+    <Box
+      sx={{
+        borderRadius: 0,
+        bgcolor,
+        px: 1.75,
+        py: 1.75,
+        minHeight: 88,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        boxShadow: '0 2px 10px -4px rgba(0,0,0,0.2)',
+      }}
+    >
+      <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(255,255,255,0.72)' }}>
+        {label}
+      </Typography>
+      <Typography sx={{ mt: 1, fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color }}>
         {value}
-      </p>
-      <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-    </div>
+      </Typography>
+    </Box>
   );
 }
 
 export default function AssessmentPerformancePanel({ performance, maxMark }) {
   if (!performance) {
     return (
-      <div className="px-6 py-14 text-center">
-        <p className="text-sm text-slate-500">Performance stats appear once marks are entered.</p>
-      </div>
+      <Box sx={{ px: 3, py: 7, textAlign: 'center' }}>
+        <Typography sx={{ fontSize: 14, color: '#64748B' }}>Performance stats appear once marks are entered.</Typography>
+      </Box>
     );
   }
 
   const distMax = Math.max(...performance.distribution.map((d) => d.count), 1);
 
   return (
-    <div className="space-y-6 p-5 sm:p-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Average" value={`${performance.average}%`} />
-        <Kpi label="Pass rate" value={`${performance.passRate}%`} accent="#2563eb" />
-        <Kpi label="Highest" value={`${performance.highest}%`} accent="#059669" />
-        <Kpi label="Lowest" value={`${performance.lowest}%`} accent="#dc2626" />
-      </div>
+    <Stack spacing={3} sx={{ p: { xs: 2.5, sm: 3 } }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 1.25 }}>
+        <Kpi label="Average" value={`${performance.average}%`} bgcolor={brand.navy} />
+        <Kpi label="Pass rate" value={`${performance.passRate}%`} bgcolor="#1D4ED8" />
+        <Kpi label="Highest" value={`${performance.highest}%`} bgcolor="#047857" />
+        <Kpi label="Lowest" value={`${performance.lowest}%`} bgcolor="#B91C1C" />
+      </Box>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Score distribution</p>
-        <div className="mt-4 flex flex-col gap-3">
+      <Paper elevation={0} sx={{ borderRadius: 2, border: `1px solid ${brand.border}`, bgcolor: '#fff', p: 2.5, boxShadow: 1 }}>
+        <Typography sx={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B' }}>
+          Score distribution
+        </Typography>
+        <Stack spacing={1.5} sx={{ mt: 2 }}>
           {performance.distribution.map((d) => (
-            <div key={d.label} className="grid grid-cols-[5.5rem_1fr_2rem] items-center gap-3">
-              <span className="text-xs font-semibold text-slate-500">{d.label}</span>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full min-w-0 rounded-full bg-gradient-to-r from-[#FCB038] to-[#000435]"
-                  style={{
+            <Box key={d.label} sx={{ display: 'grid', gridTemplateColumns: '5.5rem 1fr 2rem', alignItems: 'center', gap: 1.5 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>{d.label}</Typography>
+              <Box sx={{ height: 10, borderRadius: 99, bgcolor: '#F1F5F9', overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    height: '100%',
+                    minWidth: 0,
+                    borderRadius: 99,
+                    background: 'linear-gradient(to right, #F5A623, #13213D)',
                     width: d.count > 0 ? `${Math.max((d.count / distMax) * 100, 6)}%` : '0%',
                   }}
                 />
-              </div>
-              <span className="text-right text-sm font-extrabold tabular-nums text-[#000435]">{d.count}</span>
-            </div>
+              </Box>
+              <Typography sx={{ textAlign: 'right', fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: brand.navy }}>
+                {d.count}
+              </Typography>
+            </Box>
           ))}
-        </div>
-      </div>
+        </Stack>
+      </Paper>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="text-emerald-600" size={20} />
-            <p className="text-sm font-extrabold text-[#000435]">Strong performers</p>
-          </div>
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { md: '1fr 1fr' } }}>
+        <Box sx={{ borderRadius: 2, border: '1px solid #A7F3D0', bgcolor: 'rgba(236,253,245,0.8)', p: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+            <TrendingUpIcon sx={{ fontSize: 20, color: '#059669' }} />
+            <Typography sx={{ fontSize: 14, fontWeight: 800, color: brand.navy }}>Strong performers</Typography>
+          </Stack>
           {performance.top.length === 0 ? (
-            <p className="text-sm text-slate-500">No scored marks yet.</p>
+            <Typography sx={{ fontSize: 14, color: '#64748B' }}>No scored marks yet.</Typography>
           ) : (
-            <ul className="divide-y divide-emerald-200/60">
+            <Box sx={{ '& > *:not(:last-child)': { borderBottom: '1px solid rgba(167,243,208,0.6)' } }}>
               {performance.top.map((row) => (
-                <li key={row.student.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <span className="text-sm font-semibold text-[#000435]">{row.student.fullName}</span>
-                  <span className="shrink-0 text-sm font-extrabold tabular-nums text-emerald-700">
+                <Stack key={row.student.id} direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ py: 1.25 }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{row.student.fullName}</Typography>
+                  <Typography sx={{ flexShrink: 0, fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#047857' }}>
                     {row.score}/{maxMark} ({Math.round(row.pct)}%)
-                  </span>
-                </li>
+                  </Typography>
+                </Stack>
               ))}
-            </ul>
+            </Box>
           )}
-        </div>
+        </Box>
 
-        <div className="rounded-2xl border border-red-200 bg-red-50/80 p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <TrendingDown className="text-red-600" size={20} />
-            <p className="text-sm font-extrabold text-[#000435]">Needs support</p>
-          </div>
+        <Box sx={{ borderRadius: 2, border: '1px solid #FECACA', bgcolor: 'rgba(254,242,242,0.8)', p: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+            <TrendingDownIcon sx={{ fontSize: 20, color: '#DC2626' }} />
+            <Typography sx={{ fontSize: 14, fontWeight: 800, color: brand.navy }}>Needs support</Typography>
+          </Stack>
           {performance.weak.length === 0 ? (
-            <p className="text-sm text-slate-500">No scored marks yet.</p>
+            <Typography sx={{ fontSize: 14, color: '#64748B' }}>No scored marks yet.</Typography>
           ) : (
-            <ul className="divide-y divide-red-200/60">
+            <Box sx={{ '& > *:not(:last-child)': { borderBottom: '1px solid rgba(254,202,202,0.6)' } }}>
               {performance.weak.map((row) => (
-                <li key={row.student.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <span className="text-sm font-semibold text-[#000435]">{row.student.fullName}</span>
-                  <span className="shrink-0 text-sm font-extrabold tabular-nums text-red-700">
+                <Stack key={row.student.id} direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} sx={{ py: 1.25 }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{row.student.fullName}</Typography>
+                  <Typography sx={{ flexShrink: 0, fontSize: 14, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#B91C1C' }}>
                     {row.score}/{maxMark} ({Math.round(row.pct)}%)
-                  </span>
-                </li>
+                  </Typography>
+                </Stack>
               ))}
-            </ul>
+            </Box>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <p className="text-center text-xs text-slate-400">
+      <Typography sx={{ textAlign: 'center', fontSize: 12, color: '#94A3B8' }}>
         Based on {performance.ranked.length} student{performance.ranked.length !== 1 ? 's' : ''} with marks entered.
-      </p>
-    </div>
+      </Typography>
+    </Stack>
   );
 }

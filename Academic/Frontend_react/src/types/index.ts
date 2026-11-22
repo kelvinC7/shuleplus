@@ -196,6 +196,9 @@ export interface ClassTreeNode {
   children?: ClassTreeNode[];
 }
 
+export type AssessmentComponentCategory = 'BEGINNING_TEST' | 'CAT_CONTINUOUS' | 'MIDTERM_TEST' | 'END_OF_TERM_EXAM';
+export type ReportingStage = 'UNASSIGNED' | 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
+
 export interface ApiAssessmentComponent {
   id: string;
   templateId: string;
@@ -207,6 +210,8 @@ export interface ApiAssessmentComponent {
   isRequired: boolean;
   sortOrder: number;
   isActive: boolean;
+  assessmentCategory?: AssessmentComponentCategory | null;
+  reportingStage?: ReportingStage | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -436,9 +441,27 @@ export interface ReportCardSchoolInfo {
   website?: string | null;
   motto?: string | null;
   organizationCode?: string | null;
+  reportHeaderLines?: string[];
+  rightLogoUrl?: string | null;
+}
+
+export type ReportCardKind = 'standard' | 'midterm' | 'beginning';
+
+export interface MidTermReportSummary {
+  catQuizAverage: number;
+  assessmentsCompleted: number;
+  assessmentsTotal: number;
+  subjectsAssessed: number;
+  subjectsTotal: number;
+  position?: number | null;
+  classSize?: number | null;
+  strongestSubject?: { subject: string; percentage: number; grade: string | null } | null;
+  improvementSubject?: { subject: string; percentage: number; grade: string | null } | null;
 }
 
 export interface ReportCardDataV2 {
+  reportKind?: ReportCardKind;
+  midTermSummary?: MidTermReportSummary;
   school?: ReportCardSchoolInfo;
   student: {
     id: string;
@@ -479,11 +502,22 @@ export interface ReportCardDataV2 {
         rawMarksDisplay?: string;
         normalizedScore?: number;
         normalizedMax?: number;
+        /** Backend: true when component has PRESENT mark(s), including score 0. */
+        marksRecorded?: boolean;
+        consolidatedOnDefault?: number;
+        assessmentBreakdown?: Array<{
+          title: string;
+          score: number;
+          maxMark: number;
+          convertedOnDefault: number;
+        }>;
         score?: number;
         maxMark?: number;
       }
     >;
     totalScore: number;
+    /** Pooled teacher marks on DEFAULT (Σscore/Σmax×DEFAULT). */
+    studentMarksOnDefault?: number;
     totalMax?: number;
     defaultCourseMarks?: number;
     percentage: number;
@@ -521,8 +555,8 @@ export interface ReportCardDataV2 {
   overallScore: number;
   overallGrade: string | null;
   overallGradeDescription: string | null;
-  position: number;
-  classSize: number;
+  position: number | null;
+  classSize: number | null;
   growth: {
     termAverages: Array<{ period: string; averagePercentage: number; subjectCount: number }>;
     subjectGrowth: Record<string, Array<{ period: string; percentage: number }>>;
@@ -546,8 +580,24 @@ export interface ReportCardDataV2 {
     lowest: { subject: string; percentage: number } | null;
   } | null;
   gradingLegend?: Array<{ grade: string; minPercentage: number; maxPercentage: number; description: string | null }>;
-  attendance?: { available: boolean; message?: string; rate?: number; present?: number; days?: number };
-  discipline?: { record: string; comment: string | null; incidents: number; message?: string };
+  attendance?: {
+    available: boolean;
+    message?: string;
+    rate?: number;
+    present?: number;
+    absent?: number;
+    late?: number;
+    days?: number;
+  };
+  discipline?: {
+    available?: boolean;
+    record: string | null;
+    comment?: string | null;
+    incidents: number;
+    score?: number | null;
+    maxScore?: number;
+    message?: string;
+  };
   comments?: { classTeacher: string; headTeacher: string };
   meta?: { reportNumber: string; generatedAt: string; verifyUrl: string | null };
   settings?: { reportCard?: { classTeacherCommentHint?: string | null; enableClassTeacherComments?: boolean; enableHeadTeacherComments?: boolean } };

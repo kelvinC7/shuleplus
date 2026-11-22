@@ -22,11 +22,42 @@ const createPOSchema = z.object({
   })).min(1),
 });
 
+const importPOSchema = z.object({
+  supplierId: z.string().min(1),
+  expectedDelivery: z.string().optional(),
+  deliveryAddress: z.string().optional(),
+  paymentTerms: z.string().optional(),
+  notes: z.string().optional(),
+  rows: z.array(z.object({
+    itemName: z.string().min(1),
+    quantity: z.union([z.string(), z.number()]),
+    unitPrice: z.union([z.string(), z.number()]),
+    prCode: z.string().min(1),
+    rowNumber: z.coerce.number().optional(),
+  })).min(1),
+});
+
 export class PurchaseOrderController {
+  async importOrders(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = importPOSchema.parse(req.body);
+      const data = await purchaseOrderService.importOrders(
+        req.organizationRef!, req.user!.sub, req.user!.email ?? '', body
+      );
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { status, search } = req.query as any;
-      const data = await purchaseOrderService.list(req.organizationRef!, { status, search });
+      const {
+        status, search, academicYear, term, date, week, dateFrom, dateTo,
+      } = req.query as any;
+      const data = await purchaseOrderService.list(req.organizationRef!, {
+        status, search, academicYear, term, date, week, dateFrom, dateTo,
+      });
       res.json({ success: true, data });
     } catch (error) {
       next(error);

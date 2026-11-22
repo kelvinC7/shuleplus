@@ -1,7 +1,7 @@
 export const T = {
-  navy: '#000435',
+  navy: '#13213D',
   navyDeep: '#00022a',
-  amber: '#F59E0B',
+  amber: '#F5A623',
   amberLight: '#FCD34D',
   amberPale: '#FEF3C7',
   white: '#FFFFFF',

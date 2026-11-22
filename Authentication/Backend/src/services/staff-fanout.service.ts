@@ -18,7 +18,9 @@ export type StaffFanoutInput = {
 
 function isTeacherAssignment(input: StaffFanoutInput) {
   return (
-    input.moduleSlugs.includes('teacher-portal') || /^teacher$/i.test((input.position ?? '').trim())
+    input.moduleSlugs.includes('teacher-portal') ||
+    input.moduleSlugs.includes('ticha-portal') ||
+    /^teacher$/i.test((input.position ?? '').trim())
   );
 }
 

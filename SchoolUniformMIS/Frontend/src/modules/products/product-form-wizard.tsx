@@ -599,7 +599,7 @@ export function ProductFormWizard({
                         <span className="font-semibold">
                           {periodLoading
                             ? "Loading…"
-                            : `${periodYear || "—"} · ${periodTerm || "—"}`}
+                            : `${periodYear || "Not set"} · ${periodTerm || "Not set"}`}
                         </span>
                         <span className="mt-1 block text-xs text-muted">
                           From organization academic settings. Change in Academic
@@ -1256,7 +1256,7 @@ export function ProductFormWizard({
                     <span className="font-semibold text-navy">
                       {(form.toggles.hasVariants
                         ? totalVariantStock
-                        : Number(form.uniformOutputQty) || 0) || "—"}{" "}
+                        : Number(form.uniformOutputQty) || 0) || 0}{" "}
                       pcs
                     </span>
                   </div>

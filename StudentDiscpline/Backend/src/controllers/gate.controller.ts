@@ -196,6 +196,20 @@ export const gateController = {
     }
   },
 
+  async rfidPermissionExit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = req.body as { studentId?: string; studentCode?: string; gateLabel?: string };
+      const data = await gateService.rfidPermissionCheckout(req.organizationRef!, {
+        studentId: body.studentId,
+        studentCode: body.studentCode,
+        gateLabel: body.gateLabel,
+      });
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async emergencyExit(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const data = await gateService.emergencyExit(req.organizationRef!, {

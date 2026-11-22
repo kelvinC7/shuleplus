@@ -123,6 +123,27 @@ function formatDate(d?: string | Date | null): string {
   return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function studentMatchesSearch(
+  s: Pick<Student, 'firstName' | 'lastName' | 'studentUid' | 'studentCode'>,
+  raw: string
+): boolean {
+  const q = raw.trim().toLowerCase();
+  if (!q) return true;
+  const fn = s.firstName.toLowerCase();
+  const ln = s.lastName.toLowerCase();
+  const full = `${fn} ${ln}`.trim();
+  const fullRev = `${ln} ${fn}`.trim();
+  if (full.includes(q) || fullRev.includes(q)) return true;
+  if (fn.includes(q) || ln.includes(q)) return true;
+  if (s.studentUid.toLowerCase().includes(q)) return true;
+  if ((s.studentCode ?? '').toLowerCase().includes(q)) return true;
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2) {
+    return tokens.every((t) => fn.includes(t) || ln.includes(t) || s.studentUid.toLowerCase().includes(t));
+  }
+  return false;
+}
+
 export default function StudentsPage() {
   const navigate = useNavigate();
   const { settings, academicYear, setAcademicYear, years, loading: yearLoading } = useAcademicYearFilter();
@@ -176,9 +197,8 @@ export default function StudentsPage() {
         return enrollment?.classId === activeClassId;
       });
     }
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(s => s.firstName.toLowerCase().includes(q) || s.lastName.toLowerCase().includes(q) || s.studentUid.toLowerCase().includes(q) || (s.studentCode ?? '').toLowerCase().includes(q));
+    if (search.trim()) {
+      list = list.filter((s) => studentMatchesSearch(s, search));
     }
     return list.sort((a, b) => {
       const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
@@ -264,7 +284,7 @@ export default function StudentsPage() {
             onChange={setAcademicYear}
             disabled={yearLoading}
           />
-          <TextField size="small" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)}
+          <TextField size="small" placeholder="Name or code (e.g. ISHIMWE Theoneste)" value={search} onChange={(e) => setSearch(e.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment>, sx: { fontSize: '0.875rem', bgcolor: 'white', '& fieldset': { borderColor: '#cbd5e1' } } } }}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 }, maxWidth: { xs: 180, md: 280 }, width: '100%' }} />
           <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', whiteSpace: 'nowrap' }}>{filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}</Typography>

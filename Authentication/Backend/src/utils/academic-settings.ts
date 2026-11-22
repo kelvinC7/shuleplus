@@ -9,6 +9,18 @@ export interface ReportCardSettings {
   enableHeadTeacherComments?: boolean;
   defaultHeadTeacherComment?: string | null;
   classTeacherCommentHint?: string | null;
+  /** Lines shown under the school name on student report PDFs (after logo). */
+  reportHeaderLines?: string[];
+  /** Optional logo shown on the right of the report header (school logo stays on the left). */
+  reportRightLogoUrl?: string | null;
+}
+
+function parseReportHeaderLines(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const lines = raw
+    .map((x) => (typeof x === 'string' ? x.trim() : ''))
+    .filter((x) => x.length > 0);
+  return lines.length ? lines : undefined;
 }
 
 export interface AcademicSettings {
@@ -32,6 +44,11 @@ function parseReportCardSettings(raw: unknown): ReportCardSettings | undefined {
       typeof o.defaultHeadTeacherComment === 'string' ? o.defaultHeadTeacherComment : null,
     classTeacherCommentHint:
       typeof o.classTeacherCommentHint === 'string' ? o.classTeacherCommentHint : null,
+    reportHeaderLines: parseReportHeaderLines(o.reportHeaderLines),
+    reportRightLogoUrl:
+      typeof o.reportRightLogoUrl === 'string' && o.reportRightLogoUrl.trim()
+        ? o.reportRightLogoUrl.trim()
+        : null,
   };
 }
 

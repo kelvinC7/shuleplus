@@ -115,6 +115,16 @@ async function applyToDatabase(config) {
   const prisma = new PrismaClient();
   const { baseDomain: domain, modules } = config;
 
+  /**
+   * Legacy duplicate catalog rows that point at the same microservice.
+   * They must receive the same hosted URLs, otherwise an org assigned the
+   * duplicate slug gets a stale localhost URL and the module never opens.
+   * Only existing rows are updated — no duplicates are created here.
+   */
+  const LEGACY_ALIASES = {
+    academic: ['academic-1'],
+  };
+
   try {
     for (const mod of modules) {
       const frontendUrl = moduleFrontendUrl(mod.subdomain, domain);
@@ -144,6 +154,13 @@ async function applyToDatabase(config) {
         },
       });
       console.log(`✓ ${mod.slug}`);
+
+      for (const aliasSlug of LEGACY_ALIASES[mod.slug] ?? []) {
+        const existing = await prisma.platformModule.findUnique({ where: { slug: aliasSlug } });
+        if (!existing) continue;
+        await prisma.platformModule.update({ where: { slug: aliasSlug }, data: payload });
+        console.log(`✓ ${aliasSlug} (alias of ${mod.slug})`);
+      }
     }
   } finally {
     await prisma.$disconnect();

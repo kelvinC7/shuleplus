@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../config/database';
 import { AuthenticatedRequest, orgScope, param } from '../types';
 import { AppError } from '../middleware/error.middleware';
+import { parentMisClient } from '../clients/parent-mis.client';
 
 const processSchema = z.object({
   walletId: z.string().min(1).optional(),
@@ -94,9 +95,24 @@ export const saleController = {
         return { sale, newBalance: after.balanceRwf };
       });
 
+      const notifiedParents = await parentMisClient.notifyCanteenPurchase({
+        organizationId: org,
+        studentId: wallet.studentId,
+        studentCode: wallet.studentCode,
+        studentName: wallet.fullName,
+        saleId: result.sale.id,
+        amount,
+        balanceAfter: Number(result.newBalance),
+        items: body.items.map(({ name, quantity }) => ({ name, quantity })),
+      });
+
       res.json({
         success: true,
-        data: { ...result, message: 'Sale processed successfully' },
+        data: {
+          ...result,
+          message: 'Sale processed successfully',
+          parentNotifications: notifiedParents,
+        },
       });
     } catch (error) {
       next(error);

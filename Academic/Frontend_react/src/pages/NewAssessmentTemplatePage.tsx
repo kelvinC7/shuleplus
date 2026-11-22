@@ -32,7 +32,6 @@ interface FormErrors {
   academicLevel?: string;
   academicYear?: string;
   term?: string;
-  defaultCourseMarks?: string;
   components?: string;
 }
 
@@ -147,7 +146,6 @@ export function Step1({
     academicLevel: string;
     academicYear: string;
     term: string;
-    defaultCourseMarks?: string;
   };
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   errors: FormErrors;
@@ -197,18 +195,24 @@ export function Step1({
           sx={fieldSx}
         />
 
-        <TextField
-          label="Default course marks"
-          required
-          fullWidth
-          type="number"
-          value={formData.defaultCourseMarks}
-          onChange={(e) => setFormData((prev: any) => ({ ...prev, defaultCourseMarks: e.target.value }))}
-          error={!!errors.defaultCourseMarks}
-          helperText={errors.defaultCourseMarks || 'Final normalized result per course is calculated out of this value (e.g. 40, 50, 100).'}
-          inputProps={{ min: 1, max: 1000 }}
-          sx={fieldSx}
-        />
+        <Box
+          sx={{
+            p: 1.5,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 1,
+            bgcolor: 'rgba(0,4,53,0.02)',
+            borderRadius: '10px',
+            border: '1px solid rgba(0,4,53,0.06)',
+          }}
+        >
+          <InfoOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8', mt: 0.15, flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
+            <strong>Course total marks</strong> (report DEFAULT column) are set in{' '}
+            <strong>Timetable → Config Class</strong> per course. This template only defines assessment
+            components and weights.
+          </Typography>
+        </Box>
 
         <FormControl fullWidth error={!!errors.academicLevel}>
           <InputLabel sx={{ color: '#64748b', fontSize: '0.875rem' }}>Education level</InputLabel>
@@ -606,7 +610,6 @@ export function Step3({
     academicLevel: string;
     academicYear: string;
     term: string;
-    defaultCourseMarks?: string;
   };
   components: ComponentEntry[];
 }) {
@@ -785,7 +788,6 @@ export function NewAssessmentTemplateWizard({ embedded, onClose, onCreated }: Ne
     academicLevel: '',
     academicYear: '',
     term: '',
-    defaultCourseMarks: '40',
   });
 
   const [components, setComponents] = useState<ComponentEntry[]>([
@@ -808,10 +810,6 @@ export function NewAssessmentTemplateWizard({ embedded, onClose, onCreated }: Ne
     if (!formData.academicLevel) newErrors.academicLevel = 'Education level is required';
     if (!formData.academicYear) newErrors.academicYear = 'Academic year is required';
     if (!formData.term) newErrors.term = 'Term is required';
-    const dcm = parseFloat(formData.defaultCourseMarks);
-    if (!formData.defaultCourseMarks || Number.isNaN(dcm) || dcm <= 0) {
-      newErrors.defaultCourseMarks = 'Default course marks must be greater than 0';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -863,7 +861,6 @@ export function NewAssessmentTemplateWizard({ embedded, onClose, onCreated }: Ne
         academicLevel: formData.academicLevel,
         academicYear: formData.academicYear,
         term: formData.term,
-        defaultCourseMarks: parseFloat(formData.defaultCourseMarks) || 40,
         components: components
           .filter((c) => c.name.trim())
           .map((c, idx) => ({

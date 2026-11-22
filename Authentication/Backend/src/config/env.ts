@@ -100,6 +100,9 @@ export const env = {
   PAYROLL_API_URL: process.env.PAYROLL_API_URL ?? 'http://localhost:3026/api',
   KAZI_API_URL: process.env.KAZI_API_URL ?? 'http://localhost:4400',
   TICHA_PORTAL_API_URL: process.env.TICHA_PORTAL_API_URL ?? 'http://localhost:4000/api',
+  SHULE_TRIP_API_URL: process.env.SHULE_TRIP_API_URL ?? '',
+  /** ShuleChat / InternalChat API (school SMS quotas, parent packages). */
+  INTERNAL_CHAT_API_URL: (process.env.INTERNAL_CHAT_API_URL ?? process.env.CHAT_API_URL ?? '').trim(),
 
   /** Flag file nginx checks to serve the maintenance page (production default). */
   NGINX_MAINTENANCE_FLAG_PATH: process.env.NGINX_MAINTENANCE_FLAG_PATH ?? '/var/www/shuleplus/maintenance/ON',

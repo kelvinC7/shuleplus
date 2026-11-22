@@ -41,7 +41,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[32%_1fr] gap-2 text-sm">
       <span className="text-muted">{label}</span>
-      <span className="font-bold text-navy">{value || "—"}</span>
+      <span className="font-bold text-navy">{value || "Not set"}</span>
     </div>
   );
 }

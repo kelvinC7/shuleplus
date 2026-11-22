@@ -53,6 +53,12 @@ export interface DisciplineOrgSettings {
   defaultMaxScore: number;
   defaultStartingScore: number;
   autoInitializeStudents: boolean;
+  absenceDeductionEnabled: boolean;
+  absenceDeductionPoints: number;
+  autoAbsenceDeductionEnabled?: boolean;
+  autoAbsenceLastRunDate?: string | null;
+  lateDeductionEnabled: boolean;
+  lateDeductionPoints: number;
   initializedStudents?: number;
   totalMarks?: number;
 }
@@ -306,6 +312,39 @@ export interface ApiEnvelope<T> {
   success: boolean;
   data: T;
   message?: string;
+}
+
+export type RollCallStatus = 'present' | 'absent' | 'excused';
+
+export interface RollCallRow {
+  id: string;
+  studentId?: string;
+  studentCode?: string;
+  name: string;
+  status: RollCallStatus;
+  remarks?: string;
+}
+
+export interface RollCallSession {
+  id: string;
+  className: string;
+  classId?: string | null;
+  date: string;
+  label: string;
+  subject?: string | null;
+  period?: string | null;
+  roster: RollCallRow[];
+  presentCount: number;
+  absentCount: number;
+  excusedCount: number;
+  createdByName?: string | null;
+  updatedAt: string;
+}
+
+export interface RollCallRosterData {
+  logExists: boolean;
+  session: RollCallSession | null;
+  roster: RollCallRow[];
 }
 
 export function signedMarkPoints(type: MarkType, points: number) {

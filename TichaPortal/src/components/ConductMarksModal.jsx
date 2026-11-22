@@ -1,8 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import {
-  X, Search, CheckCircle, Activity, Users, Loader2, Minus, Plus, AlertCircle,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Dialog from '@mui/material/Dialog';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import InputBase from '@mui/material/InputBase';
+import CircularProgress from '@mui/material/CircularProgress';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import GroupsIcon from '@mui/icons-material/Groups';
+import RemoveIcon from '@mui/icons-material/Remove';
+import AddIcon from '@mui/icons-material/Add';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { brand } from '../theme/theme';
 import api from '../services/api';
 import { resolveStudentPhotoUrl, studentInitials } from '../utils/studentDisplay';
 
@@ -11,6 +23,19 @@ function signedPoints(mark) {
   if (String(mark.type || '').toUpperCase() === 'REWARD') return pts;
   return -pts;
 }
+
+const labelSx = { display: 'block', mb: 0.75, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: '#64748B' };
+
+const searchBoxSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  borderRadius: 1,
+  border: '1px solid #E2E8F0',
+  px: 1.25,
+  py: 0.75,
+  '&:focus-within': { borderColor: brand.primary },
+};
 
 export default function ConductMarksModal({
   isOpen,
@@ -142,224 +167,209 @@ export default function ConductMarksModal({
     }
   };
 
-  if (!isOpen) return null;
+  const listBoxSx = { maxHeight: 160, overflowY: 'auto', borderRadius: 1, border: '1px solid #E2E8F0', listStyle: 'none', m: 0, p: 0 };
+  const listBtnSx = { display: 'flex', width: '100%', alignItems: 'center', gap: 1.5, px: 1.5, py: 1, textAlign: 'left', border: 0, bgcolor: 'transparent', fontFamily: 'inherit', cursor: 'pointer', '&:hover': { bgcolor: '#F8FAFC' } };
 
-  const content = success ? (
-    <div className="p-8 text-center">
-      <CheckCircle className="mx-auto h-12 w-12 text-emerald-600" />
-      <h3 className="mt-4 text-lg font-bold text-[#000435]">Recorded</h3>
-      <p className="mt-2 text-sm text-slate-600">
-        {success.count} discipline case{success.count === 1 ? '' : 's'} saved for {student?.name}.
-        Parents were notified in Kinyarwanda and English when contact details exist.
-      </p>
-      {success.scoreAfter != null && (
-        <p className="mt-2 text-sm font-semibold text-[#000435]">
-          Discipline score: {success.scoreBefore ?? '-'} → {success.scoreAfter} / 100
-        </p>
-      )}
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-6 w-full rounded-lg bg-[#000435] py-3 text-sm font-semibold text-white"
-      >
-        Close
-      </button>
-    </div>
-  ) : (
-    <>
-      <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-5">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Student
-          </label>
-          {!student ? (
-            <>
-              <div className="relative mb-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  placeholder="Search student…"
-                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#FCB038]"
+  return (
+    <Dialog
+      open={Boolean(isOpen)}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: { xs: '16px 16px 0 0', sm: 2 }, maxHeight: '92vh', m: { xs: 0, sm: 2 }, position: { xs: 'fixed', sm: 'relative' }, bottom: { xs: 0, sm: 'auto' } } }}
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ borderBottom: '1px solid #E2E8F0', px: 2.5, py: 2 }}>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <GroupsIcon sx={{ fontSize: 20, color: brand.primary }} />
+          <Box>
+            <Typography sx={{ fontSize: 16, fontWeight: 700, color: brand.navy }}>Conduct marks</Typography>
+            {className && <Typography sx={{ fontSize: 12, color: '#64748B' }}>{className}</Typography>}
+          </Box>
+        </Stack>
+        <IconButton onClick={onClose} aria-label="Close" sx={{ borderRadius: 1, color: '#64748B', '&:hover': { bgcolor: '#F1F5F9' } }}>
+          <CloseIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+      </Stack>
+
+      {success ? (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <CheckCircleIcon sx={{ fontSize: 48, color: '#059669' }} />
+          <Typography sx={{ mt: 2, fontSize: 18, fontWeight: 700, color: brand.navy }}>Recorded</Typography>
+          <Typography sx={{ mt: 1, fontSize: 14, color: '#475569' }}>
+            {success.count} discipline case{success.count === 1 ? '' : 's'} saved for {student?.name}.
+            Parents were notified in Kinyarwanda and English when contact details exist.
+          </Typography>
+          {success.scoreAfter != null && (
+            <Typography sx={{ mt: 1, fontSize: 14, fontWeight: 600, color: brand.navy }}>
+              Discipline score: {success.scoreBefore ?? '-'} to {success.scoreAfter} / 100
+            </Typography>
+          )}
+          <Button
+            type="button"
+            fullWidth
+            onClick={onClose}
+            sx={{ mt: 3, py: 1.5, borderRadius: 1, bgcolor: brand.navy, color: '#fff', fontSize: 14, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: brand.navy2 } }}
+          >
+            Close
+          </Button>
+        </Box>
+      ) : (
+        <>
+          <Stack spacing={2.5} sx={{ maxHeight: '70vh', overflowY: 'auto', px: 2.5, py: 2 }}>
+            <Box>
+              <Box component="label" sx={labelSx}>Student</Box>
+              {!student ? (
+                <>
+                  <Box sx={{ ...searchBoxSx, mb: 1 }}>
+                    <SearchIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                    <InputBase
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      placeholder="Search student..."
+                      sx={{ flex: 1, fontSize: 14 }}
+                    />
+                  </Box>
+                  <Box component="ul" sx={listBoxSx}>
+                    {filteredStudents.map((s) => (
+                      <Box component="li" key={s.row_id || s.id} sx={{ borderBottom: '1px solid #F1F5F9', '&:last-of-type': { borderBottom: 'none' } }}>
+                        <Box component="button" type="button" onClick={() => setStudent(s)} sx={listBtnSx}>
+                          <StudentThumb student={s} />
+                          <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: brand.navy }}>{s.name}</Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                    {!filteredStudents.length && (
+                      <Box component="li" sx={{ px: 1.5, py: 2, textAlign: 'center', fontSize: 12, color: '#64748B' }}>No students</Box>
+                    )}
+                  </Box>
+                </>
+              ) : (
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ borderRadius: 1, border: '1px solid #E2E8F0', px: 1.5, py: 1 }}>
+                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <StudentThumb student={student} />
+                    <Box>
+                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: brand.navy }}>{student.name}</Typography>
+                      <Typography sx={{ fontSize: 12, color: '#64748B' }}>{student.student_code || student.id}</Typography>
+                    </Box>
+                  </Stack>
+                  {!initialStudent && (
+                    <IconButton size="small" onClick={() => setStudent(null)} aria-label="Clear student" sx={{ color: '#94A3B8', '&:hover': { color: '#EF4444' } }}>
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  )}
+                </Stack>
+              )}
+            </Box>
+
+            <Box>
+              <Box component="label" sx={labelSx}>Discipline case / mark</Box>
+              <Box sx={{ ...searchBoxSx, mb: 1 }}>
+                <SearchIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                <InputBase
+                  value={markSearch}
+                  onChange={(e) => setMarkSearch(e.target.value)}
+                  placeholder="Search cases from Student Discipline..."
+                  sx={{ flex: 1, fontSize: 14 }}
                 />
-              </div>
-              <ul className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-                {filteredStudents.map((s) => (
-                  <li key={s.row_id || s.id}>
-                    <button
-                      type="button"
-                      onClick={() => setStudent(s)}
-                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50"
-                    >
-                      <StudentThumb student={s} />
-                      <span className="text-sm font-medium text-[#000435]">{s.name}</span>
-                    </button>
-                  </li>
-                ))}
-                {!filteredStudents.length && (
-                  <li className="px-3 py-4 text-center text-xs text-slate-500">No students</li>
-                )}
-              </ul>
-            </>
-          ) : (
-            <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-              <div className="flex items-center gap-3">
-                <StudentThumb student={student} />
-                <div>
-                  <p className="text-sm font-semibold text-[#000435]">{student.name}</p>
-                  <p className="text-xs text-slate-500">{student.student_code || student.id}</p>
-                </div>
-              </div>
-              {!initialStudent && (
-                <button type="button" onClick={() => setStudent(null)} className="text-slate-400 hover:text-red-500">
-                  <X className="h-4 w-4" />
-                </button>
+              </Box>
+              {catalogueLoading ? (
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 2, fontSize: 14, color: '#64748B' }}>
+                  <CircularProgress size={16} /> <Box component="span">Loading marks...</Box>
+                </Stack>
+              ) : catalogueError ? (
+                <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ fontSize: 14, color: '#92400E' }}>
+                  <WarningAmberIcon sx={{ mt: 0.25, fontSize: 16, flexShrink: 0 }} />
+                  <Box component="span">{catalogueError}</Box>
+                </Stack>
+              ) : (
+                <Box component="ul" sx={{ ...listBoxSx, maxHeight: 144 }}>
+                  {filteredMarks.map((m) => (
+                    <Box component="li" key={m.id} sx={{ borderBottom: '1px solid #F1F5F9', '&:last-of-type': { borderBottom: 'none' } }}>
+                      <Box component="button" type="button" onClick={() => addMark(m)} sx={{ ...listBtnSx, justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 14, fontWeight: 500, color: brand.navy }}>{m.name}</Typography>
+                          <Typography sx={{ fontSize: 12, color: '#64748B' }}>{m.category}</Typography>
+                        </Box>
+                        <Box component="span" sx={{ fontSize: 12, fontWeight: 700, color: signedPoints(m) >= 0 ? '#059669' : '#DC2626' }}>
+                          {signedPoints(m) > 0 ? '+' : ''}{signedPoints(m)}
+                        </Box>
+                      </Box>
+                    </Box>
+                  ))}
+                  {!filteredMarks.length && (
+                    <Box component="li" sx={{ px: 1.5, py: 2, textAlign: 'center', fontSize: 12, color: '#64748B' }}>No matching marks</Box>
+                  )}
+                </Box>
               )}
-            </div>
-          )}
-        </div>
+            </Box>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Discipline case / mark
-          </label>
-          <div className="relative mb-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={markSearch}
-              onChange={(e) => setMarkSearch(e.target.value)}
-              placeholder="Search cases from Student Discipline…"
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#FCB038]"
-            />
-          </div>
-          {catalogueLoading ? (
-            <div className="flex items-center gap-2 py-4 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading marks…
-            </div>
-          ) : catalogueError ? (
-            <p className="flex items-start gap-2 text-sm text-amber-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {catalogueError}
-            </p>
-          ) : (
-            <ul className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-              {filteredMarks.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => addMark(m)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-[#000435]">{m.name}</p>
-                      <p className="text-xs text-slate-500">{m.category}</p>
-                    </div>
-                    <span
-                      className={`text-xs font-bold ${signedPoints(m) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
-                    >
-                      {signedPoints(m) > 0 ? '+' : ''}
-                      {signedPoints(m)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {!filteredMarks.length && (
-                <li className="px-3 py-4 text-center text-xs text-slate-500">No matching marks</li>
-              )}
-            </ul>
-          )}
-        </div>
+            {rows.length > 0 && (
+              <Box sx={{ borderRadius: 1, border: '1px solid #E2E8F0', bgcolor: 'rgba(248,250,252,0.8)', p: 1.5 }}>
+                <Typography sx={{ mb: 1, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', color: '#64748B' }}>Selected</Typography>
+                <Stack component="ul" spacing={1} sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                  {rows.map((r) => (
+                    <Stack component="li" key={r.id} direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ fontSize: 14 }}>
+                      <Box component="span" sx={{ fontWeight: 500, color: brand.navy }}>{r.name}</Box>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <IconButton size="small" onClick={() => updateQty(r.id, -1)} sx={{ border: '1px solid #E2E8F0', borderRadius: 1, p: 0.25 }}>
+                          <RemoveIcon sx={{ fontSize: 12 }} />
+                        </IconButton>
+                        <Box component="span" sx={{ width: 24, textAlign: 'center', fontWeight: 600 }}>{r.qty}</Box>
+                        <IconButton size="small" onClick={() => updateQty(r.id, 1)} sx={{ border: '1px solid #E2E8F0', borderRadius: 1, p: 0.25 }}>
+                          <AddIcon sx={{ fontSize: 12 }} />
+                        </IconButton>
+                        <Box component="span" sx={{ width: 40, textAlign: 'right', fontWeight: 700, color: r.impact >= 0 ? '#059669' : '#DC2626' }}>{r.impact * r.qty}</Box>
+                        <IconButton size="small" onClick={() => removeRow(r.id)} aria-label="Remove" sx={{ color: '#94A3B8', '&:hover': { color: '#EF4444' } }}>
+                          <CloseIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Stack>
+                    </Stack>
+                  ))}
+                </Stack>
+                <Typography sx={{ mt: 1.5, borderTop: '1px solid #E2E8F0', pt: 1, fontSize: 14, fontWeight: 600, color: brand.navy }}>
+                  Net points:{' '}
+                  <Box component="span" sx={{ color: totalPoints >= 0 ? '#059669' : '#DC2626' }}>
+                    {totalPoints > 0 ? '+' : ''}{totalPoints}
+                  </Box>
+                </Typography>
+              </Box>
+            )}
 
-        {rows.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Selected</p>
-            <ul className="space-y-2">
-              {rows.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="font-medium text-[#000435]">{r.name}</span>
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => updateQty(r.id, -1)} className="rounded border border-slate-200 p-1">
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className="w-6 text-center font-semibold">{r.qty}</span>
-                    <button type="button" onClick={() => updateQty(r.id, 1)} className="rounded border border-slate-200 p-1">
-                      <Plus className="h-3 w-3" />
-                    </button>
-                    <span className={`w-10 text-right font-bold ${r.impact >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {r.impact * r.qty}
-                    </span>
-                    <button type="button" onClick={() => removeRow(r.id)} className="text-slate-400 hover:text-red-500">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 border-t border-slate-200 pt-2 text-sm font-semibold text-[#000435]">
-              Net points:{' '}
-              <span className={totalPoints >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                {totalPoints > 0 ? '+' : ''}
-                {totalPoints}
-              </span>
-            </p>
-          </div>
-        )}
+            <Box>
+              <Box component="label" sx={labelSx}>Notes (optional)</Box>
+              <Box
+                component="textarea"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                placeholder="Context for this case..."
+                sx={{ width: '100%', borderRadius: 1, border: '1px solid #E2E8F0', px: 1.5, py: 1, fontSize: 14, fontFamily: 'inherit', outline: 'none', '&:focus': { borderColor: brand.primary } }}
+              />
+            </Box>
 
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Notes (optional)
-          </label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={3}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#FCB038]"
-            placeholder="Context for this case…"
-          />
-        </div>
+            {submitError && (
+              <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ borderRadius: 1, border: '1px solid #FECACA', bgcolor: '#FEF2F2', px: 1.5, py: 1, fontSize: 14, color: '#991B1B' }}>
+                <WarningAmberIcon sx={{ mt: 0.25, fontSize: 16, flexShrink: 0 }} />
+                <Box component="span">{submitError}</Box>
+              </Stack>
+            )}
+          </Stack>
 
-        {submitError && (
-          <p className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            {submitError}
-          </p>
-        )}
-      </div>
-
-      <div className="border-t border-slate-200 px-5 py-4">
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#FCB038] py-3 text-sm font-semibold text-[#000435] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
-          {submitting ? 'Saving…' : 'Record & notify parent (KR + EN)'}
-        </button>
-      </div>
-    </>
-  );
-
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-[#000435]/40" onClick={onClose} aria-hidden />
-      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-[#FCB038]" />
-            <div>
-              <h2 className="text-base font-bold text-[#000435]">Conduct marks</h2>
-              {className && <p className="text-xs text-slate-500">{className}</p>}
-            </div>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        {content}
-      </div>
-    </div>,
-    document.body
+          <Box sx={{ borderTop: '1px solid #E2E8F0', px: 2.5, py: 2 }}>
+            <Button
+              type="button"
+              fullWidth
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon sx={{ fontSize: 16 }} />}
+              sx={{ py: 1.5, borderRadius: 1, bgcolor: brand.primary, color: brand.navy, fontSize: 14, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: brand.primaryStrong }, '&.Mui-disabled': { opacity: 0.5 } }}
+            >
+              {submitting ? 'Saving...' : 'Record & notify parent (KR + EN)'}
+            </Button>
+          </Box>
+        </>
+      )}
+    </Dialog>
   );
 }
 
@@ -369,17 +379,18 @@ function StudentThumb({ student }) {
   useEffect(() => setBroken(false), [src]);
   if (src && !broken) {
     return (
-      <img
+      <Box
+        component="img"
         src={src}
         alt=""
-        className="h-9 w-9 rounded-full border border-slate-200 object-cover"
         onError={() => setBroken(true)}
+        sx={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #E2E8F0', objectFit: 'cover' }}
       />
     );
   }
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#000435]/10 text-xs font-semibold text-[#000435]">
+    <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: 'rgba(19,33,61,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: brand.navy }}>
       {studentInitials(student?.name)}
-    </div>
+    </Box>
   );
 }

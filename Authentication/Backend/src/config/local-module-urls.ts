@@ -10,6 +10,8 @@ export const LOCAL_MODULE_URLS: Record<
   { frontendUrl?: string; backendUrl?: string }
 > = {
   academic: { frontendUrl: 'http://localhost:3004', backendUrl: 'http://localhost:3003' },
+  /** IAM catalog can contain a duplicate Academic row (academic-1). */
+  'academic-1': { frontendUrl: 'http://localhost:3004', backendUrl: 'http://localhost:3003' },
   'student-management': { frontendUrl: 'http://localhost:3053', backendUrl: 'http://localhost:3052/api' },
   attendance: { frontendUrl: 'http://localhost:3025', backendUrl: 'http://localhost:3024/api' },
   transport: { frontendUrl: 'http://localhost:3065', backendUrl: 'http://localhost:3064/api' },
@@ -50,6 +52,7 @@ export const LOCAL_MODULE_URLS: Record<
   'sector-mis': { frontendUrl: 'http://localhost:3071', backendUrl: 'http://localhost:3070/api' },
   'deo-mis': { frontendUrl: 'http://localhost:3073', backendUrl: 'http://localhost:3072/api' },
   'curriculum-intelligence': { backendUrl: 'http://localhost:3094/api' },
+  'shule-trip': { frontendUrl: 'http://localhost:3077', backendUrl: 'http://localhost:3076/api' },
 };
 
 /**
@@ -59,6 +62,8 @@ export const LOCAL_MODULE_URLS: Record<
  */
 export const PRODUCTION_LOOPBACK_BACKEND_URLS: Record<string, string> = {
   academic: 'http://127.0.0.1:4002',
+  /** IAM catalog can contain a duplicate Academic row (academic-1). */
+  'academic-1': 'http://127.0.0.1:4002',
   'student-management': 'http://127.0.0.1:4024',
   'teacher-portal': 'http://127.0.0.1:4003',
   'school-fees': 'http://127.0.0.1:4004',
@@ -87,16 +92,21 @@ export const PRODUCTION_LOOPBACK_BACKEND_URLS: Record<string, string> = {
   schoolmaterial: 'http://127.0.0.1:4021',
   'task-module': 'http://127.0.0.1:4022',
   library: 'http://127.0.0.1:4025',
-  transport: 'http://127.0.0.1:4026',
+  transport: 'http://127.0.0.1:4034/api',
   'webpage-babyeyi': 'http://127.0.0.1:4027',
   'print-card': 'http://127.0.0.1:4028',
-  'sector-mis': 'http://127.0.0.1:4029',
+  shulechat: 'http://127.0.0.1:4029/api',
+  chat: 'http://127.0.0.1:4029/api',
+  'sector-mis': 'http://127.0.0.1:4032',
   'deo-mis': 'http://127.0.0.1:4030',
   'curriculum-intelligence': 'http://127.0.0.1:4031',
+  'shule-trip': 'http://127.0.0.1:4033/api',
 };
 
 /** Circulars catalog slug is an alias of Babyeyi Wizard (same app). */
 export const MODULE_SLUG_ALIASES: Record<string, string> = {
+  /** Duplicate Academic catalog row — same microservice. */
+  'academic-1': 'academic',
   circulars: 'babyeyi',
   'inventory-mis': 'inventory',
   inventory: 'inventory-mis',
@@ -105,6 +115,7 @@ export const MODULE_SLUG_ALIASES: Record<string, string> = {
   /** Legacy Finance tile slug in IAM seed — same microservice as school-fees */
   fees: 'school-fees',
   finance: 'school-fees',
+  chat: 'shulechat',
 };
 
 export function canonicalizeModuleSlug(slug: string): string {

@@ -5,7 +5,9 @@ import type {
   GoodsReceiving, GrnSummary, PoReceivingContext,
   GoodsReturn, ReturnSummary, GrnReturnContext,
   Notification, Department, ProcurementCategory,
-  SupplierPerformance,
+  SupplierPerformance, ImportItemOption, PurchaseRequestImportBody,
+  PurchaseRequestImportResult, PurchaseOrderImportBody, PurchaseOrderImportResult,
+  DocumentVerification, EnsureDocumentVerificationBody, PublicVerificationResult,
 } from '@/types';
 
 async function get<T>(url: string): Promise<T> {
@@ -33,10 +35,24 @@ export const procurementApi = {
   },
 
   purchaseRequests: {
-    list: (params?: { status?: string; departmentId?: string; priority?: string; search?: string; dateFrom?: string; dateTo?: string }) =>
+    list: (params?: {
+      status?: string;
+      departmentId?: string;
+      priority?: string;
+      search?: string;
+      academicYear?: string;
+      term?: string;
+      date?: string;
+      week?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }) =>
       get<PurchaseRequest[]>(`/purchase-requests?${new URLSearchParams(params as any).toString()}`),
     getById: (id: string) => get<PurchaseRequest>(`/purchase-requests/${id}`),
     create: (body: any) => post<PurchaseRequest>('/purchase-requests', body),
+    itemCatalog: () => get<ImportItemOption[]>('/purchase-requests/item-catalog'),
+    import: (body: PurchaseRequestImportBody) =>
+      post<PurchaseRequestImportResult>('/purchase-requests/import', body),
     update: (id: string, body: any) => put<PurchaseRequest>(`/purchase-requests/${id}`, body),
     approve: (id: string, comment?: string) => put<PurchaseRequest>(`/purchase-requests/${id}/approve`, { comment }),
     reject: (id: string, reason: string) => put<PurchaseRequest>(`/purchase-requests/${id}/reject`, { reason }),
@@ -45,10 +61,21 @@ export const procurementApi = {
   },
 
   purchaseOrders: {
-    list: (params?: { status?: string; search?: string }) =>
+    list: (params?: {
+      status?: string;
+      search?: string;
+      academicYear?: string;
+      term?: string;
+      date?: string;
+      week?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }) =>
       get<PurchaseOrder[]>(`/purchase-orders?${new URLSearchParams(params as any).toString()}`),
     getById: (id: string) => get<PurchaseOrder>(`/purchase-orders/${id}`),
     create: (body: any) => post<PurchaseOrder>('/purchase-orders', body),
+    import: (body: PurchaseOrderImportBody) =>
+      post<PurchaseOrderImportResult>('/purchase-orders/import', body),
     updateStatus: (id: string, status: string) => put<PurchaseOrder>(`/purchase-orders/${id}/status`, { status }),
     updatePayment: (id: string, paymentStatus: string) => put<PurchaseOrder>(`/purchase-orders/${id}/payment`, { paymentStatus }),
     remove: (id: string) => del(`/purchase-orders/${id}`),
@@ -145,6 +172,18 @@ export const procurementApi = {
     requesterProfile: (requesterId: string, params?: Record<string, string>) =>
       get<import('@/types/analytics').RequesterProfileData>(
         `/analytics/requester-analysis/${requesterId}?${new URLSearchParams(params).toString()}`,
+      ),
+  },
+
+  documentVerifications: {
+    ensure: (body: EnsureDocumentVerificationBody) =>
+      post<DocumentVerification>('/document-verifications', body),
+  },
+
+  publicVerification: {
+    verify: (token: string) =>
+      get<PublicVerificationResult>(
+        `/public/procurement/verify/${encodeURIComponent(token)}`,
       ),
   },
 };

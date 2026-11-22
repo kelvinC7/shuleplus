@@ -47,32 +47,123 @@ export interface TeacherSummaryCard {
   courses: CoursePeriodSummary[];
 }
 
-export interface ClassStreamGroup {
-  group: string;
-  classes: string[];
+export interface ClassCatalogEntry {
+  name: string;
+  stream?: string | null;
+  label?: string | null;
 }
 
-/** Group "S3 A" / "S3A" / "S3 B" under base "S3". */
+export interface ClassStreamMember {
+  /** Label exactly as used by timetable rows (e.g. "P6 A"). */
+  className: string;
+  /** Stream name for display (e.g. "A"). Empty when the class has no stream. */
+  stream: string;
+}
+
+export interface ClassStreamGroup {
+  group: string;
+  /** Timetable class labels that belong to this base class. */
+  classes: string[];
+  /** Ordered stream members, one per distinct stream. */
+  members: ClassStreamMember[];
+}
+
+/** Compare class labels ignoring case, spacing and separators. */
+export function normalizeClassName(className: string): string {
+  return className.trim().toLowerCase().replace(/[\s_\-/.]+/g, ' ').trim();
+}
+
+function compactClassName(className: string): string {
+  return normalizeClassName(className).replace(/\s+/g, '');
+}
+
+/**
+ * Group "S3 A" / "S3A" / "S3 - A" / "S3 B" under base "S3".
+ *
+ * Student Management stores the class and its stream separately, so a parsed
+ * label is only a fallback. Callers can pass the real catalog to make the
+ * grouping exact.
+ */
 export function classStreamBase(className: string): string {
-  const raw = className.trim();
-  const spaced = raw.match(/^(.+?)\s+([A-Za-z])$/);
-  if (spaced) return spaced[1].trim();
-  const glued = raw.match(/^([A-Za-z]+\d+)([A-Za-z])$/);
+  const raw = className.trim().replace(/\s+/g, ' ');
+
+  // "P6 A", "P6 - A", "P6/A", "P6.A", "Form 1 A"
+  const separated = raw.match(/^(.+?)(?:\s*[-–—_/.]\s*|\s+)([A-Za-z]{1,2})$/);
+  if (separated) return separated[1].trim();
+
+  // "P6A" / "S3B"
+  const glued = raw.match(/^([A-Za-z]+\d+)([A-Za-z]{1,2})$/);
   if (glued) return glued[1];
+
+  // "6A" / "6B"
+  const numeric = raw.match(/^(\d+)([A-Za-z]{1,2})$/);
+  if (numeric) return numeric[1];
+
   return raw;
 }
 
-export function groupClassesByStream(classes: string[]): ClassStreamGroup[] {
-  const map = new Map<string, string[]>();
-  for (const c of [...classes].sort()) {
-    const base = classStreamBase(c);
-    const list = map.get(base) ?? [];
-    list.push(c);
-    map.set(base, list);
+/** Extract the stream part of a label once the base class is known. */
+function streamFromLabel(label: string, base: string): string {
+  if (normalizeClassName(label) === normalizeClassName(base)) return '';
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = label.match(new RegExp(`^\\s*${escaped}\\s*[-–—_/.]?\\s*(.*)$`, 'i'));
+  const remainder = match?.[1]?.trim() ?? '';
+  if (remainder && remainder.length <= 24) return remainder;
+  return '';
+}
+
+/**
+ * Build base-class groups.
+ *
+ * When `catalog` (Student Management classes with separate `name` + `stream`)
+ * is supplied, grouping uses those real fields instead of guessing from text.
+ * Duplicate labels such as "P6 A" and "P6A" collapse into one stream member;
+ * the first label seen wins, so callers should pass timetable row labels first.
+ */
+export function groupClassesByStream(
+  classes: string[],
+  catalog: ClassCatalogEntry[] = []
+): ClassStreamGroup[] {
+  const catalogByLabel = new Map<string, ClassCatalogEntry>();
+  for (const entry of catalog) {
+    const label = entry.label?.trim() || `${entry.name ?? ''} ${entry.stream ?? ''}`.trim();
+    const key = compactClassName(label);
+    if (key) catalogByLabel.set(key, entry);
   }
-  return [...map.entries()]
-    .map(([group, classList]) => ({ group, classes: classList }))
-    .sort((a, b) => a.group.localeCompare(b.group));
+
+  const baseMap = new Map<string, { group: string; members: Map<string, ClassStreamMember> }>();
+
+  for (const raw of classes) {
+    const label = raw?.trim();
+    if (!label) continue;
+
+    const entry = catalogByLabel.get(compactClassName(label));
+    const base = entry?.name?.trim() || classStreamBase(label);
+    if (!base) continue;
+
+    const stream =
+      (entry?.stream?.trim() ?? '') || streamFromLabel(label, base);
+    const streamKey = stream ? compactClassName(stream) : '';
+
+    const baseKey = normalizeClassName(base);
+    let bucket = baseMap.get(baseKey);
+    if (!bucket) {
+      bucket = { group: base, members: new Map() };
+      baseMap.set(baseKey, bucket);
+    }
+    if (!bucket.members.has(streamKey)) {
+      bucket.members.set(streamKey, { className: label, stream });
+    }
+  }
+
+  return [...baseMap.values()]
+    .map(({ group, members }) => {
+      const list = [...members.values()].sort((a, b) =>
+        a.stream.localeCompare(b.stream, undefined, { numeric: true })
+      );
+      return { group, classes: list.map((member) => member.className), members: list };
+    })
+    .sort((a, b) => a.group.localeCompare(b.group, undefined, { numeric: true }));
 }
 
 function buildCourseSummaries(

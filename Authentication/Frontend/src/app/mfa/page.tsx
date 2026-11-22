@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { resolvePostLoginRoute, type AuthUser } from '@/lib/auth';
-import { tryLaunchDefaultModule } from '@/lib/module-launch';
+import { tryLaunchDefaultModule, tryLaunchDirectorConsole, tryLaunchPendingModule } from '@/lib/module-launch';
 import { useToast } from '@/shared/notifications';
 import { useAppLanguage } from '@/i18n/app-language';
 import { AuthShell } from '@/components/auth/auth-shell';
@@ -106,6 +106,19 @@ function MfaContent() {
       sessionStorage.removeItem('mfaOtpDelivery');
 
       const user = data.data.user as AuthUser;
+      if (
+        await tryLaunchPendingModule(
+          data.data.accessToken as string,
+          data.data.refreshToken as string,
+          user,
+          searchParams.get('module')
+        )
+      ) {
+        return;
+      }
+      if (tryLaunchDirectorConsole(user, data.data.accessToken as string)) {
+        return;
+      }
       if (
         tryLaunchDefaultModule(user, data.data.accessToken as string, data.data.refreshToken as string)
       ) {

@@ -7,7 +7,9 @@
     "subdomains:apply": "node scripts/apply-module-subdomains.mjs",
     "subdomains:preview": "node scripts/apply-module-subdomains.mjs --dry-run",
     "subdomains:doc": "node scripts/generate-subdomains-doc.mjs",
-    "ports:check": "node scripts/check-module-ports.mjs"
+    "ports:check": "node scripts/check-module-ports.mjs",
+    "fix:esbuild": "node scripts/ensure-esbuild.mjs",
+    "repair:deps": "node scripts/repair-pnpm.mjs"
   },
   "workspaces": [
     "packages/*",
@@ -19,6 +21,11 @@
     "StudentDiscpline/Frontend"
   ],
   "devDependencies": {
-    "docx": "^9.7.1"
+    "docx": "^9.7.1",
+    "esbuild": "0.28.1",
+    "tsx": "4.20.3"
+  },
+  "optionalDependencies": {
+    "@esbuild/win32-x64": "0.28.1"
   }
 }

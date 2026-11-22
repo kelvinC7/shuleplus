@@ -1,53 +1,112 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-
-const NAVY = '#000435';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import ButtonBase from '@mui/material/ButtonBase';
+import { brand } from '../../theme/theme';
 
 const TABS = [
-  { path: '/lesson-planning/generate', label: 'Generate', short: 'New' },
   { path: '/lesson-planning/all', label: 'All plans', short: 'Plans' },
   { path: '/lesson-planning/book', label: 'Download book', short: 'Book' },
   { path: '/lesson-planning/performance', label: 'Performance', short: 'Stats' },
 ];
 
-export default function LessonPlanningLayout({ title, subtitle, actions, children }) {
+export const LESSON_TABS_HEIGHT = 42;
+
+/**
+ * Same shell pattern as /marks and /assessments:
+ *  1. sticky full-width square tabs at the very top
+ *  2. optional sticky filter bar right under the tabs (`filterBar`)
+ *  3. padded page content (title, actions, children)
+ */
+export default function LessonPlanningLayout({ title, subtitle, actions, filterBar, children }) {
   const location = useLocation();
 
   return (
-    <div className="space-y-5">
-      <header className="border-b border-slate-200 pb-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-400">Lesson planning</p>
-            <h1 className="mt-0.5 text-xl font-semibold text-slate-900 sm:text-2xl">{title}</h1>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
-          </div>
-          {actions ? <div className="flex shrink-0 flex-wrap gap-2 [&_button]:min-h-[40px]">{actions}</div> : null}
-        </div>
+    <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', pb: { xs: 10, md: 4 } }}>
+      {/* Sticky tabs — full width, square */}
+      <Box
+        role="tablist"
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 22,
+          display: 'flex',
+          height: LESSON_TABS_HEIGHT,
+          bgcolor: '#fff',
+          borderBottom: '1px solid rgba(19,33,61,0.08)',
+        }}
+      >
+        {TABS.map((tab) => {
+          const active = location.pathname === tab.path || location.pathname.startsWith(`${tab.path}/`);
+          return (
+            <ButtonBase
+              key={tab.path}
+              component={Link}
+              to={tab.path}
+              role="tab"
+              aria-selected={active}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                borderRadius: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: '0.01em',
+                color: active ? brand.navy : 'rgba(19,33,61,0.45)',
+                borderBottom: active ? `2px solid ${brand.navy}` : '2px solid transparent',
+                bgcolor: active ? 'rgba(19,33,61,0.03)' : 'transparent',
+                '&:hover': { color: brand.navy, bgcolor: 'rgba(19,33,61,0.04)' },
+              }}
+            >
+              <Box component="span" sx={{ display: { sm: 'none' } }}>{tab.short}</Box>
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{tab.label}</Box>
+            </ButtonBase>
+          );
+        })}
+      </Box>
 
-        <nav
-          className="mt-4 flex gap-4 overflow-x-auto text-sm scroll-smooth sm:gap-6"
-          aria-label="Lesson planning sections"
+      {/* Sticky filter bar under the tabs */}
+      {filterBar ? (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: LESSON_TABS_HEIGHT,
+            zIndex: 20,
+            bgcolor: '#fff',
+            borderBottom: '1px solid rgba(19,33,61,0.08)',
+            boxShadow: '0 2px 8px -4px rgba(19,33,61,0.12)',
+          }}
         >
-          {TABS.map((tab) => {
-            const active = location.pathname === tab.path || location.pathname.startsWith(`${tab.path}/`);
-            return (
-              <Link
-                key={tab.path}
-                to={tab.path}
-                className={`shrink-0 border-b-2 pb-2 font-medium transition ${
-                  active ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-                style={active ? { borderColor: NAVY, color: NAVY } : undefined}
-              >
-                <span className="sm:hidden">{tab.short}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </header>
-      {children}
-    </div>
+          {filterBar}
+        </Box>
+      ) : null}
+
+      <Stack
+        spacing={2}
+        sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: { xs: 1.25, md: 2, lg: 2.5 } }}
+      >
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          alignItems={{ sm: 'center' }}
+          justifyContent="space-between"
+          spacing={1.25}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: brand.navy }}>{title}</Typography>
+            {subtitle ? (
+              <Typography sx={{ mt: 0.15, fontSize: 12, color: 'rgba(19,33,61,0.45)' }}>{subtitle}</Typography>
+            ) : null}
+          </Box>
+          {actions ? (
+            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
+              {actions}
+            </Stack>
+          ) : null}
+        </Stack>
+
+        {children}
+      </Stack>
+    </Box>
   );
 }

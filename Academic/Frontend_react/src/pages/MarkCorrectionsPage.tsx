@@ -89,7 +89,7 @@ export default function MarkCorrectionsPage() {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#f4f6f9', overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 2, px: 3, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', gap: 1.5, flexShrink: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', p: { xs: 1.5, md: 2 }, px: { xs: 2, md: 3 }, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', gap: 1.5, flexShrink: 0 }}>
         <RateReviewIcon sx={{ color: '#000435', fontSize: 20 }} />
         <Box sx={{ flex: 1 }}>
           <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#000435' }}>Mark Edit Requests</Typography>
@@ -100,7 +100,7 @@ export default function MarkCorrectionsPage() {
         )}
       </Box>
 
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, md: 3 } }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress size={24} /></Box>
         ) : corrections.length === 0 ? (
@@ -113,8 +113,8 @@ export default function MarkCorrectionsPage() {
             {pending.length > 0 && (
               <Box sx={{ p: 2.5, border: '1px solid #e2e8f0', borderRadius: '14px', bgcolor: '#ffffff', mb: 3 }}>
                 <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>Pending — needs your decision</Typography>
-                <TableContainer>
-                  <Table size="small">
+                <TableContainer sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 860 }}>
                     <TableHead>
                       <TableRow>
                         {['Requested by', 'Student', 'Assessment', 'Current', 'Requested', 'Reason', 'Date', 'Actions'].map((h) => (
@@ -165,8 +165,8 @@ export default function MarkCorrectionsPage() {
             {reviewed.length > 0 && (
               <Box sx={{ p: 2.5, border: '1px solid #e2e8f0', borderRadius: '14px', bgcolor: '#ffffff' }}>
                 <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 2 }}>Reviewed</Typography>
-                <TableContainer>
-                  <Table size="small">
+                <TableContainer sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 860 }}>
                     <TableHead>
                       <TableRow>
                         {['Requested by', 'Student', 'Assessment', 'Current', 'Requested', 'Status', 'Reviewed', 'Notes'].map((h) => (

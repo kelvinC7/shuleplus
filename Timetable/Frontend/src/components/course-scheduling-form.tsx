@@ -16,6 +16,7 @@ import {
   previewAutoCourseCode,
 } from '@/utils/course-code';
 import { defaultCourseColor, nextUnusedCourseColor } from '@/utils/timetable';
+import { DefaultCourseMarksField } from '@/components/default-course-marks-field';
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
@@ -128,6 +129,28 @@ export function CourseSchedulingForm({
 
   return (
     <div className="space-y-8">
+      <section className="space-y-3">
+        <DefaultCourseMarksField
+          value={
+            course.defaultCourseMarks != null && Number.isFinite(Number(course.defaultCourseMarks))
+              ? String(course.defaultCourseMarks)
+              : ''
+          }
+          onChange={(v) => {
+            const t = v.trim();
+            if (!t) {
+              onChange({ ...course, defaultCourseMarks: null });
+              return;
+            }
+            const n = parseFloat(t);
+            onChange({
+              ...course,
+              defaultCourseMarks: Number.isFinite(n) && n > 0 ? n : null,
+            });
+          }}
+        />
+      </section>
+
       <section className="space-y-3">
         <SectionHeader
           title="Report card category"
@@ -545,5 +568,6 @@ export function emptyCourseConfig(existingColors: Array<string | null | undefine
     customWindowEnd: null,
     schedulingRules: { ...DEFAULT_SCHEDULING_RULES },
     isCore: true,
+    defaultCourseMarks: null,
   };
 }

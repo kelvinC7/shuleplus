@@ -179,7 +179,7 @@ export function CreateReturnDrawer({
             onChange={setGrnId}
             options={grns.map((g) => ({
               value: g.id,
-              label: `${g.grnNumber} — ${g.purchaseOrder?.poNumber ?? g.poId.slice(0, 8)}`,
+              label: `${g.grnNumber} · ${g.purchaseOrder?.poNumber ?? g.poId.slice(0, 8)}`,
             }))}
             placeholder="Select GRN"
             className="mb-5"

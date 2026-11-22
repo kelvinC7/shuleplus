@@ -26,14 +26,11 @@ export function createApp() {
         if (shuleplusOrigin.test(origin)) {
           return callback(null, origin);
         }
-        // Dev convenience: IAM landing + module frontends (Print Card :3092, ParentMIS, etc.)
-        if (
-          env.NODE_ENV !== 'production' &&
-          /^http:\/\/localhost:\d+$/.test(origin)
-        ) {
+        // Dev & mobile apps: localhost frontends and Capacitor native webviews
+        if (/^(capacitor:\/\/localhost|https?:\/\/localhost(:\d+)?)$/.test(origin)) {
           return callback(null, origin);
         }
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        return callback(null, false);
       },
       credentials: true,
     })

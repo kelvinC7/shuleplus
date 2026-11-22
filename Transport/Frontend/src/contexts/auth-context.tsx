@@ -12,6 +12,7 @@ import {
 } from '@/shared/auth-token';
 import { parseJwtPayload } from '@/shared/jwt';
 import type { JwtUser } from '@/types';
+import { redirectToIamLogin } from '@/utils/iam-login-redirect';
 
 interface AuthContextValue {
   ready: boolean;
@@ -45,8 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!token) {
       setAuthorized(false);
-      setError('Missing access token. Open this module from your organization dashboard.');
+      setError('Missing access token. Sign in to continue.');
       setReady(true);
+      redirectToIamLogin({ reason: 'missing' });
       return;
     }
 
@@ -79,9 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         'Unable to access Smart Transport';
       if (status === 401) {
-        setError('Session expired or invalid. Reopen Smart Transport from your organization dashboard.');
+        setError('Session expired or invalid. Sign in again.');
+        redirectToIamLogin({ reason: 'expired' });
       } else if (status === 403 && /suspend|suspend|not licensed|inactive/i.test(message)) {
         setError('Deactivated');
+      } else if (status === 500) {
+        setError(
+          'Transport database or server error. Run `npx prisma db push` in Transport/Backend, restart the API, then reopen from Organization Admin with ?token=…'
+        );
       } else {
         setError(message);
       }
@@ -98,7 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onExpired = () => {
       setAuthorized(false);
-      setError('Session expired or invalid. Reopen Smart Transport from your organization dashboard.');
+      setError('Session expired or invalid. Sign in again.');
+      redirectToIamLogin({ reason: 'expired' });
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);

@@ -1,0 +1,318 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum TripStatus {
+  DRAFT
+  SUBMITTED
+  VALIDATION
+  UNDER_REVIEW
+  CORRECTION_REQUESTED
+  RESUBMITTED
+  AWAITING_ADDITIONAL_APPROVAL
+  APPROVED
+  REJECTED
+  TRIP_IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TripCategory {
+  EDUCATIONAL
+  SPORTS
+  CULTURAL
+  COMMUNITY_SERVICE
+  OTHER
+}
+
+enum ParticipantType {
+  STUDENT
+}
+
+enum DocumentVerificationStatus {
+  NOT_REVIEWED
+  VERIFIED
+  MISSING
+  INVALID
+  EXPIRED
+  CORRECTION_REQUIRED
+  NOT_APPLICABLE
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  CORRECTION_REQUESTED
+  ESCALATED
+}
+
+model Tenant {
+  id               String       @id @default(uuid())
+  organizationId   String       @unique @map("organization_id")
+  organizationCode String?      @map("organization_code")
+  organizationName String       @map("organization_name")
+  district         String?
+  sector           String?
+  schoolCode       String?      @map("school_code")
+  status           TenantStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  trips Trip[]
+
+  @@map("tenants")
+}
+
+model Trip {
+  id               String       @id @default(uuid())
+  organizationId   String       @map("organization_id")
+  reference        String       @unique
+  title            String
+  purpose          String?
+  learningObjectives String?    @map("learning_objectives")
+  category         TripCategory @default(EDUCATIONAL)
+  academicYear     String?      @map("academic_year")
+  term             String?
+  departAt         DateTime?    @map("depart_at")
+  returnAt         DateTime?    @map("return_at")
+  destination      String?
+  itinerary        String?      @db.Text
+  estimatedDistanceKm Float?    @map("estimated_distance_km")
+  isInternational  Boolean      @default(false) @map("is_international")
+  tripLeaderName   String?      @map("trip_leader_name")
+  emergencyContact Json?        @map("emergency_contact")
+  routeDetails     Json?        @map("route_details")
+  safetyDetails    Json?        @map("safety_details")
+  correctionNote   String?      @db.Text @map("correction_note")
+  correctionDueAt  DateTime?    @map("correction_due_at")
+  status           TripStatus   @default(DRAFT)
+  currentStageKey  String       @default("intake") @map("current_stage_key")
+  safetyReadiness  Int          @default(0) @map("safety_readiness")
+  wizardStep       Int          @default(0) @map("wizard_step")
+  submittedAt      DateTime?    @map("submitted_at")
+  createdByUserId  String?      @map("created_by_user_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  tenant       Tenant              @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+  participants TripParticipant[]
+  staff        TripStaff[]
+  vehicles     TripVehicle[]
+  documents    TripDocument[]
+  approvals    TripApproval[]
+  authorizations TripAuthorization[]
+  auditLogs    TripAuditLog[]
+
+  @@index([organizationId, status])
+  @@index([departAt])
+  @@map("trips")
+}
+
+model TripParticipant {
+  id              String          @id @default(uuid())
+  tripId          String          @map("trip_id")
+  studentId       String          @map("student_id")
+  studentCode     String?         @map("student_code")
+  fullName        String          @map("full_name")
+  classLabel      String?         @map("class_label")
+  guardianPhone   String?         @map("guardian_phone")
+  guardianEmail   String?         @map("guardian_email")
+  photoUrl        String?         @map("photo_url")
+  guardianConsent Boolean         @default(false) @map("guardian_consent")
+  participantType ParticipantType @default(STUDENT) @map("participant_type")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, studentId])
+  @@map("trip_participants")
+}
+
+model TripStaff {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  staffId   String?  @map("staff_id")
+  fullName  String   @map("full_name")
+  role      String
+  isLeader  Boolean  @default(false) @map("is_leader")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_staff")
+}
+
+model TripVehicle {
+  id           String   @id @default(uuid())
+  tripId       String   @map("trip_id")
+  mode         String?
+  plateNumber  String?  @map("plate_number")
+  vehicleType  String?  @map("vehicle_type")
+  capacity     Int?
+  driverName            String?  @map("driver_name")
+  driverPhone           String?  @map("driver_phone")
+  driverLicenseCategory String?  @map("driver_license_category")
+  driverLicenseNumber   String?  @map("driver_license_number")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_vehicles")
+}
+
+model TripDocument {
+  id                 String                     @id @default(uuid())
+  tripId             String                     @map("trip_id")
+  documentType       String                     @map("document_type")
+  fileName           String?                    @map("file_name")
+  storageKey         String?                    @map("storage_key")
+  issueDate          DateTime?                  @map("issue_date")
+  expiryDate         DateTime?                  @map("expiry_date")
+  verificationStatus DocumentVerificationStatus @default(NOT_REVIEWED) @map("verification_status")
+  reviewerComment    String?                    @map("reviewer_comment")
+  createdAt          DateTime                   @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_documents")
+}
+
+model TripApproval {
+  id           String           @id @default(uuid())
+  tripId       String           @map("trip_id")
+  stageKey     String           @map("stage_key")
+  stageLabel   String           @map("stage_label")
+  decision     ApprovalDecision @default(PENDING)
+  decidedById  String?          @map("decided_by_id")
+  decidedByName String?         @map("decided_by_name")
+  officialRole  String?          @map("official_role")
+  authorityOffice String?        @map("authority_office")
+  signatureName String?          @map("signature_name")
+  stampReference String?         @map("stamp_reference")
+  signatureStorageKey String?    @map("signature_storage_key")
+  stampStorageKey     String?    @map("stamp_storage_key")
+  signatureFileName   String?    @map("signature_file_name")
+  stampFileName       String?    @map("stamp_file_name")
+  reason       String?
+  decidedAt    DateTime?        @map("decided_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_approvals")
+}
+
+model TripAuthorization {
+  id              String    @id @default(uuid())
+  tripId          String    @unique @map("trip_id")
+  authorizationNo String    @unique @map("authorization_no")
+  issuedAt        DateTime  @default(now()) @map("issued_at")
+  issuedByName    String?   @map("issued_by_name")
+  verifyTokenHash String?   @map("verify_token_hash")
+  revokedAt       DateTime? @map("revoked_at")
+  conditions      String?   @db.Text
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_authorizations")
+}
+
+model TripAuditLog {
+  id        String   @id @default(uuid())
+  tripId    String?  @map("trip_id")
+  organizationId String? @map("organization_id")
+  actorId   String?  @map("actor_id")
+  actorName String?  @map("actor_name")
+  action    String
+  detail    String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trip Trip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@map("trip_audit_logs")
+}
+
+model TripPolicyRule {
+  id          String   @id @default(uuid())
+  jurisdiction String
+  ruleKey     String   @map("rule_key")
+  label       String
+  description String?  @db.Text
+  severity    String   @default("warning")
+  isActive    Boolean  @default(true) @map("is_active")
+  config      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([jurisdiction, ruleKey])
+  @@map("trip_policy_rules")
+}
+
+enum SchoolRegistrationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ADDITIONAL_INFO_REQUIRED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum TripPortalAccountKind {
+  SCHOOL
+  GOVERNMENT
+  SUPER_ADMIN
+}
+
+model SchoolRegistration {
+  id               String                   @id @default(uuid())
+  reference        String                   @unique
+  status           SchoolRegistrationStatus @default(SUBMITTED)
+  schoolCode       String                   @unique @map("school_code")
+  officialName     String                   @map("official_name")
+  accountEmail     String                   @map("account_email")
+  username         String                   @unique
+  passwordHash     String                   @map("password_hash")
+  payload          Json
+  organizationId   String?                  @unique @map("organization_id")
+  reviewNote       String?                  @map("review_note") @db.Text
+  reviewedAt       DateTime?                @map("reviewed_at")
+  reviewedBy       String?                  @map("reviewed_by")
+  submittedAt      DateTime                 @default(now()) @map("submitted_at")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  @@map("school_registrations")
+}
+
+model TripPortalUser {
+  id               String                @id @default(uuid())
+  kind             TripPortalAccountKind
+  email            String
+  username         String                @unique
+  passwordHash     String                @map("password_hash")
+  roles            Json                  @default("[]")
+  modules          Json                  @default("[\"shule-trip\"]")
+  organizationId   String?               @map("organization_id")
+  organizationName String?               @map("organization_name")
+  district         String?
+  displayName      String?               @map("display_name")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  @@map("trip_portal_users")
+}

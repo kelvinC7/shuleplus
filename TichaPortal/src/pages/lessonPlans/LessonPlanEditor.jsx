@@ -1,6 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Download, Loader2, RefreshCw, Save, Sparkles } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import DownloadIcon from '@mui/icons-material/Download';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SaveIcon from '@mui/icons-material/Save';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import {
   getLessonPlan,
   saveLessonPlan,
@@ -9,8 +18,7 @@ import {
   fetchAiStatus,
 } from '../../services/lessonPlansApi';
 import LessonPlanCurriculumSection from '../../components/lessonPlanning/LessonPlanCurriculumSection';
-
-const NAVY = '#000435';
+import { brand } from '../../theme/theme';
 
 const PROV_LABEL = {
   source: 'Curriculum',
@@ -19,28 +27,46 @@ const PROV_LABEL = {
   missing: 'Missing',
 };
 
+const fieldSx = {
+  width: '100%',
+  minHeight: 44,
+  borderRadius: 1,
+  border: '1px solid #E2E8F0',
+  bgcolor: '#fff',
+  px: 1.5,
+  py: 1.25,
+  fontSize: 14,
+  lineHeight: 1.6,
+  color: '#0F172A',
+  fontFamily: 'inherit',
+  outline: 'none',
+  transition: 'border-color .15s, box-shadow .15s',
+  '&:focus': { borderColor: '#94A3B8', boxShadow: '0 0 0 2px #E2E8F0' },
+};
+
 function ProvenanceBadge({ provenance }) {
   if (!provenance || provenance === 'source') return null;
   const label = PROV_LABEL[provenance] || provenance;
-  return <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</span>;
+  return (
+    <Typography sx={{ flexShrink: 0, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>
+      {label}
+    </Typography>
+  );
 }
-
-const fieldClass =
-  'min-h-[44px] w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300';
 
 function EditableField({ label, field, onChange, multiline, action }) {
   if (!field) return null;
   const val = field.value ?? '';
-  const Input = multiline ? 'textarea' : 'input';
   return (
-    <label className="block py-4 first:pt-0">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-slate-500">{label}</span>
+    <Box component="label" sx={{ display: 'block', py: 2, '&:first-of-type': { pt: 0 } }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 0.75 }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#64748B' }}>{label}</Typography>
         {action}
-      </div>
-      <div className="flex items-start gap-2">
-        <Input
-          className={fieldClass}
+      </Stack>
+      <Stack direction="row" alignItems="flex-start" spacing={1}>
+        <Box
+          component={multiline ? 'textarea' : 'input'}
+          sx={fieldSx}
           value={Array.isArray(val) ? val.join('\n') : String(val ?? '')}
           rows={multiline ? 5 : undefined}
           onChange={(e) => {
@@ -51,13 +77,13 @@ function EditableField({ label, field, onChange, multiline, action }) {
           }}
         />
         <ProvenanceBadge provenance={field.provenance} />
-      </div>
-    </label>
+      </Stack>
+    </Box>
   );
 }
 
 function SectionTitle({ children }) {
-  return <h2 className="text-sm font-semibold text-slate-900">{children}</h2>;
+  return <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>{children}</Typography>;
 }
 
 function setDeep(obj, path, value) {
@@ -156,14 +182,14 @@ export default function LessonPlanEditor() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="animate-spin text-slate-400" size={32} />
-      </div>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+        <CircularProgress size={32} sx={{ color: '#94A3B8' }} />
+      </Box>
     );
   }
 
   if (!content) {
-    return <p className="text-sm text-red-600">{message || 'Plan not found'}</p>;
+    return <Typography sx={{ fontSize: 14, color: '#DC2626' }}>{message || 'Plan not found'}</Typography>;
   }
 
   const flags = plan?.qualityFlags || [];
@@ -171,70 +197,90 @@ export default function LessonPlanEditor() {
   const prep = content.preparation || {};
   const stages = content.procedure?.stages || [];
   const hasIntelligence = Boolean(content.curriculumIntelligence);
-  const showObjectivesSection =
-    content.learningObjectives?.length && !hasIntelligence;
+  const showObjectivesSection = content.learningObjectives?.length && !hasIntelligence;
 
   const aiImprove =
     aiStatus?.policy?.enabled !== false && (aiStatus?.ready || aiStatus?.provider === 'local');
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-6 pb-16">
-      <header className="border-b border-slate-200 pb-5">
-        <Link to="/lesson-planning/all" className="text-xs font-medium text-slate-500 hover:text-slate-800">
-          All lesson plans
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">
-          {fieldVal(prep.lessonTitle) || plan?.lesson?.title || 'Lesson plan'}
-        </h1>
-        <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
-          <div>
-            <span className="text-slate-400">Subject </span>
-            {fieldVal(general.subject) || plan?.subjectLabel}
-          </div>
-          <div>
-            <span className="text-slate-400">Class </span>
-            {fieldVal(general.className) || plan?.className}
-          </div>
-          <div>
-            <span className="text-slate-400">Teacher </span>
-            {fieldVal(general.teacherName) || plan?.teacherName}
-          </div>
-        </dl>
-        {flags.length ? (
-          <p className="mt-3 text-xs text-slate-500">{flags.map((f) => f.replace(/_/g, ' ')).join(' · ')}</p>
-        ) : null}
-      </header>
+  const improveBtnSx = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.5,
+    p: 0,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: 500,
+    color: '#475569',
+    textTransform: 'none',
+    '&:hover': { bgcolor: 'transparent', color: '#0F172A' },
+    '&.Mui-disabled': { opacity: 0.5 },
+  };
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
+  const sectionBorderSx = { borderTop: '1px solid #E2E8F0', pt: 3 };
+
+  return (
+    <Stack spacing={3} sx={{ mx: 'auto', maxWidth: 768, pb: 8 }}>
+      <Box component="header" sx={{ borderBottom: '1px solid #E2E8F0', pb: 2.5 }}>
+        <Box
+          component={Link}
+          to="/lesson-planning/all"
+          sx={{ fontSize: 12, fontWeight: 500, color: '#64748B', textDecoration: 'none', '&:hover': { color: '#1E293B' } }}
+        >
+          All lesson plans
+        </Box>
+        <Typography sx={{ mt: 1, fontSize: { xs: 20, sm: 24 }, fontWeight: 600, color: '#0F172A' }}>
+          {fieldVal(prep.lessonTitle) || plan?.lesson?.title || 'Lesson plan'}
+        </Typography>
+        <Box component="dl" sx={{ mt: 1.5, m: 0, display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 0.5, fontSize: 14, color: '#475569' }}>
+          <Box>
+            <Box component="span" sx={{ color: '#94A3B8' }}>Subject </Box>
+            {fieldVal(general.subject) || plan?.subjectLabel}
+          </Box>
+          <Box>
+            <Box component="span" sx={{ color: '#94A3B8' }}>Class </Box>
+            {fieldVal(general.className) || plan?.className}
+          </Box>
+          <Box>
+            <Box component="span" sx={{ color: '#94A3B8' }}>Teacher </Box>
+            {fieldVal(general.teacherName) || plan?.teacherName}
+          </Box>
+        </Box>
+        {flags.length ? (
+          <Typography sx={{ mt: 1.5, fontSize: 12, color: '#64748B' }}>{flags.map((f) => f.replace(/_/g, ' ')).join(' · ')}</Typography>
+        ) : null}
+      </Box>
+
+      <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1}>
+        <Button
           type="button"
           onClick={() => void onSave()}
           disabled={saving}
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          style={{ background: NAVY }}
+          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
+          sx={{ minHeight: 40, borderRadius: 1, px: 2, py: 1, bgcolor: brand.navy, color: '#fff', fontSize: 14, fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: brand.navy2 }, '&.Mui-disabled': { opacity: 0.6 } }}
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           Save
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => onExport('pdf')}
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+          sx={{ minHeight: 40, borderRadius: 1, border: '1px solid #E2E8F0', bgcolor: '#fff', px: 1.5, py: 1, fontSize: 14, fontWeight: 500, color: '#334155', textTransform: 'none', '&:hover': { bgcolor: '#F8FAFC' } }}
         >
-          <Download size={16} /> PDF
-        </button>
-        <button
+          PDF
+        </Button>
+        <Button
           type="button"
           onClick={() => onExport('docx')}
-          className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+          sx={{ minHeight: 40, borderRadius: 1, border: '1px solid #E2E8F0', bgcolor: '#fff', px: 1.5, py: 1, fontSize: 14, fontWeight: 500, color: '#334155', textTransform: 'none', '&:hover': { bgcolor: '#F8FAFC' } }}
         >
-          <Download size={16} /> DOCX
-        </button>
-        {message ? <span className="text-sm text-slate-600">{message}</span> : null}
-        {errorMsg ? <span className="text-sm text-red-600">{errorMsg}</span> : null}
-      </div>
+          DOCX
+        </Button>
+        {message ? <Typography sx={{ fontSize: 14, color: '#475569' }}>{message}</Typography> : null}
+        {errorMsg ? <Typography sx={{ fontSize: 14, color: '#DC2626' }}>{errorMsg}</Typography> : null}
+      </Stack>
 
-      <article className="rounded-lg border border-slate-200 bg-white px-5 py-6 sm:px-8">
+      <Paper component="article" variant="outlined" sx={{ borderRadius: 2, borderColor: '#E2E8F0', px: { xs: 2.5, sm: 4 }, py: 3 }}>
         <LessonPlanCurriculumSection
           intelligence={content.curriculumIntelligence}
           objectives={content.learningObjectives}
@@ -249,7 +295,7 @@ export default function LessonPlanEditor() {
           }
         />
 
-        <div className={hasIntelligence ? 'border-t border-slate-200 pt-6' : ''}>
+        <Box sx={hasIntelligence ? sectionBorderSx : undefined}>
           <SectionTitle>General</SectionTitle>
           <EditableField
             label="School name"
@@ -267,9 +313,9 @@ export default function LessonPlanEditor() {
             multiline
             onChange={(f) => setContent(setDeep(content, 'general.specialEducationalNeeds', f))}
           />
-        </div>
+        </Box>
 
-        <div className="border-t border-slate-200 pt-6">
+        <Box sx={sectionBorderSx}>
           <SectionTitle>Preparation</SectionTitle>
           <EditableField
             label="Instructional objective"
@@ -277,15 +323,15 @@ export default function LessonPlanEditor() {
             multiline
             action={
               aiImprove ? (
-                <button
+                <Button
                   type="button"
                   disabled={regenerating === 'objective'}
                   onClick={() => void onRegenerate('preparation.instructionalObjective', 'objective')}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                  startIcon={regenerating === 'objective' ? <CircularProgress size={12} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 12 }} />}
+                  sx={improveBtnSx}
                 >
-                  {regenerating === 'objective' ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                   Improve
-                </button>
+                </Button>
               ) : null
             }
             onChange={(f) => setContent(setDeep(content, 'preparation.instructionalObjective', f))}
@@ -296,21 +342,23 @@ export default function LessonPlanEditor() {
             multiline
             onChange={(f) => setContent(setDeep(content, 'preparation.learningMaterials', f))}
           />
-        </div>
+        </Box>
 
         {showObjectivesSection ? (
-          <div className="border-t border-slate-200 pt-6">
+          <Box sx={sectionBorderSx}>
             <SectionTitle>Learning objectives</SectionTitle>
-            <div className="mt-3 space-y-2 text-sm leading-relaxed text-slate-800">
+            <Stack spacing={1} sx={{ mt: 1.5, fontSize: 14, lineHeight: 1.65, color: '#1E293B' }}>
               {content.learningObjectives.map((o) => (
-                <p key={(o.statement || o.value || '').slice(0, 50)}>{o.statement || o.value}</p>
+                <Typography key={(o.statement || o.value || '').slice(0, 50)} sx={{ fontSize: 14, lineHeight: 1.65 }}>
+                  {o.statement || o.value}
+                </Typography>
               ))}
-            </div>
-          </div>
+            </Stack>
+          </Box>
         ) : null}
 
         {content.assessment ? (
-          <div className="border-t border-slate-200 pt-6">
+          <Box sx={sectionBorderSx}>
             <SectionTitle>Assessment</SectionTitle>
             <EditableField
               label="Questions"
@@ -318,35 +366,31 @@ export default function LessonPlanEditor() {
               multiline
               onChange={(f) => setContent(setDeep(content, 'assessment.questions', f))}
             />
-          </div>
+          </Box>
         ) : null}
 
-        <div className="border-t border-slate-200 pt-6">
+        <Box sx={sectionBorderSx}>
           <SectionTitle>Teaching process</SectionTitle>
-          <div className="mt-4 space-y-8">
+          <Stack spacing={4} sx={{ mt: 2 }}>
             {stages.map((stage) => (
-              <div key={stage.key} className="border-b border-slate-100 pb-8 last:border-0 last:pb-0">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-medium text-slate-900">{stage.title}</h3>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span>{stage.minutes} min</span>
+              <Box key={stage.key} sx={{ borderBottom: '1px solid #F1F5F9', pb: 4, '&:last-of-type': { borderBottom: 'none', pb: 0 } }}>
+                <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 1.5 }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 500, color: '#0F172A' }}>{stage.title}</Typography>
+                  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ fontSize: 12, color: '#64748B' }}>
+                    <Box component="span">{stage.minutes} min</Box>
                     {aiImprove ? (
-                      <button
+                      <Button
                         type="button"
                         disabled={regenerating === stage.key}
                         onClick={() => void onRegenerateStage(stage.key)}
-                        className="inline-flex items-center gap-1 font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                        startIcon={regenerating === stage.key ? <CircularProgress size={12} color="inherit" /> : <RefreshIcon sx={{ fontSize: 12 }} />}
+                        sx={improveBtnSx}
                       >
-                        {regenerating === stage.key ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <RefreshCw size={12} />
-                        )}
                         Improve
-                      </button>
+                      </Button>
                     ) : null}
-                  </div>
-                </div>
+                  </Stack>
+                </Stack>
                 <EditableField
                   label="Teacher activities"
                   field={stage.teacherActivities}
@@ -369,14 +413,14 @@ export default function LessonPlanEditor() {
                     setContent({ ...content, procedure: { stages: nextStages } });
                   }}
                 />
-              </div>
+              </Box>
             ))}
-          </div>
-        </div>
-      </article>
+          </Stack>
+        </Box>
+      </Paper>
 
       {aiStatus ? (
-        <p className="text-center text-xs text-slate-400">
+        <Typography sx={{ textAlign: 'center', fontSize: 12, color: '#94A3B8' }}>
           {aiStatus.policy?.enabled === false
             ? 'AI off for your school.'
             : aiStatus.provider === 'local'
@@ -384,8 +428,8 @@ export default function LessonPlanEditor() {
               : aiStatus.ready
                 ? `${aiStatus.providerLabel || aiStatus.provider}`
                 : 'Edit manually or configure AI on the server.'}
-        </p>
+        </Typography>
       ) : null}
-    </div>
+    </Stack>
   );
 }

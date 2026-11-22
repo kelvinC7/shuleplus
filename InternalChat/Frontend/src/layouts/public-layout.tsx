@@ -23,7 +23,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             <Box component="img" src="/logo.png" alt="Internal Chat" sx={{ height: 50, width: 'auto' }} />
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Button component={Link} to="/chat" size="small" sx={{ color: 'primary.main', fontWeight: 600, textTransform: 'none' }}>
+            <Button component={Link} to="/sms" size="small" sx={{ color: 'primary.main', fontWeight: 600, textTransform: 'none' }}>
               Open Chat
             </Button>
             <Button component="a" href={`${IAM_URL}/organization-admin`} target="_blank" rel="noopener noreferrer" size="small" sx={{ color: 'primary.main', fontWeight: 600, textTransform: 'none' }}>

@@ -32,3 +32,17 @@ export function getRequestedStudent(req: Request): StudentRef {
     studentCode: getRequestedStudentCode(req),
   };
 }
+
+export function parseStudentSelector(sel?: StudentSelector): { id?: string; code?: string } {
+  if (!sel) return {};
+  if (typeof sel === 'string') {
+    const id = sel.trim();
+    return id ? { id } : {};
+  }
+  const id = sel.studentId?.trim();
+  const code = sel.studentCode?.trim();
+  return {
+    ...(id ? { id } : {}),
+    ...(code ? { code } : {}),
+  };
+}

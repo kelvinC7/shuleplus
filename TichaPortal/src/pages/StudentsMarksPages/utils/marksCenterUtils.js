@@ -1,20 +1,23 @@
-export function markColorClass(percent) {
-  if (percent == null || !Number.isFinite(percent)) return 'text-[#000435]/35 bg-[#000435]/[0.03]';
-  if (percent >= 90) return 'text-green-800 bg-green-50';
-  if (percent >= 70) return 'text-blue-800 bg-blue-50';
-  if (percent >= 50) return 'text-orange-800 bg-orange-50';
-  return 'text-red-800 bg-red-50';
+const NAVY = '#13213D';
+
+export function markTone(percent) {
+  if (percent == null || !Number.isFinite(percent)) return { color: 'rgba(19,33,61,0.35)', bgcolor: 'rgba(19,33,61,0.03)' };
+  if (percent >= 90) return { color: '#166534', bgcolor: '#F0FDF4' };
+  if (percent >= 70) return { color: '#1E40AF', bgcolor: '#EFF6FF' };
+  if (percent >= 50) return { color: NAVY, bgcolor: '#F3F5FA' };
+  return { color: '#991B1B', bgcolor: '#FEF2F2' };
 }
 
-export function gradeBadgeClass(grade) {
-  const map = {
-    A: 'bg-green-100 text-green-800',
-    B: 'bg-blue-100 text-blue-800',
-    C: 'bg-orange-100 text-orange-800',
-    D: 'bg-orange-50 text-orange-700',
-    F: 'bg-red-100 text-red-800',
-  };
-  return map[grade] || 'bg-[#000435]/5 text-[#000435]/50';
+const GRADE_TONES = {
+  A: { color: '#166534', bgcolor: '#DCFCE7' },
+  B: { color: '#1E40AF', bgcolor: '#DBEAFE' },
+  C: { color: NAVY, bgcolor: '#E3E9F5' },
+  D: { color: NAVY, bgcolor: '#F3F5FA' },
+  F: { color: '#991B1B', bgcolor: '#FEE2E2' },
+};
+
+export function gradeTone(grade) {
+  return GRADE_TONES[grade] || { color: 'rgba(19,33,61,0.5)', bgcolor: 'rgba(19,33,61,0.05)' };
 }
 
 export function buildFilterParams(filters, studentSearch, studentId) {

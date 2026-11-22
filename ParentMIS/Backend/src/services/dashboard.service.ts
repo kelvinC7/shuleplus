@@ -3,8 +3,11 @@ import { AppError } from '../middleware/error.middleware';
 import { resolveParentContext, listLinkedStudents } from './parent-context.service';
 import { feesService } from './fees.service';
 import { attendanceService } from './attendance.service';
+import { academicService } from './academic.service';
 import type { StudentSelector } from '../utils/student-param';
 import { fetchOrganizationAcademicSettings } from './iam-api';
+import { resolvePortalFeaturesForParent } from './parent-portal-mode.service';
+import { isShuleTripOnlyPortal, type PortalFeatures } from './portal-features.service';
 
 function gradeFromScore(total: number): string {
   if (total >= 80) return 'A';
@@ -24,6 +27,7 @@ export class DashboardService {
     } catch (err) {
       if (err instanceof AppError && err.statusCode === 403) {
         const tenant = await prisma.tenant.findUnique({ where: { organizationId } });
+        const portalFeatures403 = await resolvePortalFeaturesForParent(organizationId, parentId);
         return {
           student: {
             id: '',
@@ -42,6 +46,15 @@ export class DashboardService {
             avatarUrl: null,
           },
           linkedStudents: [],
+          parent: {
+            id: parentId,
+            name: 'Parent',
+            firstName: 'Parent',
+            lastName: '',
+            phone: '',
+            email: null,
+            organizationId,
+          },
           attendance: {
             todayStatus: 'NONE' as const,
             checkInTime: null,
@@ -81,6 +94,7 @@ export class DashboardService {
             recentTransactions: [],
           },
           organization: { name: tenant?.organizationName ?? 'School' },
+          portalFeatures: portalFeatures403,
           recentActivities: [],
           notifications: { unread: 0 },
         };
@@ -88,7 +102,12 @@ export class DashboardService {
       throw err;
     }
 
-    const [student, tenant, schoolAcademic, currentTerm, grades, exams, feeStatements, feePayments, wallet, activityLogs] =
+    const portalFeatures = await resolvePortalFeaturesForParent(organizationId, parentId);
+    if (isShuleTripOnlyPortal(portalFeatures)) {
+      return this.buildTripOnlySummary(organizationId, parentId, studentId, portalFeatures);
+    }
+
+    const [student, tenant, schoolAcademic, currentTerm, grades, exams, feeStatements, feePayments, wallet, activityLogs, parentAccount] =
       await Promise.all([
         prisma.student.findUnique({ where: { id: studentId } }),
         prisma.tenant.findUnique({ where: { organizationId } }),
@@ -115,6 +134,7 @@ export class DashboardService {
           orderBy: { createdAt: 'desc' },
           take: 8,
         }),
+        prisma.parentAccount.findUnique({ where: { id: parentId } }),
       ]);
 
     if (!student) throw new AppError(404, 'Student profile not found');
@@ -150,12 +170,12 @@ export class DashboardService {
     }
 
     // Academic summary (current term)
-    const currentTermName =
+    let currentTermName =
       currentTerm?.name ??
       schoolAcademic.currentTerm ??
       grades[0]?.term.name ??
       'Current Term';
-    const currentAcademicYear =
+    let currentAcademicYear =
       currentTerm?.academicYear ??
       schoolAcademic.currentAcademicYear ??
       schoolAcademic.academicYears[0] ??
@@ -163,15 +183,15 @@ export class DashboardService {
     const currentTermGrades = currentTerm
       ? grades.filter((g) => g.termId === currentTerm.id)
       : grades;
-    const gpa = currentTermGrades.length
+    let gpa = currentTermGrades.length
       ? Math.round((currentTermGrades.reduce((s, g) => s + g.total, 0) / currentTermGrades.length / 25) * 10) / 10
       : 0;
-    const classRank = currentTermGrades.length
+    let classRank = currentTermGrades.length
       ? Math.min(...currentTermGrades.map((g) => g.rank ?? 99))
       : 0;
-    const totalStudents = 42;
+    let totalStudents = 42;
 
-    const topSubjects = currentTermGrades
+    let topSubjects = currentTermGrades
       .slice()
       .sort((a, b) => b.total - a.total)
       .slice(0, 5)
@@ -183,6 +203,65 @@ export class DashboardService {
         grade: g.grade ?? gradeFromScore(g.total),
         rank: g.rank ?? 0,
       }));
+
+    let upcomingExamList = exams.map((e) => ({
+      id: e.id,
+      subject: e.subject,
+      date: e.date.toISOString(),
+      type: e.type,
+    }));
+
+    try {
+      const liveAcad = await academicService.list(organizationId, parentId, {
+        studentId: student.id,
+        studentCode: student.shuleCode,
+      });
+      if (liveAcad.terms && liveAcad.terms.length > 0) {
+        const latestTerm = liveAcad.terms[0]!;
+        if (latestTerm.gpa != null && latestTerm.gpa > 0) gpa = latestTerm.gpa;
+        if (latestTerm.classRank != null && latestTerm.classRank > 0) classRank = latestTerm.classRank;
+        if (latestTerm.totalStudents != null && latestTerm.totalStudents > 0) totalStudents = latestTerm.totalStudents;
+        if (latestTerm.term) currentTermName = latestTerm.term;
+        if (latestTerm.academicYear) currentAcademicYear = latestTerm.academicYear;
+        if (latestTerm.subjects && latestTerm.subjects.length > 0) {
+          topSubjects = latestTerm.subjects
+            .slice()
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5)
+            .map((s) => ({
+              subject: s.subject,
+              ca: s.ca,
+              exam: s.exam,
+              total: s.total,
+              grade: s.grade || gradeFromScore(s.total),
+              rank: s.rank || 0,
+            }));
+        }
+      } else if (liveAcad.publishedMarks && liveAcad.publishedMarks.length > 0) {
+        topSubjects = liveAcad.publishedMarks
+          .slice()
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5)
+          .map((m) => ({
+            subject: m.subject,
+            ca: 0,
+            exam: m.score,
+            total: m.percentage ?? m.score,
+            grade: m.grade || gradeFromScore(m.percentage ?? m.score),
+            rank: 0,
+          }));
+      }
+      if (liveAcad.upcomingExams && liveAcad.upcomingExams.length > 0) {
+        upcomingExamList = liveAcad.upcomingExams.map((e) => ({
+          id: e.id,
+          subject: e.subject,
+          date: e.date,
+          type: e.type,
+        }));
+      }
+    } catch (err) {
+      console.warn('[dashboard] live academics unavailable', (err as Error).message);
+    }
 
     const disciplineRecords = await prisma.disciplineRecord.findMany({ where: { studentId } });
     const disciplineScore = Math.max(0, Math.min(100, 100 - disciplineRecords.reduce((s, r) => s + Math.abs(r.points), 0)));
@@ -300,6 +379,17 @@ export class DashboardService {
         avatarUrl: student.avatarUrl,
       },
       linkedStudents: await listLinkedStudents(parentId, organizationId),
+      parent: parentAccount
+        ? {
+            id: parentAccount.id,
+            name: `${parentAccount.firstName} ${parentAccount.lastName}`.trim(),
+            firstName: parentAccount.firstName,
+            lastName: parentAccount.lastName,
+            phone: parentAccount.phone,
+            email: parentAccount.email,
+            organizationId: parentAccount.organizationId,
+          }
+        : undefined,
       attendance: {
         todayStatus,
         checkInTime,
@@ -339,6 +429,7 @@ export class DashboardService {
       organization: {
         name: tenant?.organizationName ?? 'Unknown School',
       },
+      portalFeatures,
       schoolAcademic: {
         academicYears: schoolAcademic.academicYears,
         terms: schoolAcademic.terms,
@@ -355,6 +446,84 @@ export class DashboardService {
       notifications: {
         unread: notificationUnread,
       },
+    };
+  }
+
+  private async buildTripOnlySummary(
+    organizationId: string,
+    parentId: string,
+    studentId: string,
+    portalFeatures: PortalFeatures
+  ) {
+    const [student, tenant, notificationUnread] = await Promise.all([
+      prisma.student.findUnique({ where: { id: studentId } }),
+      prisma.tenant.findUnique({ where: { organizationId } }),
+      prisma.notification.count({ where: { parentId, organizationId, isRead: false } }),
+    ]);
+    if (!student) throw new AppError(404, 'Student profile not found');
+
+    return {
+      student: {
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        fullName: `${student.firstName} ${student.lastName}`,
+        class: student.className,
+        stream: student.stream ?? '',
+        shuleCode: student.shuleCode,
+        cardNumber: student.cardNumber ?? '',
+        classTeacher: student.classTeacher ?? '',
+        house: student.house ?? '',
+        transportRoute: student.transportRoute ?? '',
+        admissionDate: student.admissionDate ? student.admissionDate.toISOString() : '',
+        isBoarding: student.isBoarding,
+        avatarUrl: student.avatarUrl,
+      },
+      linkedStudents: await listLinkedStudents(parentId, organizationId),
+      attendance: {
+        todayStatus: 'NONE' as const,
+        checkInTime: null,
+        checkOutTime: null,
+        monthlyPresent: 0,
+        monthlyAbsent: 0,
+        monthlyLate: 0,
+        monthlyExcused: 0,
+        attendanceRate: 0,
+      },
+      academics: {
+        currentGPA: 0,
+        classRank: 0,
+        totalStudents: 0,
+        term: '',
+        academicYear: '',
+        topSubjects: [],
+        upcomingExams: [],
+        disciplineScore: 0,
+      },
+      fees: {
+        totalBilled: 0,
+        totalPaid: 0,
+        outstanding: 0,
+        overdue: 0,
+        currency: 'RWF',
+        currentTerm: '',
+        feeStatements: [],
+        recentPayments: [],
+      },
+      wallet: {
+        balance: 0,
+        currency: 'RWF',
+        cardNumber: student.cardNumber ?? '',
+        lastTopUp: null,
+        lastTopUpAmount: null,
+        recentTransactions: [],
+      },
+      organization: {
+        name: tenant?.organizationName ?? 'School',
+      },
+      portalFeatures,
+      recentActivities: [],
+      notifications: { unread: notificationUnread },
     };
   }
 }

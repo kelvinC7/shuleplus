@@ -21,6 +21,22 @@ export const env = {
     process.env.PLATFORM_SERVICE_KEY ??
     'dev-service-key',
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? 'http://localhost:3031',
+  /**
+   * Public frontend origin used in QR verification links. Falls back to the
+   * first configured CORS origin so existing deployments keep working.
+   */
+  PUBLIC_APP_URL:
+    (process.env.PUBLIC_APP_URL ??
+      (process.env.CORS_ORIGIN ?? 'http://localhost:3031').split(',')[0])
+      .trim()
+      .replace(/\/+$/, ''),
   IAM_API_URL: process.env.IAM_API_URL ?? 'http://localhost:3001/api/v1',
+  /** InventoryMIS service-to-service API (item catalogue for Excel imports). */
+  INVENTORY_API_URL: process.env.INVENTORY_API_URL ?? 'http://localhost:4011/api',
+  INVENTORY_SERVICE_KEY:
+    process.env.INVENTORY_SERVICE_KEY ??
+    process.env.SERVICE_API_KEY ??
+    process.env.PLATFORM_SERVICE_KEY ??
+    'dev-service-key',
   MODULE_SLUG: process.env.MODULE_SLUG ?? 'procurement-mis',
 } as const;

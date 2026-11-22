@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   IconButton,
+  MenuItem,
   Switch,
   TextField,
   Typography,
@@ -17,7 +18,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import type { ApiAssessmentComponent } from '@/types';
+import type { ApiAssessmentComponent, AssessmentComponentCategory, ReportingStage } from '@/types';
 import {
   addAssessmentTemplateComponent,
   deleteAssessmentTemplateComponent,
@@ -26,6 +27,29 @@ import {
 import { toast } from '@/lib/toast';
 
 const NAVY = '#000435';
+
+export const COMPONENT_CATEGORY_OPTIONS: Array<{ value: AssessmentComponentCategory | ''; label: string }> = [
+  { value: '', label: 'Not set' },
+  { value: 'BEGINNING_TEST', label: 'Beginning Test' },
+  { value: 'CAT_CONTINUOUS', label: 'CAT / Continuous' },
+  { value: 'MIDTERM_TEST', label: 'Mid-Term Test' },
+  { value: 'END_OF_TERM_EXAM', label: 'End-of-Term Exam' },
+];
+
+export const COMPONENT_STAGE_OPTIONS: Array<{ value: ReportingStage; label: string }> = [
+  { value: 'UNASSIGNED', label: 'Not set (teacher chooses)' },
+  { value: 'BEGINNING_TERM', label: 'Beginning Term report' },
+  { value: 'MID_TERM', label: 'Mid-Term report' },
+  { value: 'TERM_FINAL', label: 'Termly report (final)' },
+];
+
+/** Category implies a default reporting stage; CATs keep whatever the admin chose. */
+export function defaultStageForCategory(category: string): ReportingStage {
+  if (category === 'BEGINNING_TEST') return 'BEGINNING_TERM';
+  if (category === 'MIDTERM_TEST') return 'MID_TERM';
+  if (category === 'END_OF_TERM_EXAM') return 'TERM_FINAL';
+  return 'UNASSIGNED';
+}
 
 function generateCode(name: string): string {
   if (!name.trim()) return '';
@@ -45,6 +69,22 @@ function activeWeightSum(components: ApiAssessmentComponent[], excludeId?: strin
   }, 0);
 }
 
+function labelFor<T extends string>(options: Array<{ value: T | ''; label: string }>, value: string | null | undefined) {
+  return options.find((o) => o.value === (value ?? ''))?.label ?? 'Not set';
+}
+
+type ComponentDraft = {
+  name: string;
+  code: string;
+  weight: string;
+  maxMark: string;
+  sortOrder: string;
+  required: boolean;
+  active: boolean;
+  category: AssessmentComponentCategory | '';
+  stage: ReportingStage;
+};
+
 type Props = {
   templateId: string;
   components: ApiAssessmentComponent[];
@@ -56,6 +96,8 @@ export default function TemplateComponentsEditor({ templateId, components, edita
   const [busyId, setBusyId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newWeight, setNewWeight] = useState('');
+  const [newCategory, setNewCategory] = useState<AssessmentComponentCategory | ''>('');
+  const [newStage, setNewStage] = useState<ReportingStage>('UNASSIGNED');
 
   const sortedComponents = useMemo(
     () => [...components].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
@@ -89,18 +131,7 @@ export default function TemplateComponentsEditor({ templateId, components, edita
     }
   };
 
-  const handleSaveComponent = async (
-    c: ApiAssessmentComponent,
-    draft: {
-      name: string;
-      code: string;
-      weight: string;
-      maxMark: string;
-      sortOrder: string;
-      required: boolean;
-      active: boolean;
-    }
-  ) => {
+  const handleSaveComponent = async (c: ApiAssessmentComponent, draft: ComponentDraft) => {
     const w = parseFloat(draft.weight);
     if (Number.isNaN(w) || w <= 0) {
       toast.error('Enter a valid weight %');
@@ -123,6 +154,8 @@ export default function TemplateComponentsEditor({ templateId, components, edita
         sortOrder: Number.isNaN(sort) ? undefined : sort,
         required: draft.required,
         isActive: draft.active,
+        assessmentCategory: draft.category || null,
+        reportingStage: draft.stage,
       });
       toast.success('Component updated');
       await refresh();
@@ -171,9 +204,13 @@ export default function TemplateComponentsEditor({ templateId, components, edita
         sortOrder: components.length,
         required: true,
         isActive: true,
+        assessmentCategory: newCategory || null,
+        reportingStage: newStage,
       });
       setNewName('');
       setNewWeight('');
+      setNewCategory('');
+      setNewStage('UNASSIGNED');
       toast.success('Component added');
       await refresh();
     } catch (e: unknown) {
@@ -192,11 +229,11 @@ export default function TemplateComponentsEditor({ templateId, components, edita
         </Typography>
       </Box>
 
-      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: 'none' }}>
+      <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: 'none', overflowX: 'auto' }}>
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: '#f8fafc' }}>
-              {['Name', 'Code', 'Weight %', 'Required', 'Active', ''].map((h) => (
+              {['Name', 'Code', 'Weight %', 'Category', 'Reports in', 'Required', 'Active', ''].map((h) => (
                 <TableCell key={h || 'actions'} sx={{ fontWeight: 700, fontSize: '0.6875rem', color: '#64748b' }}>
                   {h}
                 </TableCell>
@@ -206,7 +243,7 @@ export default function TemplateComponentsEditor({ templateId, components, edita
           <TableBody>
             {sortedComponents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} sx={{ color: '#94a3b8', py: 3 }}>
+                <TableCell colSpan={8} sx={{ color: '#94a3b8', py: 3 }}>
                   No components yet.
                 </TableCell>
               </TableRow>
@@ -237,7 +274,7 @@ export default function TemplateComponentsEditor({ templateId, components, edita
             border: '1px dashed rgba(0,4,53,0.15)',
             bgcolor: '#fafbfc',
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: '1fr 100px auto' },
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 100px 1fr 1fr auto' },
             gap: 1.5,
             alignItems: 'end',
           }}
@@ -251,6 +288,38 @@ export default function TemplateComponentsEditor({ templateId, components, edita
             onChange={(e) => setNewWeight(e.target.value)}
             slotProps={{ htmlInput: { min: 1, max: Math.max(1, 100 - totalActiveWeight) } }}
           />
+          <TextField
+            select
+            label="Category"
+            size="small"
+            value={newCategory}
+            onChange={(e) => {
+              const v = e.target.value as AssessmentComponentCategory | '';
+              setNewCategory(v);
+              setNewStage(defaultStageForCategory(v));
+            }}
+            fullWidth
+          >
+            {COMPONENT_CATEGORY_OPTIONS.map((o) => (
+              <MenuItem key={o.value || 'none'} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Reports in"
+            size="small"
+            value={newStage}
+            onChange={(e) => setNewStage(e.target.value as ReportingStage)}
+            fullWidth
+          >
+            {COMPONENT_STAGE_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -279,15 +348,7 @@ function ComponentRow({
   editable: boolean;
   busy: boolean;
   maxWeight: number;
-  onSave: (draft: {
-    name: string;
-    code: string;
-    weight: string;
-    maxMark: string;
-    sortOrder: string;
-    required: boolean;
-    active: boolean;
-  }) => void;
+  onSave: (draft: ComponentDraft) => void;
   onDelete: () => void;
   onToggleActive: (active: boolean) => void;
 }) {
@@ -298,6 +359,11 @@ function ComponentRow({
   const [sortOrder, setSortOrder] = useState(String(c.sortOrder ?? 0));
   const [required, setRequired] = useState(c.isRequired !== false);
   const [active, setActive] = useState(c.isActive !== false);
+  const [category, setCategory] = useState<AssessmentComponentCategory | ''>((c.assessmentCategory ?? '') as AssessmentComponentCategory | '');
+  const [stage, setStage] = useState<ReportingStage>((c.reportingStage ?? 'UNASSIGNED') as ReportingStage);
+
+  const originalCategory = (c.assessmentCategory ?? '') as string;
+  const originalStage = (c.reportingStage ?? 'UNASSIGNED') as string;
 
   const dirty =
     name !== c.name ||
@@ -306,7 +372,9 @@ function ComponentRow({
     maxMark !== String(c.maxMark ?? 20) ||
     sortOrder !== String(c.sortOrder ?? 0) ||
     required !== (c.isRequired !== false) ||
-    active !== (c.isActive !== false);
+    active !== (c.isActive !== false) ||
+    category !== originalCategory ||
+    stage !== originalStage;
 
   if (!editable) {
     return (
@@ -314,6 +382,8 @@ function ComponentRow({
         <TableCell sx={{ fontWeight: 600, color: NAVY }}>{c.name}</TableCell>
         <TableCell>{c.code}</TableCell>
         <TableCell>{c.weightPercentage ?? 0}%</TableCell>
+        <TableCell>{labelFor(COMPONENT_CATEGORY_OPTIONS, c.assessmentCategory)}</TableCell>
+        <TableCell>{labelFor(COMPONENT_STAGE_OPTIONS, c.reportingStage)}</TableCell>
         <TableCell>{c.isRequired !== false ? 'Yes' : 'No'}</TableCell>
         <TableCell>{c.isActive !== false ? 'Active' : 'Inactive'}</TableCell>
         <TableCell />
@@ -344,6 +414,34 @@ function ComponentRow({
           sx={{ width: 72 }}
         />
       </TableCell>
+      <TableCell sx={{ minWidth: 150 }}>
+        <TextField
+          select
+          size="small"
+          value={category}
+          onChange={(e) => {
+            const v = e.target.value as AssessmentComponentCategory | '';
+            setCategory(v);
+            setStage(defaultStageForCategory(v));
+          }}
+          fullWidth
+        >
+          {COMPONENT_CATEGORY_OPTIONS.map((o) => (
+            <MenuItem key={o.value || 'none'} value={o.value}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </TableCell>
+      <TableCell sx={{ minWidth: 170 }}>
+        <TextField select size="small" value={stage} onChange={(e) => setStage(e.target.value as ReportingStage)} fullWidth>
+          {COMPONENT_STAGE_OPTIONS.map((o) => (
+            <MenuItem key={o.value} value={o.value}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </TableCell>
       <TableCell>
         <Switch size="small" checked={required} onChange={(e) => setRequired(e.target.checked)} />
       </TableCell>
@@ -360,7 +458,11 @@ function ComponentRow({
         />
       </TableCell>
       <TableCell align="right">
-        <IconButton size="small" disabled={busy || !dirty} onClick={() => onSave({ name, code, weight, maxMark, sortOrder, required, active })}>
+        <IconButton
+          size="small"
+          disabled={busy || !dirty}
+          onClick={() => onSave({ name, code, weight, maxMark, sortOrder, required, active, category, stage })}
+        >
           <SaveOutlinedIcon fontSize="small" />
         </IconButton>
         <IconButton size="small" disabled={busy} onClick={onDelete} sx={{ color: '#dc2626' }}>

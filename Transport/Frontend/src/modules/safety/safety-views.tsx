@@ -92,8 +92,8 @@ export function MissingView() {
                   <p className="font-semibold">{s.studentName}</p>
                   <p className="text-xs text-muted">{s.studentCode}</p>
                 </td>
-                <td className="px-4 py-3">{s.pickupStop?.name ?? '—'}</td>
-                <td className="px-4 py-3">{s.morningBus?.code ?? '—'}</td>
+                <td className="px-4 py-3">{s.pickupStop?.name ?? ''}</td>
+                <td className="px-4 py-3">{s.morningBus?.code ?? ''}</td>
                 <td className="px-4 py-3"><StatusBadge status={s.liveState} /></td>
               </tr>
             ))}

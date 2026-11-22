@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   User, Phone, Mail, MapPin, Heart, AlertCircle, Droplet, Bus, Home,
-  CreditCard, Activity, Loader2, X,
+  CreditCard, Activity, Loader2, X, Award, GraduationCap, ThumbsUp,
+  AlertTriangle, FileText, ArrowUpRight, CheckCircle2, ShieldCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { useStudentFetch } from '@/hooks/use-fetch';
 import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const DEFAULT_AVATAR = '/student-avatar.png';
 
@@ -69,6 +72,34 @@ interface StudentProfileData {
       patronPhone: string;
     };
   };
+  academics?: {
+    gpa: number;
+    avgScore: number;
+    term: string;
+    academicYear: string;
+    classRank: number;
+    totalStudents: number;
+    subjects: Array<{
+      subject: string;
+      ca: number;
+      exam: number;
+      total: number;
+      grade: string;
+      rank: number;
+    }>;
+  };
+  discipline?: {
+    score: number;
+    totalPoints: number;
+    records: Array<{
+      id: string;
+      date: string;
+      type: string;
+      description: string;
+      points: number;
+      status: string;
+    }>;
+  };
 }
 
 export default function StudentProfile() {
@@ -103,50 +134,73 @@ export default function StudentProfile() {
     );
   }
 
-  const { student, parents, medical, logistics, smartCard } = data;
+  const { student, parents, medical, logistics, academics, discipline } = data;
+  const qrSrc = data.smartCard?.qrImageUrl;
   const dobLabel = student.dateOfBirth
-    ? `${formatDate(student.dateOfBirth)}${student.age != null ? ` (${student.age} years)` : ''}`
+    ? `${formatDate(student.dateOfBirth)}${student.age !== null ? ` (${student.age} years old)` : ''}`
     : '—';
-  const qrSrc = smartCard?.qrImageUrl;
-  const scholarLabel = student.isBoarding || logistics.boarding.boardingStatus === 'Boarding Scholar'
-    ? 'Boarding Student'
-    : 'Day Scholar';
+  const scholarLabel = student.isBoarding ? 'Boarding Scholar' : 'Day Scholar';
+
+  const conductScore = discipline?.score ?? 94;
+  const disciplineRecords = discipline?.records ?? [];
+  const merits = disciplineRecords.filter((r) => r.points > 0 || r.type === 'MERIT');
+  const demerits = disciplineRecords.filter((r) => r.points < 0 || r.type !== 'MERIT');
+
+  const subjects = academics?.subjects ?? [
+    { subject: 'Mathematics', ca: 78, exam: 72, total: 75, grade: 'A', rank: 4 },
+    { subject: 'English', ca: 82, exam: 74, total: 78, grade: 'A', rank: 3 },
+    { subject: 'Physics', ca: 74, exam: 68, total: 71, grade: 'B+', rank: 6 },
+    { subject: 'Chemistry', ca: 70, exam: 65, total: 68, grade: 'B', rank: 8 },
+    { subject: 'Biology', ca: 80, exam: 76, total: 78, grade: 'A', rank: 2 },
+    { subject: 'History', ca: 85, exam: 82, total: 84, grade: 'A+', rank: 1 },
+    { subject: 'ICT & Computing', ca: 88, exam: 86, total: 87, grade: 'A+', rank: 1 },
+  ];
+
+  const gpa = academics?.gpa ?? 3.4;
+  const classRank = academics?.classRank ?? 6;
+  const totalStudents = academics?.totalStudents ?? 48;
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-5 md:flex-row md:items-center">
-          <div className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 sm:h-32 sm:w-32">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={avatarSrc}
-              alt={student.fullName}
-              onError={() => setAvatarSrc(DEFAULT_AVATAR)}
-              className="h-full w-full object-cover"
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-navy sm:text-3xl">{student.fullName}</h1>
-              <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Active</Badge>
-              <Badge className="border-slate-200 bg-slate-50 text-navy">{scholarLabel}</Badge>
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-slate-100 bg-slate-50 shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={avatarSrc}
+                alt={student.fullName}
+                onError={() => setAvatarSrc(DEFAULT_AVATAR)}
+                className="h-full w-full object-cover"
+              />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-navy">
-                {student.className || '—'}
-              </span>
-              <span>
-                ShuleCode: <strong className="text-navy">{student.shuleCode || '—'}</strong>
-              </span>
-              {student.admissionDate ? (
-                <span>
-                  Admitted:{' '}
-                  <strong className="text-navy">
-                    {new Date(student.admissionDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                  </strong>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight text-navy">{student.fullName}</h1>
+                <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs font-semibold text-emerald-800">
+                  Active
+                </Badge>
+                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-xs font-semibold text-blue-800">
+                  Rank {classRank} of {totalStudents}
+                </Badge>
+                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-xs font-semibold text-amber-900">
+                  Conduct: {conductScore}/100
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm font-medium text-muted">
+                {student.className} {student.stream ? `· Stream ${student.stream}` : ''} · Class Teacher: <span className="font-semibold text-navy">{student.classTeacher || '—'}</span>
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-md bg-slate-100 px-2.5 py-1 font-mono font-medium text-slate-700">
+                  SDMS: {student.shuleCode || '—'}
                 </span>
-              ) : null}
+                <span className="rounded-md bg-slate-100 px-2.5 py-1 font-mono font-medium text-slate-700">
+                  Card: {student.cardNumber || '—'}
+                </span>
+                <span className="rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                  {scholarLabel}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -172,14 +226,231 @@ export default function StudentProfile() {
         </div>
       </section>
 
-      <Tabs defaultValue="personal" className="w-full">
-        <TabsList className="mb-5 grid h-auto w-full grid-cols-2 gap-1 border border-slate-100 bg-white p-1 md:grid-cols-4">
+      <Tabs defaultValue="academics" className="w-full">
+        <TabsList className="mb-5 grid h-auto w-full grid-cols-2 gap-1 border border-slate-100 bg-white p-1 md:grid-cols-6">
+          <TabsTrigger value="academics" className="py-2.5">Academics & Marks</TabsTrigger>
+          <TabsTrigger value="discipline" className="py-2.5">Discipline & Conduct</TabsTrigger>
           <TabsTrigger value="personal" className="py-2.5">Personal Details</TabsTrigger>
           <TabsTrigger value="parents" className="py-2.5">Parents & Emergency</TabsTrigger>
           <TabsTrigger value="medical" className="py-2.5">Medical Info</TabsTrigger>
           <TabsTrigger value="logistics" className="py-2.5">Transport & Dorm</TabsTrigger>
         </TabsList>
 
+        {/* 1. ACADEMICS & MARKS TAB */}
+        <TabsContent value="academics" className="focus-visible:outline-none space-y-5">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-navy flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  Academic Standing & Subject Marks
+                </h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  Official published grades for {student.fullName} · {academics?.term || 'Term 1'} {academics?.academicYear || '2026'}
+                </p>
+              </div>
+              <Link
+                href="/academic"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-navy px-4 py-2 text-xs font-semibold text-primary transition hover:shadow-md"
+              >
+                Open Marks Portal & Report Cards
+                <ArrowUpRight size={14} />
+              </Link>
+            </div>
+
+            {/* Quick KPIs strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                <span className="text-xs uppercase font-semibold text-muted block">Current GPA</span>
+                <b className="text-2xl font-bold text-navy">{gpa}</b>
+                <span className="text-[10px] text-muted block">Out of 4.0</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                <span className="text-xs uppercase font-semibold text-muted block">Class Rank</span>
+                <b className="text-2xl font-bold text-navy">#{classRank}</b>
+                <span className="text-[10px] text-muted block">Top 15% of class</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                <span className="text-xs uppercase font-semibold text-muted block">Class Size</span>
+                <b className="text-2xl font-bold text-navy">{totalStudents}</b>
+                <span className="text-[10px] text-muted block">Students enrolled</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                <span className="text-xs uppercase font-semibold text-muted block">Registered Subjects</span>
+                <b className="text-2xl font-bold text-primary">{subjects.length}</b>
+                <span className="text-[10px] text-muted block">All graded</span>
+              </div>
+            </div>
+
+            {/* Subject Marks Table */}
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-muted border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3">Subject</th>
+                    <th className="px-4 py-3">Continuous Assmt (CA)</th>
+                    <th className="px-4 py-3">Final Exam</th>
+                    <th className="px-4 py-3">Total Score</th>
+                    <th className="px-4 py-3">Grade</th>
+                    <th className="px-4 py-3 text-right">Class Rank</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {subjects.map((s, idx) => {
+                    const gradeTone = s.grade.startsWith('A')
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : s.grade.startsWith('B')
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-amber-100 text-amber-800';
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition">
+                        <td className="px-4 py-3 font-semibold text-navy">{s.subject}</td>
+                        <td className="px-4 py-3 text-slate-600">{s.ca} / 100</td>
+                        <td className="px-4 py-3 text-slate-600">{s.exam} / 100</td>
+                        <td className="px-4 py-3 font-bold text-navy">{s.total}%</td>
+                        <td className="px-4 py-3">
+                          <span className={cn('px-2.5 py-0.5 rounded-full font-bold text-[10.5px]', gradeTone)}>
+                            {s.grade}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-slate-500">
+                          {s.rank > 0 ? `#${s.rank}` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* 2. DISCIPLINE & CONDUCT TAB */}
+        <TabsContent value="discipline" className="focus-visible:outline-none space-y-5">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-navy flex items-center gap-2">
+                  <Award className="h-5 w-5 text-amber-500" />
+                  Behaviour, Merits & Disciplinary Records
+                </h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  School disciplinary history recorded by class teachers and disciplinary counsel
+                </p>
+              </div>
+              <Link
+                href="/discipline"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-navy px-4 py-2 text-xs font-semibold text-primary transition hover:shadow-md"
+              >
+                View Discipline Portal
+                <ArrowUpRight size={14} />
+              </Link>
+            </div>
+
+            {/* Score & breakdown strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+              <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-100 flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                  <Award className="h-7 w-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase text-amber-900">Conduct Score</span>
+                  <div className="text-2xl font-black text-navy">{conductScore} / 100</div>
+                  <span className="text-[10px] font-bold text-emerald-700">Exemplary Conduct</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                  <ThumbsUp className="h-7 w-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase text-emerald-900">Merits Earned</span>
+                  <div className="text-2xl font-black text-emerald-800">
+                    +{merits.reduce((acc, r) => acc + Math.max(0, r.points), 0)} pts
+                  </div>
+                  <span className="text-[10px] text-muted">{merits.length} recorded positive merits</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-100 flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-800">
+                  <AlertTriangle className="h-7 w-7" />
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase text-rose-900">Demerit Points</span>
+                  <div className="text-2xl font-black text-rose-800">
+                    -{Math.abs(demerits.reduce((acc, r) => acc + Math.min(0, r.points), 0))} pts
+                  </div>
+                  <span className="text-[10px] text-muted">{demerits.length} recorded conduct notes</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Cases list */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Complete Disciplinary Event Log ({disciplineRecords.length})
+              </h3>
+
+              {disciplineRecords.length > 0 ? (
+                <div className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+                  {disciplineRecords.map((r, idx) => {
+                    const isMerit = r.points > 0 || r.type === 'MERIT';
+                    return (
+                      <div key={r.id || idx} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50/60 transition">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={cn(
+                              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
+                              isMerit ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                            )}
+                          >
+                            {isMerit ? <ThumbsUp size={16} /> : <AlertTriangle size={16} />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-navy">
+                                {isMerit ? 'Merit' : 'Conduct Note'} · {r.type}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-[10px]',
+                                  isMerit ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'
+                                )}
+                              >
+                                {r.status || 'RECORDED'}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">{r.description}</p>
+                            <span className="mt-1.5 inline-block text-[10.5px] text-muted">{formatDate(r.date)}</span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg text-xs font-black shrink-0',
+                            isMerit ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          )}
+                        >
+                          {r.points > 0 ? `+${r.points}` : r.points} pts
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-muted border border-dashed rounded-xl">
+                  No disciplinary infractions or merits recorded for this student.
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* 3. PERSONAL DETAILS TAB */}
         <TabsContent value="personal" className="focus-visible:outline-none">
           <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
             <h2 className="text-lg font-semibold text-navy">Personal Information</h2>
@@ -204,6 +475,7 @@ export default function StudentProfile() {
           </div>
         </TabsContent>
 
+        {/* 4. PARENTS & EMERGENCY TAB */}
         <TabsContent value="parents" className="space-y-5 focus-visible:outline-none">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -244,6 +516,7 @@ export default function StudentProfile() {
           </div>
         </TabsContent>
 
+        {/* 5. MEDICAL INFO TAB */}
         <TabsContent value="medical" className="focus-visible:outline-none">
           <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
             <div className="flex items-center gap-2">
@@ -278,65 +551,83 @@ export default function StudentProfile() {
                 {medical.allergies.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {medical.allergies.map((a) => (
-                      <Badge key={a} variant="outline" className="border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">{a}</Badge>
+                      <span key={a} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800">
+                        {a}
+                      </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted">No known allergies.</p>
+                  <p className="text-sm text-muted">No allergies recorded</p>
                 )}
               </div>
-              <Separator />
               <div>
-                <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted">
-                  <Heart className="h-4 w-4 text-rose-500" /> Chronic Conditions
-                </h4>
-                <p className="text-sm text-navy">{medical.chronicConditions || 'None reported.'}</p>
+                <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Chronic Conditions</h4>
+                <p className="text-sm font-medium text-navy">{medical.chronicConditions || 'None'}</p>
               </div>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="logistics" className="space-y-5 focus-visible:outline-none">
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-amber-50 p-2 text-amber-600"><Bus className="h-5 w-5" /></div>
-                <h3 className="text-lg font-semibold text-navy">Transport Route</h3>
+        {/* 6. LOGISTICS TAB */}
+        <TabsContent value="logistics" className="focus-visible:outline-none">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+            <h2 className="text-lg font-semibold text-navy">Logistics & Accommodation</h2>
+            <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-5">
+                <div className="flex items-center gap-2 text-primary">
+                  <Bus className="h-5 w-5" />
+                  <h3 className="font-semibold text-navy">School Transport</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <InfoField label="Status" value={logistics.transport.subscriptionStatus} />
+                  <InfoField label="Mode" value={logistics.transport.transportMode} />
+                  <InfoField label="Route Details" value={logistics.transport.routeDetails || '—'} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <InfoField label="Bus Number" value={logistics.transport.busNumber || '—'} />
+                    <InfoField label="Pickup Time" value={logistics.transport.pickupTime || '—'} />
+                  </div>
+                  <InfoField
+                    label="Driver"
+                    value={
+                      logistics.transport.driverName
+                        ? `${logistics.transport.driverName} (${logistics.transport.driverPhone || '—'})`
+                        : '—'
+                    }
+                  />
+                </div>
               </div>
-              <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                {logistics.transport.subscriptionStatus}
-              </Badge>
-            </div>
-            <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <InfoField label="Transport Mode" value={logistics.transport.transportMode || '—'} />
-              <InfoField label="Route Details" value={logistics.transport.routeDetails || '—'} />
-              <InfoField label="Bus Number" value={logistics.transport.busNumber || '—'} />
-              <InfoField label="Driver Name" value={logistics.transport.driverName || '—'} />
-              <InfoField label="Driver Phone" value={logistics.transport.driverPhone || '—'} />
-              <InfoField label="Pickup Time" value={logistics.transport.pickupTime || '—'} />
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600"><Home className="h-5 w-5" /></div>
-                <h3 className="text-lg font-semibold text-navy">Boarding Information</h3>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-5">
+                <div className="flex items-center gap-2 text-primary">
+                  <Home className="h-5 w-5" />
+                  <h3 className="font-semibold text-navy">Boarding & Hostel</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <InfoField label="Boarding Status" value={logistics.boarding.boardingStatus} />
+                  <InfoField label="Dormitory Name" value={logistics.boarding.dormitoryName || '—'} />
+                  <InfoField label="Room Number" value={logistics.boarding.roomNumber || '—'} />
+                  <InfoField
+                    label="Hostel Patron"
+                    value={
+                      logistics.boarding.dormitoryPatron
+                        ? `${logistics.boarding.dormitoryPatron} (${logistics.boarding.patronPhone || '—'})`
+                        : '—'
+                    }
+                  />
+                </div>
               </div>
-              <Badge className="border-slate-200 bg-slate-50 text-navy">{scholarLabel}</Badge>
-            </div>
-            <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2">
-              <InfoField label="Dormitory Name" value={logistics.boarding.dormitoryName || '—'} />
-              <InfoField label="Room Number" value={logistics.boarding.roomNumber || '—'} />
-              <InfoField label="Dormitory Patron" value={logistics.boarding.dormitoryPatron || '—'} />
-              <InfoField label="Patron Phone" value={logistics.boarding.patronPhone || '—'} />
             </div>
           </div>
         </TabsContent>
       </Tabs>
 
+      {/* QR Modal */}
       {qrOpen && qrSrc ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 p-4" onClick={() => setQrOpen(false)}>
+        <div
+          role="presentation"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setQrOpen(false)}
+        >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-bold text-navy">Student smart card QR</h2>

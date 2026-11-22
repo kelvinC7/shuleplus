@@ -1,20 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ArrowLeft,
-  CornerDownRight,
-  Loader2,
-  MessageSquare,
-  Search,
-  Send,
-  UserRound,
-  Users,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import SearchIcon from '@mui/icons-material/Search';
+import SendIcon from '@mui/icons-material/Send';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import GroupIcon from '@mui/icons-material/Group';
+import CloseIcon from '@mui/icons-material/Close';
 import { io } from 'socket.io-client';
 import api from '../services/api';
 import { parentMisSocketUrl } from '../lib/parentMisSocket';
 import TeacherOrangeHero from './TeacherOrangeHero';
 
-const NAVY = '#000435';
+const NAVY = '#13213D';
+const AMBER = '#F5A623';
+const BORDER = 'rgba(19,33,61,0.1)';
 
 function formatWhen(iso) {
   try {
@@ -30,7 +38,7 @@ function formatWhen(iso) {
 }
 
 function parseReplyBody(body) {
-  const match = /^↩[^\n]*\n((?:> .*\n?)+)\n([\s\S]*)$/m.exec(body || '');
+  const match = /^[^\n]*Reply\n((?:> .*\n?)+)\n([\s\S]*)$/.exec(body || '');
   if (!match) return { quote: null, text: body };
   const quote = match[1]
     .split('\n')
@@ -46,38 +54,60 @@ function buildReplyBody(quote, text) {
     .slice(0, 4)
     .map((line) => `> ${line}`)
     .join('\n');
-  return `↩ Reply\n${q}\n\n${text.trim()}`;
+  return `? Reply\n${q}\n\n${text.trim()}`;
 }
+
+const scrollSx = { minHeight: 0, overflowY: 'auto' };
 
 function MessageBubble({ message, mine }) {
   const { quote, text } = parseReplyBody(message.body);
   return (
-    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`group max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm sm:max-w-[85%] ${
-          mine
-            ? 'rounded-br-md bg-[#000435] text-white'
-            : 'rounded-bl-md border border-slate-200 bg-white text-[#000435]'
-        }`}
+    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+      <Box
+        sx={{
+          maxWidth: { xs: '92%', sm: '85%' },
+          borderRadius: 2,
+          px: 1.75,
+          py: 1.25,
+          fontSize: 14,
+          boxShadow: '0 1px 2px rgba(19,33,61,0.06)',
+          borderBottomRightRadius: mine ? 4 : undefined,
+          borderBottomLeftRadius: mine ? undefined : 4,
+          bgcolor: mine ? NAVY : '#fff',
+          color: mine ? '#fff' : NAVY,
+          border: mine ? 'none' : `1px solid #E2E8F0`,
+        }}
       >
         {!mine ? (
-          <p className={`mb-1 text-[10px] font-bold uppercase tracking-wide ${mine ? 'text-white/60' : 'text-slate-400'}`}>
+          <Typography sx={{ mb: 0.5, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94A3B8' }}>
             {message.senderName}
-          </p>
+          </Typography>
         ) : null}
         {quote ? (
-          <div
-            className={`mb-2 rounded-xl border-l-2 px-2.5 py-1.5 text-xs ${
-              mine ? 'border-amber-300/80 bg-white/10 text-white/90' : 'border-amber-400 bg-slate-50 text-slate-600'
-            }`}
+          <Box
+            sx={{
+              mb: 1,
+              borderRadius: 1.5,
+              borderLeft: '2px solid',
+              px: 1.25,
+              py: 0.75,
+              fontSize: 12,
+              borderColor: mine ? 'rgba(252,211,77,0.8)' : '#FBBF24',
+              bgcolor: mine ? 'rgba(255,255,255,0.1)' : '#F8FAFC',
+              color: mine ? 'rgba(255,255,255,0.9)' : '#475569',
+            }}
           >
             {quote}
-          </div>
+          </Box>
         ) : null}
-        <p className="whitespace-pre-wrap leading-relaxed">{text}</p>
-        <p className={`mt-1 text-[10px] ${mine ? 'text-white/50' : 'text-slate-400'}`}>{formatWhen(message.createdAt)}</p>
-      </div>
-    </div>
+        <Typography component="p" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+          {text}
+        </Typography>
+        <Typography sx={{ mt: 0.5, fontSize: 10, color: mine ? 'rgba(255,255,255,0.5)' : '#94A3B8' }}>
+          {formatWhen(message.createdAt)}
+        </Typography>
+      </Box>
+    </Box>
   );
 }
 
@@ -268,319 +298,410 @@ export default function TeacherParentChat({
     setError(null);
   }
 
+  const tabSx = (active) => ({
+    flex: 1,
+    px: 1.5,
+    py: 1.5,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    borderBottom: '2px solid',
+    borderColor: active ? '#FBBF24' : 'transparent',
+    color: active ? NAVY : '#94A3B8',
+  });
+
+  const listItemSx = (active) => ({
+    display: 'block',
+    width: '100%',
+    mb: 0.5,
+    borderRadius: 2,
+    px: 1.5,
+    py: 1.25,
+    textAlign: 'left',
+    bgcolor: active ? NAVY : 'transparent',
+    color: active ? '#fff' : 'inherit',
+    transition: 'background-color 0.15s',
+    '&:hover': { bgcolor: active ? NAVY : '#F8FAFC' },
+  });
+
   const chatHeader = thread ? (
-    <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 sm:py-4">
-      <button
-        type="button"
-        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ borderBottom: `1px solid #F1F5F9`, px: { xs: 2, sm: 2.5 }, py: { xs: 1.5, sm: 2 } }}>
+      <IconButton
         onClick={() => setMobilePane('list')}
         aria-label="Back"
+        sx={{ display: { xs: 'inline-flex', lg: 'none' }, borderRadius: 2, color: '#64748B', '&:hover': { bgcolor: '#F1F5F9' } }}
       >
-        <ArrowLeft size={18} />
-      </button>
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11"
-        style={{ background: 'rgba(252,176,56,0.18)', color: NAVY }}
-      >
-        <UserRound size={20} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate text-base font-extrabold sm:text-lg" style={{ color: NAVY }}>
+        <ArrowBackIcon sx={{ fontSize: 18 }} />
+      </IconButton>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: { xs: 40, sm: 44 }, height: { xs: 40, sm: 44 }, borderRadius: 2, bgcolor: 'rgba(252,176,56,0.18)', color: NAVY }}>
+        <PersonOutlineIcon sx={{ fontSize: 20 }} />
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography noWrap sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 800, color: NAVY }}>
           {thread.studentName}
-        </h2>
-        <p className="truncate text-xs text-slate-500 sm:text-sm">{thread.className}</p>
-      </div>
+        </Typography>
+        <Typography noWrap sx={{ fontSize: { xs: 12, sm: 14 }, color: '#64748B' }}>
+          {thread.className}
+        </Typography>
+      </Box>
       {socketLive ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.5}
+          sx={{ flexShrink: 0, borderRadius: 99, bgcolor: '#ECFDF5', px: 1, py: 0.25, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#047857' }}
+        >
+          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10B981' }} aria-hidden />
           Live
-        </span>
+        </Stack>
       ) : null}
-    </div>
+    </Stack>
   ) : null;
 
   const parentsPanelBody = (
     <>
-      <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Parents</p>
+      <Typography sx={{ px: 1, pb: 0.5, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>
+        Parents
+      </Typography>
       {!selectedStudent ? (
-        <p className="px-2 py-6 text-center text-xs text-slate-400">Select a student</p>
+        <Typography sx={{ px: 1, py: 3, textAlign: 'center', fontSize: 12, color: '#94A3B8' }}>Select a student</Typography>
       ) : selectedStudent.parents?.length === 0 ? (
-        <p className="px-2 py-6 text-center text-xs text-slate-400">No linked parents in Parent Portal</p>
+        <Typography sx={{ px: 1, py: 3, textAlign: 'center', fontSize: 12, color: '#94A3B8' }}>
+          No linked parents in Parent Portal
+        </Typography>
       ) : (
         selectedStudent.parents.map((p) => {
           const active = p.id === selectedParentId;
           return (
-            <button
-              key={p.id}
+            <Box
+              component="button"
               type="button"
+              key={p.id}
               onClick={() => setSelectedParentId(p.id)}
-              className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm ${
-                active ? 'bg-amber-100 ring-1 ring-amber-300' : 'hover:bg-slate-50'
-              }`}
+              sx={{
+                display: 'block',
+                width: '100%',
+                mb: 0.5,
+                borderRadius: 2,
+                px: 1.5,
+                py: 1.25,
+                textAlign: 'left',
+                bgcolor: active ? '#FEF3C7' : 'transparent',
+                boxShadow: active ? 'inset 0 0 0 1px #FCD34D' : 'none',
+                '&:hover': { bgcolor: active ? '#FEF3C7' : '#F8FAFC' },
+              }}
             >
-              <p className="font-bold text-[#000435]">{p.fullName}</p>
-              <p className="text-xs text-slate-500">
-                {p.relationship || 'Parent'} · {p.phone}
-              </p>
-            </button>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: NAVY }}>{p.fullName}</Typography>
+              <Typography sx={{ fontSize: 12, color: '#64748B' }}>
+                {p.relationship || 'Parent'} &middot; {p.phone}
+              </Typography>
+            </Box>
           );
         })
       )}
       {selectedStudent && selectedParentId ? (
-        <button
+        <Button
           type="button"
           disabled={opening}
           onClick={() => void openComposeChat()}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-[#000435] disabled:opacity-50"
-          style={{ background: '#FCB038' }}
+          startIcon={opening ? <CircularProgress size={16} sx={{ color: NAVY }} /> : <GroupIcon sx={{ fontSize: 16 }} />}
+          sx={{ mt: 1, width: '100%', borderRadius: 2, py: 1.25, fontSize: 14, fontWeight: 700, textTransform: 'none', color: NAVY, bgcolor: AMBER, '&:hover': { bgcolor: AMBER }, '&.Mui-disabled': { opacity: 0.5 } }}
         >
-          {opening ? <Loader2 className="animate-spin" size={16} /> : <Users size={16} />}
           Open chat
-        </button>
+        </Button>
       ) : null}
     </>
   );
 
   const chatBody = (
     <>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-4">
-        {(thread?.messages || []).map((m) => {
-          const mine = m.senderRole === 'TEACHER';
-          return (
-            <div key={m.id} className="relative">
-              <MessageBubble message={m} mine={mine} />
-              {!mine ? (
-                <button
-                  type="button"
-                  className="ml-1 mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 hover:text-amber-600"
-                  onClick={() => {
-                    setReplyTo(m);
-                    setDraft('');
-                  }}
-                >
-                  <CornerDownRight size={12} /> Reply
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
+      <Box sx={{ ...scrollSx, flex: 1, bgcolor: 'rgba(248,250,252,0.7)', px: { xs: 1.5, sm: 2 }, py: 2 }}>
+        <Stack spacing={1.5}>
+          {(thread?.messages || []).map((m) => {
+            const mine = m.senderRole === 'TEACHER';
+            return (
+              <Box key={m.id} sx={{ position: 'relative' }}>
+                <MessageBubble message={m} mine={mine} />
+                {!mine ? (
+                  <ButtonBase
+                    onClick={() => {
+                      setReplyTo(m);
+                      setDraft('');
+                    }}
+                    sx={{ ml: 0.5, mt: 0.25, gap: 0.5, borderRadius: 1, px: 0.5, fontSize: 10, fontWeight: 600, color: '#94A3B8', '&:hover': { color: '#D97706' } }}
+                  >
+                    <SubdirectoryArrowRightIcon sx={{ fontSize: 12 }} /> Reply
+                  </ButtonBase>
+                ) : null}
+              </Box>
+            );
+          })}
+        </Stack>
+        <Box ref={bottomRef} />
+      </Box>
 
-      <form
+      <Box
+        component="form"
         onSubmit={(e) => void sendMessage(e)}
-        className="border-t border-slate-100 bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+        sx={{ borderTop: `1px solid #F1F5F9`, bgcolor: '#fff', p: 1.5, pb: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       >
         {replyTo ? (
-          <div className="mb-2 flex items-start justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            <span className="line-clamp-2">{parseReplyBody(replyTo.body).text || replyTo.body}</span>
-            <button type="button" className="shrink-0 font-bold text-slate-400 hover:text-slate-600" onClick={() => setReplyTo(null)}>
-              ×
-            </button>
-          </div>
+          <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mb: 1, borderRadius: 2, bgcolor: '#F8FAFC', px: 1.5, py: 1, fontSize: 12, color: '#475569' }}>
+            <Box
+              component="span"
+              sx={{ flex: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            >
+              {parseReplyBody(replyTo.body).text || replyTo.body}
+            </Box>
+            <IconButton
+              type="button"
+              size="small"
+              onClick={() => setReplyTo(null)}
+              aria-label="Cancel reply"
+              sx={{ flexShrink: 0, p: 0.25, color: '#94A3B8', '&:hover': { color: '#475569' } }}
+            >
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Stack>
         ) : null}
-        <div className="flex gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-amber-400"
-            placeholder={replyTo ? 'Write a reply…' : 'Message…'}
+        <Stack direction="row" spacing={1}>
+          <Box
+            component="input"
+            sx={{
+              minWidth: 0,
+              flex: 1,
+              borderRadius: 2,
+              border: `1px solid #E2E8F0`,
+              px: 1.5,
+              py: 1.25,
+              fontSize: 14,
+              fontFamily: 'inherit',
+              outline: 'none',
+              '&:focus': { borderColor: '#FBBF24' },
+            }}
+            placeholder={replyTo ? 'Write a reply...' : 'Message...'}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={sending}
           />
-          <button
+          <Button
             type="submit"
             disabled={sending || !draft.trim()}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-[#000435] disabled:opacity-50"
-            style={{ background: '#FCB038' }}
+            sx={{ flexShrink: 0, minWidth: 0, borderRadius: 2, px: 2, py: 1.25, bgcolor: AMBER, color: NAVY, '&:hover': { bgcolor: AMBER }, '&.Mui-disabled': { opacity: 0.5 } }}
           >
-            {sending ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
-          </button>
-        </div>
-      </form>
+            {sending ? <CircularProgress size={16} sx={{ color: NAVY }} /> : <SendIcon sx={{ fontSize: 16 }} />}
+          </Button>
+        </Stack>
+      </Box>
     </>
   );
 
   const inboxList = (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex border-b border-slate-100">
-        <button
-          type="button"
-          onClick={() => setMode('inbox')}
-          className={`flex-1 px-3 py-3 text-xs font-bold uppercase tracking-wide ${
-            mode === 'inbox' ? 'border-b-2 border-amber-400 text-[#000435]' : 'text-slate-400'
-          }`}
-        >
+    <Paper
+      component="aside"
+      elevation={0}
+      sx={{ display: 'flex', height: '100%', minHeight: 0, flexDirection: 'column', overflow: 'hidden', borderRadius: 2, border: `1px solid #E2E8F0`, bgcolor: '#fff', boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}
+    >
+      <Box sx={{ display: 'flex', borderBottom: `1px solid #F1F5F9` }}>
+        <Box component="button" type="button" onClick={() => setMode('inbox')} sx={tabSx(mode === 'inbox')}>
           Inbox
-        </button>
-        <button
+        </Box>
+        <Box
+          component="button"
           type="button"
           onClick={() => {
             setMode('compose');
             setMobilePane('list');
           }}
-          className={`flex-1 px-3 py-3 text-xs font-bold uppercase tracking-wide ${
-            mode === 'compose' ? 'border-b-2 border-amber-400 text-[#000435]' : 'text-slate-400'
-          }`}
+          sx={tabSx(mode === 'compose')}
         >
           New chat
-        </button>
-      </div>
+        </Box>
+      </Box>
 
       {mode === 'inbox' ? (
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <Box sx={{ ...scrollSx, flex: 1, p: 1 }}>
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
-              <Loader2 className="animate-spin" size={16} /> Loading…
-            </div>
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ py: 5, fontSize: 14, color: '#64748B' }}>
+              <CircularProgress size={16} />
+              <Box component="span">Loading...</Box>
+            </Stack>
           ) : threads.length === 0 ? (
-            <div className="px-3 py-10 text-center text-sm text-slate-400">
-              <MessageSquare className="mx-auto mb-2 opacity-40" size={28} />
-              <p>No conversations yet.</p>
-              <button type="button" className="mt-3 text-xs font-bold text-amber-600" onClick={() => setMode('compose')}>
-                Start with a student & parent
-              </button>
-            </div>
+            <Box sx={{ px: 1.5, py: 5, textAlign: 'center', fontSize: 14, color: '#94A3B8' }}>
+              <ChatBubbleOutlineIcon sx={{ display: 'block', mx: 'auto', mb: 1, fontSize: 28, opacity: 0.4 }} />
+              <Typography component="p" sx={{ fontSize: 14 }}>No conversations yet.</Typography>
+              <ButtonBase onClick={() => setMode('compose')} sx={{ mt: 1.5, fontSize: 12, fontWeight: 700, color: '#D97706' }}>
+                Start with a student &amp; parent
+              </ButtonBase>
+            </Box>
           ) : (
             threads.map((t) => {
               const active = t.id === activeId;
               return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => pickThread(t.id)}
-                  className={`mb-1 w-full rounded-xl px-3 py-3 text-left transition ${
-                    active ? 'bg-[#000435] text-white' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <p className={`flex items-center gap-2 font-bold ${active ? 'text-white' : 'text-[#000435]'}`}>
-                    <span className="truncate">{t.studentName}</span>
+                <Box component="button" type="button" key={t.id} onClick={() => pickThread(t.id)} sx={listItemSx(active)}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ fontWeight: 700, color: active ? '#fff' : NAVY }}>
+                    <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.studentName}</Box>
                     {t.unreadFromParent > 0 ? (
-                      <span
-                        className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                          active ? 'bg-amber-300 text-[#000435]' : 'bg-rose-500 text-white'
-                        }`}
+                      <Box
+                        component="span"
+                        sx={{
+                          display: 'inline-flex',
+                          height: 20,
+                          minWidth: 20,
+                          flexShrink: 0,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 99,
+                          px: 0.75,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          bgcolor: active ? '#FCD34D' : '#F43F5E',
+                          color: active ? NAVY : '#fff',
+                        }}
                       >
                         {t.unreadFromParent}
-                      </span>
+                      </Box>
                     ) : null}
-                  </p>
-                  <p className={`text-xs ${active ? 'text-white/70' : 'text-slate-500'}`}>{t.className}</p>
+                  </Stack>
+                  <Typography sx={{ fontSize: 12, color: active ? 'rgba(255,255,255,0.7)' : '#64748B' }}>{t.className}</Typography>
                   {t.lastMessage?.body ? (
-                    <p className={`mt-1 truncate text-xs ${active ? 'text-amber-300' : 'text-slate-400'}`}>
+                    <Typography
+                      noWrap
+                      sx={{ mt: 0.5, fontSize: 12, color: active ? '#FCD34D' : '#94A3B8' }}
+                    >
                       {parseReplyBody(t.lastMessage.body).text || t.lastMessage.body}
-                    </p>
+                    </Typography>
                   ) : null}
-                </button>
+                </Box>
               );
             })
           )}
-        </div>
+        </Box>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="border-b border-slate-100 p-2">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
-              <Search size={16} className="text-slate-400" />
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                placeholder="Search students or parents…"
+        <Box sx={{ display: 'flex', minHeight: 0, flex: 1, flexDirection: 'column' }}>
+          <Box sx={{ borderBottom: `1px solid #F1F5F9`, p: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ borderRadius: 2, border: `1px solid #E2E8F0`, bgcolor: '#F8FAFC', px: 1.25, py: 1 }}>
+              <SearchIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+              <Box
+                component="input"
+                sx={{ minWidth: 0, flex: 1, bgcolor: 'transparent', border: 'none', outline: 'none', fontSize: 14, fontFamily: 'inherit' }}
+                placeholder="Search students or parents..."
                 value={contactSearch}
                 onChange={(e) => setContactSearch(e.target.value)}
               />
-            </div>
-          </div>
-          <div className="grid min-h-0 flex-1 grid-rows-2 divide-y divide-slate-100 lg:grid-rows-none lg:grid-cols-1">
-            <div className="min-h-0 overflow-y-auto p-2">
-              <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Students</p>
+            </Stack>
+          </Box>
+          <Box sx={{ display: 'grid', minHeight: 0, flex: 1, gridTemplateRows: '1fr 1fr', '& > * + *': { borderTop: '1px solid #F1F5F9' }, '@media (min-width:1200px)': { gridTemplateRows: 'none', gridTemplateColumns: '1fr', '& > * + *': { borderTop: 'none' } } }}>
+            <Box sx={{ ...scrollSx, p: 1 }}>
+              <Typography sx={{ px: 1, pb: 0.5, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: '#94A3B8' }}>
+                Students
+              </Typography>
               {contactsLoading ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="animate-spin text-slate-400" size={18} />
-                </div>
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                  <CircularProgress size={18} sx={{ color: '#94A3B8' }} />
+                </Box>
               ) : (
                 filteredContacts.map((s) => {
                   const active = s.id === selectedStudentId;
                   return (
-                    <button
-                      key={s.id}
+                    <Box
+                      component="button"
                       type="button"
+                      key={s.id}
                       onClick={() => {
                         setSelectedStudentId(s.id);
                         setSelectedParentId(s.parents?.[0]?.id ?? null);
                       }}
-                      className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left text-sm ${
-                        active ? 'bg-[#000435] text-white' : 'hover:bg-slate-50'
-                      }`}
+                      sx={listItemSx(active)}
                     >
-                      <p className={`font-bold ${active ? 'text-white' : 'text-[#000435]'}`}>{s.fullName}</p>
-                      <p className={`text-xs ${active ? 'text-white/70' : 'text-slate-500'}`}>{s.className}</p>
-                    </button>
+                      <Typography sx={{ fontSize: 14, fontWeight: 700, color: active ? '#fff' : NAVY }}>{s.fullName}</Typography>
+                      <Typography sx={{ fontSize: 12, color: active ? 'rgba(255,255,255,0.7)' : '#64748B' }}>{s.className}</Typography>
+                    </Box>
                   );
                 })
               )}
-            </div>
-            <div className="min-h-0 overflow-y-auto p-2 xl:hidden">{parentsPanelBody}</div>
-          </div>
-        </div>
+            </Box>
+            <Box sx={{ ...scrollSx, p: 1, display: { xs: 'block', xl: 'none' } }}>{parentsPanelBody}</Box>
+          </Box>
+        </Box>
       )}
-    </aside>
+    </Paper>
   );
 
   const chatPanel = (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Paper
+      component="section"
+      elevation={0}
+      sx={{ display: 'flex', minHeight: 0, flex: 1, flexDirection: 'column', overflow: 'hidden', borderRadius: 2, border: `1px solid #E2E8F0`, bgcolor: '#fff', boxShadow: '0 1px 2px rgba(19,33,61,0.06)' }}
+    >
       {!thread ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-slate-400">
-          <MessageSquare size={28} />
-          <p className="text-sm">Select or start a conversation</p>
-        </div>
+        <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ flex: 1, p: 3, color: '#94A3B8' }}>
+          <ChatBubbleOutlineIcon sx={{ fontSize: 28 }} />
+          <Typography sx={{ fontSize: 14 }}>Select or start a conversation</Typography>
+        </Stack>
       ) : (
         <>
           {chatHeader}
           {chatBody}
         </>
       )}
-    </section>
+    </Paper>
   );
 
+  const isCompose = mode === 'compose';
   const shell = (
     <>
-      {error ? <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-      <div
-        className={`grid h-[calc(100dvh-11rem)] min-h-[480px] gap-3 lg:h-auto lg:min-h-[560px] ${
-          mode === 'compose'
-            ? 'lg:grid-cols-[minmax(260px,300px)_1fr] xl:grid-cols-[minmax(240px,280px)_minmax(220px,260px)_1fr]'
-            : 'lg:grid-cols-[minmax(260px,300px)_1fr]'
-        }`}
+      {error ? (
+        <Typography sx={{ mb: 1.5, borderRadius: 2, bgcolor: '#FFF1F2', px: 1.5, py: 1, fontSize: 14, color: '#BE123C' }}>{error}</Typography>
+      ) : null}
+      <Box
+        sx={{
+          display: 'grid',
+          height: { xs: 'calc(100dvh - 11rem)', lg: 'auto' },
+          minHeight: { xs: 480, lg: 560 },
+          gap: 1.5,
+          gridTemplateColumns: '1fr',
+          '@media (min-width:1200px)': {
+            gridTemplateColumns: isCompose
+              ? 'minmax(260px,300px) minmax(220px,260px) 1fr'
+              : 'minmax(260px,300px) 1fr',
+          },
+        }}
       >
-        <div
-          className={`min-h-0 ${
-            mobilePane === 'chat' ? 'hidden lg:block' : 'block'
-          }`}
-        >
-          {inboxList}
-        </div>
-        {mode === 'compose' ? (
-          <aside
-            className={`hidden min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm xl:flex ${
-              mobilePane === 'chat' ? 'xl:flex' : ''
-            }`}
+        <Box sx={{ minHeight: 0, display: mobilePane === 'chat' ? { xs: 'none', lg: 'block' } : 'block' }}>{inboxList}</Box>
+        {isCompose ? (
+          <Paper
+            component="aside"
+            elevation={0}
+            sx={{
+              display: { xs: 'none', xl: 'flex' },
+              minHeight: 0,
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRadius: 2,
+              border: `1px solid #E2E8F0`,
+              bgcolor: '#fff',
+              p: 1,
+              boxShadow: '0 1px 2px rgba(19,33,61,0.06)',
+            }}
           >
             {parentsPanelBody}
-          </aside>
+          </Paper>
         ) : null}
-        <div className={`min-h-0 ${mobilePane === 'list' ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
-          {chatPanel}
-        </div>
-      </div>
+        <Box sx={{ minHeight: 0, display: mobilePane === 'list' ? { xs: 'none', lg: 'flex' } : 'flex', flexDirection: 'column' }}>{chatPanel}</Box>
+      </Box>
     </>
   );
 
   if (showHero) {
     return (
-      <div className="min-h-screen" style={{ background: '#f4f6fb', fontFamily: "'Montserrat', sans-serif" }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f4f6fb', fontFamily: "'Montserrat', sans-serif" }}>
         <TeacherOrangeHero title={title} subtitle={subtitle} />
-        <div className="mx-auto max-w-6xl px-3 pb-10 sm:px-4">{shell}</div>
-      </div>
+        <Box sx={{ mx: 'auto', maxWidth: 1152, px: { xs: 1.5, sm: 2 }, pb: 5 }}>{shell}</Box>
+      </Box>
     );
   }
 
-  return <div className="space-y-4">{shell}</div>;
+  return <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{shell}</Box>;
 }

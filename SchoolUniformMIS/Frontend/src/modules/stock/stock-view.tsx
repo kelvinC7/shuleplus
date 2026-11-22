@@ -107,10 +107,12 @@ export function StockView() {
   const [rows, setRows] = useState<StockBalance[]>([]);
   const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState("");
+  const [specificDate, setSpecificDate] = useState("");
+  const [weekDate, setWeekDate] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState<"pdf" | "excel" | null>(null);
+  const [exporting, setExporting] = useState<"pdf" | "excel" | "week" | null>(null);
 
   useEffect(() => {
     uniformApi.stock
@@ -130,10 +132,11 @@ export function StockView() {
         return false;
       const ss = stockStatus(r.available);
       if (stockFilter && ss !== stockFilter) return false;
-      if (!inDateRange(r.updatedAt, dateFrom, dateTo)) return false;
+      if (!inSpecificDate(r.updatedAt, specificDate)) return false;
+      if (!inDateRange(r.updatedAt, effectiveFrom, effectiveTo)) return false;
       return true;
     });
-  }, [rows, search, stockFilter, dateFrom, dateTo]);
+  }, [rows, search, stockFilter, specificDate, effectiveFrom, effectiveTo]);
 
   const enriched = useMemo(() => filtered.map(metricsFor), [filtered]);
 
@@ -393,21 +396,28 @@ export function StockView() {
     status: "",
   };
 
-  async function handlePdf() {
-    setExporting("pdf");
+  function periodLabel() { if(specificDate) return `Date: ${new Date(`${specificDate}T00:00:00`).toLocaleDateString()}`; if(weekDate) return `Week: ${weekLabelForDate(weekDate)}`; if(effectiveFrom||effectiveTo) return `Period: ${effectiveFrom||"…"} to ${effectiveTo||"…"}`; return "All dates"; }
+  async function handlePdf(weekMode = false) {
+    setExporting(weekMode ? "week" : "pdf");
     try {
       await exportToPdf({
-        title: "Stock Report",
-        subtitle: "Opening · Sold · Remaining · Financial summary",
+        title: weekMode ? "Stock Week Report" : "Stock Report",
+        subtitle: `${periodLabel()} · Opening, sold, remaining and financial summary`,
         organizationName: orgName,
         userName: user?.email || undefined,
         columns: exportColumns,
         data: exportRows(),
         totals: exportTotals,
-        fileName: `${orgName}_stock_report`,
+        summary: [
+          { label: "SKUs", value: String(enriched.length) },
+          { label: "Money Sold", value: money(totals.moneySold) },
+          { label: "Remaining Value", value: money(totals.purchaseTotal - totals.moneySold) },
+          { label: "Income/Loss", value: money(totals.profitLoss) },
+        ],
+        fileName: `${orgName}_${weekMode ? "stock_week_report" : "stock_report"}`,
         orientation: "landscape",
       });
-      toast.success("PDF exported");
+      toast.success(weekMode ? "Week report exported" : "PDF exported");
     } catch {
       toast.error("PDF export failed");
     } finally {
@@ -446,10 +456,20 @@ export function StockView() {
             type="button"
             className="btn-secondary !py-2"
             disabled={!!exporting || enriched.length === 0}
-            onClick={() => void handlePdf()}
+            onClick={() => void handlePdf(false)}
           >
             <FileText size={15} />
             {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={!!exporting || enriched.length === 0 || !weekDate}
+            onClick={() => void handlePdf(true)}
+            title={weekDate ? `Week: ${weekLabelForDate(weekDate)}` : "Select a week date first"}
+          >
+            <FileText size={15} />
+            {exporting === "week" ? "Exporting…" : "Week Report"}
           </button>
           <button
             type="button"
@@ -484,21 +504,25 @@ export function StockView() {
           onReset={() => {
             setSearch("");
             setStockFilter("");
+            setSpecificDate("");
+            setWeekDate("");
             setDateFrom("");
             setDateTo("");
           }}
         />
 
+        <div className="grid gap-3 rounded-xl border border-border bg-white p-3 shadow-soft sm:grid-cols-2 sm:p-4">
+          <label className="block"><span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">Specific Date</span><input type="date" className="input !rounded-lg !py-2" value={specificDate} onChange={(e)=>{setSpecificDate(e.target.value); if(e.target.value){setWeekDate(""); setDateFrom(""); setDateTo("");}}} /></label>
+          <label className="block"><span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">Week (pick any day)</span><input type="date" className="input !rounded-lg !py-2" value={weekDate} onChange={(e)=>{setWeekDate(e.target.value); if(e.target.value){setSpecificDate("");}}} /></label>
+          {weekDate ? <p className="sm:col-span-2 text-xs font-medium text-navy">Week: {weekLabelForDate(weekDate)}</p> : null}
+        </div>
         <DateRangeFilter
-          from={dateFrom}
-          to={dateTo}
-          onFromChange={setDateFrom}
-          onToChange={setDateTo}
-          onClear={() => {
-            setDateFrom("");
-            setDateTo("");
-          }}
-          label="Stock updated"
+          from={effectiveFrom}
+          to={effectiveTo}
+          onFromChange={(v)=>{setWeekDate(""); setDateFrom(v);}}
+          onToChange={(v)=>{setWeekDate(""); setDateTo(v);}}
+          onClear={() => { setWeekDate(""); setDateFrom(""); setDateTo(""); }}
+          label="Stock updated (range)"
         />
 
         <ListKpiStrip items={kpis} />

@@ -59,12 +59,14 @@ export function FabricStockOutView() {
   const [fabrics, setFabrics] = useState<Fabric[]>([]);
   const [issues, setIssues] = useState<FabricIssue[]>([]);
   const [search, setSearch] = useState("");
+  const [specificDate, setSpecificDate] = useState("");
+  const [weekDate, setWeekDate] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [manualOpen, setManualOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<FabricIssue | null>(null);
-  const [exporting, setExporting] = useState<"pdf" | "excel" | null>(null);
+  const [exporting, setExporting] = useState<"pdf" | "excel" | "week" | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   async function load() {
@@ -82,6 +84,44 @@ export function FabricStockOutView() {
     }
   }
 
+
+  function startOfWeekMonday(d: Date) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+  function endOfWeekSunday(d: Date) {
+    const start = startOfWeekMonday(d);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }
+  function toISODate(d: Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  function weekLabelForDate(dateStr: string) {
+    if (!dateStr) return "";
+    const d = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${startOfWeekMonday(d).toLocaleDateString()} - ${endOfWeekSunday(d).toLocaleDateString()}`;
+  }
+  function inSpecificDate(iso: string | null | undefined, dateStr: string) {
+    if (!dateStr) return true;
+    if (!iso) return false;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return false;
+    return toISODate(d) === dateStr;
+  }
+  const effectiveFrom = weekDate ? toISODate(startOfWeekMonday(new Date(`${weekDate}T00:00:00`))) : dateFrom;
+  const effectiveTo = weekDate ? toISODate(endOfWeekSunday(new Date(`${weekDate}T00:00:00`))) : dateTo;
+
   useEffect(() => {
     void load();
   }, []);
@@ -89,13 +129,14 @@ export function FabricStockOutView() {
   const filteredIssues = useMemo(() => {
     const q = search.trim().toLowerCase();
     return issues.filter((r) => {
-      if (!inDateRange(r.issuedAt, dateFrom, dateTo)) return false;
+      if (!inSpecificDate(r.issuedAt, specificDate)) return false;
+      if (!inDateRange(r.issuedAt, effectiveFrom, effectiveTo)) return false;
       if (!q) return true;
       return `${r.fabric?.name ?? ""} ${r.tailor?.name ?? ""} ${r.notes ?? ""}`
         .toLowerCase()
         .includes(q);
     });
-  }, [issues, search, dateFrom, dateTo]);
+  }, [issues, search, specificDate, effectiveFrom, effectiveTo]);
 
   const issuePaging = usePagedRows(filteredIssues);
   const pageRows = issuePaging.pageRows;
@@ -306,9 +347,10 @@ export function FabricStockOutView() {
     });
     const totalMeters = rows.reduce((s, r) => s + r.meters, 0);
     const totalPurchase = rows.reduce((s, r) => s + r.purchaseValue, 0);
+    const period = specificDate ? `Date: ${new Date(`${specificDate}T00:00:00`).toLocaleDateString()}` : weekDate ? `Week: ${weekLabelForDate(weekDate)}` : (effectiveFrom||effectiveTo) ? `Period: ${effectiveFrom||"…"} to ${effectiveTo||"…"}` : "All dates";
     return {
       title: "Fabric Stock Out: Manual Usage",
-      subtitle: "Manual meter usage report",
+      subtitle: `${period} · Manual meter usage report`,
       columns: [
         { header: "Fabric", accessor: "fabric" },
         { header: "Roll / Batch", accessor: "roll" },
@@ -351,18 +393,19 @@ export function FabricStockOutView() {
     };
   }
 
-  async function handlePdf() {
+  async function handlePdf(weekMode = false) {
     if (!exportCanRun) return;
-    setExporting("pdf");
+    setExporting(weekMode ? "week" : "pdf");
     try {
       const payload = buildManualExport();
       await exportToPdf({
         ...payload,
+        title: weekMode ? "Fabric Stock Out Week Report" : payload.title,
         organizationName: orgName,
         userName: user?.email || undefined,
         orientation: "landscape",
       });
-      toast.success("PDF exported");
+      toast.success(weekMode ? "Week report exported" : "PDF exported");
     } catch {
       toast.error("PDF export failed");
     } finally {
@@ -398,10 +441,20 @@ export function FabricStockOutView() {
             type="button"
             className="btn-secondary !py-2"
             disabled={!!exporting || !exportCanRun}
-            onClick={() => void handlePdf()}
+            onClick={() => void handlePdf(false)}
           >
             <FileText size={15} />
             {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={!!exporting || !exportCanRun || !weekDate}
+            onClick={() => void handlePdf(true)}
+            title={weekDate ? `Week: ${weekLabelForDate(weekDate)}` : "Select a week date first"}
+          >
+            <FileText size={15} />
+            {exporting === "week" ? "Exporting…" : "Week Report"}
           </button>
           <button
             type="button"
@@ -425,16 +478,18 @@ export function FabricStockOutView() {
           searchPlaceholder="Search issues…"
         />
 
+        <div className="grid gap-3 rounded-xl border border-border bg-white p-3 shadow-soft sm:grid-cols-2 sm:p-4">
+          <label className="block"><span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">Specific Date</span><input type="date" className="input !rounded-lg !py-2" value={specificDate} onChange={(e)=>{setSpecificDate(e.target.value); if(e.target.value){setWeekDate(""); setDateFrom(""); setDateTo("");}}} /></label>
+          <label className="block"><span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">Week (pick any day)</span><input type="date" className="input !rounded-lg !py-2" value={weekDate} onChange={(e)=>{setWeekDate(e.target.value); if(e.target.value){setSpecificDate("");}}} /></label>
+          {weekDate ? <p className="sm:col-span-2 text-xs font-medium text-navy">Week: {weekLabelForDate(weekDate)}</p> : null}
+        </div>
         <DateRangeFilter
-          from={dateFrom}
-          to={dateTo}
-          onFromChange={setDateFrom}
-          onToChange={setDateTo}
-          onClear={() => {
-            setDateFrom("");
-            setDateTo("");
-          }}
-          label="Stock-out date"
+          from={effectiveFrom}
+          to={effectiveTo}
+          onFromChange={(v)=>{setWeekDate(""); setDateFrom(v);}}
+          onToChange={(v)=>{setWeekDate(""); setDateTo(v);}}
+          onClear={() => { setWeekDate(""); setDateFrom(""); setDateTo(""); }}
+          label="Stock-out date range"
         />
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

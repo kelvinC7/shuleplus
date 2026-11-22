@@ -14,6 +14,7 @@ import {
   ScanLine,
   Users,
   MessageSquare,
+  CalendarRange,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -55,8 +56,10 @@ export const ATTENDANCE_NAV_SECTIONS: AttendanceNavSection[] = [
     items: [
       { href: '/entry', label: 'Entry', description: 'School arrival', icon: LogIn },
       { href: '/exit', label: 'Exit', description: 'School departure', icon: LogOut },
-      { href: '/records', label: 'Records', description: 'Historical database', icon: ClipboardList },
+      { href: '/records', label: 'Daily Attendance', description: 'Historical database', icon: ClipboardList },
+      { href: '/weekly-attendance', label: 'Weekly Attendance', description: 'Mon–Fri register', icon: CalendarRange },
       { href: '/exceptions', label: 'Exceptions', description: 'Scan issues', icon: AlertTriangle },
+      { href: '/reports', label: 'Attendance Reports', description: 'Export & tables', icon: BarChart3 },
     ],
   },
   {
@@ -81,7 +84,6 @@ export const ATTENDANCE_NAV_SECTIONS: AttendanceNavSection[] = [
 
 export const ATTENDANCE_FOOTER: AttendanceNavItem[] = [
   { href: '/analytics', label: 'Analytics', description: 'Charts & insights', icon: BarChart3 },
-  { href: '/reports', label: 'Reports', description: 'Export & tables', icon: BarChart3 },
   { href: '/parent-sms', label: 'Parent SMS', description: 'Message log', icon: MessageSquare },
   { href: '/settings', label: 'Settings', description: 'Policies & rules', icon: Settings },
 ];

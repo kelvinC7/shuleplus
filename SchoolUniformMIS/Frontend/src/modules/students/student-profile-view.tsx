@@ -84,7 +84,7 @@ function sizesFromMeasurement(
   }
   const fromCols: SizeRow[] = [];
   for (const { key, label } of LEGACY_SIZE_MAP) {
-    const val = (measurement as Record<string, unknown>)[key];
+    const val = (measurement as unknown as Record<string, unknown>)[key];
     if (val !== null && val !== undefined && String(val).trim() !== "") {
       fromCols.push({ id: `col-${key}`, label, value: String(val) });
     }

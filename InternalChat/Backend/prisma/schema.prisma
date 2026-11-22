@@ -146,3 +146,274 @@ model Message {
   @@index([organizationId])
   @@map("messages")
 }
+
+enum SmsQuotaPeriod {
+  MONTHLY
+  TERM
+  ANNUAL
+  ONE_TIME
+}
+
+enum SmsCampaignMode {
+  SELECTED_STUDENTS
+  CUSTOM_NUMBERS
+  BULK_CLASS
+  BULK_SCHOOL
+}
+
+enum SmsCampaignStatus {
+  DRAFT
+  QUEUED
+  SENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SmsRecipientStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+enum SmsParentTarget {
+  FATHER
+  MOTHER
+  BOTH
+}
+
+enum SmsParentPackageKind {
+  TERM
+  ACADEMIC_YEAR
+}
+
+enum SmsParentPurchaseStatus {
+  PENDING_PAYMENT
+  PENDING_APPROVAL
+  PAYMENT_VERIFIED
+  ACTIVATED
+  REJECTED
+  CANCELLED
+}
+
+enum SmsParentPaymentStatus {
+  AWAITING
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum SmsCreditAllocation {
+  CHILD
+  FAMILY
+}
+
+model SmsSchoolSettings {
+  organizationId          String         @id @map("organization_id")
+  smsEnabled              Boolean        @default(false) @map("sms_enabled")
+  maxSegments             Int            @default(0) @map("max_segments")
+  quotaPeriod             SmsQuotaPeriod @default(MONTHLY) @map("quota_period")
+  segmentsUsed            Int            @default(0) @map("segments_used")
+  periodStartedAt         DateTime?      @map("period_started_at")
+  warnAt80                Boolean        @default(true) @map("warn_at_80")
+  warnAt90                Boolean        @default(true) @map("warn_at_90")
+  blockAtLimit            Boolean        @default(true) @map("block_at_limit")
+  parentPackagesEnabled   Boolean        @default(false) @map("parent_packages_enabled")
+  momoPayeeNumber         String?        @map("momo_payee_number")
+  momoUssdTemplate        String?        @map("momo_ussd_template")
+  defaultAllocation       SmsCreditAllocation @default(CHILD) @map("default_allocation")
+  updatedBy               String?        @map("updated_by")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  campaigns        SmsCampaign[]
+  parentPackages   SmsParentPackage[]
+
+  @@map("sms_school_settings")
+}
+
+model SmsParentPackage {
+  id               String               @id @default(cuid())
+  organizationId   String               @map("organization_id")
+  kind             SmsParentPackageKind
+  title            String
+  priceRwf         Int                  @map("price_rwf")
+  segmentAllowance Int                  @map("segment_allowance")
+  validityDays     Int                  @map("validity_days")
+  description      String?
+  active           Boolean              @default(true)
+  sortOrder        Int                  @default(0) @map("sort_order")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  settings  SmsSchoolSettings @relation(fields: [organizationId], references: [organizationId])
+  lines     SmsParentPurchaseLine[]
+
+  @@index([organizationId, active])
+  @@map("sms_parent_packages")
+}
+
+model SmsParentPurchase {
+  id               String                  @id @default(cuid())
+  purchaseRef      String                  @unique @map("purchase_ref")
+  organizationId   String                  @map("organization_id")
+  parentId         String                  @map("parent_id")
+  parentPhone      String                  @map("parent_phone")
+  payerPhone       String                  @map("payer_phone")
+  status           SmsParentPurchaseStatus @default(PENDING_PAYMENT)
+  totalAmountRwf   Int                     @map("total_amount_rwf")
+  totalSegments    Int                     @map("total_segments")
+  allocation       SmsCreditAllocation     @default(CHILD)
+  creditsActivated Boolean                 @default(false) @map("credits_activated")
+  activatedAt      DateTime?               @map("activated_at")
+  rejectionReason  String?                 @map("rejection_reason")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  lines       SmsParentPurchaseLine[]
+  payment     SmsParentPaymentTransaction?
+  balances    SmsParentCreditBalance[]
+
+  @@index([parentId, createdAt])
+  @@index([organizationId, status])
+  @@map("sms_parent_purchases")
+}
+
+model SmsParentPurchaseLine {
+  id               String   @id @default(cuid())
+  purchaseId       String   @map("purchase_id")
+  packageId        String   @map("package_id")
+  studentId        String   @map("student_id")
+  studentName      String   @map("student_name")
+  studentCode      String?  @map("student_code")
+  className        String?  @map("class_name")
+  organizationId   String   @map("organization_id")
+  schoolName       String?  @map("school_name")
+  amountRwf        Int      @map("amount_rwf")
+  segmentAllowance Int      @map("segment_allowance")
+
+  purchase SmsParentPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  package  SmsParentPackage  @relation(fields: [packageId], references: [id])
+
+  @@index([purchaseId])
+  @@map("sms_parent_purchase_lines")
+}
+
+model SmsParentPaymentTransaction {
+  id                String                 @id @default(cuid())
+  purchaseId        String                 @unique @map("purchase_id")
+  status            SmsParentPaymentStatus @default(AWAITING)
+  momoReference     String?                @map("momo_reference")
+  submittedAt       DateTime?              @map("submitted_at")
+  verifiedAt        DateTime?              @map("verified_at")
+  verifiedBy        String?                @map("verified_by")
+  rejectionReason   String?                @map("rejection_reason")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  purchase SmsParentPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@map("sms_parent_payment_transactions")
+}
+
+model SmsParentCreditBalance {
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  parentId          String    @map("parent_id")
+  studentId         String?   @map("student_id")
+  purchaseId        String    @map("purchase_id")
+  segmentsGranted   Int       @map("segments_granted")
+  segmentsUsed      Int       @default(0) @map("segments_used")
+  segmentsRemaining Int       @map("segments_remaining")
+  expiresAt         DateTime? @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  purchase SmsParentPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ledger   SmsParentCreditLedger[]
+
+  @@index([parentId, organizationId])
+  @@index([studentId])
+  @@map("sms_parent_credit_balances")
+}
+
+model SmsParentCreditLedger {
+  id             String   @id @default(cuid())
+  balanceId      String   @map("balance_id")
+  organizationId String   @map("organization_id")
+  parentId       String   @map("parent_id")
+  deltaSegments  Int      @map("delta_segments")
+  reason         String
+  recipientId    String?  @map("recipient_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  balance SmsParentCreditBalance @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+
+  @@index([parentId, createdAt])
+  @@map("sms_parent_credit_ledger")
+}
+
+model SmsCampaign {
+  id              String            @id @default(cuid())
+  organizationId  String            @map("organization_id")
+  mode            SmsCampaignMode
+  status          SmsCampaignStatus @default(QUEUED)
+  title           String?
+  templateBody    String            @map("template_body")
+  parentTarget    SmsParentTarget?  @map("parent_target")
+  classFilter     String?           @map("class_filter")
+  senderUserId    String            @map("sender_user_id")
+  senderEmail     String?           @map("sender_email")
+  recipientCount  Int               @default(0) @map("recipient_count")
+  segmentsTotal   Int               @default(0) @map("segments_total")
+  deliveredCount  Int               @default(0) @map("delivered_count")
+  failedCount     Int               @default(0) @map("failed_count")
+  pendingCount    Int               @default(0) @map("pending_count")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  completedAt     DateTime?         @map("completed_at")
+
+  settings   SmsSchoolSettings @relation(fields: [organizationId], references: [organizationId])
+  recipients SmsRecipient[]
+
+  @@index([organizationId, createdAt])
+  @@map("sms_campaigns")
+}
+
+model SmsRecipient {
+  id              String             @id @default(cuid())
+  campaignId      String             @map("campaign_id")
+  organizationId  String             @map("organization_id")
+  phoneNormalized String             @map("phone_normalized")
+  phoneMasked     String             @map("phone_masked")
+  parentName      String?            @map("parent_name")
+  parentRole      String?            @map("parent_role")
+  studentSummary  String?            @map("student_summary")
+  messageBody     String             @map("message_body")
+  segments        Int                @default(1)
+  status          SmsRecipientStatus @default(QUEUED)
+  failureReason   String?            @map("failure_reason")
+  sentAt          DateTime?          @map("sent_at")
+  deliveredAt     DateTime?          @map("delivered_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  campaign SmsCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, phoneNormalized])
+  @@index([campaignId, status])
+  @@map("sms_recipients")
+}
+
+model SmsQuotaLedger {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  deltaSegments  Int      @map("delta_segments")
+  reason         String
+  campaignId     String?  @map("campaign_id")
+  actorId        String?  @map("actor_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@map("sms_quota_ledger")
+}

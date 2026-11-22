@@ -16,6 +16,7 @@ import {
   Users,
   AlertTriangle,
   ClipboardList,
+  ClipboardCheck,
   Tablet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -136,6 +137,12 @@ export const DISCIPLINE_NAV_ITEMS: DisciplineNavItem[] = [
     description: 'Default scores & mark rules',
     icon: Settings,
   },
+  {
+    href: '/round-roll-call',
+    label: 'Round Roll Call',
+    description: 'Take a whole-class roll and view attendance history',
+    icon: ClipboardList,
+  },
 ];
 
 export interface DisciplineNavSection {
@@ -185,6 +192,12 @@ export const DISCIPLINE_NAV_SECTIONS: DisciplineNavSection[] = [
     items: DISCIPLINE_NAV_ITEMS.slice(1, 3),
   },
   {
+    id: 'marks-attendance',
+    title: 'Marks & Attendance',
+    icon: ClipboardCheck,
+    items: [DISCIPLINE_NAV_ITEMS[18], DISCIPLINE_NAV_ITEMS[2], DISCIPLINE_NAV_ITEMS[17]],
+  },
+  {
     id: 'permissions',
     title: 'Permissions',
     icon: Ticket,
@@ -200,7 +213,7 @@ export const DISCIPLINE_NAV_SECTIONS: DisciplineNavSection[] = [
     id: 'operations',
     title: 'Operations',
     icon: FileText,
-    items: DISCIPLINE_NAV_ITEMS.slice(14),
+    items: DISCIPLINE_NAV_ITEMS.slice(14, 17),
   },
 ];
 

@@ -81,6 +81,11 @@ enum AlertSeverity {
   CRITICAL
 }
 
+enum DeviceSchoolLinkStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model Tenant {
   id               String       @id @default(cuid())
   organizationId   String       @unique @map("organization_id")
@@ -111,6 +116,7 @@ model AttendanceSettings {
   schoolStarts            String   @default("07:00") @map("school_starts")
   lateStarts              String   @default("07:15") @map("late_starts")
   schoolEnds              String   @default("17:00") @map("school_ends")
+  exitOpensAt             String?  @map("exit_opens_at")
   maxExitTime             String   @default("18:00") @map("max_exit_time")
   weekendStart            String   @default("08:00") @map("weekend_start")
   attendanceClosingTime   String   @default("09:00") @map("attendance_closing_time")
@@ -235,6 +241,7 @@ model CardReplacement {
 
 model RfidDevice {
   id               String       @id @default(cuid())
+  /// Primary/owning school for this physical device (backward-compatible).
   organizationId   String       @map("organization_id")
   deviceCode       String       @map("device_code")
   name             String
@@ -256,12 +263,51 @@ model RfidDevice {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  logs       DeviceLog[]
-  attendance AttendanceRecord[]
+  logs        DeviceLog[]
+  attendance  AttendanceRecord[]
+  schoolLinks RfidDeviceSchool[]
 
   @@unique([organizationId, deviceCode])
   @@index([organizationId, status])
   @@map("rfid_devices")
+}
+
+model RfidDeviceSchool {
+  id             String                 @id @default(cuid())
+  deviceId       String                 @map("device_id")
+  organizationId String                 @map("organization_id")
+  isPrimary      Boolean                @default(false) @map("is_primary")
+  status         DeviceSchoolLinkStatus @default(ACTIVE)
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  device RfidDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, organizationId])
+  @@index([organizationId, status])
+  @@index([deviceId, status])
+  @@map("rfid_device_schools")
+}
+
+/// Staff eligibility per school for shared-device tap attribution (synced from IAM).
+model AttendanceStaffSchoolAccess {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  staffKey       String   @map("staff_key")
+  iamUserId      String?  @map("iam_user_id")
+  email          String?
+  externalId     String?  @map("external_id")
+  source         String?
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, staffKey])
+  @@index([organizationId, status])
+  @@index([iamUserId])
+  @@index([email])
+  @@index([externalId, source])
+  @@map("attendance_staff_school_access")
 }
 
 model DeviceLog {

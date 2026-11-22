@@ -9,7 +9,7 @@ export function ChatPage() {
   const threadOpen = Boolean(activeId);
 
   return (
-    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       <ChatSubNav activeTab="chat" />
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Box

@@ -1,20 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, PrinterIcon, X, TrendingUp, Wallet, CreditCard, PiggyBank, ChevronRight, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import api, { API_BASE_URL } from '../services/api';
 import { jsPDF } from 'jspdf';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import { Page, PageHeader, Panel, PageLoading, EmptyState, ErrorBanner, KpiGrid, Kpi } from '../components/ui';
+import { brand } from '../theme/theme';
 
-const fmt = (v) => `${new Intl.NumberFormat('en-RW', { maximumFractionDigits: 0 }).format(Number(v) || 0)} RWF`;
 const fmtN = (v) => new Intl.NumberFormat('en-RW', { maximumFractionDigits: 0 }).format(Number(v) || 0);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const API_ORIGIN = String(API_BASE_URL || '').replace(/\/api\/?$/, '');
-
-const statusConfig = {
-  paid: { label: 'Paid', icon: CheckCircle, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
-  pending: { label: 'Pending', icon: Clock, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-400' },
-  default: { label: 'Processing', icon: AlertCircle, bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200', dot: 'bg-slate-400' },
-};
-
-const getStatus = (s) => statusConfig[String(s || '').toLowerCase()] || statusConfig.default;
 
 const buildPayslipHtml = (record, staff) => {
   const basic = Number(record?.basic || 0);
@@ -37,10 +33,10 @@ const buildPayslipHtml = (record, staff) => {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Montserrat', system-ui, sans-serif; max-width: 680px; margin: 32px auto; color: #0f172a; background: #f8fafc; padding: 0 16px; }
     .card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .header { background: #000435; padding: 28px 28px 24px; }
+    .header { background: #13213D; padding: 28px 28px 24px; }
     .header h1 { color: white; font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
     .header .sub { color: rgba(255,255,255,0.55); font-size: 12px; margin-top: 4px; }
-    .period-badge { display: inline-block; background: #f5bf24; color: #000435; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px; margin-top: 12px; letter-spacing: 0.5px; }
+    .period-badge { display: inline-block; background: #f5bf24; color: #13213D; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px; margin-top: 12px; letter-spacing: 0.5px; }
     .body { padding: 24px 28px; }
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 24px; }
     .info-row { display: flex; flex-direction: column; }
@@ -52,8 +48,8 @@ const buildPayslipHtml = (record, staff) => {
     .red { color: #dc2626; }
     .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; font-size: 13px; }
     .row:nth-child(odd) { background: #f8fafc; }
-    .row.total { background: #000435; color: white; font-size: 14px; font-weight: 800; border-radius: 10px; margin-top: 8px; padding: 12px 16px; }
-    .row.paid { background: #f5bf24; color: #000435; font-size: 13px; font-weight: 800; border-radius: 10px; margin-top: 6px; padding: 10px 16px; }
+    .row.total { background: #13213D; color: white; font-size: 14px; font-weight: 800; border-radius: 10px; margin-top: 8px; padding: 12px 16px; }
+    .row.paid { background: #f5bf24; color: #13213D; font-size: 13px; font-weight: 800; border-radius: 10px; margin-top: 6px; padding: 10px 16px; }
     .footer { text-align: center; color: #94a3b8; font-size: 10px; padding: 20px 28px; border-top: 1px solid #f1f5f9; }
   </style>
 </head>
@@ -166,7 +162,7 @@ const generatePayslipPdf = async (record, staff, school) => {
   const margin = 14;
   let y = 14;
 
-  doc.setFillColor(0, 4, 53);
+  doc.setFillColor(19, 33, 61);
   doc.roundedRect(margin, y, pageWidth - margin * 2, 28, 2, 2, 'F');
  
   if (schoolLogo) doc.addImage(schoolLogo, 'PNG', pageWidth - margin - 24, y + 4, 20, 20);
@@ -226,7 +222,7 @@ const generatePayslipPdf = async (record, staff, school) => {
   drawRow('Total Deductions', `- ${fmtN(totalDeductions)} RWF`, { bold: true, highlight: true, fill: [254, 242, 242], color: [153, 27, 27] });
   y += 4;
 
-  doc.setFillColor(0, 4, 53);
+  doc.setFillColor(19, 33, 61);
   doc.roundedRect(margin, y, pageWidth - margin * 2, 20, 2, 2, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
@@ -249,41 +245,6 @@ const generatePayslipPdf = async (record, staff, school) => {
   doc.save(`payslip-${fileCode}-${record?.month || 'month'}-${record?.year || 'year'}.pdf`);
 };
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-const StatCard = ({ icon: Icon, label, value, accent }) => (
-  <div className="relative bg-white rounded-2xl border border-slate-100 p-4 overflow-hidden group hover:shadow-md transition-all duration-200">
-    <div className={`absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-5 ${accent}`} />
-    <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl mb-3 ${accent} bg-opacity-10`}>
-      <Icon size={16} className={accent.replace('bg-', 'text-')} />
-    </div>
-    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{label}</p>
-    <p className="text-lg font-black text-[#000435] leading-none">{value}</p>
-  </div>
-);
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-const StatusBadge = ({ status }) => {
-  const cfg = getStatus(status);
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
-    </span>
-  );
-};
-
-// ─── Line Item ────────────────────────────────────────────────────────────────
-const LineItem = ({ label, value, valueClass = 'text-[#000435]', bold, separator }) => (
-  <>
-    {separator && <div className="border-t border-dashed border-slate-100 my-1" />}
-    <div className={`flex items-center justify-between py-2.5 px-1 ${bold ? 'font-black' : ''}`}>
-      <span className={`text-sm ${bold ? 'text-[#000435]' : 'text-slate-500'}`}>{label}</span>
-      <span className={`text-sm font-black ${valueClass}`}>{value}</span>
-    </div>
-  </>
-);
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function StaffPayroll() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -304,11 +265,16 @@ export default function StaffPayroll() {
         if (active) setLoading(false);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const history = data?.history || [];
-  const paidTotal = useMemo(() => history.filter((h) => h.status === 'Paid').reduce((s, h) => s + Number(h.paid || 0), 0), [history]);
+  const paidTotal = useMemo(
+    () => history.filter((h) => h.status === 'Paid').reduce((s, h) => s + Number(h.paid || 0), 0),
+    [history]
+  );
   const staff = data?.staff || {};
   const school = data?.school || {};
   const selectedIsPaid = String(selectedPayroll?.status || '').toLowerCase() === 'paid';
@@ -318,8 +284,11 @@ export default function StaffPayroll() {
     const html = buildPayslipHtml(selectedPayroll, staff);
     const w = window.open('', '_blank');
     if (!w) return;
-    w.document.open(); w.document.write(html); w.document.close();
-    w.focus(); w.print();
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
   };
 
   const handleDownloadPayslip = () => {
@@ -327,270 +296,112 @@ export default function StaffPayroll() {
     generatePayslipPdf(selectedPayroll, staff, school);
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
-      <div className="w-12 h-12 rounded-2xl bg-[#000435] flex items-center justify-center">
-        <Loader2 size={22} className="animate-spin text-amber-400" />
-      </div>
-      <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Loading your payroll…</p>
-    </div>
-  );
+  const fmt = (n) => {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '—';
+    return `${Math.round(v).toLocaleString()} RWF`;
+  };
 
-  if (error) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="max-w-sm w-full rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
-        <AlertCircle className="mx-auto mb-3 text-red-400" size={32} />
-        <p className="font-black text-red-700 text-sm">{error}</p>
-        <button onClick={() => window.location.reload()} className="mt-4 text-xs font-black text-red-500 underline">Try again</button>
-      </div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <Page>
+        <PageLoading label="Loading your payroll…" />
+      </Page>
+    );
+  }
 
-  const initials = (staff?.fullName || 'S')
-    .split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase();
+  if (error) {
+    return (
+      <Page>
+        <ErrorBanner message={error} onRetry={() => window.location.reload()} />
+      </Page>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <Page maxWidth={900}>
+      <PageHeader
+        title="My payroll"
+        description={staff?.fullName ? `${staff.fullName}${staff.staffCode ? ` · ${staff.staffCode}` : ''}` : 'Salary history and payslips'}
+      />
 
-      {/* ── Hero Header ─────────────────────────────────────────────────────── */}
-      <div className="bg-[#000435] relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, #f5bf24 0%, transparent 60%)' }} />
-        <div className="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-amber-400 opacity-5 translate-x-1/3 translate-y-1/3" />
-        <div className="relative px-4 sm:px-6 pt-8 pb-6 max-w-4xl mx-auto">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-400 flex items-center justify-center text-[#000435] text-lg font-black flex-shrink-0 shadow-lg">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-0.5">My Payroll</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white leading-tight truncate">{staff?.fullName || 'Staff Member'}</h1>
-              <p className="text-xs text-slate-400 mt-0.5 truncate">
-                {staff?.staffCode && <span className="text-amber-400/70">{staff.staffCode}</span>}
-                {staff?.staffCode && staff?.role && <span className="mx-1.5 text-slate-600">·</span>}
-                {staff?.role && <span>{staff.role}</span>}
-                {staff?.department && <><span className="mx-1.5 text-slate-600">·</span><span>{staff.department}</span></>}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <KpiGrid columns={3}>
+        <Kpi label="Paid total" value={fmt(paidTotal)} />
+        <Kpi label="Records" value={history.length} />
+        <Kpi label="Status" value={history[0]?.status || '—'} hint={history[0] ? `${history[0].month || ''} ${history[0].year || ''}` : ''} />
+      </KpiGrid>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+      <Panel title="Salary history" bodySx={{ p: 0 }}>
+        {!history.length ? (
+          <EmptyState title="No payroll records" description="Payslips appear here after payroll is processed." />
+        ) : (
+          <Stack spacing={0}>
+            {history.map((row, i) => {
+              const selected = selectedPayroll === row || (selectedPayroll && selectedPayroll.id && selectedPayroll.id === row.id);
+              return (
+                <Box
+                  key={row.id || `${row.month}-${row.year}-${i}`}
+                  onClick={() => setSelectedPayroll(row)}
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    borderBottom: i < history.length - 1 ? `1px solid ${brand.border}` : 'none',
+                    bgcolor: selected ? 'rgba(245,166,35,0.08)' : 'transparent',
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'rgba(19,33,61,0.03)' },
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, color: brand.navy, fontSize: 14 }}>
+                        {row.month || '—'} {row.year || ''}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: brand.muted }}>{row.term || row.status || ''}</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'right' }}>
+                      <Typography sx={{ fontWeight: 700, color: brand.navy, fontSize: 14 }}>{fmt(row.paid ?? row.netPay)}</Typography>
+                      <Typography sx={{ fontSize: 11, color: brand.muted }}>{row.status || '—'}</Typography>
+                    </Box>
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
+      </Panel>
 
-        {/* ── Stats Grid ──────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <StatCard icon={Wallet} label="Net Salary" value={fmt(data?.currentSalary?.net)} accent="bg-[#000435]" />
-          
-          <StatCard icon={TrendingUp} label="Allowances" value={fmt(data?.currentSalary?.allowances)} accent="bg-emerald-500" />
-          <StatCard icon={PiggyBank} label="Total Received" value={fmt(paidTotal)} accent="bg-amber-500" />
-        </div>
-
-        {/* ── Payroll History ──────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
-            <div>
-              <h2 className="font-black text-[#000435] text-base">Payment History</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">All your past salary disbursements</p>
-            </div>
-            <span className="text-[10px] font-black text-slate-400 bg-slate-50 border border-slate-100 rounded-full px-3 py-1">
-              {history.length} record{history.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-
-          {history.length === 0 ? (
-            <div className="py-16 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-3">
-                <Wallet size={20} className="text-slate-300" />
-              </div>
-              <p className="text-sm font-black text-slate-300">No payments recorded yet</p>
-              <p className="text-xs text-slate-300 mt-1">Your payroll history will appear here</p>
-            </div>
-          ) : (
-            <>
-              {/* Desktop table */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Pay Period</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Net Salary</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Amount Paid</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
-                      <th className="px-5 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((row, i) => (
-                      <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <p className="font-black text-[#000435] text-sm">{row.month} {row.year}</p>
-                          {row.term && <p className="text-[10px] text-slate-400 mt-0.5">{row.term}</p>}
-                        </td>
-                        <td className="px-5 py-3.5 font-black text-slate-700">{fmt(row.net)}</td>
-                        <td className="px-5 py-3.5 font-black text-[#000435]">{fmt(row.paid)}</td>
-                        <td className="px-5 py-3.5"><StatusBadge status={row.status} /></td>
-                        <td className="px-5 py-3.5 text-right">
-                          <button
-                            onClick={() => setSelectedPayroll(row)}
-                            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-[#000435] text-white text-[11px] font-black hover:bg-[#000c6e] transition-colors"
-                          >
-                            View Details <ChevronRight size={11} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="sm:hidden divide-y divide-slate-50">
-                {history.map((row) => (
-                  <div key={row.id} className="px-4 py-4 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-black text-[#000435] text-sm">{row.month} {row.year}</p>
-                        <StatusBadge status={row.status} />
-                      </div>
-                      <p className="text-xs text-slate-400">{row.term || 'Salary'}</p>
-                      <p className="text-base font-black text-[#000435] mt-1">{fmt(row.net)}</p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedPayroll(row)}
-                      className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#000435] text-white flex items-center justify-center hover:bg-[#000c6e] transition-colors"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Payroll Detail Modal ─────────────────────────────────────────────── */}
-      {selectedPayroll && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-[#000435]/60 backdrop-blur-sm" onClick={() => setSelectedPayroll(null)} />
-
-          {/* Sheet */}
-          <div className="relative w-full sm:max-w-lg bg-white sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-
-            {/* Modal Header */}
-            <div className="bg-[#000435] px-5 py-4 flex items-start justify-between flex-shrink-0">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 mb-1">Payslip Details</p>
-                <h3 className="text-lg font-black text-white leading-tight">
-                  {selectedPayroll.month} {selectedPayroll.year}
-                  {selectedPayroll.term && <span className="text-amber-400/70 text-sm font-bold ml-2">· {selectedPayroll.term}</span>}
-                </h3>
-                <StatusBadge status={selectedPayroll.status} />
-              </div>
-              <button
-                onClick={() => setSelectedPayroll(null)}
-                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors flex-shrink-0 ml-3 mt-0.5"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="overflow-y-auto flex-1">
-              <div className="p-5 space-y-4">
-
-                {/* Earnings Section */}
-                <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                  <div className="bg-emerald-50 px-4 py-2.5 border-b border-emerald-100">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">What You Earned</p>
-                  </div>
-                  <div className="px-4 divide-y divide-slate-50">
-                    <LineItem label="Base Salary" value={fmt(selectedPayroll.basic)} />
-                    <LineItem label="Allowances" value={`+ ${fmt(selectedPayroll.allowances)}`} valueClass="text-emerald-600" />
-                    <LineItem label="Gross Pay" value={fmt((Number(selectedPayroll.basic) || 0) + (Number(selectedPayroll.allowances) || 0))} bold valueClass="text-emerald-700" />
-                  </div>
-                </div>
-
-                {/* Deductions Section */}
-                <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                  <div className="bg-red-50 px-4 py-2.5 border-b border-red-100">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-600">Deductions</p>
-                  </div>
-                  <div className="px-4 divide-y divide-slate-50">
-                    <LineItem label="RSSB / Pension" value={`- ${fmt(selectedPayroll.rssb)}`} valueClass="text-red-500" />
-                    <LineItem label="Income Tax" value={`- ${fmt(selectedPayroll.deductions ?? selectedPayroll.tax)}`} valueClass="text-red-500" />
-                    <LineItem label="Salary Advance" value={`- ${fmt(selectedPayroll.advance)}`} valueClass="text-orange-500" />
-                    <LineItem label="Total Deductions" value={`- ${fmt((Number(selectedPayroll.rssb) || 0) + (Number(selectedPayroll.deductions ?? selectedPayroll.tax) || 0) + (Number(selectedPayroll.advance) || 0))}`} bold valueClass="text-red-700" />
-                  </div>
-                </div>
-
-                {/* Net Summary */}
-                <div className="rounded-2xl bg-[#000435] overflow-hidden">
-                  <div className="px-5 py-4 flex items-center justify-between border-b border-white/10">
-                    <span className="text-sm font-black text-white">Your Net Salary</span>
-                    <span className="text-base font-black text-white">{fmt(selectedPayroll.net)}</span>
-                  </div>
-                  <div className="px-5 py-3.5 flex items-center justify-between">
-                    <span className="text-sm font-black text-amber-400">Amount Deposited</span>
-                    <span className="text-base font-black text-amber-400">{fmt(selectedPayroll.paid)}</span>
-                  </div>
-                </div>
-
-                {/* Additional Info */}
-                <div className="rounded-2xl border border-slate-100 p-4 grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Reference No.', value: selectedPayroll.payrollId || `PAY-${selectedPayroll.id}` },
-                    { label: 'Final Payable', value: fmt(selectedPayroll.finalPayable) },
-                    { label: 'Paid On', value: selectedPayroll.paidDate ? String(selectedPayroll.paidDate).slice(0, 10) : '-' },
-                    { label: 'Amount Requested', value: fmt(selectedPayroll.amountRequested) },
-                    { label: 'Submitted By', value: selectedPayroll.submittedBy || '-' },
-                    { label: 'Approved By', value: selectedPayroll.approvedBy || '-' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p>
-                      <p className="text-xs font-black text-[#000435] mt-0.5 truncate">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {!selectedIsPaid && (
-                  <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center gap-3">
-                    <Clock size={16} className="text-amber-500 flex-shrink-0" />
-                    <p className="text-xs text-amber-700 font-black">Your payslip will be available once payment is confirmed.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="flex gap-3 p-4 border-t border-slate-100 bg-white flex-shrink-0">
-              <button
-                onClick={handleDownloadPayslip}
-                disabled={!selectedIsPaid}
-                className={`flex-1 h-11 rounded-xl text-xs font-black inline-flex items-center justify-center gap-2 transition-all ${
-                  selectedIsPaid
-                    ? 'border-2 border-[#000435] text-[#000435] hover:bg-[#000435] hover:text-white'
-                    : 'border border-slate-100 text-slate-300 cursor-not-allowed bg-slate-50'
-                }`}
-              >
-                <Download size={13} /> Download PDF
-              </button>
-              <button
-                onClick={handlePrintPayslip}
-                disabled={!selectedIsPaid}
-                className={`flex-1 h-11 rounded-xl text-xs font-black inline-flex items-center justify-center gap-2 transition-all ${
-                  selectedIsPaid
-                    ? 'bg-[#000435] text-white hover:bg-[#000c6e]'
-                    : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                }`}
-              >
-                <PrinterIcon size={13} /> Print Payslip
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {selectedPayroll ? (
+        <Panel
+          title="Payslip actions"
+          subtitle={`${selectedPayroll.month || ''} ${selectedPayroll.year || ''} · ${selectedPayroll.status || ''}`}
+          sx={{ mt: 2 }}
+        >
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="outlined"
+              disabled={!selectedIsPaid}
+              onClick={handlePrintPayslip}
+              sx={{ borderColor: brand.border, fontWeight: 600 }}
+            >
+              Print
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={!selectedIsPaid}
+              onClick={handleDownloadPayslip}
+              sx={{ fontWeight: 600 }}
+            >
+              Download PDF
+            </Button>
+          </Stack>
+          {!selectedIsPaid ? (
+            <Typography sx={{ mt: 1.5, fontSize: 13, color: brand.muted }}>
+              Payslip downloads are available once payment is confirmed.
+            </Typography>
+          ) : null}
+        </Panel>
+      ) : null}
+    </Page>
   );
 }

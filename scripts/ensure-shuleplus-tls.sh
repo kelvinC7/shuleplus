@@ -51,6 +51,9 @@ HOSTS=(
   studentmanagement.shuleplus.rw studentmanagement-api.shuleplus.rw
   library.shuleplus.rw library-api.shuleplus.rw
   printcard.shuleplus.rw printcard-api.shuleplus.rw
+  shulechat.shuleplus.rw shulechat-api.shuleplus.rw
+  shuletrip.shuleplus.rw shuletrip-api.shuleplus.rw
+  transport.shuleplus.rw transport-api.shuleplus.rw
   notifications-api.shuleplus.rw
 )
 

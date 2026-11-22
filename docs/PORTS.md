@@ -45,6 +45,7 @@ Checked: **2026-07-30**
 | Student Discipline | **3033** | **3032** | `StudentDiscpline/` |
 | Nesa Dashboard | **3016** | **3018** | `NesaDashboard/` |
 | Parent MIS | **3049** | **3048** | `ParentMIS/` |
+| ShuleTrip | **3077** | **3076** | `ShuleTrip/` |
 | Sector MIS (SEI Attendance) | **3071** | **3070** | `SectorMIS/` |
 | DEO MIS (District Attendance) | **3073** | **3072** | `DEOMIS/` |
 
@@ -71,6 +72,7 @@ Checked: **2026-07-30**
 | School Uniform MIS | **3050** | **3051** | `SchoolUniformMIS/` |
 | Task MIS | **3047** | **3046** | `TaskMIS/` |
 | ShuleKit MIS | **3039** | **3038** | `ShuleKitMIS/` |
+| Director Console (School Representative) | **3081** | **3080** | `SchoolRepresentative/` |
 
 ### Template only
 

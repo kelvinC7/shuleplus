@@ -4,6 +4,12 @@ const { authenticateIam, orgId, teacher } = require('../middleware/iamAuth');
 const { serviceFetch, unwrap } = require('../lib/serviceFetch');
 const { existingPhoto } = require('../lib/teacherPhoto');
 const {
+  pickAssessmentPayload,
+  classificationFromComponent,
+  ASSESSMENT_CREATE_FIELDS,
+  ASSESSMENT_UPDATE_FIELDS,
+} = require('../lib/assessmentPayload');
+const {
   buildTeacherPayrollSummary,
   probeConfiguredModules,
   disciplineApi,
@@ -495,6 +501,107 @@ router.get('/my-classes/:classId/students', async (req, res) => {
   }
 });
 
+/** Class teacher: students of a class they teach. SM enforces the school's access toggle. */
+router.get('/class-students', async (req, res) => {
+  try {
+    const t = await teacherIdentity(req);
+    const organizationId = orgId(req);
+    const payload = await serviceFetch(env.STUDENT_MANAGEMENT_API_URL, '/service/class-teacher/students', {
+      query: {
+        organizationId,
+        classId: q(req, 'classId') || '',
+        className: q(req, 'className') || '',
+        teacherUserId: t.id,
+        teacherEmail: t.email,
+      },
+    });
+    send(res, unwrap(payload));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.put('/class-students/:studentId', async (req, res) => {
+  try {
+    const t = await teacherIdentity(req);
+    const organizationId = orgId(req);
+    const payload = await serviceFetch(
+      env.STUDENT_MANAGEMENT_API_URL,
+      `/service/class-teacher/students/${encodeURIComponent(req.params.studentId)}`,
+      {
+        method: 'PUT',
+        query: { organizationId },
+        body: { ...(req.body || {}), teacherUserId: t.id, teacherEmail: t.email },
+      }
+    );
+    send(res, unwrap(payload));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.put('/class-students/:studentId/parents/:parentId', async (req, res) => {
+  try {
+    const t = await teacherIdentity(req);
+    const payload = await serviceFetch(
+      env.STUDENT_MANAGEMENT_API_URL,
+      `/service/class-teacher/students/${encodeURIComponent(req.params.studentId)}/parents/${encodeURIComponent(req.params.parentId)}`,
+      {
+        method: 'PUT',
+        query: { organizationId: orgId(req) },
+        body: { ...(req.body || {}), teacherUserId: t.id, teacherEmail: t.email },
+      }
+    );
+    send(res, unwrap(payload));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.get('/class-students/parents/search', async (req, res) => {
+  try {
+    const t = await teacherIdentity(req);
+    const payload = await serviceFetch(
+      env.STUDENT_MANAGEMENT_API_URL,
+      '/service/class-teacher/parents/search',
+      {
+        query: {
+          organizationId: orgId(req),
+          className: q(req, 'className') || '',
+          q: q(req, 'q') || '',
+          teacherUserId: t.id,
+          teacherEmail: t.email,
+        },
+      }
+    );
+    send(res, unwrap(payload));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.post('/class-students/parents', async (req, res) => {
+  try {
+    const t = await teacherIdentity(req);
+    const payload = await serviceFetch(
+      env.STUDENT_MANAGEMENT_API_URL,
+      '/service/class-teacher/parents',
+      {
+        method: 'POST',
+        query: { organizationId: orgId(req) },
+        body: {
+          ...(req.body || {}),
+          teacherUserId: t.id,
+          teacherEmail: t.email,
+        },
+      }
+    );
+    send(res, unwrap(payload), 201);
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 function examGet(req, path, query) {
   return academic(path, req, { query });
 }
@@ -579,7 +686,8 @@ router.get('/assessments', async (req, res) => {
             classId: q(req, 'classId'),
             academicYear: q(req, 'academicYear'),
             term: q(req, 'term'),
-            createdBy: q(req, 'mine') === '1' ? req.user?.sub : undefined,
+            // Teachers see only their own assessments by default; 'all=1' is an explicit override.
+            createdBy: q(req, 'all') === '1' ? undefined : req.user?.sub,
           },
         })
       )
@@ -591,7 +699,8 @@ router.get('/assessments', async (req, res) => {
 
 router.post('/assessments', async (req, res) => {
   try {
-    send(res, unwrap(await academic('/assessments', req, { method: 'POST', body: req.body || {} })), 201);
+    const body = pickAssessmentPayload(req.body, ASSESSMENT_CREATE_FIELDS);
+    send(res, unwrap(await academic('/assessments', req, { method: 'POST', body })), 201);
   } catch (err) {
     fail(res, err);
   }
@@ -607,7 +716,8 @@ router.get('/assessments/preview-code', async (req, res) => {
 
 router.put('/assessments/:id', async (req, res) => {
   try {
-    send(res, unwrap(await academic(`/assessments/${req.params.id}`, req, { method: 'PUT', body: req.body || {} })));
+    const body = pickAssessmentPayload(req.body, ASSESSMENT_UPDATE_FIELDS);
+    send(res, unwrap(await academic(`/assessments/${req.params.id}`, req, { method: 'PUT', body })));
   } catch (err) {
     fail(res, err);
   }
@@ -1288,6 +1398,64 @@ async function fetchCheckInHistorySafe(req, extra = {}) {
   }
 }
 
+/** Staff gate RFID attendance from the Attendance module (not lesson QR scans). */
+async function fetchTeacherGateFromAttendance(req, extra = {}) {
+  const t = await teacherIdentity(req);
+  const organizationId = orgId(req);
+  const baseQuery = {
+    teacherUserId: t.id,
+    email: t.email || undefined,
+    teacherName: t.name || undefined,
+  };
+
+  if (extra.monthly) {
+    return unwrap(
+      await attendanceApi('/service/teacher-attendance/monthly-grid', organizationId, {
+        ...baseQuery,
+        month: String(extra.month ?? q(req, 'month') ?? new Date().getMonth() + 1),
+        year: String(extra.year ?? q(req, 'year') ?? new Date().getFullYear()),
+      })
+    );
+  }
+
+  const from = extra.from || q(req, 'from');
+  const to = extra.to || q(req, 'to');
+  if (from && to) {
+    return (
+      unwrap(
+        await attendanceApi('/service/teacher-attendance', organizationId, {
+          ...baseQuery,
+          from,
+          to,
+        })
+      ) || []
+    );
+  }
+
+  const scope = extra.scope || q(req, 'scope');
+  if (scope === 'term' || scope === 'days') {
+    return (
+      unwrap(
+        await attendanceApi('/service/teacher-attendance', organizationId, {
+          ...baseQuery,
+          scope,
+          days: String(extra.days ?? q(req, 'days') ?? 45),
+        })
+      ) || []
+    );
+  }
+
+  const date = extra.date || q(req, 'date') || todayIso();
+  return (
+    unwrap(
+      await attendanceApi('/service/teacher-attendance', organizationId, {
+        ...baseQuery,
+        date,
+      })
+    ) || []
+  );
+}
+
 function toTtStatus(status) {
   const v = String(status || '').toLowerCase();
   if (v === 'absent') return 'ABSENT';
@@ -1417,9 +1585,7 @@ router.get('/me', async (req, res) => {
     teacherLink(organizationId, t.id, t.email),
     studentMgmt('/service/classes', organizationId).then(unwrap),
     academic('/exam-invigilator/me', req).then(unwrap),
-    attendanceApi('/service/attendance', organizationId, { date })
-      .then(unwrap)
-      .catch(() => []),
+    fetchTeacherGateFromAttendance(req, { date }).catch(() => []),
     fetchCheckInHistorySafe(req, { date, limit: '20' }),
     probeConfiguredModules(),
   ]);
@@ -1797,11 +1963,7 @@ router.get('/teacher-portal/class-period/active', async (req, res) => {
       period_log: {
         checked_in: Boolean(current?.qrVerified || current?.scannedAt),
         checked_out: current?.lessonStatus === 'COMPLETED',
-        entry_time: current?.scannedAt
-          ? String(current.scannedAt).slice(11, 16)
-          : current?.startedAt
-            ? String(current.startedAt).slice(11, 16)
-            : null,
+        entry_time: current?.scannedAt || current?.startedAt || null,
       },
     });
   } catch {
@@ -1819,7 +1981,7 @@ router.get('/teacher-portal/class-period/history', async (req, res) => {
         subject_name: r.subjectName,
         class_name: r.className,
         start_time: r.startTime,
-        entry_hm: r.checkedInAt ? String(r.checkedInAt).slice(11, 16) : null,
+        entry_hm: r.checkedInAt || null,
         exit_hm: null,
         status: r.punctuality,
       }))
@@ -1862,69 +2024,32 @@ router.post('/teacher-portal/class-room/scan', async (req, res) => {
 
 router.get('/teacher-portal/attendance-module/teacher', async (req, res) => {
   try {
-    const t = teacher(req);
-    const date = q(req, 'date') || todayIso();
-    const history = await fetchCheckInHistorySafe(req, { date, limit: '50' });
-    const first = Array.isArray(history) && history.length ? history[history.length - 1] : null;
-    const last = Array.isArray(history) && history.length ? history[0] : null;
-    const late = (Array.isArray(history) ? history : []).some((r) => String(r.punctuality).toUpperCase() === 'LATE');
-    send(res, [
-      {
-        teacher_id: t.id,
-        date,
-        status_in: first ? (late ? 'late' : 'present') : 'missed',
-        check_in: first?.checkedInAt || null,
-        check_out: last && last !== first ? last.checkedInAt : null,
-      },
-    ]);
-  } catch {
-    send(res, []);
+    const rows = await fetchTeacherGateFromAttendance(req);
+    send(res, Array.isArray(rows) ? rows : []);
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.get('/teacher-portal/attendance-module/teacher/history', async (req, res) => {
+  try {
+    const scope = q(req, 'scope') === 'days' ? 'days' : 'term';
+    const days = Math.min(90, Math.max(1, Number(q(req, 'days') || 45)));
+    const rows = await fetchTeacherGateFromAttendance(req, { scope, days });
+    send(res, Array.isArray(rows) ? rows : []);
+  } catch (err) {
+    fail(res, err);
   }
 });
 
 router.get('/teacher-portal/attendance-module/teacher/monthly-grid', async (req, res) => {
   try {
-    const t = teacher(req);
     const month = Number(q(req, 'month') || new Date().getMonth() + 1);
     const year = Number(q(req, 'year') || new Date().getFullYear());
-    const history = await fetchCheckInHistorySafe(req, { limit: '200' });
-    const rows = Array.isArray(history) ? history : [];
-    const inMonth = rows.filter((r) => {
-      const d = String(r.date || '');
-      return d.startsWith(`${year}-${String(month).padStart(2, '0')}`);
-    });
-    const byDay = new Map();
-    for (const r of inMonth) {
-      const day = r.date;
-      const prev = byDay.get(day) || { late: false, present: false };
-      prev.present = true;
-      if (String(r.punctuality).toUpperCase() === 'LATE') prev.late = true;
-      byDay.set(day, prev);
-    }
-    let present = 0;
-    let late = 0;
-    for (const v of byDay.values()) {
-      if (v.late) late += 1;
-      else present += 1;
-    }
-    const daysInMonth = new Date(year, month, 0).getDate();
-    let weekdays = 0;
-    for (let d = 1; d <= daysInMonth; d += 1) {
-      const wd = new Date(year, month - 1, d).getDay();
-      if (wd >= 1 && wd <= 5) weekdays += 1;
-    }
-    send(res, {
-      grid: [
-        {
-          teacher_id: t.id,
-          present_days: present,
-          late_days: late,
-          absent_days: Math.max(0, weekdays - present - late),
-        },
-      ],
-    });
-  } catch {
-    send(res, { grid: [] });
+    const payload = await fetchTeacherGateFromAttendance(req, { monthly: true, month, year });
+    send(res, payload && typeof payload === 'object' ? payload : { grid: [] });
+  } catch (err) {
+    fail(res, err);
   }
 });
 
@@ -1951,6 +2076,59 @@ router.get('/teacher-portal/attendance-module/teacher-class-checkin', async (req
     });
   } catch {
     send(res, { rows: [] });
+  }
+});
+
+// Class-teacher: student card tap in/out attendance (from Attendance module) for assigned class
+router.get('/teacher-portal/class-teacher/student-attendance/roster', async (req, res) => {
+  try {
+    const className = q(req, 'className') || q(req, 'class_name');
+    if (!className) {
+      return res.status(400).json({ success: false, message: 'className is required' });
+    }
+    await assertClassTeacherForClass(req, className);
+    const organizationId = orgId(req);
+    const data = unwrap(
+      await attendanceApi('/service/attendance/student-roster', organizationId, {
+        className,
+        date: q(req, 'date'),
+        from: q(req, 'from'),
+        to: q(req, 'to'),
+        status: q(req, 'status'),
+        q: q(req, 'q'),
+        page: q(req, 'page'),
+        limit: q(req, 'limit'),
+        sortBy: q(req, 'sortBy'),
+        sortDir: q(req, 'sortDir'),
+      })
+    );
+    send(res, data || { items: [], summary: null });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.get('/teacher-portal/class-teacher/student-attendance/student/:id/performance', async (req, res) => {
+  try {
+    const className = q(req, 'className') || q(req, 'class_name');
+    if (className) await assertClassTeacherForClass(req, className);
+    const organizationId = orgId(req);
+    const data = unwrap(
+      await attendanceApi(
+        `/service/people/students/${encodeURIComponent(req.params.id)}/performance`,
+        organizationId,
+        {
+          date: q(req, 'date'),
+          from: q(req, 'from'),
+          to: q(req, 'to'),
+          academicYear: q(req, 'academicYear'),
+          term: q(req, 'term'),
+        }
+      )
+    );
+    send(res, data || null);
+  } catch (err) {
+    fail(res, err);
   }
 });
 
@@ -2122,6 +2300,8 @@ async function resolveTemplateComponents(req, { className, academicYear, term, t
     code: c.code,
     weight_percent: Number(c.weightPercentage || 0),
     default_max_score: Number(c.maxMark || 20),
+    assessmentCategory: c.assessmentCategory || null,
+    reportingStage: c.reportingStage || 'UNASSIGNED',
   }));
 
   return { template, rows, templates: templateSummaries };
@@ -2934,6 +3114,8 @@ router.post('/teacher-portal/register-marks', async (req, res) => {
         templateId: body.template_id || body.templateId,
       });
       const { templateId, componentId } = resolveAssessmentTemplateRefs(body, templateRows);
+      const component = templateRows.find((r) => r.component_id === componentId);
+      const classification = classificationFromComponent(component);
       const created = unwrap(
         await academic('/assessments', req, {
           method: 'POST',
@@ -2948,6 +3130,7 @@ router.post('/teacher-portal/register-marks', async (req, res) => {
             description: body.description,
             templateId: templateId || undefined,
             componentId: componentId || undefined,
+            ...classification,
           },
         })
       );

@@ -1,7 +1,7 @@
-import { GateDevicesView } from '@/components/super-admin/gate-devices/gate-devices-view';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function SuperAdminGateDevicesPage() {
-  return <GateDevicesView />;
+  redirect('/super-admin/device-management');
 }

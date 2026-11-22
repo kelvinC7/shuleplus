@@ -45,7 +45,7 @@ const PIPELINE = [
     label: 'Submitted',
     short: 'Submitted',
     description: 'Your request has been received and is queued for finance review.',
-    color: '#F59E0B',
+    color: '#F5A623',
     bgClass: 'bg-amber-50',
     borderClass: 'border-amber-300',
     textClass: 'text-amber-700',
@@ -177,13 +177,13 @@ function PipelineBar({ currentStatus }) {
                 ${done
                   ? 'bg-amber-400 border-amber-400'
                   : active
-                    ? 'bg-[#000435] border-amber-400'
+                    ? 'bg-[#13213D] border-amber-400'
                     : 'bg-white border-slate-200'
                 }`}
                 style={active ? { boxShadow: '0 0 0 3px rgba(245,158,11,0.2)' } : {}}
               >
                 {done
-                  ? <CheckCircle2 size={13} className="text-[#000435]" strokeWidth={2.5} />
+                  ? <CheckCircle2 size={13} className="text-[#13213D]" strokeWidth={2.5} />
                   : active
                     ? <step.Icon size={12} className="text-amber-400" />
                     : <Circle size={10} className="text-slate-300" />
@@ -191,7 +191,7 @@ function PipelineBar({ currentStatus }) {
               </div>
               {/* Label - hidden on xs, shown sm+ */}
               <span className={`hidden sm:block text-[8px] font-black uppercase tracking-wider mt-1 text-center leading-none
-                ${done ? 'text-amber-500' : active ? 'text-[#000435]' : 'text-slate-300'}`}>
+                ${done ? 'text-amber-500' : active ? 'text-[#13213D]' : 'text-slate-300'}`}>
                 {step.short}
               </span>
             </div>
@@ -202,7 +202,7 @@ function PipelineBar({ currentStatus }) {
                   className="h-full rounded-full transition-all duration-700"
                   style={{
                     width: done ? '100%' : active ? '50%' : '0%',
-                    background: 'linear-gradient(90deg, #F59E0B, #D97706)',
+                    background: 'linear-gradient(90deg, #F5A623, #D97706)',
                   }}
                 />
               </div>
@@ -231,7 +231,7 @@ function DeliveryAction({ row, status }) {
         isDelivered ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'
       }`}>
         <div className={`px-4 py-2.5 flex items-center gap-2 ${
-          isDelivered ? 'bg-emerald-500' : 'bg-[#000435]'
+          isDelivered ? 'bg-emerald-500' : 'bg-[#13213D]'
         }`}>
           <Store size={14} className="text-amber-400" />
           <span className="text-[10px] font-black uppercase tracking-wider text-white">
@@ -245,7 +245,7 @@ function DeliveryAction({ row, status }) {
                 <Store size={18} className="text-amber-600" />
               </div>
               <div>
-                <p className="font-black text-[#000435] text-sm">{delivery.agentName}</p>
+                <p className="font-black text-[#13213D] text-sm">{delivery.agentName}</p>
                 {delivery.agentLocation && <p className="text-xs text-slate-500 font-semibold mt-0.5">{delivery.agentLocation}</p>}
               </div>
             </div>
@@ -291,7 +291,7 @@ function DeliveryAction({ row, status }) {
                 <School size={18} className="text-blue-600" />
               </div>
               <div>
-                <p className="font-black text-[#000435] text-sm">{delivery.schoolName}</p>
+                <p className="font-black text-[#13213D] text-sm">{delivery.schoolName}</p>
                 {delivery.schoolLocation && <p className="text-xs text-slate-500 font-semibold mt-0.5">{delivery.schoolLocation}</p>}
               </div>
             </div>
@@ -371,7 +371,7 @@ function DealCard({ row, index, navigate }) {
             </div>
 
             {/* Product names */}
-            <p className="text-sm font-black text-[#000435] leading-snug line-clamp-2 mb-1">
+            <p className="text-sm font-black text-[#13213D] leading-snug line-clamp-2 mb-1">
               {products.map(p => p.name).filter(Boolean).join(' · ') || row.purpose || 'Teacher Deal'}
             </p>
 
@@ -383,7 +383,7 @@ function DealCard({ row, index, navigate }) {
               {payType === 'ticha_avance' && (
                 <>
                   <span className="text-slate-300 text-xs">·</span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-[#000435]/6 text-[#000435] border border-[#000435]/10">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-[#13213D]/6 text-[#13213D] border border-[#13213D]/10">
                     <TrendingUp size={9} /> Avance
                   </span>
                 </>
@@ -410,7 +410,7 @@ function DealCard({ row, index, navigate }) {
           {/* Expand toggle */}
           <button
             onClick={() => setExpanded(e => !e)}
-            className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-[#000435] transition-all flex-shrink-0"
+            className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 hover:text-[#13213D] transition-all flex-shrink-0"
           >
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -470,9 +470,9 @@ function DealCard({ row, index, navigate }) {
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Finance Notes</p>
               {row.accountant_note && (
                 <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-white border border-slate-200">
-                  <Shield size={13} className="text-[#000435] flex-shrink-0 mt-0.5" />
+                  <Shield size={13} className="text-[#13213D] flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[10px] font-black text-[#000435] uppercase tracking-wider mb-0.5">Finance</p>
+                    <p className="text-[10px] font-black text-[#13213D] uppercase tracking-wider mb-0.5">Finance</p>
                     <p className="text-xs text-slate-600 font-semibold leading-relaxed">{row.accountant_note}</p>
                   </div>
                 </div>
@@ -481,7 +481,7 @@ function DealCard({ row, index, navigate }) {
                 <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-white border border-slate-200">
                   <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[10px] font-black text-[#000435] uppercase tracking-wider mb-0.5">Manager</p>
+                    <p className="text-[10px] font-black text-[#13213D] uppercase tracking-wider mb-0.5">Manager</p>
                     <p className="text-xs text-slate-600 font-semibold leading-relaxed">{row.manager_feedback}</p>
                   </div>
                 </div>
@@ -491,7 +491,7 @@ function DealCard({ row, index, navigate }) {
 
           {/* Payment info */}
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div className="px-4 py-2.5 bg-[#000435]">
+            <div className="px-4 py-2.5 bg-[#13213D]">
               <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/80">Payment Details</p>
             </div>
             <div className="p-4 space-y-2.5">
@@ -501,7 +501,7 @@ function DealCard({ row, index, navigate }) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500 font-semibold">Method</span>
-                <span className="font-black text-[#000435] capitalize">
+                <span className="font-black text-[#13213D] capitalize">
                   {payType === 'ticha_avance' ? 'Ticha Avance (payroll)' : 'Direct Payment'}
                 </span>
               </div>
@@ -509,7 +509,7 @@ function DealCard({ row, index, navigate }) {
                 <>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500 font-semibold">Duration</span>
-                    <span className="font-black text-[#000435]">{row.metadata.repayment_term_months} months</span>
+                    <span className="font-black text-[#13213D]">{row.metadata.repayment_term_months} months</span>
                   </div>
                   {row.metadata?.monthly_payment && (
                     <div className="flex justify-between text-sm">
@@ -542,8 +542,8 @@ function DealCard({ row, index, navigate }) {
             <button
               type="button"
               onClick={() => navigate(`/ticha-deals/${firstProduct.id}`)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#000435]/20
-              text-[#000435] font-black text-sm hover:bg-[#000435]/4 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#13213D]/20
+              text-[#13213D] font-black text-sm hover:bg-[#13213D]/4 transition-all"
             >
               <ExternalLink size={14} /> View Product
             </button>
@@ -565,7 +565,7 @@ function StatsBar({ rows }) {
   const totalSpend = rows.reduce((s, r) => s + (Number(r.amount_rwf) || 0), 0);
 
   const stats = [
-    { label: 'Total Requests', value: total, color: 'text-[#000435]', icon: ShoppingBag },
+    { label: 'Total Requests', value: total, color: 'text-[#13213D]', icon: ShoppingBag },
     { label: 'Pending', value: pending, color: 'text-amber-500', icon: Clock },
     { label: 'Approved', value: approved, color: 'text-emerald-500', icon: CheckCircle2 },
     { label: 'Delivered', value: delivered, color: 'text-violet-500', icon: Truck },
@@ -652,6 +652,14 @@ export default function TrackingTichaDeals() {
 
   const filtered = useMemo(() => filterRows(sorted, filter), [sorted, filter]);
 
+  const FILTER_TABS = [
+    { key: 'all', label: 'All' },
+    { key: 'active', label: 'Active' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'delivered', label: 'Delivered' },
+    { key: 'rejected', label: 'Rejected' },
+  ];
+
   const filterCounts = useMemo(() => ({
     all: sorted.length,
     active: sorted.filter(r => ['pending_accountant', 'sent_to_manager'].includes(r.status)).length,
@@ -679,69 +687,53 @@ export default function TrackingTichaDeals() {
         .spin-anim { animation: spin 1s linear infinite; }
       `}</style>
 
-      <div className="min-h-screen bg-[#f0f2f9] pb-20"
-        style={{ fontFamily: PAGE_FONT_FAMILY }}>
-
-        {/* ── HERO ── */}
-        <div className="relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #000435 0%, #001080 60%, #000c55 100%)' }}>
-
-          {/* Ambient glows */}
-          <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #F59E0B 0%, transparent 70%)', filter: 'blur(60px)', transform: 'translate(30%, -30%)' }} />
-          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full opacity-8 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #F59E0B 0%, transparent 70%)', filter: 'blur(50px)', transform: 'translate(-30%, 30%)' }} />
-
-          {/* Dot grid pattern */}
-          <div className="absolute inset-0 opacity-5 pointer-events-none"
-            style={{
-              backgroundImage: 'radial-gradient(circle, #F59E0B 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-            }} />
-
-          <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-16"
-            style={{ animation: 'heroReveal 0.5s ease both' }}>
-
-            {/* Back nav */}
-            <button type="button" onClick={() => navigate('/ticha-deals')}
-              className="inline-flex items-center gap-2 mb-6 text-white/60 hover:text-white text-xs font-black uppercase tracking-wider transition-colors">
-              <ArrowLeft size={15} /> Back to Catalog
-            </button>
-
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                {/* Eyebrow */}
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-400/15 border border-amber-400/25 mb-4">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400">
-                    Deal Tracking
-                  </span>
-                </div>
-                <h1 className="text-3xl sm:text-4xl font-black text-white leading-none tracking-tight mb-3">
-                  My <span className="text-amber-400">Deals</span>
-                </h1>
-                <p className="text-sm text-white/60 font-semibold max-w-sm leading-relaxed">
-                  Track every request from submission through approval to delivery.
-                </p>
-              </div>
-
-              {/* Refresh */}
-              <button
-                type="button"
-                onClick={() => load(true)}
-                disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white/70
-                hover:bg-white/20 hover:text-white transition-all text-xs font-black uppercase tracking-wider flex-shrink-0"
-              >
-                <RefreshCw size={13} className={refreshing ? 'spin-anim' : ''} />
-                {refreshing ? 'Refreshing…' : 'Refresh'}
-              </button>
-            </div>
+      <div className="min-h-screen bg-[#F4F5F8] pb-20" style={{ fontFamily: PAGE_FONT_FAMILY }}>
+        {/* Sticky filter tabs */}
+        <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
+          <div className="max-w-3xl mx-auto flex overflow-x-auto">
+            {FILTER_TABS.map(({ key, label }) => {
+              const count = filterCounts[key];
+              const active = filter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={`flex-1 min-w-[72px] py-3 text-[12.5px] font-bold whitespace-nowrap border-b-2 transition-colors ${
+                    active
+                      ? 'border-[#13213D] text-[#13213D] bg-[#13213D]/[0.03]'
+                      : 'border-transparent text-slate-500 hover:text-[#13213D]'
+                  }`}
+                >
+                  {label}
+                  {count != null && count > 0 ? (
+                    <span className={`ml-1 text-[10px] font-black ${active ? 'text-amber-600' : 'text-slate-400'}`}>
+                      {count}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* ── CONTENT ── */}
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 -mt-8 relative z-10">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 relative z-10">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h1 className="text-[15px] font-semibold text-[#13213D]">My deals</h1>
+              <p className="text-xs text-slate-500 mt-0.5">Track requests from submission to delivery.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => load(true)}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-[#13213D] text-xs font-bold hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={refreshing ? 'spin-anim' : ''} />
+              {refreshing ? '…' : 'Refresh'}
+            </button>
+          </div>
+
 
           {/* Stats bar */}
           {!loading && rows.length > 0 && <StatsBar rows={sorted} />}
@@ -767,10 +759,10 @@ export default function TrackingTichaDeals() {
           ) : sorted.length === 0 ? (
             /* Empty state */
             <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-10 text-center">
-              <div className="w-20 h-20 mx-auto rounded-full bg-[#000435]/6 flex items-center justify-center mb-5 border-2 border-[#000435]/10">
-                <ShoppingBag className="w-9 h-9 text-[#000435]/30" />
+              <div className="w-20 h-20 mx-auto rounded-full bg-[#13213D]/6 flex items-center justify-center mb-5 border-2 border-[#13213D]/10">
+                <ShoppingBag className="w-9 h-9 text-[#13213D]/30" />
               </div>
-              <h2 className="text-xl font-black text-[#000435] mb-2">
+              <h2 className="text-xl font-black text-[#13213D] mb-2">
                 No deal requests yet
               </h2>
               <p className="text-sm text-slate-500 font-semibold mb-7 max-w-xs mx-auto leading-relaxed">
@@ -779,54 +771,18 @@ export default function TrackingTichaDeals() {
               <button
                 type="button"
                 onClick={() => navigate('/ticha-deals')}
-                className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-[#000435] text-white text-sm font-black shadow-lg shadow-[#000435]/20 hover:bg-[#000c70] transition-all active:scale-[.97]"
+                className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-[#13213D] text-white text-sm font-black shadow-lg shadow-[#13213D]/20 hover:bg-[#000c70] transition-all active:scale-[.97]"
               >
                 <Tag size={16} /> Browse Deals <ChevronRight size={15} />
               </button>
             </div>
 
           ) : (
-            <>
-              {/* Filter tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-5 scrollbar-hide">
-                {FILTERS.map(({ key, label }) => {
-                  const count = filterCounts[key];
-                  if (count === 0 && key !== 'all') return null;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setFilter(key)}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider
-                      whitespace-nowrap border-2 transition-all flex-shrink-0 ${
-                        filter === key
-                          ? 'bg-[#000435] text-white border-[#000435] shadow-md'
-                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {label}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black ${
-                        filter === key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Deal cards */}
-              {filtered.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
-                  <p className="text-slate-400 font-bold text-sm">No deals match this filter.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filtered.map((row, i) => (
-                    <DealCard key={row.id} row={row} index={i} navigate={navigate} />
-                  ))}
-                </div>
-              )}
-            </>
+            <div className="space-y-3">
+              {filtered.map((row, i) => (
+                <DealCard key={row.id} row={row} index={i} navigate={navigate} />
+              ))}
+            </div>
           )}
 
           {/* Footer info */}
@@ -836,7 +792,7 @@ export default function TrackingTichaDeals() {
                 <Truck className="w-4 h-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-xs font-black text-[#000435] mb-0.5">About Delivery</p>
+                <p className="text-xs font-black text-[#13213D] mb-0.5">About Delivery</p>
                 <p className="text-xs font-semibold text-slate-500 leading-relaxed">
                   After approval, agent pickup or school delivery is coordinated by your school's finance team.
                   Check back here for status updates - the page refreshes automatically.

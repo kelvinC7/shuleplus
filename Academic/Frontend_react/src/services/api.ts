@@ -9,6 +9,7 @@ import {
   setToken,
 } from '@/shared/auth-token';
 import { apiErrorMessage, toast } from '@/lib/toast';
+import type { AssessmentComponentCategory, ReportingStage } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3003/api';
 const IAM_API_URL = import.meta.env.VITE_IAM_API_URL ?? 'http://localhost:3001/api/v1';
@@ -504,6 +505,8 @@ export async function syncAssessmentTemplateComponents(
     required?: boolean;
     isActive?: boolean;
     maxMark?: number;
+    assessmentCategory?: AssessmentComponentCategory | null;
+    reportingStage?: ReportingStage;
   }>,
   opts?: { skipToast?: boolean }
 ) {
@@ -546,6 +549,8 @@ export async function addAssessmentTemplateComponent(
     sortOrder?: number;
     required?: boolean;
     isActive?: boolean;
+    assessmentCategory?: AssessmentComponentCategory | null;
+    reportingStage?: ReportingStage;
   }
 ) {
   const res = await api.post(`/assessment-templates/${templateId}/components`, data);
@@ -563,6 +568,8 @@ export async function updateAssessmentTemplateComponent(
     sortOrder?: number;
     isActive?: boolean;
     required?: boolean;
+    assessmentCategory?: AssessmentComponentCategory | null;
+    reportingStage?: ReportingStage;
   }
 ) {
   const res = await api.put(`/assessment-templates/components/${componentId}`, data);
@@ -647,16 +654,76 @@ export async function createGradingScale(data: {
 }
 
 // ─── Academic Settings ──────────────────────────────────
+export interface AcademicReportFooterSettings {
+  mode: 'head_teacher' | 'custom';
+  roleLabel: string;
+  selectedUserId?: string | null;
+  selectedUserName?: string | null;
+  selectedUserEmail?: string | null;
+}
+
 export interface AcademicSettings {
   academicYears: string[];
   terms: string[];
   currentAcademicYear: string | null;
   currentTerm: string | null;
+  reportFooter?: AcademicReportFooterSettings | null;
+}
+
+const REPORT_FOOTER_STORAGE_KEY = 'academic-report-footer-settings';
+
+export function getStoredReportFooterSettings(): AcademicReportFooterSettings | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(REPORT_FOOTER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AcademicReportFooterSettings;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function persistReportFooterSettings(value: AcademicReportFooterSettings) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(REPORT_FOOTER_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures silently.
+  }
 }
 
 export async function getAcademicSettings() {
   const res = await api.get('/academic-settings');
-  return res.data.data as AcademicSettings;
+  const data = (res.data.data ?? {}) as AcademicSettings;
+  const stored = getStoredReportFooterSettings();
+  if (stored) {
+    data.reportFooter = { ...stored, ...(data.reportFooter ?? {}) };
+  }
+  return data;
+}
+
+export async function saveAcademicReportFooterSettings(data: AcademicReportFooterSettings) {
+  const payload = {
+    mode: data.mode,
+    roleLabel: data.roleLabel?.trim() || 'Head Teacher',
+    selectedUserId: data.selectedUserId ?? null,
+    selectedUserName: data.selectedUserName ?? null,
+    selectedUserEmail: data.selectedUserEmail ?? null,
+  };
+
+  persistReportFooterSettings(payload);
+
+  const res = await api.put('/academic-settings/report-footer', payload);
+  const saved = (res.data.data ?? payload) as AcademicReportFooterSettings;
+  persistReportFooterSettings(saved);
+  return saved;
+}
+
+export async function listAcademicStaffForReportFooter() {
+  const res = await api.get('/academic-settings/report-footer/staff');
+  return (res.data.data ?? []) as Array<{ id: string; name: string; email?: string; role?: string }>;
 }
 
 // ─── Actual Assessments ────────────────────────────────
@@ -736,6 +803,18 @@ export async function deleteAssessment(id: string) {
   return res.data.data;
 }
 
+/** Admin: delete an assessment course together with all marks entered for it. */
+export async function deleteAssessmentCourse(id: string) {
+  const res = await api.delete(`/assessments/${id}/course`);
+  return res.data.data;
+}
+
+/** Admin: remove all marks entered for an assessment; the course remains and reports recompute. */
+export async function deleteAssessmentMarks(assessmentId: string) {
+  const res = await api.delete(`/assessments/${assessmentId}/marks`);
+  return res.data.data;
+}
+
 export async function getTeacherDashboard() {
   const res = await api.get('/assessments/teacher-dashboard');
   return res.data.data;
@@ -784,10 +863,12 @@ export async function calculateFinalResults(templateId: string, classId: string,
 export async function getClassReportSummaries(
   classId: string,
   academicYear: string,
-  term?: string
+  term?: string,
+  reportKind?: 'standard' | 'midterm' | 'beginning'
 ) {
   const params: Record<string, string> = {};
   if (term) params.term = term;
+  if (reportKind && reportKind !== 'standard') params.reportKind = reportKind;
   const res = await api.get(`/grading/report-card/class-summaries/${classId}/${academicYear}`, {
     params,
   });
@@ -811,11 +892,13 @@ export async function getReportCardV2(
   classId: string,
   academicYear: string,
   term?: string,
-  includeTerms?: string[]
+  includeTerms?: string[],
+  reportKind?: 'standard' | 'midterm' | 'beginning'
 ) {
   const params: Record<string, string> = {};
   if (term) params.term = term;
   if (includeTerms?.length) params.includeTerms = includeTerms.join(',');
+  if (reportKind && reportKind !== 'standard') params.reportKind = reportKind;
   const res = await api.get(`/grading/report-card/${studentId}/${classId}/${academicYear}`, { params });
   return res.data.data;
 }
@@ -825,6 +908,8 @@ export async function publishReportCard(body: {
   classId: string;
   academicYear: string;
   term: string;
+  reportKind?: 'standard' | 'midterm' | 'beginning';
+  accessPolicy?: 'PAID_ONLY' | 'ALL_PARENTS';
 }) {
   const res = await api.post('/grading/report-card/publish', body);
   return res.data.data;
@@ -834,9 +919,26 @@ export async function publishReportCardsForClass(body: {
   classId: string;
   academicYear: string;
   term: string;
+  reportKind?: 'standard' | 'midterm' | 'beginning';
+  accessPolicy?: 'PAID_ONLY' | 'ALL_PARENTS';
+  studentIds?: string[];
+  /** When provided, all class students are published: selected receive marks (ALL_PARENTS + notify), others published as Pay-to-view (PAID_ONLY). */
+  selectedStudentIds?: string[];
+  notifyInApp?: boolean;
+  notifyPush?: boolean;
+  includeReportLink?: boolean;
 }) {
   const res = await api.post('/grading/report-card/publish-class', body);
-  return res.data.data as { published: number; skipped: number; total: number; errors: string[] };
+  return res.data.data as {
+    published: number;
+    skipped: number;
+    total: number;
+    granted?: number;
+    payToView?: number;
+    errors: string[];
+    accessPolicy?: string;
+    batchId?: string;
+  };
 }
 
 export async function listReportCardPublications(params: {
@@ -846,6 +948,33 @@ export async function listReportCardPublications(params: {
   search?: string;
 }) {
   const res = await api.get('/grading/report-card/publications', { params });
+  return res.data.data;
+}
+
+
+export async function listAssessmentReportingStageRecords(params: {
+  academicYear?: string;
+  term?: string;
+  classId?: string;
+  stream?: string;
+  subjectId?: string;
+  componentId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  reportingStage?: string;
+}) {
+  const res = await api.get('/assessments/reporting-stage/records', { params });
+  return res.data.data;
+}
+
+export async function bulkUpdateAssessmentReportingStage(body: {
+  assessmentIds?: string[];
+  markIds?: string[];
+  reportingStage: 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL' | 'UNASSIGNED';
+  filters?: { academicYear?: string; term?: string; classId?: string };
+}) {
+  const res = await api.post('/assessments/reporting-stage/bulk-update', body);
   return res.data.data;
 }
 
@@ -1204,4 +1333,475 @@ export async function smGetStudentProfile(studentCode: string) {
 export async function smUpdateStudentStatus(studentId: string, status: string, opts?: { skipToast?: boolean }) {
   const res = await api.patch(`/sm/students/${studentId}/status`, { status }, { skipToast: opts?.skipToast });
   return res.data.data;
+}
+
+export type MarksDemoPhase = 'quiz' | 'exam' | 'all';
+
+export async function marksDemoStatus(classId?: string) {
+  const res = await api.get('/dev/marks-demo/status', { params: classId ? { classId } : undefined, skipToast: true });
+  return res.data.data as {
+    enabled: boolean;
+    assessmentCount: number;
+    markRows: number;
+    assessments: Array<{ id: string; title: string; term: string; academicYear: string }>;
+  };
+}
+
+export async function marksDemoApply(body: {
+  classId?: string;
+  className?: string;
+  academicYear: string;
+  term: string;
+  phase?: MarksDemoPhase;
+}) {
+  const res = await api.post('/dev/marks-demo/apply', body);
+  return res.data.data as {
+    className: string;
+    subjects: string[];
+    students: number;
+    phase: MarksDemoPhase;
+    assessmentsCreated: number;
+    assessmentsUpdated: number;
+  };
+}
+
+export async function marksDemoRemove(classId?: string) {
+  const res = await api.delete('/dev/marks-demo', { params: classId ? { classId } : undefined });
+  return res.data.data as { deletedAssessments: number };
+}
+// ─── Examination Timetable (class exam schedule) ────────────────────────
+export type ExaminationSessionPeriod = 'MORNING' | 'AFTERNOON';
+
+export type ClassExaminationSlot = {
+  id: string;
+  timetableId: string;
+  examDate: string;
+  session: ExaminationSessionPeriod;
+  courseName: string;
+  startTime: string;
+  endTime: string;
+};
+
+export type ExaminationType = { id: string; organizationId: string; name: string; academicYear: string; term: string; description?: string | null; createdAt?: string; updatedAt?: string; };
+
+export type ClassExaminationTimetable = {
+  id: string;
+  organizationId: string;
+  examinationCode?: string | null;
+  name?: string | null;
+  examinationTypeId?: string | null;
+  examinationType?: ExaminationType | null;
+  classId: string;
+  className: string;
+  academicYear: string;
+  term: string;
+  startDate: string;
+  endDate: string;
+  excludeWeekends: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  slots: ClassExaminationSlot[];
+};
+
+export type ExaminationTimetableContext = {
+  classId: string;
+  className: string;
+  academicYear: string;
+  term: string;
+  courses: Array<{ subjectName: string; courseCode?: string | null; teacherName?: string | null }>;
+  examinationTypes?: ExaminationType[];
+  timetable: ClassExaminationTimetable | null;
+};
+
+export async function getExaminationTimetableContext(params: { classId: string; academicYear: string; term: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-timetables/context', { params });
+  return res.data.data as ExaminationTimetableContext;
+}
+
+export async function listExaminationTypes(params?: { academicYear?: string; term?: string }) {
+  const res = await api.get('/examination-timetables/types', { params });
+  return (res.data.data ?? []) as ExaminationType[];
+}
+
+export async function createExaminationType(data: { name: string; academicYear: string; term: string; description?: string }) {
+  const res = await api.post('/examination-timetables/types', data);
+  return res.data.data as ExaminationType;
+}
+
+export async function listExaminationTimetables(params?: { classId?: string; academicYear?: string; term?: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-timetables', { params });
+  return (res.data.data ?? []) as ClassExaminationTimetable[];
+}
+
+export async function getExaminationTimetable(id: string) {
+  const res = await api.get(`/examination-timetables/${id}`);
+  return res.data.data as ClassExaminationTimetable;
+}
+
+export type ExaminationTimetableProposal = {
+  id?: string | null;
+  examinationCode?: string | null;
+  name?: string | null;
+  classId: string;
+  className?: string;
+  academicYear: string;
+  term: string;
+  startDate: string;
+  endDate: string;
+  excludeWeekends: boolean;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; courseName: string; startTime: string; endTime: string }>;
+  generated?: boolean;
+  persisted?: boolean;
+};
+
+export async function generateExaminationTimetable(data: {
+  classId: string;
+  academicYear: string;
+  term: string;
+  examinationTypeId?: string;
+  startDate: string;
+  endDate: string;
+  excludeWeekends?: boolean;
+}) {
+  const res = await api.post('/examination-timetables/generate', data);
+  return res.data.data as ExaminationTimetableProposal;
+}
+
+export async function saveExaminationTimetable(data: {
+  id?: string;
+  examinationCode?: string | null;
+  name?: string;
+  examinationTypeId?: string | null;
+  classId: string;
+  className?: string;
+  academicYear: string;
+  term: string;
+  startDate: string;
+  endDate: string;
+  excludeWeekends?: boolean;
+  confirmImpact?: boolean;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; courseName: string; startTime: string; endTime: string }>;
+}) {
+  if (data.id) {
+    const res = await api.put(`/examination-timetables/${data.id}`, data);
+    return res.data.data as ClassExaminationTimetable;
+  }
+  const res = await api.post('/examination-timetables', data);
+  return res.data.data as ClassExaminationTimetable;
+}
+
+// ─── Examination Lists (room allocation) ────────────────────────────────
+export type ExaminationDistributionMethod = 'KEEP_CLASS' | 'MIX_CLASSES';
+
+export type ExaminationAllocation = {
+  id: string;
+  listId: string;
+  roomId: string;
+  studentId: string;
+  studentCode?: string | null;
+  studentName: string;
+  classId: string;
+  className: string;
+  gender?: string | null;
+};
+
+export type ExaminationListRoom = {
+  id: string;
+  listId: string;
+  sourceRoomId?: string | null;
+  roomName: string;
+  roomNumber?: string | null;
+  capacity: number;
+  isUniqueCapacity: boolean;
+  sortOrder: number;
+  allocations?: ExaminationAllocation[];
+  _count?: { allocations: number };
+};
+
+export type ExaminationListClass = {
+  id: string;
+  listId: string;
+  classId: string;
+  className: string;
+  studentCount: number;
+};
+
+export type ExaminationList = {
+  id: string;
+  organizationId: string;
+  listCode?: string | null;
+  examinationTimetableId?: string | null;
+  examinationTypeId?: string | null;
+  examinationCode?: string | null;
+  examinationName?: string | null;
+  academicYear: string;
+  term: string;
+  name?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  distributionMethod: ExaminationDistributionMethod;
+  mixQuantity?: number | null;
+  defaultCapacity: number;
+  status: 'DRAFT' | 'GENERATED' | 'PUBLISHED';
+  generatedAt?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  rooms: ExaminationListRoom[];
+  classes: ExaminationListClass[];
+  allocations?: ExaminationAllocation[];
+  examinationTimetable?: { id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationType?: ExaminationType | null; name?: string | null; className?: string; startDate?: string; endDate?: string; slots?: any[] } | null;
+  _count?: { allocations: number };
+};
+
+export type ExaminationListsDashboard = {
+  stats: {
+    totalStudents: number;
+    totalExaminationRooms: number;
+    totalStudentsAllocated: number;
+    studentsNotAllocated: number;
+    totalClassesParticipating: number;
+    examinationListsGenerated?: number;
+  };
+  lists: ExaminationList[];
+  latestList: ExaminationList | null;
+  classCount: number;
+};
+
+export type ExaminationListsContext = {
+  academicYear: string;
+  term: string;
+  rooms: Array<{ sourceRoomId: string; roomName: string; roomNumber?: string | null; capacity: number; building?: string | null; floor?: string | null; active: boolean; source?: string }>;
+  classes: Array<{ id: string; name: string; stream?: string | null; label: string; studentCount: number }>;
+  totalStudents: number;
+  examinationTypes?: Array<{ id: string; name: string; academicYear: string; term: string }>;
+  examinationTimetables?: Array<{ id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; name: string; classId: string; className: string; academicYear: string; term: string; startDate?: string | null; endDate?: string | null; slotCount?: number }>;
+  selectedExamination?: { id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; name: string; classId: string; className: string; academicYear: string; term: string; startDate?: string | null; endDate?: string | null; slots?: any[] } | null;
+};
+
+export async function getExaminationListsDashboard(params?: { academicYear?: string; term?: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-lists/dashboard', { params });
+  return res.data.data as ExaminationListsDashboard;
+}
+
+export async function getExaminationListsContext(params?: { academicYear?: string; term?: string; examinationTimetableId?: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-lists/context', { params });
+  return res.data.data as ExaminationListsContext;
+}
+
+export async function listExaminationLists(params?: { academicYear?: string; term?: string; examinationTimetableId?: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-lists', { params });
+  return (res.data.data ?? []) as ExaminationList[];
+}
+
+export async function getExaminationList(id: string) {
+  const res = await api.get(`/examination-lists/${id}`);
+  return res.data.data as ExaminationList;
+}
+
+export async function generateExaminationList(data: {
+  examinationTimetableId?: string;
+  examinationTypeId?: string;
+  academicYear?: string;
+  term?: string;
+  name?: string;
+  defaultCapacity?: number;
+  rooms: Array<{ sourceRoomId?: string | null; roomName: string; roomNumber?: string | null; capacity: number; isUniqueCapacity?: boolean; selected?: boolean }>;
+  participatingClassIds: string[];
+  distributionMethod: ExaminationDistributionMethod;
+  mixQuantity?: number | null;
+}) {
+  const res = await api.post('/examination-lists/generate', data);
+  return res.data.data as ExaminationList;
+}
+
+export async function deleteExaminationList(id: string, opts?: { skipToast?: boolean; confirmImpact?: boolean }) {
+  const res = await api.delete(`/examination-lists/${id}`, {
+    skipToast: opts?.skipToast,
+    params: opts?.confirmImpact ? { confirmImpact: 'true' } : undefined,
+  });
+  return res.data.data;
+}
+
+export async function moveExaminationListStudent(id: string, data: { allocationId: string; targetRoomId: string }) {
+  const res = await api.post(`/examination-lists/${id}/move-student`, data);
+  return res.data.data as ExaminationList;
+}
+
+export async function addExaminationListStudent(id: string, data: { roomId: string; studentId: string }) {
+  const res = await api.post(`/examination-lists/${id}/allocations`, data);
+  return res.data.data as ExaminationList;
+}
+
+export async function removeExaminationListAllocation(id: string, allocationId: string) {
+  const res = await api.delete(`/examination-lists/${id}/allocations/${allocationId}`);
+  return res.data.data as ExaminationList;
+}
+
+export async function getExaminationListAvailableStudents(id: string, q?: string) {
+  const res = await api.get(`/examination-lists/${id}/available-students`, { params: { q } });
+  return (res.data.data ?? []) as Array<{ id: string; studentCode?: string | null; fullName: string; classId: string; className: string; gender?: string | null }>;
+}
+
+export async function getExaminationListImpact(id: string) {
+  const res = await api.get(`/examination-lists/${id}/impact`);
+  return res.data.data as { listId: string; status: string; linkedInvigilatorAssignments: number; hasImpact: boolean; canDelete: boolean; canModify: boolean; warnings: string[] };
+}
+
+export async function publishExaminationList(id: string) {
+  const res = await api.post(`/examination-lists/${id}/publish`);
+  return res.data.data as ExaminationList;
+}
+
+export async function unpublishExaminationList(id: string) {
+  const res = await api.post(`/examination-lists/${id}/unpublish`);
+  return res.data.data as ExaminationList;
+}
+
+export async function getExaminationTimetableImpact(id: string) {
+  const res = await api.get(`/examination-timetables/${id}/impact`);
+  return res.data.data as { timetableId: string; linkedLists: number; linkedInvigilatorAssignments: number; hasImpact: boolean; warnings: string[] };
+}
+
+export async function deleteExaminationTimetable(id: string, confirmImpact = false) {
+  const res = await api.delete(`/examination-timetables/${id}`, { params: { confirmImpact } });
+  return res.data.data as { deleted: boolean; id: string };
+}
+
+// ─── Examination Invigilators ───────────────────────────────────────────
+export type ExaminationInvigilatorTeacher = {
+  id: string;
+  name: string;
+  email?: string | null;
+  roles?: string[];
+  modules?: string[];
+  isTeacher?: boolean;
+  active?: boolean;
+};
+
+export type ExaminationInvigilatorAssignment = {
+  id: string;
+  organizationId: string;
+  examinationTimetableId?: string | null;
+  examinationListId: string;
+  examinationCode?: string | null;
+  listCode?: string | null;
+  roomId: string;
+  roomName: string;
+  roomNumber?: string | null;
+  examDate: string;
+  session: ExaminationSessionPeriod;
+  startTime?: string | null;
+  endTime?: string | null;
+  teacherUserId: string;
+  teacherName: string;
+  teacherEmail?: string | null;
+  assignmentType: 'AUTOMATIC' | 'MANUAL';
+  status: 'ASSIGNED' | 'PENDING' | 'CHECKED_IN' | 'REPLACED';
+  notes?: string | null;
+};
+
+export type ExaminationInvigilatorCoverageRow = {
+  examDate: string;
+  session: ExaminationSessionPeriod;
+  startTime: string;
+  endTime: string;
+  roomId: string;
+  roomName: string;
+  roomNumber?: string | null;
+  classNames: string[];
+  required: number;
+  assigned: number;
+  status: 'COVERED' | 'MISSING';
+  invigilators: Array<{ id: string; teacherUserId: string; teacherName: string }>;
+};
+
+export type ExaminationTypeTimetableSummary = {
+  id: string;
+  classId: string;
+  className: string;
+  examinationCode?: string | null;
+  startDate: string;
+  endDate: string;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; startTime?: string | null; endTime?: string | null; courseName?: string | null }>;
+};
+
+export type ExaminationInvigilatorsContext = {
+  examinationTypes?: Array<{ id: string; name: string; academicYear: string; term: string }>;
+  typeTimetables?: ExaminationTypeTimetableSummary[];
+  lists: Array<{ id: string; listCode?: string | null; examinationCode?: string | null; examinationName?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; academicYear: string; term: string; status: string; roomCount: number; studentCount: number }>;
+  teachers: ExaminationInvigilatorTeacher[];
+  selected: {
+    list: { id: string; listCode?: string | null; examinationCode?: string | null; examinationName?: string | null; examinationTypeId?: string | null; academicYear: string; term: string; startDate?: string; endDate?: string };
+    rooms: Array<{ id: string; roomName: string; roomNumber?: string | null; capacity: number }>;
+    sessions: Array<{ examDate: string; session: ExaminationSessionPeriod; startTime?: string; endTime?: string; courseName?: string | null }>;
+    assignments: ExaminationInvigilatorAssignment[];
+    coverage?: ExaminationInvigilatorCoverageRow[];
+  } | null;
+};
+
+export async function getExaminationInvigilatorsContext(params?: { examinationListId?: string; examinationTypeId?: string }) {
+  const res = await api.get('/examination-invigilators/context', { params });
+  return res.data.data as ExaminationInvigilatorsContext;
+}
+
+export async function getExaminationInvigilatorsDashboard(examinationListId: string) {
+  const res = await api.get('/examination-invigilators/dashboard', { params: { examinationListId } });
+  return res.data.data as { stats: { totalExaminationDays: number; totalExaminationRooms: number; availableTeachers: number; assignedInvigilators: number; unassignedRooms: number; totalAssignments: number }; selected: ExaminationInvigilatorsContext['selected']; teachers: ExaminationInvigilatorTeacher[] };
+}
+
+export async function generateExaminationInvigilators(data: {
+  examinationListId?: string;
+  examinationTypeId?: string;
+  teacherIds: string[];
+  mode: 'AUTO' | 'MANUAL';
+  rotationMode?: 'PER_SESSION' | 'DAILY' | 'NONE';
+  defaultPerRoom?: number;
+  manual?: { rooms: Array<{ roomId: string; defaultCount?: number; sessions?: Record<string, number> }> };
+  replaceExisting?: boolean;
+}) {
+  const res = await api.post('/examination-invigilators/generate', data);
+  return res.data.data as { created: number; unassigned: Array<{ roomName: string; date: string; session: string; needed: number; assigned: number }>; assignments: ExaminationInvigilatorAssignment[] };
+}
+
+export async function updateExaminationInvigilatorAssignment(id: string, data: { teacherUserId?: string; status?: string; roomId?: string }) {
+  const res = await api.put(`/examination-invigilators/${id}`, data);
+  return res.data.data as ExaminationInvigilatorAssignment;
+}
+
+export async function getAvailableInvigilatorTeachers(params: { examinationListId: string; examDate: string; session: 'MORNING' | 'AFTERNOON' }) {
+  const res = await api.get('/examination-invigilators/available-teachers', { params });
+  return (res.data.data ?? []) as Array<{ id: string; name: string; email?: string | null }>;
+}
+
+export async function addExaminationInvigilatorAssignment(data: { examinationListId: string; roomId: string; examDate: string; session: 'MORNING' | 'AFTERNOON'; teacherUserId: string }) {
+  const res = await api.post('/examination-invigilators/assignments', data);
+  return res.data.data as ExaminationInvigilatorAssignment;
+}
+
+export async function clearExaminationInvigilatorAssignments(params: { examinationListId?: string; examinationTypeId?: string }) {
+  const res = await api.delete('/examination-invigilators/assignments', { params });
+  return res.data.data as { deleted: number };
+}
+
+export interface ExaminationAttendanceRecord {
+  id: string;
+  studentId: string;
+  studentCode?: string | null;
+  studentName: string;
+  classId?: string | null;
+  className?: string | null;
+  examDate: string;
+  session: 'MORNING' | 'AFTERNOON';
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+  notes?: string | null;
+  markedByName?: string | null;
+  markedAt?: string | null;
+  room?: { id: string; roomName: string; roomNumber?: string | null };
+  examinationList?: { id: string; listCode?: string; examinationName?: string; academicYear: string; term: string; examinationTypeId?: string | null; examinationType?: { id: string; name: string } | null };
+}
+
+export async function listExaminationAttendance(params: Record<string, any>) {
+  const res = await api.get('/examination-invigilators/attendance/records', { params });
+  return res.data.data as { rows: ExaminationAttendanceRecord[]; stats: { total: number; present: number; absent: number; late: number; excused: number }; pagination: { page: number; limit: number; total: number; pages: number }; filters: { rooms: any[]; classes: any[] } };
 }

@@ -11,6 +11,12 @@ export interface JwtPayload {
   roles: string[];
   modules: string[];
   position?: string | null;
+  name?: string;
+  district?: string;
+  sector?: string;
+  authority?: string;
+  canFinalApprove?: boolean;
+  tripRoleSlug?: string;
 }
 
 export interface AuthenticatedRequest extends Request {

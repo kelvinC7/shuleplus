@@ -14,7 +14,7 @@ import {
 import { Search, Person } from '@mui/icons-material';
 import { useChat } from '@/contexts/chat-context';
 import { AvatarWithStatus } from './avatar-with-status';
-import { CUSTOM_SCROLLBAR } from '@/shared/styles';
+import { CUSTOM_SCROLLBAR, PRIMARY, ACCENT_HOVER, ACCENT_BORDER } from '@/shared/styles';
 import type { Member } from '@/types';
 
 interface MemberPickerProps {
@@ -100,7 +100,7 @@ export function MemberPicker({ selected, onToggle, multi = true, searchPlacehold
                   primary={name}
                   secondary={secondary}
                   slotProps={{
-                    primary: { sx: { fontSize: '0.82rem', fontWeight: 600, color: '#001121' } },
+                    primary: { sx: { fontSize: '0.82rem', fontWeight: 600, color: PRIMARY } },
                     secondary: { sx: { fontSize: '0.68rem', color: 'rgba(0,0,0,0.5)' } },
                   }}
                 />
@@ -132,7 +132,7 @@ export function SelectedMembersChips({ members, onRemove }: SelectedMembersProps
           label={`${m.firstName} ${m.lastName}`}
           onDelete={() => onRemove(m.userId)}
           size="small"
-          sx={{ fontSize: '0.7rem', bgcolor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)' }}
+          sx={{ fontSize: '0.7rem', bgcolor: ACCENT_HOVER, border: `1px solid ${ACCENT_BORDER}` }}
         />
       ))}
     </Box>

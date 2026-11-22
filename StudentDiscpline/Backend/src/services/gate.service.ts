@@ -2,7 +2,11 @@ import { prisma } from '../config/database';
 import { fetchSmStudentById, fetchSmStudents } from '../clients/student-management.client';
 import { provisionGateOfficerAccount } from '../clients/iam.client';
 import { AppError } from '../middleware/error.middleware';
-import { notifyGateOfficerOverdue, notifyOverdueStudent } from './gate-notification.service';
+import {
+  notifyGateOfficerOverdue,
+  notifyOverdueStudent,
+  notifyPermissionExit,
+} from './gate-notification.service';
 
 const DEFAULT_GATES = [
   { name: 'Main Gate', code: 'MAIN', isDefault: true },
@@ -562,7 +566,60 @@ export const gateService = {
       include: { events: { orderBy: { createdAt: 'asc' } } },
     });
 
+    void notifyPermissionExit(organizationId, permission, gate.name, now);
+
     return { permission: updated, log, varianceMinutes, varianceLabel: label };
+  },
+
+  /** RFID gate device: checkout when student has approved discipline permission today. */
+  async rfidPermissionCheckout(
+    organizationId: string,
+    input: { studentId?: string; studentCode?: string; gateLabel?: string }
+  ) {
+    await ensureDefaultGates(organizationId);
+    let studentId = input.studentId?.trim();
+    if (!studentId && input.studentCode?.trim()) {
+      const students = await fetchSmStudents(organizationId, { search: input.studentCode.trim() }).catch(() => []);
+      const match = students.find(
+        (s) => s.studentCode?.toLowerCase() === input.studentCode!.trim().toLowerCase()
+      );
+      studentId = match?.id;
+    }
+    if (!studentId) {
+      return { allowed: false as const, reason: 'Student not found' };
+    }
+
+    const permission = await findActivePermissionForStudent(organizationId, studentId);
+    if (!permission) {
+      return { allowed: false as const, reason: 'No approved permission for today' };
+    }
+
+    const smStudent = await fetchSmStudentById(organizationId, studentId).catch(() => null);
+    const studentActive = smStudent ? (smStudent.status ?? 'Active').toLowerCase() !== 'inactive' : true;
+    const validation = buildExitChecks(permission, studentActive);
+    if (!validation.allowed) {
+      return { allowed: false as const, reason: validation.reason ?? 'Exit not allowed' };
+    }
+
+    const gate =
+      (await prisma.gate.findFirst({ where: { organizationId, isDefault: true, status: 'Active' } })) ??
+      (await prisma.gate.findFirst({ where: { organizationId, status: 'Active' }, orderBy: { name: 'asc' } }));
+    if (!gate) {
+      return { allowed: false as const, reason: 'No gate configured' };
+    }
+
+    const result = await this.checkout(organizationId, permission.id, {
+      gateId: gate.id,
+      method: 'RFID Gate',
+      officerName: input.gateLabel?.trim() || gate.name,
+    });
+
+    return {
+      allowed: true as const,
+      permission: result.permission,
+      referenceNumber: permission.referenceNumber,
+      gateName: gate.name,
+    };
   },
 
   async checkin(

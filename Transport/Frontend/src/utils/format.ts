@@ -1,3 +1,5 @@
+import { EMPTY } from '@/utils/empty';
+
 export function formatRwf(value: number | null | undefined): string {
   const n = Number(value) || 0;
   return new Intl.NumberFormat('en-RW', {
@@ -12,15 +14,15 @@ export function formatNumber(value: number | null | undefined): string {
 }
 
 export function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return '—';
+  if (!value) return EMPTY;
   const d = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return EMPTY;
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export function formatTime(value: string | Date | null | undefined): string {
-  if (!value) return '—';
+  if (!value) return EMPTY;
   const d = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return EMPTY;
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }

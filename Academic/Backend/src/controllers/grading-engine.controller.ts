@@ -1,3 +1,4 @@
+import { normalizeReportKind } from '../utils/report-kind';
 import { Request, Response, NextFunction } from 'express';
 import { gradingEngineService } from '../services/grading-engine.service';
 import type { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -56,11 +57,13 @@ export class GradingEngineController {
       const orgId = orgIdOf(req);
       const { classId, academicYear } = req.params as Record<string, string>;
       const term = req.query.term as string | undefined;
+      const reportKind = normalizeReportKind(req.query.reportKind);
       const result = await gradingEngineService.getClassReportSummaries(
         orgId,
         classId,
         academicYear,
-        term
+        term,
+        reportKind
       );
       res.json({ data: result });
     } catch (err) {
@@ -80,13 +83,15 @@ export class GradingEngineController {
             .map((t) => t.trim())
             .filter(Boolean)
         : undefined;
+      const reportKind = normalizeReportKind(req.query.reportKind);
       const result = await gradingEngineService.getReportCard(
         orgId,
         studentId,
         classId,
         academicYear,
         term,
-        includeTerms
+        includeTerms,
+        reportKind
       );
       res.json({ data: result });
     } catch (err) { next(err); }

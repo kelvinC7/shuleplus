@@ -323,10 +323,10 @@ export class AnalyticsService {
     >();
 
     for (const pr of prs) {
-      const deptId = pr.departmentId;
-      const deptName = pr.departmentOther?.trim() || pr.department?.name || 'Unknown';
-      const cur = deptStats.get(deptId) ?? {
-        departmentId: deptId,
+      const deptKey = pr.departmentId ?? '__none__';
+      const deptName = pr.departmentOther?.trim() || pr.department?.name || 'Unassigned';
+      const cur = deptStats.get(deptKey) ?? {
+        departmentId: pr.departmentId ?? '',
         department: deptName,
         requests: 0,
         requested: 0,
@@ -340,7 +340,7 @@ export class AnalyticsService {
       for (const po of pr.purchaseOrders) {
         cur.purchased += Number(po.totalAmount);
       }
-      deptStats.set(deptId, cur);
+      deptStats.set(deptKey, cur);
     }
 
     const ranking = [...deptStats.values()]

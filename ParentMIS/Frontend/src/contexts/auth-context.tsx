@@ -2,9 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { api } from '@/services/api';
-import { captureTokenFromUrl, getParentSession, getToken } from '@/shared/auth-token';
+import { captureTokenFromUrl, getParentSession, getToken, storeParentSession } from '@/shared/auth-token';
 import { parseJwtPayload } from '@/shared/jwt';
-import type { DashboardData, JwtUser, LinkedStudent, StudentInfo } from '@/types';
+import type { DashboardData, JwtUser, LinkedStudent, PortalFeatures, StudentInfo } from '@/types';
+import {
+  inferPortalFeaturesFromSession,
+  isShuleTripOnlyPortal,
+  SHULE_TRIP_ONLY_FEATURES,
+  type PortalFeatures as PmPortalFeatures,
+} from '@/lib/portal-features';
+import { parentAuthJson, type StatusData } from '@/lib/parent-auth-api';
 
 function summaryFromSession(): DashboardData | null {
   const session = getParentSession();
@@ -80,7 +87,26 @@ function summaryFromSession(): DashboardData | null {
       recentTransactions: [],
     },
     recentActivities: [],
+    portalFeatures: session.portalFeatures ?? SHULE_TRIP_ONLY_FEATURES,
   };
+}
+
+async function refreshPortalFeaturesFromStatus(phone: string): Promise<PmPortalFeatures | null> {
+  try {
+    const data = await parentAuthJson<StatusData>(
+      `/public/parents/auth/status?phone=${encodeURIComponent(phone.trim())}`
+    );
+    return data.portalFeatures ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function persistPortalFeatures(features: PmPortalFeatures) {
+  const session = getParentSession();
+  if (session) {
+    storeParentSession({ ...session, portalFeatures: features });
+  }
 }
 
 const ACTIVE_STUDENT_KEY = 'pm-active-student';
@@ -96,6 +122,8 @@ interface AuthContextValue {
   activeStudentId: string | null;
   linkedStudents: LinkedStudent[];
   studentParams: Record<string, string>;
+  portalFeatures: PortalFeatures;
+  shuleTripOnly: boolean;
   setActiveStudent: (id: string) => void;
   reload: () => Promise<void>;
 }
@@ -109,39 +137,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<DashboardData | null>(null);
   const [user, setUser] = useState<JwtUser | null>(null);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
+  const [portalFeaturesState, setPortalFeaturesState] = useState<PmPortalFeatures | null>(null);
 
   const parentSession = typeof window !== 'undefined' ? getParentSession() : null;
+  const portalFeatures =
+    portalFeaturesState ??
+    summary?.portalFeatures ??
+    inferPortalFeaturesFromSession(parentSession);
+  const shuleTripOnly = isShuleTripOnlyPortal(portalFeatures);
+
   const parentName = parentSession
     ? `${parentSession.parent.firstName} ${parentSession.parent.lastName}`.trim()
     : null;
 
   const linkedStudents = (() => {
-    const byId = new Map<string, LinkedStudent>();
-    const byCode = new Map<string, LinkedStudent>();
-    for (const s of summary?.linkedStudents ?? []) {
-      if (s.id) byId.set(s.id, s);
-      if (s.shuleCode) byCode.set(s.shuleCode, s);
+    if (summary?.linkedStudents?.length) {
+      return summary.linkedStudents;
     }
-    for (const s of parentSession?.students ?? []) {
-      if (!s.id) continue;
-      const code = s.studentCode ?? '';
-      if (byId.has(s.id) || (code && byCode.has(code))) continue;
-      const row: LinkedStudent = {
-        id: s.id,
-        fullName: s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || 'Student',
-        firstName: s.firstName ?? '',
-        lastName: s.lastName ?? '',
-        shuleCode: code,
-        className: s.className ?? '',
-        stream: '',
-        avatarUrl: s.photo ?? null,
-        relationship: s.role ?? 'GUARDIAN',
-        isPrimary: byId.size === 0,
-      };
-      byId.set(s.id, row);
-      if (code) byCode.set(code, row);
-    }
-    return Array.from(byId.values());
+    if (!parentSession?.students?.length) return [];
+    return parentSession.students.map((s, i) => ({
+      id: s.id,
+      fullName: s.name || [s.firstName, s.lastName].filter(Boolean).join(' ') || 'Student',
+      firstName: s.firstName ?? '',
+      lastName: s.lastName ?? '',
+      shuleCode: s.studentCode ?? '',
+      className: s.className ?? '',
+      stream: '',
+      avatarUrl: s.photo ?? null,
+      relationship: s.role ?? 'GUARDIAN',
+      isPrimary: i === 0,
+    }));
   })();
 
   const fetchDashboard = useCallback(async (studentId?: string, studentCode?: string, lockTo?: LinkedStudent) => {
@@ -160,6 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sameChild || !prev) return next;
       return { ...next, student: prev.student };
     });
+    if (next.portalFeatures) {
+      setPortalFeaturesState(next.portalFeatures);
+      persistPortalFeatures(next.portalFeatures);
+    }
     setAuthorized(true);
     setError(null);
     return next;
@@ -180,20 +209,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       typeof window !== 'undefined' ? window.localStorage.getItem(ACTIVE_STUDENT_KEY) : null;
 
     try {
+      const phoneForStatus =
+        parentSession?.parent.phone?.trim() ||
+        (token ? parseJwtPayload(token)?.phone?.trim() : undefined);
+      if (phoneForStatus) {
+        const fresh = await refreshPortalFeaturesFromStatus(phoneForStatus);
+        if (fresh) {
+          setPortalFeaturesState(fresh);
+          persistPortalFeatures(fresh);
+        }
+      }
+
       const sessionChild = parentSession?.students.find((s) => s.id === stored);
       const data = await fetchDashboard(stored ?? undefined, sessionChild?.studentCode ?? undefined);
       const primaryId = data.student?.id ?? null;
+      const linkedOk = (id: string | null) =>
+        Boolean(id && data.linkedStudents?.some((s) => s.id === id || s.shuleCode === id));
       const matched =
         stored &&
+        linkedOk(stored) &&
         (data.student?.id === stored ||
           (sessionChild?.studentCode && data.student?.shuleCode === sessionChild.studentCode) ||
           data.linkedStudents?.some(
             (s) => s.id === stored || (sessionChild?.studentCode && s.shuleCode === sessionChild.studentCode)
           ));
+      if (stored && !linkedOk(stored) && typeof window !== 'undefined') {
+        window.localStorage.removeItem(ACTIVE_STUDENT_KEY);
+      }
       setActiveStudentId(matched ? data.student?.id || stored : primaryId);
     } catch (err: unknown) {
       const fallback = summaryFromSession();
       if (fallback) {
+        if (fallback.portalFeatures) {
+          setPortalFeaturesState(fallback.portalFeatures);
+        }
         setSummary(fallback);
         setAuthorized(true);
         setActiveStudentId(fallback.student.id);
@@ -272,6 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ? { studentCode: linkedStudents.find((s) => s.id === activeStudentId)!.shuleCode }
             : {}),
         },
+        portalFeatures,
+        shuleTripOnly,
         setActiveStudent,
         reload: load,
       }}

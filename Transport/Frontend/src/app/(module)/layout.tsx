@@ -1,8 +1,10 @@
 ﻿'use client';
 
 import { type ReactNode } from 'react';
+import { SessionAccessDeniedScreen } from '@/components/session-access/session-access-denied-screen';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { MainLayout } from '@/layouts/main-layout';
+import { buildIamLoginUrl, isSessionAuthError } from '@/utils/iam-login-redirect';
 
 function Gate({ children }: { children: ReactNode }) {
   const { ready, authorized, error } = useAuth();
@@ -16,27 +18,25 @@ function Gate({ children }: { children: ReactNode }) {
   }
 
   if (!authorized) {
-    const loginUrl =
-      process.env.NEXT_PUBLIC_IAM_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="max-w-md rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-bold text-navy">
-            {/deactivat|suspend/i.test(error ?? '') ? 'Deactivated' : 'Access Denied'}
-          </h1>
-          <p className="mt-3 text-sm text-muted">
-            {/deactivat|suspend/i.test(error ?? '')
-              ? 'Deactivated · this module is not available for your organization. Contact your administrator.'
-              : error ?? 'Module Not Licensed'}
-          </p>
-          <a
-            href={`${loginUrl}/organization-admin`}
-            className="mt-6 inline-block rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-navy"
-          >
-            Back to Organization Dashboard
-          </a>
+    if (isSessionAuthError(error)) {
+      return (
+        <div className="flex min-h-[100dvh] items-center justify-center px-4 text-sm text-muted">
+          Redirecting to sign in…
         </div>
-      </div>
+      );
+    }
+
+    const loginUrl = process.env.NEXT_PUBLIC_IAM_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+    return (
+      <SessionAccessDeniedScreen
+        error={error}
+        moduleName="Smart Transport"
+        iamUrl={loginUrl}
+        primaryHref={buildIamLoginUrl()}
+        primaryLabel="Sign in"
+        showTryAgain
+        idPrefix="transport"
+      />
     );
   }
 

@@ -16,6 +16,7 @@ import { useChat } from '@/contexts/chat-context';
 import { useAuth } from '@/contexts/auth-context';
 import { MemberPicker, SelectedMembersChips, useSelectedMembers } from './member-picker';
 import { PRIMARY } from '@/shared/styles';
+import { useMainPaneModal } from '@/shared/main-pane-modal';
 
 interface NewConversationDialogProps {
   open: boolean;
@@ -78,6 +79,7 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
   };
 
   const meUserId = user?.sub;
+  const { scoped, disablePortal, container, scopedSx } = useMainPaneModal(open, handleClose);
 
   return (
     <Dialog
@@ -85,7 +87,18 @@ export function NewConversationDialog({ open, onClose }: NewConversationDialogPr
       onClose={handleClose}
       fullWidth
       maxWidth="sm"
-      slotProps={{ paper: { sx: { maxHeight: '80vh', display: 'flex', flexDirection: 'column' } } }}
+      disablePortal={disablePortal}
+      container={container}
+      sx={scopedSx}
+      slotProps={{
+        paper: {
+          sx: {
+            maxHeight: scoped ? 'calc(100% - 32px)' : '80vh',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        },
+      }}
     >
       <DialogTitle sx={{ fontWeight: 800, color: PRIMARY, fontSize: '1.05rem', pb: 1.5 }}>
         New Chat

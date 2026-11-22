@@ -1,15 +1,6 @@
 import { prisma } from '../config/database';
 import { Prisma } from '../generated/prisma';
 import { AppError } from '../middleware/error.middleware';
-import {
-  defaultAcademicSettings,
-  parseAcademicSettings,
-  validateAcademicYear,
-  type AcademicSettings,
-} from '../utils/academic-settings';
-
-import { prisma } from '../config/database';
-import { AppError } from '../middleware/error.middleware';
 import { env } from '../config/env';
 import {
   defaultAcademicSettings,
@@ -44,7 +35,7 @@ export class SettingsService {
       if (tenant) {
         await prisma.tenant.update({
           where: { organizationId },
-          data: { academicSettings: iam },
+          data: { academicSettings: iam as unknown as Prisma.InputJsonValue },
         });
       }
       return iam;

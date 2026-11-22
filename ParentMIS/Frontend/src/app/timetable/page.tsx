@@ -229,13 +229,13 @@ export default function TimetablePage() {
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-2xl border border-border bg-white p-1 shadow-sm">
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
           <button
             type="button"
             onClick={() => setView('day')}
             className={cn(
-              'rounded-xl px-4 py-2 text-sm font-bold transition',
-              view === 'day' ? 'bg-navy text-primary' : 'text-slate-500 hover:bg-slate-50'
+              'rounded-lg px-4 py-2 text-sm font-semibold transition',
+              view === 'day' ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'
             )}
           >
             Day
@@ -244,8 +244,8 @@ export default function TimetablePage() {
             type="button"
             onClick={() => setView('week')}
             className={cn(
-              'rounded-xl px-4 py-2 text-sm font-bold transition',
-              view === 'week' ? 'bg-navy text-primary' : 'text-slate-500 hover:bg-slate-50'
+              'rounded-lg px-4 py-2 text-sm font-semibold transition',
+              view === 'week' ? 'bg-white text-navy shadow-sm' : 'text-slate-500 hover:text-navy'
             )}
           >
             Week
@@ -260,7 +260,7 @@ export default function TimetablePage() {
             This week
           </button>
           <div className="min-w-[140px] rounded-xl border border-border bg-white px-3 py-2 text-center text-sm font-bold text-navy">
-            {formatShortDate(weekStart)} – {formatShortDate(weekEnd)}
+            {formatShortDate(weekStart)} to {formatShortDate(weekEnd)}
           </div>
           <button type="button" className="btn-secondary px-3 py-2" onClick={() => shiftWeek(1)}>
             <ChevronRight className="size-4" />
@@ -269,19 +269,20 @@ export default function TimetablePage() {
       </div>
 
       {summary ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
           {[
-            { label: 'Present', value: summary.present, tone: 'text-emerald-700 bg-emerald-50' },
-            { label: 'Absent', value: summary.absent, tone: 'text-rose-700 bg-rose-50' },
-            { label: 'Late', value: summary.late, tone: 'text-amber-700 bg-amber-50' },
-            { label: 'Excused', value: summary.excused, tone: 'text-sky-700 bg-sky-50' },
-            { label: 'Not marked', value: summary.unmarked, tone: 'text-slate-600 bg-slate-100' },
+            { label: 'Present', value: summary.present },
+            { label: 'Absent', value: summary.absent },
+            { label: 'Late', value: summary.late },
+            { label: 'Excused', value: summary.excused },
+            { label: 'Not marked', value: summary.unmarked },
           ].map((item) => (
-            <div key={item.label} className={cn('rounded-2xl px-4 py-3', item.tone)}>
-              <p className="text-[11px] font-bold uppercase tracking-wide opacity-70">{item.label}</p>
-              <p className="mt-1 text-2xl font-extrabold">{item.value}</p>
+            <div key={item.label} className="min-w-[4.5rem]">
+              <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
+              <p className="text-lg font-extrabold tabular-nums text-navy">{item.value}</p>
             </div>
           ))}
+          <p className="ml-auto hidden text-xs text-slate-400 sm:block">Period attendance this week</p>
         </div>
       ) : null}
 
@@ -321,10 +322,10 @@ export default function TimetablePage() {
                     type="button"
                     onClick={() => setActiveDate(d.date)}
                     className={cn(
-                      'rounded-xl px-2 py-3 text-center transition',
+                      'rounded-xl border px-2 py-3 text-center transition',
                       isActive
-                        ? 'bg-gradient-to-r from-primary to-gold font-bold text-navy shadow-md shadow-primary/20'
-                        : 'text-slate-500 hover:bg-slate-50'
+                        ? 'border-navy bg-navy font-bold text-white shadow-sm'
+                        : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     )}
                   >
                     <span className="block text-xs font-semibold uppercase tracking-wide">
@@ -354,7 +355,7 @@ export default function TimetablePage() {
                     : 'Class periods for this day'}
                 </p>
               </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-primary">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-navy">
                 {activeSlots.length} periods
               </span>
             </div>
@@ -371,28 +372,28 @@ export default function TimetablePage() {
               activeSlots.map((slot) => (
                 <article
                   key={slot.id}
-                  className="hr-card overflow-hidden border border-border/70 transition hover:border-primary/30"
+                  className="rounded-2xl border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                 >
                   <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                     <div className="flex min-w-0 items-start gap-4">
-                      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-navy text-primary">
-                        <span className="text-[10px] font-bold uppercase tracking-wide opacity-70">P</span>
-                        <span className="text-lg font-extrabold leading-none">{slot.period}</span>
+                      <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-100 text-navy">
+                        <span className="text-[9px] font-bold uppercase text-slate-400">P</span>
+                        <span className="text-base font-extrabold leading-none">{slot.period}</span>
                       </div>
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-extrabold text-navy">{slot.subject}</h3>
                         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
                           <span className="inline-flex items-center gap-1.5">
-                            <Clock className="size-3.5 text-primary" />
-                            {slot.startTime} – {slot.endTime}
+                            <Clock className="size-3.5 text-slate-400" />
+                            {slot.startTime} to {slot.endTime}
                           </span>
                           <span className="inline-flex items-center gap-1.5">
-                            <UserRound className="size-3.5 text-primary" />
+                            <UserRound className="size-3.5 text-slate-400" />
                             {slot.teacher}
                           </span>
                           {slot.room ? (
                             <span className="inline-flex items-center gap-1.5">
-                              <MapPin className="size-3.5 text-primary" />
+                              <MapPin className="size-3.5 text-slate-400" />
                               {slot.room}
                             </span>
                           ) : null}

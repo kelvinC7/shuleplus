@@ -1,64 +1,67 @@
 import { useState } from 'react';
-import { TrendingUp, AlertTriangle, Target, Loader2 } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
 
 export default function TeacherInsights() {
   const [params, setParams] = useState({});
   const { loading, error, insights, termTrend, interventionPlans, kpis, filters, selected } =
     useTeacherMarksAnalytics(params);
 
-  if (loading) {
-    return (
-      <div className="py-20 flex justify-center">
-        <Loader2 className="animate-spin text-amber-500" size={32} />
-      </div>
-    );
-  }
-  if (error) {
-    return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
-  }
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Teacher Insights</h1>
-          <p className="text-gray-500 text-sm mt-1">Live insights from your published marks</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Teacher Insights</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Live insights from your published marks</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {insights.map((item, i) => (
-          <div
-            key={i}
-            className={`rounded-xl p-5 border ${
-              item.type === 'success' ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              {item.type === 'success' ? (
-                <TrendingUp size={20} className="text-green-600 shrink-0" />
-              ) : (
-                <AlertTriangle size={20} className="text-amber-600 shrink-0" />
-              )}
-              <p className="text-sm font-medium text-gray-800">{item.text}</p>
-            </div>
-          </div>
-        ))}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+        {insights.map((item, i) => {
+          const success = item.type === 'success';
+          return (
+            <Paper
+              key={i}
+              variant="outlined"
+              sx={{ borderRadius: 2, p: 2.5, bgcolor: success ? '#F0FDF4' : '#FFFBEB', borderColor: success ? '#DCFCE7' : '#FDE68A' }}
+            >
+              <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+                {success
+                  ? <TrendingUpIcon sx={{ fontSize: 20, color: '#16A34A', flexShrink: 0 }} />
+                  : <WarningAmberIcon sx={{ fontSize: 20, color: '#D97706', flexShrink: 0 }} />}
+                <Typography sx={{ fontSize: 14, fontWeight: 500, color: '#1F2937' }}>{item.text}</Typography>
+              </Stack>
+            </Paper>
+          );
+        })}
         {!insights.length && (
-          <p className="text-sm text-gray-400 col-span-2 text-center py-8">Record marks to generate insights.</p>
+          <Typography sx={{ gridColumn: 'span 2', py: 4, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>
+            Record marks to generate insights.
+          </Typography>
         )}
-      </div>
+      </Box>
 
-      <div className="bg-white rounded-xl p-5 border border-gray-200">
-        <h3 className="font-semibold mb-4" style={{ color: NAVY }}>Performance trend</h3>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 }}>
+        <Typography sx={{ fontWeight: 600, color: NAVY, mb: 2 }}>Performance trend</Typography>
         {termTrend.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">No trend data yet</p>
+          <Typography sx={{ py: 4, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>No trend data yet</Typography>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={termTrend}>
@@ -66,36 +69,37 @@ export default function TeacherInsights() {
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="average" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 4 }} />
+              <Line type="monotone" dataKey="average" stroke={brand.primary} strokeWidth={2} dot={{ fill: brand.primary, r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         )}
-      </div>
+      </Paper>
 
       {interventionPlans.length > 0 && (
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <div className="flex items-center gap-2 mb-4">
-            <Target size={18} className="text-amber-500" />
-            <h3 className="font-semibold" style={{ color: NAVY }}>Suggested interventions</h3>
-            <span className="text-xs text-gray-400">({kpis.at_risk_count ?? 0} at risk)</span>
-          </div>
-          <div className="space-y-3">
-            {interventionPlans.map((rec) => (
-              <div key={rec.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium" style={{ color: NAVY }}>{rec.student} · {rec.class}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{rec.action}</p>
-                </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                  rec.priority === 'High' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'
-                }`}>
-                  {rec.priority}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', p: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <TrackChangesIcon sx={{ fontSize: 18, color: '#F59E0B' }} />
+            <Typography sx={{ fontWeight: 600, color: NAVY }}>Suggested interventions</Typography>
+            <Typography sx={{ fontSize: 12, color: '#9CA3AF' }}>({kpis.at_risk_count ?? 0} at risk)</Typography>
+          </Stack>
+          <Stack spacing={1.5}>
+            {interventionPlans.map((rec) => {
+              const high = rec.priority === 'High';
+              return (
+                <Box key={rec.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, bgcolor: '#F9FAFB', borderRadius: 1.5, gap: 2 }}>
+                  <Box>
+                    <Typography sx={{ fontSize: 14, fontWeight: 500, color: NAVY }}>{rec.student} - {rec.class}</Typography>
+                    <Typography sx={{ mt: 0.25, fontSize: 12, color: '#6B7280' }}>{rec.action}</Typography>
+                  </Box>
+                  <Box component="span" sx={{ flexShrink: 0, borderRadius: 999, px: 1.25, py: 0.5, fontSize: 12, fontWeight: 600, bgcolor: high ? '#FEF2F2' : '#FFFBEB', color: high ? '#DC2626' : '#B45309' }}>
+                    {rec.priority}
+                  </Box>
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
       )}
-    </div>
+    </Stack>
   );
 }

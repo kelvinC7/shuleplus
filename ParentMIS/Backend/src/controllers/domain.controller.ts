@@ -33,6 +33,9 @@ export class ReportCardController {
       const classId = String(req.query.classId ?? '');
       const academicYear = String(req.query.academicYear ?? '');
       const term = String(req.query.term ?? '');
+      const rk = String(req.query.reportKind ?? '').toLowerCase();
+      const reportKind =
+        rk === 'midterm' ? ('midterm' as const) : rk === 'beginning' ? ('beginning' as const) : ('standard' as const);
       if (!classId || !academicYear || !term) {
         res.status(400).json({ success: false, message: 'classId, academicYear, term required' });
         return;
@@ -41,9 +44,10 @@ export class ReportCardController {
         req.organizationRef!,
         req.user!.sub,
         getRequestedStudent(req),
-        { classId, academicYear, term }
+        { classId, academicYear, term, reportKind }
       );
-      res.json({ success: true, data });
+      const report = (data as { report?: unknown }).report ?? data;
+      res.json({ success: true, data: { report } });
     } catch (error) {
       next(error);
     }
@@ -61,6 +65,24 @@ export class AcademicController {
         req.user!.sub,
         getRequestedStudent(req),
         { academicYear, term }
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async coursePerformance(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const academicYear =
+        typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined;
+      const term = typeof req.query.term === 'string' ? req.query.term : undefined;
+      const subject = typeof req.query.subject === 'string' ? req.query.subject : undefined;
+      const data = await academicService.getCoursePerformance(
+        req.organizationRef!,
+        req.user!.sub,
+        getRequestedStudent(req),
+        { academicYear, term, subject }
       );
       res.json({ success: true, data });
     } catch (error) {
@@ -88,6 +110,46 @@ export class AttendanceController {
         getRequestedStudent(req)
       );
       res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reportFromParent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = req.body as { date?: string; reason?: string; kind?: 'ABSENT' | 'LATE'; detail?: string };
+      const data = await attendanceService.reportFromParent(
+        req.organizationRef!,
+        req.user!.sub,
+        {
+          date: body.date ?? '',
+          reason: body.reason ?? '',
+          kind: body.kind,
+          detail: body.detail,
+        },
+        getRequestedStudent(req)
+      );
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listParentReportsService(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { parentAttendanceReportService } = await import('../services/parent-attendance-report.service');
+      const org =
+        (typeof req.query.organizationId === 'string' ? req.query.organizationId : '') ||
+        req.organizationRef ||
+        '';
+      const className = String(req.query.className ?? '');
+      const data = await parentAttendanceReportService.listForClass({
+        organizationId: org,
+        className,
+        from: typeof req.query.from === 'string' ? req.query.from : undefined,
+        to: typeof req.query.to === 'string' ? req.query.to : undefined,
+      });
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }

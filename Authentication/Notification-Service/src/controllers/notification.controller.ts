@@ -146,7 +146,7 @@ export const notificationController = {
   async markInAppRead(req: Request, res: Response, next: NextFunction) {
     try {
       const { userId } = z.object({ userId: z.string().uuid() }).parse(req.body);
-      await inAppService.markRead(req.params.id, userId);
+      await inAppService.markRead(String(req.params.id), userId);
       res.json({ success: true });
     } catch (e) {
       next(e);
@@ -166,7 +166,7 @@ export const notificationController = {
   async archiveInApp(req: Request, res: Response, next: NextFunction) {
     try {
       const { userId } = z.object({ userId: z.string().uuid() }).parse(req.body);
-      await inAppService.archive(req.params.id, userId);
+      await inAppService.archive(String(req.params.id), userId);
       res.json({ success: true });
     } catch (e) {
       next(e);
@@ -241,7 +241,7 @@ export const notificationController = {
 
   async updatePreferences(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.params.userId;
+      const userId = String(req.params.userId);
       const data = await preferenceService.update(userId, req.body);
       res.json({ success: true, data });
     } catch (e) {

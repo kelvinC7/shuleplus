@@ -1,6 +1,8 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { settingsService } from './settings.service';
+import { parentService } from './parent.service';
+import { purgeTimetableClass } from '../clients/timetable.client';
 
 function normalizeYear(year: string): string {
   return year.replace(/\s/g, '').replace(/–/g, '-');
@@ -194,6 +196,115 @@ export class ClassService {
     });
   }
 
+  async setStudentAccess(id: string, organizationId: string, canEditStudents: boolean) {
+    const existing = await prisma.class.findFirst({ where: { id, organizationId } });
+    if (!existing) throw new AppError(404, 'Class not found');
+    return prisma.class.update({
+      where: { id },
+      data: { headTeacherCanEditStudents: canEditStudents },
+      include: { grade: true, combination: true },
+    });
+  }
+
+  private async assertClassTeacherAccess(
+    classId: string,
+    organizationId: string,
+    teacher: { userId?: string | null; email?: string | null }
+  ) {
+    const cls = await prisma.class.findFirst({ where: { id: classId, organizationId } });
+    if (!cls) throw new AppError(404, 'Class not found');
+    const userId = teacher.userId?.trim();
+    const email = teacher.email?.trim().toLowerCase();
+    const isHead =
+      (!!userId && cls.headTeacherUserId === userId) ||
+      (!!email && (cls.headTeacherEmail ?? '').trim().toLowerCase() === email);
+    if (!isHead) throw new AppError(403, 'You are not the class teacher for this class');
+    if (!cls.headTeacherCanEditStudents) {
+      throw new AppError(403, 'Student information access has been turned off for this class by the school');
+    }
+    return cls;
+  }
+
+  async authorizeClassTeacherStudentEdit(
+    classId: string,
+    organizationId: string,
+    teacher: { userId?: string | null; email?: string | null }
+  ) {
+    return this.assertClassTeacherAccess(classId, organizationId, teacher);
+  }
+
+  async listStudentsForClassTeacher(
+    classId: string,
+    organizationId: string,
+    teacher: { userId?: string | null; email?: string | null }
+  ) {
+    await this.assertClassTeacherAccess(classId, organizationId, teacher);
+    const { studentService } = await import('./student.service');
+    return studentService.list(organizationId, { classId, status: 'ACTIVE' });
+  }
+
+  async updateStudentForClassTeacher(
+    studentId: string,
+    organizationId: string,
+    teacher: { userId?: string | null; email?: string | null },
+    data: Record<string, unknown>
+  ) {
+    const enrollment = await prisma.enrollment.findFirst({
+      where: { studentId, organizationId, isCurrent: true, status: 'ACTIVE' },
+      select: { classId: true },
+    });
+    if (!enrollment) throw new AppError(404, 'Student has no current class');
+    await this.assertClassTeacherAccess(enrollment.classId, organizationId, teacher);
+    if (Array.isArray(data.parents)) {
+      const parents = data.parents as { parentId?: unknown; role?: unknown }[];
+      const validRoles = new Set(['FATHER', 'MOTHER', 'GUARDIAN']);
+      if (parents.some((parent) => typeof parent.parentId !== 'string' || !validRoles.has(String(parent.role)))) {
+        throw new AppError(400, 'Parent links must include a valid parent and role');
+      }
+      const parentIds = [...new Set(parents.map((parent) => String(parent.parentId)))];
+      const matches = await prisma.parent.count({
+        where: { organizationId, id: { in: parentIds } },
+      });
+      if (matches !== parentIds.length) {
+        throw new AppError(400, 'One or more selected parents are not in this school');
+      }
+      if (parents.length !== parentIds.length) {
+        throw new AppError(400, 'A parent can only be linked once to this student');
+      }
+    }
+    const { studentService } = await import('./student.service');
+    return studentService.update(studentId, organizationId, data as any);
+  }
+
+  async updateLinkedParentForClassTeacher(
+    studentId: string,
+    parentId: string,
+    organizationId: string,
+    teacher: { userId?: string | null; email?: string | null },
+    data: {
+      firstName: string;
+      lastName: string;
+      phone?: string;
+      email?: string;
+      nationalId?: string;
+      occupation?: string;
+      address?: string;
+    }
+  ) {
+    const enrollment = await prisma.enrollment.findFirst({
+      where: { studentId, organizationId, isCurrent: true, status: 'ACTIVE' },
+      select: { classId: true },
+    });
+    if (!enrollment) throw new AppError(404, 'Student has no current class');
+    await this.assertClassTeacherAccess(enrollment.classId, organizationId, teacher);
+    const link = await prisma.studentParent.findFirst({
+      where: { organizationId, studentId, parentId },
+      select: { id: true },
+    });
+    if (!link) throw new AppError(404, 'Parent is not linked to this student');
+    return parentService.update(parentId, organizationId, data);
+  }
+
   async delete(id: string, organizationId: string) {
     const existing = await prisma.class.findFirst({
       where: { id, organizationId },
@@ -204,11 +315,20 @@ export class ClassService {
     if (!existing) throw new AppError(404, 'Class not found');
 
     const activeCount = existing.enrollments.length;
+    const label = [existing.name, existing.stream].filter(Boolean).join(' ').trim();
     if (activeCount > 0) {
-      const label = [existing.name, existing.stream].filter(Boolean).join(' ');
       throw new AppError(
         400,
         `Cannot delete class "${label}" — ${activeCount} student${activeCount === 1 ? ' is' : 's are'} still enrolled. Reassign or remove them first.`
+      );
+    }
+
+    // Keep Timetable in sync: remove class timetable/config data before deleting the class record.
+    const purge = await purgeTimetableClass(organizationId, label || existing.name);
+    if (!purge.ok) {
+      throw new AppError(
+        502,
+        `Class was not deleted because Timetable could not be updated. ${purge.message || 'Please try again.'}`
       );
     }
 

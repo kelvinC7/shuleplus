@@ -1,9 +1,27 @@
 import { useState } from 'react';
-import { Loader2, Search } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import SearchIcon from '@mui/icons-material/Search';
 import { useTeacherMarksAnalytics } from '../../../hooks/useTeacherMarksAnalytics';
 import MarksAnalyticsFilters from '../components/MarksAnalyticsFilters';
+import { brand } from '../../../theme/theme';
 
-const NAVY = '#000435';
+const NAVY = brand.navy;
+
+const headSx = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: '#9CA3AF', fontWeight: 600, py: 1.5, px: 2 };
+const cellSx = { fontSize: 14, py: 1.5, px: 2, borderColor: '#F3F4F6' };
 
 export default function StudentPerformance() {
   const [params, setParams] = useState({});
@@ -15,54 +33,65 @@ export default function StudentPerformance() {
     return !q || hay.includes(q.toLowerCase());
   });
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-amber-500" size={32} /></div>;
-  if (error) return <div className="rounded-xl bg-red-50 border border-red-100 text-red-800 p-4 text-sm">{error}</div>;
+  if (loading) return <Box sx={{ py: 10, display: 'flex', justifyContent: 'center' }}><CircularProgress size={32} sx={{ color: brand.primary }} /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: NAVY }}>Student Performance</h1>
-          <p className="text-gray-500 text-sm mt-1">Ranked by average across your subjects</p>
-        </div>
+    <Stack spacing={3}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+        <Box>
+          <Typography sx={{ fontSize: 24, fontWeight: 700, color: NAVY }}>Student Performance</Typography>
+          <Typography sx={{ mt: 0.5, fontSize: 14, color: '#6B7280' }}>Ranked by average across your subjects</Typography>
+        </Box>
         <MarksAnalyticsFilters filters={filters} selected={selected} onChange={setParams} />
-      </div>
+      </Stack>
 
-      <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search students..."
-          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-400/40 outline-none"
-        />
-      </div>
+      <TextField
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search students..."
+        size="small"
+        sx={{ maxWidth: 440 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ fontSize: 16, color: '#9CA3AF' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400">
-              <th className="text-left py-3 px-4">Rank</th>
-              <th className="text-left py-3 px-4">Student</th>
-              <th className="text-left py-3 px-4">Class</th>
-              <th className="text-left py-3 px-4">Average</th>
-              <th className="text-left py-3 px-4">Grade</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((s) => (
-              <tr key={s.student_id} className="border-b border-gray-50 hover:bg-amber-50/30">
-                <td className="py-3 px-4 text-gray-400 font-semibold">#{s.rank ?? '-'}</td>
-                <td className="py-3 px-4 font-semibold" style={{ color: NAVY }}>{s.name}</td>
-                <td className="py-3 px-4 text-gray-500">{s.class_name}</td>
-                <td className="py-3 px-4 font-bold">{s.average_percent != null ? `${s.average_percent}%` : '-'}</td>
-                <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-lg bg-[#000435]/5 text-xs font-bold">{s.grade || '-'}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!filtered.length && <p className="text-center text-gray-400 py-10 text-sm">No students found</p>}
-      </div>
-    </div>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: '#E5E7EB', overflow: 'hidden' }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={headSx}>Rank</TableCell>
+                <TableCell sx={headSx}>Student</TableCell>
+                <TableCell sx={headSx}>Class</TableCell>
+                <TableCell sx={headSx}>Average</TableCell>
+                <TableCell sx={headSx}>Grade</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filtered.map((s) => (
+                <TableRow key={s.student_id} hover sx={{ '&:hover': { bgcolor: 'rgba(245,166,35,0.06)' } }}>
+                  <TableCell sx={{ ...cellSx, color: '#9CA3AF', fontWeight: 600 }}>#{s.rank ?? '-'}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 600, color: NAVY }}>{s.name}</TableCell>
+                  <TableCell sx={{ ...cellSx, color: '#6B7280' }}>{s.class_name}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{s.average_percent != null ? `${s.average_percent}%` : '-'}</TableCell>
+                  <TableCell sx={cellSx}>
+                    <Box component="span" sx={{ borderRadius: 1, bgcolor: 'rgba(19,33,61,0.05)', px: 1, py: 0.25, fontSize: 12, fontWeight: 700 }}>
+                      {s.grade || '-'}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {!filtered.length && <Typography sx={{ py: 5, textAlign: 'center', fontSize: 14, color: '#9CA3AF' }}>No students found</Typography>}
+      </Paper>
+    </Stack>
   );
 }

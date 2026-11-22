@@ -16,6 +16,7 @@ import { procurementApi } from '@/services/procurement-api';
 import type { PurchaseRequest, Supplier } from '@/types';
 import { FormField, SelectField } from '@/components/procurement-form-ui';
 import { formatFrw } from '@/utils/currency';
+import { formatPersonName } from '@/utils/person-name';
 
 type POItemForm = {
   itemName: string;
@@ -29,9 +30,16 @@ interface SetOrdersDrawerProps {
   open: boolean;
   purchaseRequest: PurchaseRequest | null;
   onClose: () => void;
+  /** Optional handler after a purchase order is created. */
+  onCreated?: () => void;
 }
 
-export function SetOrdersDrawer({ open, purchaseRequest, onClose }: SetOrdersDrawerProps) {
+export function SetOrdersDrawer({
+  open,
+  purchaseRequest,
+  onClose,
+  onCreated,
+}: SetOrdersDrawerProps) {
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState('');
@@ -118,7 +126,8 @@ export function SetOrdersDrawer({ open, purchaseRequest, onClose }: SetOrdersDra
       });
       toast.success('Purchase order created');
       onClose();
-      router.push('/purchase-orders');
+      if (onCreated) onCreated();
+      else router.push('/purchase-orders');
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -173,7 +182,7 @@ export function SetOrdersDrawer({ open, purchaseRequest, onClose }: SetOrdersDra
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Requested By</p>
-              <p className="mt-0.5 font-semibold text-navy">{purchaseRequest.requestedByName ?? '—'}</p>
+              <p className="mt-0.5 font-semibold text-navy">{formatPersonName(purchaseRequest.requestedByName) || '—'}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Items</p>

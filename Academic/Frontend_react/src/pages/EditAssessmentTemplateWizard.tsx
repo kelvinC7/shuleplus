@@ -23,7 +23,6 @@ type FormErrors = {
   academicLevel?: string;
   academicYear?: string;
   term?: string;
-  defaultCourseMarks?: string;
   components?: string;
 };
 
@@ -62,7 +61,6 @@ export function EditAssessmentTemplateWizard({
     academicLevel: '',
     academicYear: '',
     term: '',
-    defaultCourseMarks: '40',
   });
 
   const [components, setComponents] = useState<ComponentEntry[]>([]);
@@ -80,7 +78,6 @@ export function EditAssessmentTemplateWizard({
         academicLevel: data.academicLevel ?? '',
         academicYear: data.academicYear ?? '',
         term: data.term ?? '',
-        defaultCourseMarks: String(data.defaultCourseMarks ?? 40),
       });
       const rows = (data.components ?? []).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       setOriginalComponentIds(rows.map((c) => c.id));
@@ -115,10 +112,6 @@ export function EditAssessmentTemplateWizard({
     if (!formData.academicLevel) newErrors.academicLevel = 'Education level is required';
     if (!formData.academicYear) newErrors.academicYear = 'Academic year is required';
     if (!formData.term) newErrors.term = 'Term is required';
-    const dcm = parseFloat(formData.defaultCourseMarks);
-    if (!formData.defaultCourseMarks || Number.isNaN(dcm) || dcm <= 0) {
-      newErrors.defaultCourseMarks = 'Default course marks must be greater than 0';
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -176,7 +169,6 @@ export function EditAssessmentTemplateWizard({
     if (!templateId || !canEdit || !validateStep1() || !validateStep2()) return;
     setSubmitting(true);
     try {
-      const dcm = parseFloat(formData.defaultCourseMarks);
       const filled = components.filter((c) => c.name.trim());
       await updateAssessmentTemplate(
         templateId,
@@ -186,7 +178,6 @@ export function EditAssessmentTemplateWizard({
           academicLevel: formData.academicLevel,
           academicYear: formData.academicYear,
           term: formData.term,
-          defaultCourseMarks: Number.isNaN(dcm) || dcm <= 0 ? 40 : dcm,
         },
         { skipToast: true }
       );

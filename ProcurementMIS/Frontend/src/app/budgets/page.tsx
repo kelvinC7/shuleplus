@@ -105,7 +105,7 @@ export default function BudgetsPage() {
                 <span
                   className={`font-medium ${a.status === 'EXCEEDED' ? 'text-red-600' : 'text-amber-600'}`}
                 >
-                  {a.utilization}% {a.status === 'EXCEEDED' ? '— EXCEEDED' : '— Warning'}
+                  {a.utilization}% {a.status === 'EXCEEDED' ? 'EXCEEDED' : 'Warning'}
                 </span>
               </div>
             ))}

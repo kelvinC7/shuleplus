@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CurriculumProcessingStatus {
+  UPLOADED
+  EXTRACTING
+  NEEDS_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+  FAILED
+}
+
+enum CurriculumReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProcessingJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum LessonPlanStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  ARCHIVED
+}
+
+enum LessonPlanApprovalAction {
+  SUBMITTED
+  APPROVED
+  RETURNED
+  REJECTED
+}
+
+model CurriculumBook {
+  id                 String                     @id @default(uuid())
+  title              String
+  subject            String
+  grade              String
+  educationLevel     String?                    @map("education_level")
+  language           String
+  edition            String?
+  curriculumVersion  String?                    @map("curriculum_version")
+  academicYear       String?                    @map("academic_year")
+  sourceName         String?                    @map("source_name")
+  sourceUrl          String?                    @map("source_url")
+  publicationYear    Int?                       @map("publication_year")
+  documentType       String?                    @map("document_type")
+  publisher          String?
+  description        String?                    @db.Text
+  extractionOptions  Json?                      @map("extraction_options")
+  fileSha256         String?                    @map("file_sha256")
+  fileKey            String                     @map("file_key")
+  storageProvider    String                     @default("local") @map("storage_provider")
+  fileSizeBytes      Int?                       @map("file_size_bytes")
+  pageCount          Int?                       @map("page_count")
+  mimeType           String                     @default("application/pdf") @map("mime_type")
+  version            Int                        @default(1)
+  processingStatus   CurriculumProcessingStatus @default(UPLOADED) @map("processing_status")
+  extractionSummary  Json?                      @map("extraction_summary")
+  processingError    String?                    @map("processing_error")
+  publishedAt        DateTime?                  @map("published_at")
+  publishedBy        String?                    @map("published_by")
+  archivedAt         DateTime?                  @map("archived_at")
+  companionBookId    String?                    @map("companion_book_id")
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+
+  companionBook CurriculumBook?  @relation("BookCompanion", fields: [companionBookId], references: [id], onDelete: SetNull)
+  companionFor  CurriculumBook[] @relation("BookCompanion")
+  versions CurriculumVersion[]
+  units    CurriculumUnit[]
+  pages    CurriculumDocumentPage[]
+  jobs     CurriculumProcessingJob[]
+
+  @@index([subject, grade, processingStatus])
+  @@index([companionBookId])
+  @@map("curriculum_books")
+}
+
+model CurriculumVersion {
+  id             String   @id @default(uuid())
+  bookId         String   @map("book_id")
+  versionNumber  Int      @map("version_number")
+  snapshot       Json
+  changeNote     String?  @map("change_note")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  book CurriculumBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, versionNumber])
+  @@map("curriculum_versions")
+}
+
+model CurriculumProcessingJob {
+  id           String              @id @default(uuid())
+  bookId       String              @map("book_id")
+  status       ProcessingJobStatus @default(QUEUED)
+  jobType         String              @default("pdf_extract") @map("job_type")
+  pipelineStage   String?             @map("pipeline_stage")
+  progress        Int                 @default(0)
+  pagesProcessed  Int                 @default(0) @map("pages_processed")
+  pagesTotal      Int?                @map("pages_total")
+  cancelRequested Boolean             @default(false) @map("cancel_requested")
+  attempts        Int                 @default(0)
+  lastError    String?             @map("last_error")
+  result       Json?
+  startedAt    DateTime?           @map("started_at")
+  finishedAt   DateTime?           @map("finished_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  book CurriculumBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, status])
+  @@map("curriculum_processing_jobs")
+}
+
+model CurriculumDocumentPage {
+  id                  String   @id @default(uuid())
+  bookId              String   @map("book_id")
+  pageNumber          Int      @map("page_number")
+  textContent         String?  @map("text_content") @db.Text
+  isScanned           Boolean  @default(false) @map("is_scanned")
+  ocrApplied          Boolean  @default(false) @map("ocr_applied")
+  extractionConfidence Decimal? @map("extraction_confidence") @db.Decimal(4, 3)
+  layoutJson          Json?    @map("layout_json")
+  needsManualReview   Boolean  @default(false) @map("needs_manual_review")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  book CurriculumBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, pageNumber])
+  @@index([bookId])
+  @@map("curriculum_document_pages")
+}
+
+model CurriculumUnit {
+  id               String   @id @default(uuid())
+  bookId           String   @map("book_id")
+  unitNumber       String   @map("unit_number")
+  title            String
+  keyCompetence    String?  @map("key_competence") @db.Text
+  suggestedPeriods Int?     @map("suggested_periods")
+  sortOrder        Int      @default(0) @map("sort_order")
+  sourcePageStart  Int?     @map("source_page_start")
+  sourcePageEnd    Int?     @map("source_page_end")
+  reviewStatus     CurriculumReviewStatus @default(PENDING) @map("review_status")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  book    CurriculumBook     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  lessons CurriculumLesson[]
+
+  @@index([bookId, sortOrder])
+  @@map("curriculum_units")
+}
+
+model CurriculumLesson {
+  id                   String                 @id @default(uuid())
+  unitId               String                 @map("unit_id")
+  lessonNumber         String?                @map("lesson_number")
+  title                String
+  suggestedPeriods     Int?                   @map("suggested_periods")
+  sortOrder            Int                    @default(0) @map("sort_order")
+  prerequisites        Json                   @default("[]")
+  materials            Json                   @default("[]")
+  sourcePages          Json                   @default("[]") @map("source_pages")
+  sourceContent        Json?                  @map("source_content")
+  extractionConfidence Decimal?               @map("extraction_confidence") @db.Decimal(4, 3)
+  reviewStatus         CurriculumReviewStatus @default(PENDING) @map("review_status")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  unit       CurriculumUnit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  objectives LearningObjective[]
+  references CurriculumSourceReference[]
+  lessonPlans GeneratedLessonPlan[]
+
+  @@index([unitId, sortOrder])
+  @@map("curriculum_lessons")
+}
+
+model LearningObjective {
+  id          String   @id @default(uuid())
+  lessonId    String   @map("lesson_id")
+  sortOrder   Int      @default(0) @map("sort_order")
+  statement   String   @db.Text
+  isOfficial  Boolean  @default(true) @map("is_official")
+  sourcePages Json     @default("[]") @map("source_pages")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@map("learning_objectives")
+}
+
+model CurriculumSourceReference {
+  id          String   @id @default(uuid())
+  lessonId    String   @map("lesson_id")
+  label       String
+  pageStart   Int?     @map("page_start")
+  pageEnd     Int?     @map("page_end")
+  excerpt     String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lesson CurriculumLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@map("curriculum_source_references")
+}
+
+model LessonPlanTemplate {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  description String?
+  schema      Json
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("lesson_plan_templates")
+}
+
+model GeneratedLessonPlan {
+  id                 String           @id @default(uuid())
+  organizationId     String           @map("organization_id")
+  schoolId           String?          @map("school_id")
+  teacherId          String           @map("teacher_id")
+  teacherName        String?          @map("teacher_name")
+  teacherEmail       String?          @map("teacher_email")
+  curriculumLessonId String?          @map("curriculum_lesson_id")
+  curriculumVersion  Int?             @map("curriculum_version")
+  templateSlug       String           @default("reb-primary-cbc") @map("template_slug")
+  lessonDate         DateTime?        @map("lesson_date") @db.Date
+  termLabel          String?          @map("term_label")
+  academicYear       String?          @map("academic_year")
+  subjectLabel       String?          @map("subject_label")
+  gradeLabel         String?          @map("grade_label")
+  className          String?          @map("class_name")
+  durationMinutes    Int              @map("duration_minutes")
+  classSize          Int?             @map("class_size")
+  maleLearners       Int?             @map("male_learners")
+  femaleLearners     Int?             @map("female_learners")
+  language           String           @default("English")
+  taughtAt           DateTime?        @map("taught_at")
+  archivedAt         DateTime?        @map("archived_at")
+  deletedAt          DateTime?        @map("deleted_at")
+  planContent        Json             @map("plan_content")
+  qualityFlags       Json             @default("[]") @map("quality_flags")
+  status             LessonPlanStatus @default(DRAFT)
+  currentRevision    Int              @default(1) @map("current_revision")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  lesson    CurriculumLesson?   @relation(fields: [curriculumLessonId], references: [id], onDelete: SetNull)
+  revisions LessonPlanVersion[]
+  approvals LessonPlanApproval[]
+  aiLogs    AIProcessingLog[]
+
+  @@index([organizationId, teacherId])
+  @@index([curriculumLessonId])
+  @@map("generated_lesson_plans")
+}
+
+model LessonPlanVersion {
+  id           String   @id @default(uuid())
+  lessonPlanId String   @map("lesson_plan_id")
+  revision     Int
+  planContent  Json     @map("plan_content")
+  changeNote   String?  @map("change_note")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  lessonPlan GeneratedLessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonPlanId, revision])
+  @@map("lesson_plan_versions")
+}
+
+model LessonPlanApproval {
+  id           String                   @id @default(uuid())
+  lessonPlanId String                   @map("lesson_plan_id")
+  action       LessonPlanApprovalAction
+  actorId      String?                  @map("actor_id")
+  actorName    String?                  @map("actor_name")
+  comment      String?                  @db.Text
+  createdAt    DateTime                 @default(now()) @map("created_at")
+
+  lessonPlan GeneratedLessonPlan @relation(fields: [lessonPlanId], references: [id], onDelete: Cascade)
+
+  @@index([lessonPlanId])
+  @@map("lesson_plan_approvals")
+}
+
+model AIProcessingLog {
+  id             String   @id @default(uuid())
+  lessonPlanId   String?  @map("lesson_plan_id")
+  bookId         String?  @map("book_id")
+  operation      String
+  provider       String?
+  model          String?
+  promptTokens   Int?     @map("prompt_tokens")
+  completionTokens Int?   @map("completion_tokens")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  lessonPlan GeneratedLessonPlan? @relation(fields: [lessonPlanId], references: [id], onDelete: SetNull)
+
+  @@index([lessonPlanId])
+  @@map("ai_processing_logs")
+}
+
+model PlatformActivityLog {
+  id        String   @id @default(uuid())
+  actorId   String?  @map("actor_id")
+  actorEmail String? @map("actor_email")
+  action    String
+  entityType String? @map("entity_type")
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("platform_activity_logs")
+}

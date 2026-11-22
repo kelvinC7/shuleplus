@@ -4,6 +4,7 @@ export type ToastItem = {
   id: string;
   kind: ToastKind;
   title: string;
+  detail?: string;
   duration: number;
 };
 
@@ -40,24 +41,25 @@ export function dismissToast(id: string) {
   emit();
 }
 
-function push(kind: ToastKind, title: string, duration = 4200) {
+function push(kind: ToastKind, title: string, duration = 4200, detail?: string) {
   const message = title.trim();
   if (!message) return;
+  const sub = detail?.trim() || undefined;
   const last = toasts[toasts.length - 1];
-  if (last && last.kind === kind && last.title === message) {
+  if (last && last.kind === kind && last.title === message && last.detail === sub) {
     dismissToast(last.id);
   }
-  const item: ToastItem = { id: uid(), kind, title: message, duration };
+  const item: ToastItem = { id: uid(), kind, title: message, detail: sub, duration };
   toasts = [...toasts.slice(-4), item];
   emit();
   timers.set(item.id, setTimeout(() => dismissToast(item.id), duration));
 }
 
 export const toast = {
-  success: (title: string) => push('success', title),
-  error: (title: string) => push('error', title, 5600),
-  info: (title: string) => push('info', title),
-  warning: (title: string) => push('warning', title, 5000),
+  success: (title: string, detail?: string) => push('success', title, 4200, detail),
+  error: (title: string, detail?: string) => push('error', title, 6400, detail),
+  info: (title: string, detail?: string) => push('info', title, 4800, detail),
+  warning: (title: string, detail?: string) => push('warning', title, 5200, detail),
 };
 
 export function apiErrorMessage(err: unknown, fallback = 'Something went wrong') {

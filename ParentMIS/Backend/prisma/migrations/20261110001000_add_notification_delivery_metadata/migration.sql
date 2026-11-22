@@ -1,0 +1,4 @@
+ALTER TABLE "notifications"
+ADD COLUMN IF NOT EXISTS "sms_status" TEXT,
+ADD COLUMN IF NOT EXISTS "push_status" TEXT,
+ADD COLUMN IF NOT EXISTS "language" TEXT DEFAULT 'rw';

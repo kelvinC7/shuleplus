@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { resolvePostLoginRoute, type AuthUser } from '@/lib/auth';
-import { tryLaunchDefaultModule } from '@/lib/module-launch';
+import {
+  stashPostLoginModule,
+  tryLaunchDefaultModule,
+  tryLaunchPendingModule,
+  tryLaunchDirectorConsole,
+} from '@/lib/module-launch';
 import { useAppLanguage } from '@/i18n/app-language';
 import { AuthShell } from '@/components/auth/auth-shell';
 import {
@@ -47,6 +52,9 @@ function LoginForm() {
         rememberMe,
       });
 
+      const moduleSlug = searchParams.get('module');
+      if (moduleSlug) stashPostLoginModule(moduleSlug);
+
       if (data.data.requiresMfa) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -70,6 +78,19 @@ function LoginForm() {
       localStorage.setItem('user', JSON.stringify(data.data.user));
 
       const user = data.data.user as AuthUser;
+      if (
+        await tryLaunchPendingModule(
+          data.data.accessToken as string,
+          data.data.refreshToken as string,
+          user,
+          moduleSlug
+        )
+      ) {
+        return;
+      }
+      if (tryLaunchDirectorConsole(user, data.data.accessToken as string)) {
+        return;
+      }
       if (
         tryLaunchDefaultModule(user, data.data.accessToken as string, data.data.refreshToken as string)
       ) {

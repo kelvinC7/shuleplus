@@ -1,17 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../services/api';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
+import Avatar from '@mui/material/Avatar';
+import Collapse from '@mui/material/Collapse';
+import Alert from '@mui/material/Alert';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import {
-    GraduationCap, TrendingUp, Search, ChevronDown,
-    Download, Save, FileText, CheckCircle, BarChart2,
-    Users, BookOpen, Clock, Activity, Printer, Filter, ChevronUp, User, AlertCircle,
-} from 'lucide-react';
-import {
-    teacherInnerSelectCls,
-    teacherInnerSearchCls,
-    teacherInnerScoreCls,
     buildSubjectsForClass,
     normalizeGradebookLabel,
 } from '../utils/teacherGradebookUi';
+import { brand } from '../theme/theme';
+
+const GRADES = [
+    { min: 90, label: 'A+', color: '#059669', bg: 'rgba(5,150,105,0.10)', ring: 'rgba(5,150,105,0.22)' },
+    { min: 80, label: 'A', color: '#10B981', bg: 'rgba(16,185,129,0.10)', ring: 'rgba(16,185,129,0.18)' },
+    { min: 70, label: 'B', color: '#3B82F6', bg: 'rgba(59,130,246,0.10)', ring: 'rgba(59,130,246,0.18)' },
+    { min: 60, label: 'C', color: '#24396A', bg: '#F3F5FA', ring: 'rgba(36,57,106,0.16)' },
+    { min: 50, label: 'D', color: '#D97706', bg: 'rgba(217,119,6,0.10)', ring: 'rgba(217,119,6,0.18)' },
+    { min: -Infinity, label: 'E', color: '#EF4444', bg: 'rgba(239,68,68,0.10)', ring: 'rgba(239,68,68,0.18)' },
+];
+
+const gradeFor = (total) => GRADES.find((g) => total >= g.min);
+
+const selectSx = {
+    '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: '#fff', fontSize: 12 },
+};
+
+const headSx = {
+    bgcolor: 'rgba(247,248,250,0.5)',
+    borderRight: `1px solid ${brand.border}`,
+    borderBottom: `1px solid ${brand.border}`,
+    px: { xs: 1, sm: 2 },
+    py: 2,
+    fontSize: 10,
+    fontWeight: 700,
+    color: brand.muted,
+};
+
+const cellSx = {
+    borderRight: `1px solid ${brand.border}`,
+    borderBottom: `1px solid ${brand.border}`,
+    px: { xs: 1, sm: 2 },
+    py: 2,
+};
 
 export default function RecordMarks() {
     const [classes, setClasses] = useState([]);
@@ -23,17 +83,14 @@ export default function RecordMarks() {
     const [selectedTerm, setSelectedTerm] = useState('Term 1');
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
-    /** @type {{ slug: string, label: string, sort_order: number, default_max_score: number|null }[]} */
     const [columns, setColumns] = useState([]);
     const [marks, setMarks] = useState([]);
     const [saveColumnSlug, setSaveColumnSlug] = useState('');
-    /** API / empty roster message for this class+subject */
     const [matrixNotice, setMatrixNotice] = useState(null);
     const [registryClassHint, setRegistryClassHint] = useState(null);
     const [matrixLoadFailed, setMatrixLoadFailed] = useState(false);
-    /** @type {{ class_name: string, subject_name: string }[]} */
     const [timetablePairs, setTimetablePairs] = useState([]);
-    const [filterMode, setFilterMode] = useState('registry'); // 'timetable' | 'registry'
+    const [filterMode, setFilterMode] = useState('registry');
 
     useEffect(() => {
         fetchMetadata();
@@ -164,15 +221,19 @@ export default function RecordMarks() {
             const cols = Array.isArray(payload.columns) ? payload.columns : [];
             const rawStudents = Array.isArray(payload.students) ? payload.students : [];
             setColumns(cols);
-            setMarks(
-                rawStudents.map((s) => ({
+            // Always show students in ascending alphabetical order (A–Z).
+            const sortedStudents = rawStudents
+                .map((s) => ({
                     id: s.student_id,
                     adm: s.student_uid,
                     name: s.name,
                     gender: s.gender === 'Male' ? 'M' : 'F',
                     scores: { ...(s.scores || {}) },
                 }))
-            );
+                .sort((x, y) =>
+                    String(x.name || '').localeCompare(String(y.name || ''), undefined, { sensitivity: 'base', numeric: true })
+                );
+            setMarks(sortedStudents);
             const regLabel = payload.student_class_name;
             setRegistryClassHint(
                 rawStudents.length > 0 && regLabel
@@ -267,14 +328,6 @@ export default function RecordMarks() {
 
     const calculateTotal = (m) =>
         columns.reduce((acc, c) => acc + (Number(m.scores?.[c.slug]) || 0), 0);
-    const calculateGrade = (total) => {
-        if (total >= 90) return { label: 'A+', color: 'text-emerald-600 bg-emerald-50 ring-emerald-500/20' };
-        if (total >= 80) return { label: 'A', color: 'text-emerald-500 bg-emerald-50 ring-emerald-500/10' };
-        if (total >= 70) return { label: 'B', color: 'text-blue-500 bg-blue-50 ring-blue-500/10' };
-        if (total >= 60) return { label: 'C', color: 'text-orange-500 bg-orange-50 ring-orange-500/10' };
-        if (total >= 50) return { label: 'D', color: 'text-amber-600 bg-amber-50 ring-amber-500/10' };
-        return { label: 'E', color: 'text-red-500 bg-red-50 ring-red-500/10' };
-    };
 
     const q = searchQuery.trim().toLowerCase();
     const filteredMarks = marks.filter((s) => {
@@ -292,353 +345,462 @@ export default function RecordMarks() {
             : 0,
     };
 
+    const statCards = [
+        { label: 'Class Average', value: `${stats.avg}%`, icon: <TrendingUpIcon sx={{ fontSize: 14 }} /> },
+        { label: 'Pass Ratio', value: `${stats.passRate}%`, icon: <CheckCircleOutlineIcon sx={{ fontSize: 14 }} /> },
+        { label: 'Highest Mark', value: `${stats.highest}%`, icon: <TimelineIcon sx={{ fontSize: 14 }} /> },
+    ];
+
+    const statsDisplay = !isClassSelected ? { display: { xs: 'none', lg: 'grid' } } : { display: 'grid' };
+    const toolbarDisplay = !isClassSelected ? { display: { xs: 'none', lg: 'flex' } } : { display: 'flex' };
+    const tableDisplay = !isClassSelected ? { display: { xs: 'none', lg: 'block' } } : { display: 'block' };
+
     return (
-        <div className="animate-in fade-in duration-700 bg-re-bg min-h-screen pb-12">
+        <Box sx={{ bgcolor: brand.background, minHeight: '100vh', pb: 6 }}>
+            <Box sx={{ position: 'relative', width: '100%', minHeight: 300, overflow: 'hidden' }}>
+                <Box
+                    component="img"
+                    src="/teacher.jpg"
+                    alt=""
+                    sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.05)' }}
+                />
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                            'linear-gradient(135deg, rgba(8,17,31,0.92), rgba(18,35,58,0.84), rgba(33,49,74,0.78))',
+                    }}
+                />
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                            'radial-gradient(circle at top right, rgba(19,33,61,0.20), transparent 28%), radial-gradient(circle at bottom left, rgba(255,184,0,0.10), transparent 24%)',
+                    }}
+                />
+                <Box sx={{ position: 'relative', zIndex: 2, maxWidth: 1600, mx: 'auto', px: { xs: 3, md: 6 }, pt: 8, pb: 12 }}>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                        <Box sx={{ width: 24, height: 4, borderRadius: 99, bgcolor: brand.primary }} />
+                        <Typography sx={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+                            Academic Grading
+                        </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: { xs: 30, md: 48 }, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
+                        Students Marks
+                    </Typography>
+                    <Typography sx={{ mt: 1, fontSize: { xs: 12, md: 13 }, fontWeight: 500, color: 'rgba(255,255,255,0.7)', maxWidth: 560 }}>
+                        {selectedClass} · {selectedSubject}. Fill columns in any order; pick the column, Save, and name each round (quiz, CAT, exam-your wording).
+                    </Typography>
+                </Box>
+            </Box>
 
-            {/* ── High-Fidelity Hero Section ── */}
-            <div className="relative w-full min-h-[300px] overflow-hidden">
-                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(8,17,31,0.92),rgba(18,35,58,0.84),rgba(33,49,74,0.78))] z-10 backdrop-blur-[2px]"></div>
-                <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top_right,rgba(255,140,0,0.20),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(255,184,0,0.10),transparent_24%)]"></div>
-                <img src="/teacher.jpg" alt="Hero" className="absolute inset-0 w-full h-full object-cover scale-105 opacity-100" />
-
-                <div className="relative z-20 max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-24">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="w-6 h-1 bg-re-orange rounded-full"></span>
-                            <span className="text-[10px] font-bold text-white/80">Academic Grading</span>
-                        </div>
-                        <h1 className="text-3xl md:text-5xl font-bold text-white">
-                            Students Marks
-                        </h1>
-                        <p className="text-[12px] md:text-sm text-white/70 font-medium max-w-xl leading-relaxed opacity-80">
-                            {selectedClass} · {selectedSubject}. Fill columns in any order; pick the column, Save, and name each round (quiz, CAT, exam-your wording).
-                        </p>
-                    </div>
-
-                </div>
-            </div>
-
-            {/* ── Main Content Area ── */}
-            <div className="relative z-30 max-w-[1600px] mx-auto px-2 md:px-6 -mt-16">
-                <div className="bg-white rounded-t-[2.5rem] shadow-2xl border border-black/5 overflow-hidden flex flex-col">
-
-                    {/* High-Density Stats Grid */}
-                    <div className={`${!isClassSelected ? 'hidden lg:grid' : 'grid'} grid-cols-2 lg:grid-cols-3 divide-x divide-y lg:divide-y-0 divide-black/5 border-b border-black/5`}>
-                        {[
-                            { label: 'Class Average', value: `${stats.avg}%`, icon: <TrendingUp size={12} /> },
-                            { label: 'Pass Ratio', value: `${stats.passRate}%`, icon: <CheckCircle size={12} /> },
-                            { label: 'Highest Mark', value: `${stats.highest}%`, icon: <Activity size={12} /> }
-                        ].map((s, i) => (
-                            <div key={i} className="p-4 sm:p-8 flex flex-col items-center justify-center text-center group hover:bg-re-bg/20 transition-all">
-                                <div className="text-re-orange opacity-40 mb-1.5 sm:mb-2">{s.icon}</div>
-                                <div className="text-sm sm:text-2xl font-bold text-re-text group-hover:text-re-orange">{s.value}</div>
-                                <div className="text-[10px] font-semibold text-re-text-muted mt-0.5 opacity-60">{s.label}</div>
-                            </div>
+            <Box sx={{ position: 'relative', zIndex: 3, maxWidth: 1600, mx: 'auto', px: { xs: 1, md: 3 }, mt: '-64px' }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        borderRadius: '32px 32px 0 0',
+                        boxShadow: '0 24px 48px rgba(15,23,42,0.16)',
+                        border: `1px solid ${brand.border}`,
+                        overflow: 'hidden',
+                    }}
+                >
+                    <Box
+                        sx={{
+                            ...statsDisplay,
+                            gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(3, 1fr)' },
+                            borderBottom: `1px solid ${brand.border}`,
+                            '& > *:not(:last-child)': { borderRight: `1px solid ${brand.border}` },
+                        }}
+                    >
+                        {statCards.map((s) => (
+                            <Box key={s.label} sx={{ p: { xs: 2, sm: 4 }, textAlign: 'center', '&:hover': { bgcolor: 'rgba(247,248,250,0.5)' } }}>
+                                <Box sx={{ color: brand.navy, opacity: 0.4, mb: 0.75, display: 'inline-flex' }}>{s.icon}</Box>
+                                <Typography sx={{ fontSize: { xs: 14, sm: 24 }, fontWeight: 700, color: brand.text }}>{s.value}</Typography>
+                                <Typography sx={{ fontSize: 10, fontWeight: 600, color: brand.muted, mt: 0.25, opacity: 0.6 }}>
+                                    {s.label}
+                                </Typography>
+                            </Box>
                         ))}
-                    </div>
+                    </Box>
 
-                    {/* Controls Toolbar - compact on desktop */}
-                    <div className={`${!isClassSelected ? 'hidden lg:flex' : 'flex'} px-4 py-4 lg:px-3 lg:py-2 border-b border-black/5 flex flex-col lg:flex-row lg:flex-nowrap lg:items-center lg:justify-start gap-4 lg:gap-2 bg-re-bg/20`}>
-                        <div className="flex items-center gap-3 lg:gap-2 w-full lg:w-auto lg:shrink-0">
-                            {/* Class Selector (Desktop) */}
-                            <div className="relative hidden lg:block lg:w-[9.5rem] shrink-0">
-                                <Users size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-re-text-muted z-[1] pointer-events-none" />
-                                <select
-                                    value={selectedClass}
-                                    onChange={(e) => setSelectedClass(e.target.value)}
-                                    className={`${teacherInnerSelectCls} !pl-8 shadow-[inset_0_2px_8px_rgba(15,23,42,0.11),inset_0_-1px_0_rgba(255,255,255,0.55)]`}
-                                >
-                                    {classes.map(cls => (
-                                        <option key={cls} value={cls}>{cls}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Mobile Filter Toggle */}
-                            <button
-                                onClick={() => setShowMobileFilters(!showMobileFilters)}
-                                className="lg:hidden w-full flex justify-between items-center gap-2 text-[10px] font-bold transition-all"
+                    <Box
+                        sx={{
+                            ...toolbarDisplay,
+                            flexDirection: { xs: 'column', lg: 'row' },
+                            alignItems: { lg: 'center' },
+                            gap: { xs: 2, lg: 1 },
+                            px: { xs: 2, lg: 1.5 },
+                            py: { xs: 2, lg: 1 },
+                            borderBottom: `1px solid ${brand.border}`,
+                            bgcolor: 'rgba(247,248,250,0.4)',
+                        }}
+                    >
+                        <Box sx={{ display: { xs: 'none', lg: 'block' }, width: 152, flexShrink: 0 }}>
+                            <TextField
+                                select
+                                fullWidth
+                                size="small"
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <PeopleAltOutlinedIcon sx={{ fontSize: 14, color: brand.muted }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                sx={selectSx}
                             >
-                                <div className="flex items-center gap-2">
-                                    <Filter size={14} className="text-re-orange" /> show filters
-                                </div>
-                                {showMobileFilters ? <ChevronUp size={14} className="text-re-orange" /> : <ChevronDown size={14} />}
-                            </button>
+                                {classes.map((cls) => (
+                                    <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
 
-                        </div>
+                        <ButtonBase
+                            onClick={() => setShowMobileFilters(!showMobileFilters)}
+                            sx={{ display: { lg: 'none' }, width: '100%', justifyContent: 'space-between', px: 0.5, py: 1 }}
+                        >
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <FilterAltOutlinedIcon sx={{ fontSize: 16, color: brand.navy }} />
+                                <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.navy, textTransform: 'lowercase' }}>
+                                    show filters
+                                </Typography>
+                            </Stack>
+                            {showMobileFilters ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
+                        </ButtonBase>
 
-                        {/* Collapsible Mobile Section */}
-                        <div className={`${showMobileFilters ? 'flex' : 'hidden lg:flex'} flex-col lg:flex-row lg:flex-nowrap lg:items-center gap-3 lg:gap-2 w-full lg:flex-1 lg:min-w-0 animate-in slide-in-from-top-2 duration-300`}>
-                            <div className="relative w-full lg:w-[10.5rem] lg:shrink-0">
-                                <BookOpen size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-re-text-muted lg:hidden z-[1] pointer-events-none" />
-                                <BookOpen size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-re-text-muted hidden lg:block z-[1] pointer-events-none" />
-                                <select
-                                    value={selectedSubject}
+                        <Collapse in={showMobileFilters} sx={{ display: { lg: 'none' }, width: '100%' }}>
+                            <Stack spacing={1.5} sx={{ pb: 1 }}>
+                                <TextField
+                                    select fullWidth size="small" value={selectedSubject}
                                     onChange={(e) => setSelectedSubject(e.target.value)}
-                                    className={`${teacherInnerSelectCls} !pl-10 lg:!pl-8`}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><MenuBookOutlinedIcon sx={{ fontSize: 16, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
                                 >
-                                    {subjects.map(sub => (
-                                        <option key={sub} value={sub}>{sub}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="relative w-full lg:w-[5.5rem] lg:shrink-0">
-                                <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-re-text-muted lg:hidden z-[1] pointer-events-none" />
-                                <Clock size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-re-text-muted hidden lg:block z-[1] pointer-events-none" />
-                                <select
-                                    value={selectedTerm}
+                                    {subjects.map((sub) => <MenuItem key={sub} value={sub}>{sub}</MenuItem>)}
+                                </TextField>
+                                <TextField
+                                    select fullWidth size="small" value={selectedTerm}
                                     onChange={(e) => setSelectedTerm(e.target.value)}
-                                    className={`${teacherInnerSelectCls} !pl-10 lg:!pl-8`}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><AccessTimeIcon sx={{ fontSize: 16, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
                                 >
-                                    <option>Term 1</option>
-                                    <option>Term 2</option>
-                                </select>
-                            </div>
-
-                            <div className="relative w-full lg:flex-1 lg:min-w-[7rem] lg:max-w-[11rem] group">
-                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-re-text-muted/50 group-focus-within:text-re-orange transition-colors lg:hidden z-[1] pointer-events-none" />
-                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-re-text-muted/50 group-focus-within:text-re-orange transition-colors hidden lg:block z-[1] pointer-events-none" />
-                                <input
-                                    type="text"
-                                    placeholder="Search student..."
-                                    value={searchQuery}
+                                    <MenuItem value="Term 1">Term 1</MenuItem>
+                                    <MenuItem value="Term 2">Term 2</MenuItem>
+                                </TextField>
+                                <TextField
+                                    fullWidth size="small" placeholder="Search student..." value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className={`${teacherInnerSearchCls} !pl-10 lg:!pl-8`}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
                                 />
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-2 lg:gap-1.5 w-full lg:w-auto lg:items-center lg:shrink-0">
-                                <select
-                                    value={saveColumnSlug}
+                                <TextField
+                                    select fullWidth size="small" value={saveColumnSlug}
                                     onChange={(e) => setSaveColumnSlug(e.target.value)}
-                                    className={`${teacherInnerSelectCls} lg:max-w-[8rem] lg:!px-2 lg:!pl-2`}
-                                    title="Save marks into this gradebook column; name the assessment when prompted (any title you use in class)."
+                                    sx={selectSx}
                                 >
-                                    {columns.length === 0 && <option value="">No columns</option>}
-                                    {columns.map((c) => (
-                                        <option key={c.slug} value={c.slug}>{c.label}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveColumn}
-                                    className="hidden lg:inline-flex h-8 px-3 bg-re-grad-orange text-white text-nowrap font-bold text-[10px] rounded-lg hover:shadow-re-glow transition-all items-center gap-1 active:scale-95"
-                                >
-                                    <Save size={12} /> Save
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                                    {columns.length === 0 ? <MenuItem value="">No columns</MenuItem> : null}
+                                    {columns.map((c) => <MenuItem key={c.slug} value={c.slug}>{c.label}</MenuItem>)}
+                                </TextField>
+                                <Button variant="contained" color="secondary" fullWidth startIcon={<SaveOutlinedIcon />} onClick={handleSaveColumn} sx={{ py: 1.1 }}>
+                                    Save
+                                </Button>
+                            </Stack>
+                        </Collapse>
 
-                    {registryClassHint && isClassSelected && !loading && !matrixLoadFailed && (
-                        <div className="mx-4 mt-3 rounded-xl border border-sky-200/80 bg-sky-50/90 px-4 py-2.5 text-[10px] font-bold text-sky-950/90 leading-snug">
+                        <Box sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+                            <Box sx={{ width: 168, flexShrink: 0 }}>
+                                <TextField
+                                    select fullWidth size="small" value={selectedSubject}
+                                    onChange={(e) => setSelectedSubject(e.target.value)}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><MenuBookOutlinedIcon sx={{ fontSize: 14, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
+                                >
+                                    {subjects.map((sub) => <MenuItem key={sub} value={sub}>{sub}</MenuItem>)}
+                                </TextField>
+                            </Box>
+                            <Box sx={{ width: 96, flexShrink: 0 }}>
+                                <TextField
+                                    select fullWidth size="small" value={selectedTerm}
+                                    onChange={(e) => setSelectedTerm(e.target.value)}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><AccessTimeIcon sx={{ fontSize: 14, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
+                                >
+                                    <MenuItem value="Term 1">Term 1</MenuItem>
+                                    <MenuItem value="Term 2">Term 2</MenuItem>
+                                </TextField>
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 112, maxWidth: 176 }}>
+                                <TextField
+                                    fullWidth size="small" placeholder="Search student..." value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 14, color: brand.muted }} /></InputAdornment> }}
+                                    sx={selectSx}
+                                />
+                            </Box>
+                            <Box sx={{ width: 128, flexShrink: 0 }}>
+                                <TextField
+                                    select fullWidth size="small" value={saveColumnSlug}
+                                    onChange={(e) => setSaveColumnSlug(e.target.value)}
+                                    title="Save marks into this gradebook column; name the assessment when prompted."
+                                    sx={selectSx}
+                                >
+                                    {columns.length === 0 ? <MenuItem value="">No columns</MenuItem> : null}
+                                    {columns.map((c) => <MenuItem key={c.slug} value={c.slug}>{c.label}</MenuItem>)}
+                                </TextField>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                onClick={handleSaveColumn}
+                                startIcon={<SaveOutlinedIcon sx={{ fontSize: 14 }} />}
+                                sx={{ height: 32, px: 1.5, flexShrink: 0, fontSize: 10, fontWeight: 700 }}
+                            >
+                                Save
+                            </Button>
+                        </Box>
+                    </Box>
+
+                    {registryClassHint && isClassSelected && !loading && !matrixLoadFailed ? (
+                        <Alert severity="info" sx={{ mx: 2, mt: 1.5, py: 0.25, fontSize: 10, fontWeight: 700, borderRadius: 1.5 }}>
                             {registryClassHint}
-                        </div>
-                    )}
+                        </Alert>
+                    ) : null}
 
-                    {/* Mobile Class Selection Gatekeeper */}
-                    {!isClassSelected && (
-                        <div className="lg:hidden p-6 bg-re-bg/20 flex flex-col items-center justify-center text-center py-12 animate-in fade-in zoom-in-95 duration-500">
-                            <div className="w-16 h-16 bg-white rounded-[2rem] shadow-xl flex items-center justify-center text-re-orange mb-6 border border-black/5 animate-bounce">
-                                <GraduationCap size={32} />
-                            </div>
-                            <h2 className="text-xl font-bold text-re-text mb-2">Select Class</h2>
-                            <p className="text-[10px] text-re-text-muted font-bold leading-relaxed mb-8 max-w-[240px]">Choose a class to start recording academic marks.</p>
-
-                            <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-                                {classes.map(cls => (
-                                    <button
+                    {!isClassSelected ? (
+                        <Box sx={{ display: { xs: 'flex', lg: 'none' }, flexDirection: 'column', px: 3, py: 6, textAlign: 'center', alignItems: 'center', bgcolor: 'rgba(247,248,250,0.4)' }}>
+                            <Box sx={{ width: 64, height: 64, borderRadius: '32px', bgcolor: '#fff', boxShadow: 6, display: 'grid', placeItems: 'center', color: brand.navy, mb: 3, border: `1px solid ${brand.border}` }}>
+                                <SchoolOutlinedIcon sx={{ fontSize: 32 }} />
+                            </Box>
+                            <Typography sx={{ fontSize: 20, fontWeight: 700, color: brand.text, mb: 0.75 }}>Select Class</Typography>
+                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, mb: 4, maxWidth: 240 }}>
+                                Choose a class to start recording academic marks.
+                            </Typography>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, width: '100%', maxWidth: 384 }}>
+                                {classes.map((cls) => (
+                                    <ButtonBase
                                         key={cls}
                                         onClick={() => {
                                             setSelectedClass(cls);
                                             setIsClassSelected(true);
                                         }}
-                                        className="h-16 flex items-center justify-center gap-2.5 bg-white border border-black/5 rounded-2xl shadow-sm hover:border-re-orange/30 hover:bg-re-orange/5 transition-all group active:scale-95 px-4"
+                                        sx={{ height: 64, justifyContent: 'center', gap: 1, px: 2, bgcolor: '#fff', border: `1px solid ${brand.border}`, borderRadius: 2, boxShadow: 1, '&:hover': { borderColor: 'rgba(19,33,61,0.3)', bgcolor: 'rgba(19,33,61,0.05)' } }}
                                     >
-                                        <div className="flex flex-col items-center gap-0.5">
-                                            <span className="text-[10px] font-bold text-re-text group-hover:text-re-orange">{cls}</span>
-                                            <span className="text-[10px] font-medium text-re-text-muted opacity-40 italic">Registry</span>
-                                        </div>
-                                        <ChevronDown size={14} className="text-re-text-muted -rotate-90" />
-                                    </button>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.text }}>{cls}</Typography>
+                                            <Typography sx={{ fontSize: 10, fontWeight: 500, color: brand.muted, fontStyle: 'italic' }}>Registry</Typography>
+                                        </Box>
+                                        <ExpandMoreIcon sx={{ fontSize: 14, color: brand.muted, transform: 'rotate(-90deg)' }} />
+                                    </ButtonBase>
                                 ))}
-                            </div>
-                        </div>
-                    )}
+                            </Box>
+                        </Box>
+                    ) : null}
 
-                    <div className={`${!isClassSelected ? 'hidden lg:block' : 'block'} w-full overflow-hidden`}>
-                        {/* Mobile Table Header */}
-                        {isClassSelected && (
-                            <div className="lg:hidden px-6 py-3 bg-white border-b border-black/5 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-re-orange rounded-full"></div>
-                                    <span className="text-[10px] font-bold text-re-text">{selectedClass} Registry</span>
-                                </div>
-                                <button
-                                    onClick={() => setIsClassSelected(false)}
-                                    className="text-[10px] font-bold text-re-orange hover:underline"
-                                >
-                                    Change Class
-                                </button>
-                            </div>
-                        )}
+                    <Box sx={{ ...tableDisplay, width: '100%', overflow: 'hidden' }}>
+                        {isClassSelected ? (
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ display: { lg: 'none' }, px: 3, py: 1.5, borderBottom: `1px solid ${brand.border}` }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: brand.navy }} />
+                                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.text }}>{selectedClass} Registry</Typography>
+                                </Stack>
+                                <ButtonBase onClick={() => setIsClassSelected(false)}>
+                                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.navy, '&:hover': { textDecoration: 'underline' } }}>
+                                        Change Class
+                                    </Typography>
+                                </ButtonBase>
+                            </Stack>
+                        ) : null}
 
-                        {!loading && isClassSelected && matrixNotice && (
-                            <div
-                                className={`mx-4 mt-4 mb-2 flex gap-3 rounded-xl border px-4 py-3 text-left shadow-sm ${
-                                    matrixLoadFailed
-                                        ? 'border-red-200/90 bg-red-50/90'
-                                        : 'border-amber-200/80 bg-amber-50/90'
-                                }`}
+                        {!loading && isClassSelected && matrixNotice ? (
+                            <Alert
+                                severity={matrixLoadFailed ? 'error' : 'warning'}
+                                icon={<CheckCircleOutlineIcon sx={{ display: 'none' }} />}
+                                sx={{ mx: 2, my: 2, borderRadius: 1.5, '& .MuiAlert-message': { fontSize: 11, fontWeight: 700 } }}
                             >
-                                <AlertCircle
-                                    className={`w-5 h-5 shrink-0 mt-0.5 ${matrixLoadFailed ? 'text-red-600' : 'text-amber-600'}`}
-                                />
-                                <div>
-                                    <p
-                                        className={`text-[10px] font-bold ${
-                                            matrixLoadFailed ? 'text-red-900/90' : 'text-amber-900/90'
-                                        }`}
-                                    >
-                                        {matrixLoadFailed ? 'Gradebook could not load' : 'No students in this class'}
-                                    </p>
-                                    <p className="text-[11px] font-bold text-re-text/90 leading-snug mt-1">{matrixNotice}</p>
-                                </div>
-                            </div>
-                        )}
+                                <Typography sx={{ fontSize: 10, fontWeight: 700 }}>
+                                    {matrixLoadFailed ? 'Gradebook could not load' : 'No students in this class'}
+                                </Typography>
+                                <Typography sx={{ fontSize: 11, fontWeight: 700, mt: 0.5 }}>{matrixNotice}</Typography>
+                            </Alert>
+                        ) : null}
 
-                        {/* Table View */}
-                        <div className="overflow-x-auto custom-scrollbar">
-                            <table className="w-full text-left border-collapse min-w-full">
-                                <thead>
-                                    <tr>
-                                        <th className="bg-re-bg/50 border-b border-r border-black/5 px-2 sm:px-4 py-4 text-[10px] font-bold text-re-text-muted w-10 text-center">#</th>
-                                        <th className="bg-re-bg/50 border-b border-r border-black/5 px-2 sm:px-4 py-4 text-[10px] font-bold text-re-text-muted">Student Details</th>
+                        <TableContainer sx={{ overflowX: 'auto' }}>
+                            <Table sx={{ minWidth: '100%', borderCollapse: 'collapse' }}>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell align="center" sx={{ ...headSx, width: 40 }}>#</TableCell>
+                                        <TableCell sx={headSx}>Student Details</TableCell>
                                         {columns.map((c) => (
-                                            <th
+                                            <TableCell
                                                 key={c.slug}
-                                                className="bg-re-bg/50 border-b border-r border-black/5 px-1 sm:px-4 py-4 text-[10px] font-bold text-re-text-muted w-16 sm:w-24 text-center"
+                                                align="center"
                                                 title={c.default_max_score != null ? `Max ${c.default_max_score}` : undefined}
+                                                sx={{ ...headSx, width: { xs: 64, sm: 96 } }}
                                             >
-                                                <span className="block">{c.label}</span>
-                                                {c.default_max_score != null && (
-                                                    <span className="block text-[10px] font-medium opacity-50">max {c.default_max_score}</span>
-                                                )}
-                                            </th>
+                                                <Box component="span" sx={{ display: 'block' }}>{c.label}</Box>
+                                                {c.default_max_score != null ? (
+                                                    <Box component="span" sx={{ display: 'block', fontSize: 10, fontWeight: 500, opacity: 0.5 }}>
+                                                        max {c.default_max_score}
+                                                    </Box>
+                                                ) : null}
+                                            </TableCell>
                                         ))}
-                                        <th className="bg-re-bg/50 border-b border-r border-black/5 px-1 sm:px-4 py-4 text-[10px] font-bold text-re-text-muted w-12 sm:w-16 text-center">Total</th>
-                                        <th className="bg-re-bg/50 border-b border-black/5 px-1 sm:px-4 py-4 text-[10px] font-bold text-re-text-muted w-12 sm:w-16 text-center">Grade</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-black/5">
+                                        <TableCell align="center" sx={{ ...headSx, borderRight: `1px solid ${brand.border}`, width: { xs: 48, sm: 64 } }}>Total</TableCell>
+                                        <TableCell align="center" sx={{ ...headSx, borderRight: 'none', width: { xs: 48, sm: 64 } }}>Grade</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
                                     {loading ? (
-                                        <tr>
-                                            <td colSpan={4 + columns.length} className="p-12 text-center">
-                                                <div className="w-8 h-8 border-4 border-re-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                                                <p className="text-[10px] font-bold text-re-text-muted">Fetching Central Records...</p>
-                                            </td>
-                                        </tr>
+                                        <TableRow>
+                                            <TableCell colSpan={4 + columns.length} sx={{ p: 6, textAlign: 'center' }}>
+                                                <CircularProgress size={32} sx={{ mb: 2, color: brand.navy }} />
+                                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted }}>
+                                                    Fetching Central Records...
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
                                     ) : matrixLoadFailed ? (
-                                        <tr>
-                                            <td colSpan={8} className="p-8 text-center text-[10px] font-bold text-re-text-muted">
+                                        <TableRow>
+                                            <TableCell colSpan={8} sx={{ p: 4, textAlign: 'center', fontSize: 10, fontWeight: 700, color: brand.muted }}>
                                                 See the alert above - the gradebook did not load.
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     ) : columns.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="p-10 text-center text-[10px] font-bold text-re-text-muted">
+                                        <TableRow>
+                                            <TableCell colSpan={4} sx={{ p: 5, textAlign: 'center', fontSize: 10, fontWeight: 700, color: brand.muted }}>
                                                 No gradebook columns yet. Your school manager can add them under Gradebook columns.
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     ) : marks.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4 + columns.length} className="p-10 text-center">
-                                                <p className="text-[11px] font-bold text-re-text mb-1">No students to display</p>
-                                                <p className="text-[10px] font-bold text-re-text-muted leading-relaxed max-w-lg mx-auto">
+                                        <TableRow>
+                                            <TableCell colSpan={4 + columns.length} sx={{ p: 5, textAlign: 'center' }}>
+                                                <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.text, mb: 0.5 }}>No students to display</Typography>
+                                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, maxWidth: 512, mx: 'auto' }}>
                                                     Details are in the yellow notice above (class name must match the registry).
-                                                </p>
-                                            </td>
-                                        </tr>
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
                                     ) : filteredMarks.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4 + columns.length} className="p-10 text-center text-[10px] font-bold text-re-text-muted">
+                                        <TableRow>
+                                            <TableCell colSpan={4 + columns.length} sx={{ p: 5, textAlign: 'center', fontSize: 10, fontWeight: 700, color: brand.muted }}>
                                                 No students match your search. Clear the search box to see everyone.
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     ) : (
                                         filteredMarks.map((m, idx) => {
                                             const total = calculateTotal(m);
-                                            const grade = calculateGrade(total);
+                                            const grade = gradeFor(total);
                                             return (
-                                                <tr key={m.id} className="hover:bg-re-bg/30 transition-colors group">
-                                                    <td className="border-r border-b border-black/5 px-2 sm:px-4 py-4 text-center text-[10px] font-bold text-gray-300">
+                                                <TableRow key={m.id} hover>
+                                                    <TableCell align="center" sx={{ ...cellSx, fontSize: 10, fontWeight: 700, color: '#D1D5DB' }}>
                                                         {idx + 1}
-                                                    </td>
-                                                    <td className="border-r border-b border-black/5 px-2 sm:px-4 py-4 min-w-0 overflow-hidden">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-re-bg flex-shrink-0 flex items-center justify-center font-bold text-[10px] text-gray-400 border border-black/5 group-hover:bg-white transition-colors">
-                                                                <User size={14} className="opacity-40" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="text-[11px] font-bold text-re-text truncate block">{m.name}</h4>
-                                                                <p className="text-[10px] font-medium text-re-text-muted opacity-40">{m.adm}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
+                                                    </TableCell>
+                                                    <TableCell sx={cellSx}>
+                                                        <Stack direction="row" spacing={1.5} alignItems="center">
+                                                            <Avatar sx={{ width: 32, height: 32, bgcolor: brand.background, color: brand.muted, border: `1px solid ${brand.border}` }}>
+                                                                <PersonOutlineIcon sx={{ fontSize: 14 }} />
+                                                            </Avatar>
+                                                            <Box sx={{ minWidth: 0 }}>
+                                                                <Typography noWrap sx={{ fontSize: 11, fontWeight: 700, color: brand.text }}>{m.name}</Typography>
+                                                                <Typography noWrap sx={{ fontSize: 10, fontWeight: 500, color: 'rgba(107,115,133,0.5)' }}>{m.adm}</Typography>
+                                                            </Box>
+                                                        </Stack>
+                                                    </TableCell>
                                                     {columns.map((c) => (
-                                                        <td key={c.slug} className="border-r border-b border-black/5 px-1.5 sm:px-3 py-3 align-middle">
-                                                            <input
+                                                        <TableCell key={c.slug} sx={{ ...cellSx, px: { xs: 0.75, sm: 1.5 }, py: 1.5 }}>
+                                                            <TextField
                                                                 type="number"
-                                                                inputMode="decimal"
+                                                                size="small"
                                                                 value={m.scores?.[c.slug] ?? ''}
                                                                 onChange={(e) => handleMarkChange(m.id, c.slug, e.target.value)}
-                                                                className={teacherInnerScoreCls}
                                                                 placeholder="-"
+                                                                inputProps={{ inputMode: 'decimal' }}
+                                                                sx={{
+                                                                    width: '100%',
+                                                                    '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: '#fff', fontSize: 12, fontWeight: 700 },
+                                                                    '& input': { textAlign: 'center', px: 0.5, py: 0.75 },
+                                                                }}
                                                             />
-                                                        </td>
+                                                        </TableCell>
                                                     ))}
-                                                    <td className="border-r border-b border-black/5 px-1 sm:px-4 py-4 text-center">
-                                                        <span className="text-sm font-bold text-re-text">{total}</span>
-                                                    </td>
-                                                    <td className="border-b border-black/5 px-1 sm:px-4 py-4 text-center">
-                                                        <div className={`inline-flex h-7 w-7 flex items-center justify-center px-1 py-1 rounded-full text-[10px] font-bold ring-1 ring-inset ${grade.color}`}>
+                                                    <TableCell align="center" sx={{ ...cellSx }}>
+                                                        <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.text }}>{total}</Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center" sx={{ ...cellSx, borderRight: 'none' }}>
+                                                        <Box
+                                                            sx={{
+                                                                display: 'inline-flex',
+                                                                height: 28,
+                                                                minWidth: 28,
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                borderRadius: 99,
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                color: grade.color,
+                                                                bgcolor: grade.bg,
+                                                                boxShadow: `inset 0 0 0 1px ${grade.ring}`,
+                                                            }}
+                                                        >
                                                             {grade.label}
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
                                             );
                                         })
                                     )}
-                                </tbody>
-                            </table>
-                        </div>
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
 
-                        {/* Footer / Actions */}
-                        <div className="px-6 py-5 bg-re-bg/10 border-t border-black/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 text-[10px] font-medium text-re-text-muted opacity-40 italic order-2 sm:order-1">
-                                <Activity size={12} /> Scholastic Analytics Sync Active
-                            </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
-                                <div className="flex items-center gap-3 w-full sm:w-auto">
-                                    <button className="flex-1 sm:flex-none h-12 sm:h-9 px-4 bg-white border border-black/5 text-re-text font-bold text-[10px] rounded-2xl hover:bg-re-bg transition-all flex items-center justify-center gap-2">
-                                        <Printer size={14} /> Print
-                                    </button>
-                                    <button className="flex-1 sm:flex-none h-12 sm:h-9 px-4 bg-white border border-black/5 text-re-text font-bold text-[10px] rounded-2xl hover:bg-re-bg transition-all flex items-center justify-center gap-2">
-                                        <Download size={14} /> Export
-                                    </button>
-                                </div>
-                                <button
-                                    type="button"
+                        <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            alignItems="center"
+                            justifyContent="space-between"
+                            spacing={2}
+                            sx={{ px: 3, py: 2.5, bgcolor: 'rgba(247,248,250,0.1)', borderTop: `1px solid ${brand.border}` }}
+                        >
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ order: { xs: 2, sm: 1 }, color: 'rgba(107,115,133,0.5)' }}>
+                                <TimelineIcon sx={{ fontSize: 13 }} />
+                                <Typography sx={{ fontSize: 10, fontWeight: 500, fontStyle: 'italic' }}>
+                                    Scholastic Analytics Sync Active
+                                </Typography>
+                            </Stack>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ width: { xs: '100%', sm: 'auto' }, order: { xs: 1, sm: 2 } }}>
+                                <Stack direction="row" spacing={1.5}>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<PrintOutlinedIcon sx={{ fontSize: 14 }} />}
+                                        sx={{ flex: { xs: 1, sm: 'none' }, height: { xs: 48, sm: 36 }, px: 2, borderRadius: 2, fontSize: 10, fontWeight: 700, color: brand.text, borderColor: brand.border, bgcolor: '#fff' }}
+                                    >
+                                        Print
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 14 }} />}
+                                        sx={{ flex: { xs: 1, sm: 'none' }, height: { xs: 48, sm: 36 }, px: 2, borderRadius: 2, fontSize: 10, fontWeight: 700, color: brand.text, borderColor: brand.border, bgcolor: '#fff' }}
+                                    >
+                                        Export
+                                    </Button>
+                                </Stack>
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
                                     onClick={handleSaveColumn}
-                                    className="lg:hidden w-full h-14 bg-re-grad-orange text-white font-bold text-sm rounded-2xl shadow-re-glow flex items-center justify-center gap-3 active:scale-95 transition-all"
+                                    startIcon={<SaveOutlinedIcon />}
+                                    sx={{ display: { lg: 'none' }, width: '100%', height: 56, borderRadius: 2, fontSize: 14, fontWeight: 700 }}
                                 >
-                                    <Save size={18} /> Save column marks
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                                    Save column marks
+                                </Button>
+                            </Stack>
+                        </Stack>
+                    </Box>
+                </Paper>
+            </Box>
+        </Box>
     );
 }

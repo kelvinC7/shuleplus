@@ -1,6 +1,15 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Eye, Pencil, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  Eye,
+  History,
+  Pencil,
+  Printer,
+  Trash2,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface AssetsTableColumn<T> {
@@ -26,14 +35,20 @@ interface AssetsDataTableProps<T> {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  pageSizeOptions?: number[];
   loading?: boolean;
   emptyMessage?: string;
   emptyAction?: ReactNode;
   onView?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  onPrint?: (row: T) => void;
+  onHistory?: (row: T) => void;
   canDelete?: (row: T) => boolean;
   canEdit?: (row: T) => boolean;
+  onSort?: (key: string) => void;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 function pageNumbers(current: number, total: number): (number | '...')[] {
@@ -61,17 +76,23 @@ export function AssetsDataTable<T>({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  pageSizeOptions = [5, 10, 20, 50],
   loading,
   emptyMessage = 'No records found',
   emptyAction,
   onView,
   onEdit,
   onDelete,
+  onPrint,
+  onHistory,
   canDelete,
   canEdit,
+  onSort,
+  sortKey,
+  sortDir,
 }: AssetsDataTableProps<T>) {
   const showSelection = Boolean(onSelectRow);
-  const showActions = Boolean(onView || onEdit || onDelete);
+  const showActions = Boolean(onView || onEdit || onDelete || onPrint || onHistory);
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
 
@@ -93,10 +114,27 @@ export function AssetsDataTable<T>({
               )}
               {columns.map((col) => (
                 <th key={col.key} className={`px-4 py-3 text-xs font-medium uppercase tracking-[0.04em] text-muted ${col.className ?? ''}`}>
-                  <span className="inline-flex items-center gap-1">
-                    {col.header}
-                    {col.sortable ? <ChevronsUpDown size={14} className="text-muted/70" /> : null}
-                  </span>
+                  {onSort && col.sortable ? (
+                    <button
+                      type="button"
+                      onClick={() => onSort(col.key)}
+                      className="inline-flex items-center gap-1 uppercase tracking-[0.04em] transition hover:text-navy"
+                    >
+                      {col.header}
+                      <ChevronsUpDown
+                        size={14}
+                        className={sortKey === col.key ? 'text-ochre' : 'text-muted/70'}
+                      />
+                      {sortKey === col.key ? (
+                        <span className="text-[9px] text-ochre">{sortDir === 'desc' ? '▼' : '▲'}</span>
+                      ) : null}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      {col.header}
+                      {col.sortable ? <ChevronsUpDown size={14} className="text-muted/70" /> : null}
+                    </span>
+                  )}
                 </th>
               ))}
               {showActions && (
@@ -175,6 +213,28 @@ export function AssetsDataTable<T>({
                               <Pencil size={16} />
                             </button>
                           ) : null}
+                          {onPrint ? (
+                            <button
+                              type="button"
+                              onClick={() => onPrint(row)}
+                              title="Print"
+                              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-navy"
+                              aria-label="Print"
+                            >
+                              <Printer size={16} />
+                            </button>
+                          ) : null}
+                          {onHistory ? (
+                            <button
+                              type="button"
+                              onClick={() => onHistory(row)}
+                              title="Financial History"
+                              className="rounded-lg p-2 text-slate-500 transition hover:bg-violet-50 hover:text-violet-700"
+                              aria-label="Financial History"
+                            >
+                              <History size={16} />
+                            </button>
+                          ) : null}
                           {onDelete ? (
                             <button
                               type="button"
@@ -249,7 +309,7 @@ export function AssetsDataTable<T>({
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs font-medium text-navy"
             >
-              {[5, 10, 20, 50].map((n) => (
+              {pageSizeOptions.map((n) => (
                 <option key={n} value={n}>
                   {n} / page
                 </option>

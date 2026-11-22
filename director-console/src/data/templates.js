@@ -1,0 +1,4 @@
+export const TPL = {'Fee reminder':['Term 1 2027 fees reminder','Dear {ParentName}, this is a reminder that {StudentName} ({Class}) has a fee balance of {FeeBalance}. Kindly pay via MoMo or bank before 30 Nov. Thank you. St Matthew’s'],
+ 'Early closure':['School closes early on Friday','Dear {ParentName}, school closes at 12:30 this Friday for staff development. Buses leave at 12:45. Please arrange pick-up for {StudentName}. St Matthew’s'],
+ 'Results out':['Mid-term results are ready','Dear {ParentName}, {StudentName}’s mid-term report for {Class} is now available in the Shule+ parent app. St Matthew’s'],
+ 'Event invite':['Invitation: Sports Day, 7 November','Dear {ParentName}, you are warmly invited to Sports Day on Saturday 7 Nov from 09:00. {StudentName} and {Class} look forward to seeing you. St Matthew’s']};

@@ -14,7 +14,7 @@ MODULES=(
   Academic TichaPortal SchoolFeesPortal Budget Payroll HR Attendance
   ActionPlanMIS ProcurementMIS InventoryMIS AssetsPortal Cafeteria Timetable
   ParentMIS NesaDashboard BabyeyiWizard KaziAvance StudentDiscpline SampleModule
-  ShuleKitMIS TaskMIS SchoolUniformMIS StudentManagement Library MiniWebsite PrintCardMIS
+  ShuleKitMIS TaskMIS SchoolUniformMIS StudentManagement Library MiniWebsite PrintCardMIS InternalChat ShuleTrip
 )
 
 declare -A PM_BACK=(
@@ -30,6 +30,8 @@ declare -A PM_BACK=(
   [Library]=library-api
   [MiniWebsite]=mini-website-api
   [PrintCardMIS]=print-card-api
+  [InternalChat]=chat-api
+  [ShuleTrip]=shule-trip-api
 )
 declare -A PM_FRONT=(
   [Authentication]=auth-web
@@ -44,6 +46,8 @@ declare -A PM_FRONT=(
   [Library]=library-web
   [MiniWebsite]=mini-website-web
   [PrintCardMIS]=print-card-web
+  [InternalChat]=chat-web
+  [ShuleTrip]=shule-trip-web
 )
 
 cd "$REPO" || exit 1

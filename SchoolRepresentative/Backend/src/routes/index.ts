@@ -1,0 +1,46 @@
+import { Router } from 'express';
+import contextRoutes from './context.routes';
+import overviewRoutes from './overview.routes';
+import branchesRoutes from './branches.routes';
+import approvalsRoutes from './approvals.routes';
+import peopleRoutes from './people.routes';
+import academicsRoutes from './academics.routes';
+import financeRoutes from './finance.routes';
+import notificationsRoutes from './notifications.routes';
+import incidentsRoutes from './incidents.routes';
+import teachingRoutes from './teaching.routes';
+import attendanceReportRoutes from './attendance-report.routes';
+import transportRoutes from './transport.routes';
+import communicationRoutes from './communication.routes';
+import servicesRoutes from './services.routes';
+import tasksRoutes from './tasks.routes';
+import meetingsRoutes from './meetings.routes';
+import auditRoutes from './audit.routes';
+import searchRoutes from './search.routes';
+import reportsRoutes from './reports.routes';
+import requestsRoutes from './requests.routes';
+
+const router = Router();
+
+router.use('/', contextRoutes);
+router.use('/', overviewRoutes);
+router.use('/', branchesRoutes);
+router.use('/', approvalsRoutes);
+router.use('/', requestsRoutes);
+router.use('/', peopleRoutes);
+router.use('/', academicsRoutes);
+router.use('/', financeRoutes);
+router.use('/', notificationsRoutes);
+router.use('/', incidentsRoutes);
+router.use('/', teachingRoutes);
+router.use('/', attendanceReportRoutes);
+router.use('/', transportRoutes);
+router.use('/', communicationRoutes);
+router.use('/', servicesRoutes);
+router.use('/', tasksRoutes);
+router.use('/', meetingsRoutes);
+router.use('/', auditRoutes);
+router.use('/', searchRoutes);
+router.use('/', reportsRoutes);
+
+export default router;

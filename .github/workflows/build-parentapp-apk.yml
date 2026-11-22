@@ -1,0 +1,104 @@
+name: Build ParentApp APK
+
+on:
+  push:
+    branches:
+      - feature/parentApp
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-parentapp-apk:
+    name: Build yoShule Parent APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install dependencies and build web app
+        working-directory: ParentMIS/ParentApp
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_STUDENT_API_URL: ${{ secrets.VITE_STUDENT_API_URL }}
+        run: |
+          npm install --no-package-lock
+          npm run build
+          npx cap sync android
+
+      - name: Prepare Android version and signing
+        id: signing
+        working-directory: ParentMIS/ParentApp/android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          PARENT_KEYSTORE_BASE64: ${{ secrets.PARENT_KEYSTORE_BASE64 }}
+        run: |
+          sed -i "s/versionCode [0-9]*/versionCode ${BUILD_NUMBER}/" app/build.gradle
+          mkdir -p "$GITHUB_WORKSPACE/apk-out"
+          if [ -n "$PARENT_KEYSTORE_BASE64" ]; then
+            printf '%s' "$PARENT_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and stage APK
+        working-directory: ParentMIS/ParentApp/android
+        env:
+          SIGNING_AVAILABLE: ${{ steps.signing.outputs.available }}
+          PARENT_KEYSTORE_PASSWORD: ${{ secrets.PARENT_KEYSTORE_PASSWORD }}
+          PARENT_KEY_ALIAS: ${{ secrets.PARENT_KEY_ALIAS }}
+          PARENT_KEY_PASSWORD: ${{ secrets.PARENT_KEY_PASSWORD }}
+        run: |
+          if [ "$SIGNING_AVAILABLE" = "true" ]; then
+            ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
+              -Pandroid.injected.signing.store.password="$PARENT_KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$PARENT_KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$PARENT_KEY_PASSWORD"
+            cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/apk-out/yoShule-Parent-release.apk"
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/apk-out/yoShule-Parent-debug.apk"
+          fi
+
+      - name: Release APK on GitHub
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: parentapp-build-${{ github.run_number }}
+          name: "yoShule Parent App (Build #${{ github.run_number }})"
+          body: |
+            Automated APK build for yoShule Parent App.
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Run: #${{ github.run_number }}
+          files: apk-out/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: yoShule-Parent-apk-${{ github.run_number }}
+          path: apk-out/*.apk
+          if-no-files-found: error
+          retention-days: 1

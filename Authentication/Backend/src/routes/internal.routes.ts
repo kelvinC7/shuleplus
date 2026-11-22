@@ -19,6 +19,13 @@ import {
 import { AppError } from '../middleware/error.middleware';
 import { UserStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
+import {
+  changeShuleTripOfficialPassword,
+  getShuleTripOfficialProfile,
+  updateShuleTripOfficialProfile,
+  verifyShuleTripOfficialPortalLogin,
+} from '../services/shule-trip-official-internal.service';
+import { z } from 'zod';
 
 const router = Router();
 const uploadRoot = path.resolve(process.cwd(), process.env.UPLOAD_DIR ?? 'uploads');
@@ -84,6 +91,34 @@ router.get(
   '/organizations/:organizationId/profile',
   requireServiceKey,
   (req, res, next) => organizationProfileController.getProfile(req, res, next)
+);
+
+/** Service-to-service: verify org admin email (ShuleTrip Student Management connect, etc.). */
+router.get(
+  '/organizations/:organizationId/verify-admin-email',
+  requireServiceKey,
+  async (req, res, next) => {
+    try {
+      const organizationId = String(req.params.organizationId);
+      const email = typeof req.query.email === 'string' ? req.query.email.trim() : '';
+      if (!email) throw new AppError(400, 'email query is required');
+      const user = await prisma.user.findFirst({
+        where: {
+          organizationId,
+          email: { equals: email, mode: 'insensitive' },
+          status: UserStatus.ACTIVE,
+          userRoles: { some: { role: { slug: ROLES.ORGANIZATION_ADMIN } } },
+        },
+        select: { id: true, email: true, firstName: true, lastName: true },
+      });
+      res.json({
+        success: true,
+        data: { valid: Boolean(user), admin: user },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 );
 
 /** Service-to-service: resolve IAM user by org + email (Payroll → Teacher Portal linking). */
@@ -361,6 +396,70 @@ router.post(
     }
   }
 );
+
+router.get('/shule-trip/officials/:userId/profile', requireServiceKey, async (req, res, next) => {
+  try {
+    const profile = await getShuleTripOfficialProfile(String(req.params.userId));
+    if (!profile) throw new AppError(404, 'Official account not found');
+    res.json({ success: true, data: profile });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/shule-trip/officials/:userId/profile', requireServiceKey, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().min(1).optional(),
+        phone: z.string().min(9).nullable().optional(),
+      })
+      .parse(req.body);
+    const data = await updateShuleTripOfficialProfile(String(req.params.userId), body);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/shule-trip/officials/:userId/change-password', requireServiceKey, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(8),
+      })
+      .parse(req.body);
+    const data = await changeShuleTripOfficialPassword(
+      String(req.params.userId),
+      body.currentPassword,
+      body.newPassword
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** ShuleTrip public login: verify Super Admin–provisioned government officials (IAM bcrypt passwords). */
+router.post('/shule-trip/official-login', requireServiceKey, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        identifier: z.string().min(3),
+        password: z.string().min(1),
+      })
+      .parse(req.body);
+    const official = await verifyShuleTripOfficialPortalLogin(body.identifier, body.password);
+    if (!official) {
+      throw new AppError(401, 'Invalid credentials');
+    }
+    res.json({ success: true, data: official });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * Super-admin branding upload during registration.

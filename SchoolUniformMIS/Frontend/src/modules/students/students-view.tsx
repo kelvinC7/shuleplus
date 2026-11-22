@@ -6,6 +6,7 @@ import {
   BookOpen,
   GraduationCap,
   Plus,
+  RefreshCw,
   Upload,
   UserRound,
 } from "lucide-react";
@@ -40,6 +41,7 @@ export function StudentsView() {
   const [rows, setRows] = useState<UniformStudent[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
   const [openImport, setOpenImport] = useState(false);
   const [hasStudentManagement, setHasStudentManagement] = useState<
@@ -100,6 +102,23 @@ export function StudentsView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      const result = await uniformApi.students.syncAcademic();
+      toast.success(
+        `Synced ${result.fetched} students (${result.created} new, ${result.updated} updated)`,
+      );
+      await Promise.all([load(), detectStudentManagement()]);
+    } catch {
+      toast.error(
+        "Sync failed. Check the Student Management connection and try again.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function createLocal() {
     if (!form.firstName.trim() || !form.lastName.trim()) {
@@ -223,21 +242,31 @@ export function StudentsView() {
 
   const subtitle =
     hasStudentManagement === null
-      ? "Checking Student Management…"
+      ? "Checking student roster…"
       : hasStudentManagement
         ? smReachable
-          ? `Linked to Student Management · ${smCount || rows.length} students · updates automatically`
+          ? `${smCount || rows.length} students synced from Student Management`
           : smConfigured
-            ? "Student Management API is configured but unreachable. Ensure it is running on port 3052."
-            : "Student Management is licensed but STUDENT_MANAGEMENT_API_URL is not set on Uniform backend"
-        : "No Student Management module. Add students manually or upload a spreadsheet.";
+            ? "Student Management is unavailable. Retry the sync or check the connection."
+            : "Student roster sync is not configured on this server."
+        : "Add students manually or import a spreadsheet.";
 
   return (
     <PlatformPageLayout
       title="Student Profiles"
       subtitle={subtitle}
       actions={
-        hasStudentManagement ? null : (
+        hasStudentManagement ? (
+          <button
+            type="button"
+            className="btn-secondary !py-2"
+            disabled={syncing}
+            onClick={() => void syncNow()}
+          >
+            <RefreshCw className={syncing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+            {syncing ? "Syncing…" : "Sync now"}
+          </button>
+        ) : (
           <>
             <button
               type="button"
@@ -259,9 +288,17 @@ export function StudentsView() {
     >
       <div className="space-y-4">
         {hasStudentManagement === false ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Student Management module not licensed. Add students manually or
             import a spreadsheet.
+          </div>
+        ) : null}
+
+        {hasStudentManagement === true && !smReachable ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {smConfigured
+              ? "Student Management is not reachable. Student profiles will appear after a successful sync."
+              : "Student roster sync is not configured on this server."}
           </div>
         ) : null}
 
@@ -280,7 +317,7 @@ export function StudentsView() {
           loading={loading || hasStudentManagement === null}
           emptyMessage={
             hasStudentManagement
-              ? "No students yet. Register students in Student Management — they will appear here automatically."
+              ? "No students yet. Register students in Student Management. They will appear here automatically."
               : "No students yet. Add manually or import a file."
           }
           emptyAction={
@@ -434,15 +471,14 @@ export function StudentsView() {
         </div>
       ) : null}
 
-      {openImport ? (
-        <StudentImportWizard
-          onClose={() => setOpenImport(false)}
-          onDone={() => {
-            setOpenImport(false);
-            void load();
-          }}
-        />
-      ) : null}
+      <StudentImportWizard
+        open={openImport}
+        onClose={() => setOpenImport(false)}
+        onImported={() => {
+          setOpenImport(false);
+          void load();
+        }}
+      />
     </PlatformPageLayout>
   );
 }

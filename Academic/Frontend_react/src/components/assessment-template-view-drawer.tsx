@@ -67,12 +67,14 @@ export function AssessmentTemplateViewDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: fullScreen ? '100%' : { xs: '100%', sm: 440, md: 480 },
-          maxWidth: '100vw',
-          borderTopLeftRadius: fullScreen ? 0 : 16,
-          borderBottomLeftRadius: fullScreen ? 0 : 16,
+      slotProps={{
+        paper: {
+          sx: {
+            width: fullScreen ? '100%' : { xs: '100%', sm: 440, md: 480 },
+            maxWidth: '100vw',
+            borderTopLeftRadius: fullScreen ? 0 : 16,
+            borderBottomLeftRadius: fullScreen ? 0 : 16,
+          },
         },
       }}
     >
@@ -137,10 +139,12 @@ export function AssessmentTemplateViewDrawer({
                 </Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mt: 2 }}>
                   <Meta label="Education level" value={educationLevelLabel(template.academicLevel)} />
-                  <Meta label="Default marks" value={String(template.defaultCourseMarks ?? 100)} />
                   <Meta label="Academic year" value={template.academicYear} />
                   <Meta label="Term" value={termDisplayLabel(template.term)} />
                 </Box>
+                <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 1.5, lineHeight: 1.45 }}>
+                  Course total marks: Timetable → Config Class (per course).
+                </Typography>
               </Box>
 
               <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>

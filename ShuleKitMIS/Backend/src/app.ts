@@ -23,6 +23,9 @@ export function createApp() {
         if (corsOrigins.includes('*') || corsOrigins.includes(origin)) {
           return callback(null, origin);
         }
+        if (origin === 'https://localhost' || origin === 'capacitor://localhost') {
+          return callback(null, origin);
+        }
         if (shuleplusOrigin.test(origin)) {
           return callback(null, origin);
         }

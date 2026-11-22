@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  BookOpen,
-  CalendarClock,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Eye,
-  Loader2,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import TeacherPageShell, { tpActionBtn, tpActionBtnPrimary } from '../../components/TeacherPageShell';
+import { useNavigate } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import Checkbox from '@mui/material/Checkbox';
+import AddIcon from '@mui/icons-material/Add';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ButtonBase from '@mui/material/ButtonBase';
+import Divider from '@mui/material/Divider';
+import FormControl from '@mui/material/FormControl';
+import Select from '@mui/material/Select';
+import { PageLoading, EmptyState } from '../../components/ui';
+import { NavyStats } from '../../components/ListPageKit';
 import useTpAcademic from '../../hooks/useTpAcademic';
 import { fetchMyCourses, tpApiError } from '../../services/teacherPortalApi';
 import {
@@ -21,121 +29,21 @@ import {
   deleteHomework,
   fetchHomeworkList,
   fetchHomeworkStats,
+  publishHomework,
 } from '../../services/homeworkApi';
 import CreateHomeworkModal from './CreateHomeworkModal';
 import { TP_EMPTY } from '../../utils/tpEmpty';
-import { STATUS_BADGES, TYPE_LABELS, formatDueDate, formatSubmissionCount } from './utils';
+import { TYPE_LABELS, formatDueDate, formatSubmissionCount } from './utils';
+import { brand } from '../../theme/theme';
 
 const QUICK_FILTERS = [
+  { id: '', label: 'All' },
   { id: 'active', label: 'Active' },
   { id: 'dueToday', label: 'Due today' },
   { id: 'pendingReview', label: 'Pending review' },
   { id: 'completed', label: 'Completed' },
 ];
-
 const PAGE_SIZE = 8;
-
-const STATUS_ACCENT = {
-  DRAFT: 'bg-slate-400',
-  ACTIVE: 'bg-emerald-500',
-  PUBLISHED: 'bg-emerald-500',
-  DUE_SOON: 'bg-amber-500',
-  OVERDUE: 'bg-red-500',
-  CLOSED: 'bg-slate-400',
-  ARCHIVED: 'bg-slate-300',
-};
-
-const iconBtn =
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-black/[0.08] bg-white text-slate-600 shadow-sm transition hover:border-[#000435]/20 hover:text-[#000435] disabled:opacity-40';
-const iconBtnDanger = `${iconBtn} hover:border-red-200 hover:bg-red-50 hover:text-red-600`;
-
-function HomeworkRowActions({ item, onView, onEdit, onDelete, busyId }) {
-  const busy = busyId === item.id;
-  return (
-    <div className="inline-flex flex-nowrap items-center justify-end gap-1.5">
-      <button type="button" className={iconBtn} title="View" onClick={() => onView(item.id)}>
-        <Eye className="h-4 w-4" strokeWidth={1.75} />
-      </button>
-      <button type="button" className={iconBtn} title="Edit" onClick={() => onEdit(item.id)}>
-        <Pencil className="h-4 w-4" strokeWidth={1.75} />
-      </button>
-      <button type="button" className={iconBtnDanger} title="Delete" disabled={busy} onClick={() => onDelete(item.id)}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" strokeWidth={1.75} />}
-      </button>
-    </div>
-  );
-}
-
-function HomeworkMobileCard({ item, index, selected, onToggle, rowNumber, actions }) {
-  const accent = STATUS_ACCENT[item.status] || STATUS_ACCENT.DRAFT;
-  const typeLabel = TYPE_LABELS[item.homeworkType] || item.homeworkType;
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white">
-      <div className={`h-1 ${accent}`} aria-hidden />
-      <div className="p-3">
-        <div className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={() => onToggle(item.id)}
-            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#000435]"
-            aria-label={`Select ${item.title}`}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">#{rowNumber}</span>
-                <h3 className="font-semibold text-[#000435]">{item.title}</h3>
-                <p className="text-xs text-slate-500">
-                  {item.className} · {item.courseName}
-                </p>
-              </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_BADGES[item.status] || STATUS_BADGES.DRAFT}`}>
-                {(item.status || 'DRAFT').replace('_', ' ')}
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5">
-                <ClipboardList className="h-3 w-3" /> {typeLabel}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <CalendarClock className="h-3 w-3" /> {formatDueDate(item.dueDate)}
-              </span>
-              <span>{formatSubmissionCount(item)} submitted</span>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 border-t border-black/[0.05] pt-3">{actions}</div>
-      </div>
-    </article>
-  );
-}
-
-function PaginationBar({ page, totalPages, total, onPage }) {
-  if (totalPages <= 1) {
-    return (
-      <p className="text-xs text-slate-500">
-        {total} record{total === 1 ? '' : 's'}
-      </p>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-slate-500">
-        Page {page} of {totalPages} · {total} total
-      </p>
-      <div className="flex gap-1">
-        <button type="button" className={tpActionBtn} disabled={page <= 1} onClick={() => onPage(page - 1)}>
-          <ChevronLeft className="h-4 w-4" /> Prev
-        </button>
-        <button type="button" className={tpActionBtn} disabled={page >= totalPages} onClick={() => onPage(page + 1)}>
-          Next <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function HomeworkPage() {
   const navigate = useNavigate();
@@ -190,8 +98,14 @@ export default function HomeworkPage() {
     setPage(1);
   }, [filters, statFilter]);
 
-  const classOptions = useMemo(() => [...new Set(assignments.map((a) => a.classLabel || a.className).filter(Boolean))], [assignments]);
-  const courseOptions = useMemo(() => [...new Set(assignments.map((a) => a.subjectName).filter(Boolean))], [assignments]);
+  const classOptions = useMemo(
+    () => [...new Set(assignments.map((a) => a.classLabel || a.className).filter(Boolean))],
+    [assignments]
+  );
+  const courseOptions = useMemo(
+    () => [...new Set(assignments.map((a) => a.subjectName).filter(Boolean))],
+    [assignments]
+  );
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -227,7 +141,7 @@ export default function HomeworkPage() {
       const created = await createHomework(payload);
       if (!asDraft) await publishHomework(created.id);
       setModalOpen(false);
-      setMessage(asDraft ? 'Homework saved as draft.' : 'Homework published. Parents will see it in Homework Center.');
+      setMessage(asDraft ? 'Homework saved as draft.' : 'Homework published.');
       await load();
     } catch (err) {
       setMessage(tpApiError(err, 'Could not save homework'));
@@ -264,214 +178,273 @@ export default function HomeworkPage() {
     }
   }
 
-  const rowActionsProps = {
-    onView: (id) => navigate(`/homework/${id}`),
-    onEdit: (id) => navigate(`/homework/${id}`),
-    onDelete: handleDelete,
-    busyId,
-  };
-
   const shellStats = [
-    { label: 'Active', value: loading ? TP_EMPTY : (stats?.active ?? TP_EMPTY) },
-    { label: 'Due today', value: loading ? TP_EMPTY : (stats?.dueToday ?? TP_EMPTY) },
-    { label: 'Pending review', value: loading ? TP_EMPTY : (stats?.pendingReview ?? TP_EMPTY) },
-    { label: 'Completed', value: loading ? TP_EMPTY : (stats?.completed ?? TP_EMPTY) },
-    {
-      label: 'Avg score',
-      value: loading ? TP_EMPTY : stats?.averageScore != null ? `${stats.averageScore}%` : TP_EMPTY,
-    },
+    { label: 'Active', value: loading ? TP_EMPTY : stats?.active ?? TP_EMPTY },
+    { label: 'Due today', value: loading ? TP_EMPTY : stats?.dueToday ?? TP_EMPTY },
+    { label: 'Pending review', value: loading ? TP_EMPTY : stats?.pendingReview ?? TP_EMPTY },
+    { label: 'Completed', value: loading ? TP_EMPTY : stats?.completed ?? TP_EMPTY },
   ];
 
-  const shellActions = (
-    <>
-      <button type="button" onClick={() => setModalOpen(true)} className={`${tpActionBtnPrimary} w-full sm:w-auto`}>
-        <Plus className="h-4 w-4" /> Create homework
-      </button>
-      {selected.size > 0 && (
-        <button type="button" className={`${tpActionBtn} w-full text-red-600 sm:w-auto`} onClick={() => void handleBulkDelete()}>
-          <Trash2 className="h-4 w-4" /> Delete ({selected.size})
-        </button>
-      )}
-      <div className="-mx-1 flex w-full gap-1.5 overflow-x-auto px-1 pb-0.5 sm:ml-auto sm:w-auto sm:flex-wrap sm:overflow-visible">
-        {QUICK_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => setStatFilter((cur) => (cur === f.id ? '' : f.id))}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              statFilter === f.id ? 'bg-[#000435] text-white' : 'border border-black/[0.08] bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-
   return (
-    <TeacherPageShell title="Homework" subtitle="Create and track homework for your classes" stats={shellStats} actions={shellActions}>
-      {message && (
-        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</div>
-      )}
+    <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column', pb: { xs: 10, md: 4 } }}>
+      {/* Sticky status tabs */}
+      <Box
+        role="tablist"
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 22,
+          display: 'flex',
+          bgcolor: '#fff',
+          borderBottom: '1px solid rgba(19,33,61,0.08)',
+          overflowX: 'auto',
+        }}
+      >
+        {QUICK_FILTERS.map((f) => {
+          const active = statFilter === f.id;
+          return (
+            <ButtonBase
+              key={f.id || 'all'}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setStatFilter(f.id)}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                maxWidth: '100%',
+                py: 1.2,
+                px: 0.5,
+                borderRadius: 0,
+                fontSize: { xs: 11, sm: 12.5 },
+                fontWeight: 700,
+                color: active ? brand.navy : 'rgba(19,33,61,0.45)',
+                borderBottom: active ? `2px solid ${brand.navy}` : '2px solid transparent',
+                bgcolor: active ? 'rgba(19,33,61,0.03)' : 'transparent',
+              }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  display: 'block',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  px: 0.25,
+                }}
+              >
+                {f.label}
+              </Box>
+            </ButtonBase>
+          );
+        })}
+      </Box>
 
-      <div className="tp-card overflow-hidden p-0">
-        <div className="tp-card-header flex flex-col gap-3 border-b border-black/[0.06] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          <div>
-            <h3 className="text-sm font-semibold text-[#000435]">All assignments</h3>
-            <p className="text-xs text-slate-500">
-              {loading ? 'Loading…' : `${items.length} item${items.length === 1 ? '' : 's'}`}
-              {academicYear && term ? ` · ${term} · ${academicYear}` : ''}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3 border-b border-black/[0.06] bg-slate-50/40 p-3 sm:p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              className="tp-input border-black/[0.06] bg-white pl-10 shadow-sm"
-              placeholder="Search homework…"
+      {/* Sticky filter bar */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 42,
+          zIndex: 20,
+          bgcolor: '#fff',
+          borderBottom: '1px solid rgba(19,33,61,0.08)',
+          boxShadow: '0 2px 8px -4px rgba(19,33,61,0.12)',
+        }}
+      >
+        <Stack direction="row" alignItems="center" sx={{ px: 1.5, py: 0.25 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FormControl variant="standard" size="small" fullWidth>
+              <Select
+                variant="standard"
+                disableUnderline
+                displayEmpty
+                value={filters.className}
+                onChange={(e) => setFilters((f) => ({ ...f, className: e.target.value }))}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: brand.navy,
+                  '&:before, &:after': { borderBottom: 'none !important' },
+                  '& .MuiSelect-select': { py: 0.75, pr: '24px !important' },
+                }}
+                inputProps={{ 'aria-label': 'Class' }}
+              >
+                <MenuItem value="">All classes</MenuItem>
+                {classOptions.map((c) => (
+                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+          <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FormControl variant="standard" size="small" fullWidth>
+              <Select
+                variant="standard"
+                disableUnderline
+                displayEmpty
+                value={filters.course}
+                onChange={(e) => setFilters((f) => ({ ...f, course: e.target.value }))}
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: brand.navy,
+                  '&:before, &:after': { borderBottom: 'none !important' },
+                  '& .MuiSelect-select': { py: 0.75, pr: '24px !important' },
+                }}
+                inputProps={{ 'aria-label': 'Course' }}
+              >
+                <MenuItem value="">All courses</MenuItem>
+                {courseOptions.map((c) => (
+                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+          <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 1.25, display: { xs: 'none', sm: 'block' } }} />
+          <Box sx={{ flex: 1.3, minWidth: 0, display: { xs: 'none', sm: 'block' } }}>
+            <Box
+              component="input"
+              type="search"
               value={filters.search}
-              onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Search homework…"
+              sx={{
+                width: '100%',
+                border: 'none',
+                outline: 'none',
+                bgcolor: 'transparent',
+                py: 0.75,
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                color: brand.navy,
+                '&::placeholder': { color: 'rgba(19,33,61,0.35)', fontWeight: 500 },
+              }}
             />
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <select className="tp-input bg-white text-sm" value={filters.className} onChange={(e) => setFilters((p) => ({ ...p, className: e.target.value }))}>
-              <option value="">All classes</option>
-              {classOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <select className="tp-input bg-white text-sm" value={filters.course} onChange={(e) => setFilters((p) => ({ ...p, course: e.target.value }))}>
-              <option value="">All courses</option>
-              {courseOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <select className="tp-input bg-white text-sm" value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}>
-              <option value="">All statuses</option>
-              {['DRAFT', 'ACTIVE', 'DUE_SOON', 'OVERDUE', 'CLOSED', 'ARCHIVED'].map((s) => (
-                <option key={s} value={s}>
-                  {s.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          </Box>
+        </Stack>
+        <Box sx={{ display: { xs: 'block', sm: 'none' }, px: 1.5, py: 0.5, borderTop: '1px solid rgba(19,33,61,0.08)' }}>
+          <Box
+            component="input"
+            type="search"
+            value={filters.search}
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+            placeholder="Search homework…"
+            sx={{
+              width: '100%',
+              border: 'none',
+              outline: 'none',
+              bgcolor: 'transparent',
+              py: 0.5,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              color: brand.navy,
+              '&::placeholder': { color: 'rgba(19,33,61,0.35)' },
+            }}
+          />
+        </Box>
+      </Box>
+
+      <Stack spacing={2} sx={{ width: '100%', maxWidth: 1200, mx: 'auto', p: { xs: 1.25, md: 2 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1.25}>
+          <Box>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, color: brand.navy }}>Homework</Typography>
+            <Typography sx={{ fontSize: 12, color: 'rgba(19,33,61,0.45)' }}>Assign work, track submissions and review.</Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setModalOpen(true)}
+            sx={{ textTransform: 'none', fontWeight: 700, bgcolor: brand.navy, color: '#fff', '&:hover': { bgcolor: '#1B2D52' }, width: { xs: '100%', sm: 'auto' } }}
+          >
+            Create homework
+          </Button>
+        </Stack>
+
+        {message ? (
+          <Alert severity="info" onClose={() => setMessage(null)} sx={{ borderRadius: 1 }}>
+            {message}
+          </Alert>
+        ) : null}
+
+        <NavyStats stats={shellStats} />
+
+        {selected.size > 0 ? (
+          <Button color="error" variant="outlined" onClick={() => void handleBulkDelete()} sx={{ alignSelf: 'flex-start', fontWeight: 700, textTransform: 'none' }}>
+            Delete {selected.size} selected
+          </Button>
+        ) : null}
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading homework…
-          </div>
-        ) : items.length === 0 ? (
-          <div className="px-4 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
-              <BookOpen className="h-7 w-7 text-slate-400" />
-            </div>
-            <p className="mt-4 font-semibold text-[#000435]">No homework yet</p>
-            <p className="mx-auto mt-1 max-w-xs text-sm text-slate-500">Create an assignment for one of your classes. Parents see it in Homework Center.</p>
-            <button type="button" onClick={() => setModalOpen(true)} className={`${tpActionBtnPrimary} mt-5 inline-flex items-center gap-2`}>
-              <Plus className="h-4 w-4" /> Create homework
-            </button>
-          </div>
+          <PageLoading label="Loading homework…" />
+        ) : !pageItems.length ? (
+          <EmptyState title="No homework found" description="Create an assignment or adjust filters." />
         ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[960px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-black/[0.06] bg-slate-50/90 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        onChange={togglePageAll}
-                        className="h-4 w-4 rounded border-slate-300"
-                        aria-label="Select all on page"
-                      />
-                    </th>
-                    <th className="w-12 px-2 py-3">#</th>
-                    <th className="px-3 py-3">Homework</th>
-                    <th className="px-3 py-3">Class</th>
-                    <th className="px-3 py-3">Course</th>
-                    <th className="px-3 py-3">Type</th>
-                    <th className="px-3 py-3">Due</th>
-                    <th className="px-3 py-3">Submissions</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="w-[8.5rem] px-3 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04]">
-                  {pageItems.map((item, idx) => {
-                    const rowNum = (safePage - 1) * PAGE_SIZE + idx + 1;
-                    return (
-                      <tr key={item.id} className={`transition ${selected.has(item.id) ? 'bg-[#000435]/[0.03]' : 'hover:bg-slate-50/70'}`}>
-                        <td className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(item.id)}
-                            onChange={() => toggleOne(item.id)}
-                            className="h-4 w-4 rounded border-slate-300"
-                            aria-label={`Select row ${rowNum}`}
-                          />
-                        </td>
-                        <td className="px-2 py-3 text-xs font-medium text-slate-400">{rowNum}</td>
-                        <td className="px-3 py-3">
-                          <Link to={`/homework/${item.id}`} className="font-medium text-[#000435] hover:underline">
-                            {item.title}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-3 text-slate-600">{item.className}</td>
-                        <td className="px-3 py-3 text-slate-600">{item.courseName}</td>
-                        <td className="px-3 py-3">
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                            {TYPE_LABELS[item.homeworkType] || item.homeworkType}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-3 text-slate-600">{formatDueDate(item.dueDate)}</td>
-                        <td className="px-3 py-3 tabular-nums text-slate-600">{formatSubmissionCount(item)}</td>
-                        <td className="px-3 py-3">
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGES[item.status] || STATUS_BADGES.DRAFT}`}>
-                            {(item.status || 'DRAFT').replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <HomeworkRowActions item={item} {...rowActionsProps} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="space-y-3 p-3 md:hidden">
-              {pageItems.map((item, idx) => {
-                const rowNum = (safePage - 1) * PAGE_SIZE + idx + 1;
-                return (
-                  <HomeworkMobileCard
-                    key={item.id}
-                    item={item}
-                    index={idx}
-                    rowNumber={rowNum}
-                    selected={selected.has(item.id)}
-                    onToggle={toggleOne}
-                    actions={<HomeworkRowActions item={item} {...rowActionsProps} />}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="border-t border-black/[0.06] bg-white px-3 py-3 sm:px-4">
-              <PaginationBar page={safePage} totalPages={totalPages} total={items.length} onPage={setPage} />
-            </div>
-          </>
+          <Paper elevation={0} sx={{ borderRadius: 2, border: `1px solid ${brand.border}`, overflow: 'hidden' }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${brand.border}` }}>
+              <Checkbox checked={allPageSelected} onChange={togglePageAll} size="small" />
+              <Typography sx={{ fontSize: 12, color: brand.muted, fontWeight: 600 }}>Select page</Typography>
+              <Box sx={{ ml: 'auto', borderRadius: 999, bgcolor: '#F1F5F9', px: 1, py: 0.25, fontSize: 10, fontWeight: 700, color: '#64748B' }}>
+                {items.length}
+              </Box>
+            </Stack>
+            {pageItems.map((item, idx) => (
+              <Stack
+                key={item.id}
+                direction="row"
+                spacing={1}
+                alignItems="flex-start"
+                sx={{
+                  px: 1.5,
+                  py: 1.35,
+                  bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                  borderBottom: idx < pageItems.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none',
+                }}
+              >
+                <Checkbox checked={selected.has(item.id)} onChange={() => toggleOne(item.id)} size="small" sx={{ mt: -0.25 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontWeight: 700, fontSize: 14, color: brand.navy }}>{item.title}</Typography>
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                    <Chip size="small" label={item.status || '—'} sx={{ height: 22, fontWeight: 700, fontSize: 10 }} />
+                    <Chip size="small" variant="outlined" label={TYPE_LABELS?.[item.type] || item.type || 'Homework'} sx={{ height: 22, fontSize: 10 }} />
+                    <Typography sx={{ fontSize: 11.5, color: brand.muted, alignSelf: 'center' }}>
+                      Due {formatDueDate(item.dueDate)} · {formatSubmissionCount(item)} submitted
+                    </Typography>
+                  </Stack>
+                </Box>
+                <Stack direction="row" spacing={0.25}>
+                  <IconButton size="small" onClick={() => navigate(`/homework/${item.id}`)} aria-label="View">
+                    <VisibilityOutlinedIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    disabled={busyId === item.id}
+                    onClick={() => void handleDelete(item.id)}
+                    aria-label="Delete"
+                    sx={{ color: brand.danger }}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            ))}
+            {totalPages > 1 ? (
+              <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ py: 1.25, borderTop: `1px solid ${brand.border}` }}>
+                <IconButton size="small" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                  <ChevronLeftIcon fontSize="small" />
+                </IconButton>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: brand.navy }}>
+                  {safePage} / {totalPages}
+                </Typography>
+                <IconButton size="small" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                  <ChevronRightIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            ) : null}
+          </Paper>
         )}
-      </div>
+      </Stack>
 
       <CreateHomeworkModal
         open={modalOpen}
@@ -482,6 +455,6 @@ export default function HomeworkPage() {
         term={term}
         assignments={assignments}
       />
-    </TeacherPageShell>
+    </Box>
   );
 }

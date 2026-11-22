@@ -219,6 +219,21 @@ export default function CoursesPage() {
               ))}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 150, display: { xs: 'flex', md: 'none' } }}>
+            <InputLabel>Section</InputLabel>
+            <Select
+              label="Section"
+              value={section ?? 'all'}
+              onChange={(e) => setSection(e.target.value === 'all' ? null : e.target.value)}
+            >
+              <MenuItem value="all">All sections</MenuItem>
+              {sections.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <ToggleButtonGroup
             exclusive
             size="small"

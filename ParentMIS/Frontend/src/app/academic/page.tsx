@@ -11,7 +11,18 @@ import { api } from '@/services/api';
 function AcademicInner() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const defaultTab = tabParam === 'schedule' ? 'schedule' : tabParam === 'reports' ? 'reports' : 'marks';
+  const activeTab =
+    tabParam === 'schedule'
+      ? 'schedule'
+      : tabParam === 'exams'
+        ? 'exams'
+        : tabParam === 'reports'
+          ? 'reports'
+          : tabParam === 'marks'
+            ? 'marks'
+            : tabParam === 'feedback'
+              ? 'feedback'
+              : 'overview';
   const { activeStudentId, linkedStudents, summary } = useAuth();
   const schoolDefaults: SchoolAcademicSettings | undefined = summary?.schoolAcademic;
   const code = linkedStudents.find((s) => s.id === activeStudentId)?.shuleCode;
@@ -32,7 +43,11 @@ function AcademicInner() {
   }, [activeStudentId, code, academicYear, term]);
 
   const load = useCallback(async () => {
-    if (!activeStudentId) return;
+    if (!activeStudentId) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -70,7 +85,7 @@ function AcademicInner() {
       data={data}
       loading={loading}
       error={error}
-      defaultTab={defaultTab === 'schedule' ? 'schedule' : defaultTab === 'reports' ? 'reports' : 'marks'}
+      activeTab={activeTab}
       activeStudentId={activeStudentId ?? ''}
       academicYear={academicYear || data?.filters.academicYear || ''}
       term={term || data?.filters.term || ''}

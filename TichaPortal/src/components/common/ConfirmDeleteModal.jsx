@@ -1,5 +1,15 @@
-import React, { useEffect } from 'react';
-import { Loader2, Trash2, X } from 'lucide-react';
+import Drawer from '@mui/material/Drawer';
+import Dialog from '@mui/material/Dialog';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import { brand } from '../../theme/theme';
 
 /**
  * @param {{ open: boolean; title?: string; description?: string; itemLabel?: string; loading?: boolean; onCancel: () => void; onConfirm: () => void | Promise<void> }} props
@@ -13,85 +23,137 @@ export default function ConfirmDeleteModal({
   onCancel,
   onConfirm,
 }) {
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape' && !loading) onCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [open, loading, onCancel]);
+    const isDesktop = useMediaQuery('(min-width:1200px)', { noSsr: true });
 
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000435]/55 p-4 backdrop-blur-[2px]"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-delete-title"
-      onClick={() => {
-        if (!loading) onCancel();
-      }}
-    >
-      <div
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+  const body = (
+    <>
+      <Box
+        sx={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 1.5,
+          borderBottom: '1px solid #E5E8EF',
+        }}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <div className="flex gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
-              <Trash2 size={20} />
-            </div>
-            <div>
-              <h2 id="confirm-delete-title" className="text-base font-bold text-[#000435]">
-                {title}
-              </h2>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">{description}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onCancel}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <Box sx={{ position: 'absolute', top: 6, width: 36, height: 4, borderRadius: 2, bgcolor: '#D5D9E3', display: { lg: 'none' } }} />
+        <Typography id="confirm-delete-title" sx={{ fontSize: 14, fontWeight: 800, mt: 0.5, color: brand.navy }}>
+          {title}
+        </Typography>
+        <IconButton
+          onClick={onCancel}
+          disabled={loading}
+          size="small"
+          aria-label="Close"
+          sx={{ position: 'absolute', right: 8, top: 8 }}
+        >
+          <CloseRoundedIcon fontSize="small" />
+        </IconButton>
+      </Box>
 
+      <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+        <Typography sx={{ fontSize: 13.5, lineHeight: 1.5, color: '#475569', textAlign: 'center' }}>
+          {description}
+        </Typography>
         {itemLabel ? (
-          <div className="mx-5 mt-4 rounded-md border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm font-medium text-[#000435]">
+          <Box
+            sx={{
+              mt: 1.75,
+              px: 1.5,
+              py: 1.25,
+              borderRadius: 2,
+              bgcolor: '#F2F4F8',
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: brand.navy,
+              textAlign: 'center',
+            }}
+          >
             {itemLabel}
-          </div>
+          </Box>
         ) : null}
+      </Box>
 
-        <div className="flex flex-col-reverse gap-2 px-5 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            disabled={loading}
+      <Box sx={{ p: 1.5, pb: 'calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid #E5E8EF' }}>
+        <Stack direction="row" spacing={1}>
+          <Button
+            fullWidth
             onClick={onCancel}
-            className="h-10 rounded-md border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            disabled={loading}
+            sx={{
+              height: 48,
+              borderRadius: 999,
+              border: '1px solid #E5E8EF',
+              color: brand.navy,
+              fontWeight: 700,
+              textTransform: 'none',
+            }}
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            disabled={loading}
+          </Button>
+          <Button
+            fullWidth
             onClick={() => void onConfirm()}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            disabled={loading}
+            variant="contained"
+            startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon sx={{ fontSize: 18 }} />}
+            sx={{
+              height: 48,
+              borderRadius: 999,
+              bgcolor: '#DC2626',
+              fontWeight: 800,
+              textTransform: 'none',
+              '&:hover': { bgcolor: '#B91C1C' },
+            }}
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            Delete permanently
-          </button>
-        </div>
-      </div>
-    </div>
+            Delete
+          </Button>
+        </Stack>
+      </Box>
+    </>
+  );
+
+  return (
+    <>
+      {isDesktop ? (
+        <Dialog
+          open={Boolean(open)}
+          onClose={loading ? undefined : onCancel}
+          transitionDuration={{ enter: 180, exit: 120 }}
+          PaperProps={{
+            role: 'dialog',
+            'aria-labelledby': 'confirm-delete-title',
+            sx: { width: '100%', maxWidth: 440, m: 2, overflow: 'hidden', backgroundImage: 'none' },
+          }}
+          slotProps={{ backdrop: { sx: { bgcolor: 'rgba(11,18,32,0.45)', backdropFilter: 'blur(2px)' } } }}
+        >
+          {body}
+        </Dialog>
+      ) : (
+        <Drawer
+          anchor="bottom"
+          open={Boolean(open)}
+          onClose={loading ? undefined : onCancel}
+          PaperProps={{
+            role: 'dialog',
+            'aria-labelledby': 'confirm-delete-title',
+            sx: {
+              width: '100%',
+              maxWidth: 480,
+              mx: 'auto',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              bgcolor: '#fff',
+              boxShadow: '0 -12px 40px rgba(0,4,53,0.28)',
+              overflow: 'hidden',
+            },
+          }}
+          slotProps={{ backdrop: { sx: { bgcolor: 'rgba(0,2,31,0.55)' } } }}
+        >
+          {body}
+        </Drawer>
+      )}
+    </>
   );
 }

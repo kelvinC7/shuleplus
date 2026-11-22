@@ -1,6 +1,7 @@
 import {
   AttendanceStatus,
   CardStatus,
+  DeviceSchoolLinkStatus,
   DeviceStatus,
   NotificationChannel,
   PermissionStatus,
@@ -14,6 +15,7 @@ import { prisma } from "../config/database";
 import { AppError } from "../middleware/error.middleware";
 import {
   computeAttendanceDisplay,
+  lateThresholdMinutes,
   staffDepartmentFromLevel,
   staffRoleFromLevel,
 } from "../utils/attendance-display.util";
@@ -29,14 +31,19 @@ import {
 } from "../clients/student-management.client";
 import {
   fetchStaffByRfidUid,
+  fetchStaffApprovedLeaveToday,
   countOrganizationStaffRoster,
   isStaffIntegrationEnabled,
+  lookupStaffByRfidGlobally,
   type StaffMember,
+  type RfidStaffHit,
 } from "../clients/staff-integration.client";
+import { isDisciplineIntegrationEnabled, tryDisciplinePermissionExit } from "../clients/discipline.client";
 import { fetchAcademicContext } from "../clients/academic-settings.client";
 import { isPresentStatus, resolvePeriod } from "../utils/attendance-period";
 import { parentMisClient } from "../clients/parent-mis.client";
 import { notificationClient } from "../clients/notification.client";
+import { notifyStaffAttendanceTap } from "../clients/ticha-portal-push.client";
 import { writeAudit } from "./seed.service";
 
 function uniqueCodes(values: Array<string | null | undefined>): string[] {
@@ -114,10 +121,15 @@ type ScheduleSettings = {
   maxExitTime: string;
   attendanceClosingTime: string;
   enableLateDetection: boolean;
+  graceMinutes?: number;
 };
 
 function resolveTapDirection(
-  _settings: Pick<ScheduleSettings, "schoolEnds">,
+  ctx: {
+    settings: { exitOpensAt?: string | null; schoolEnds: string; maxExitTime: string };
+    resolvedSchoolEnds: string;
+    nowMin: number;
+  },
   record: { entryTime?: Date | null; exitTime?: Date | null } | null,
   input: {
     direction?: TapDirection | string;
@@ -134,13 +146,32 @@ function resolveTapDirection(
   }
 
   if (input.device?.direction === TapDirection.EXIT) {
-    // Exit reader but no entry yet today → treat as arrival (misconfigured reader or first scan)
-    if (!record?.entryTime) return TapDirection.ENTRY;
+    if (!record?.entryTime) {
+      const exitOpensAt = resolveExitOpensAt(ctx.settings, ctx.resolvedSchoolEnds);
+      if (
+        isExitWindowOpen(exitOpensAt, ctx.settings.maxExitTime, ctx.nowMin) &&
+        ctx.nowMin >= parseHm(exitOpensAt)
+      ) {
+        return TapDirection.EXIT;
+      }
+      return TapDirection.ENTRY;
+    }
     return TapDirection.EXIT;
   }
 
   if (input.device?.direction === TapDirection.ENTRY) {
     return TapDirection.ENTRY;
+  }
+
+  // Single reader: after exit opens, first tap with no entry today → checkout (dismissal)
+  if (!record?.entryTime && !record?.exitTime) {
+    const exitOpensAt = resolveExitOpensAt(ctx.settings, ctx.resolvedSchoolEnds);
+    if (
+      isExitWindowOpen(exitOpensAt, ctx.settings.maxExitTime, ctx.nowMin) &&
+      ctx.nowMin >= parseHm(exitOpensAt)
+    ) {
+      return TapDirection.EXIT;
+    }
   }
 
   return TapDirection.ENTRY;
@@ -158,12 +189,56 @@ function isEntryWindowOpen(settings: ScheduleSettings, nowMin: number) {
   return nowMin < end;
 }
 
+const HM_RE = /^\d{2}:\d{2}$/;
+
+function normalizeHmField(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const s = String(value).trim().slice(0, 5);
+  return HM_RE.test(s) ? s : null;
+}
+
+/** API + HTML time inputs expect HH:mm (24h). */
+export function serializeAttendanceSettings<T extends Record<string, unknown>>(row: T) {
+  return {
+    ...row,
+    exitOpensAt: normalizeHmField(row.exitOpensAt) ?? null,
+    schoolStarts: normalizeHmField(row.schoolStarts) ?? row.schoolStarts,
+    lateStarts: normalizeHmField(row.lateStarts) ?? row.lateStarts,
+    schoolEnds: normalizeHmField(row.schoolEnds) ?? row.schoolEnds,
+    maxExitTime: normalizeHmField(row.maxExitTime) ?? row.maxExitTime,
+    attendanceClosingTime:
+      normalizeHmField(row.attendanceClosingTime) ?? row.attendanceClosingTime,
+    weekendStart: normalizeHmField(row.weekendStart) ?? row.weekendStart,
+  };
+}
+
+/** Gate checkout opens at Attendance Settings → Exit opens, else resolved school end for that person/day. */
+function resolveExitOpensAt(
+  settings: { exitOpensAt?: string | null; schoolEnds: string },
+  resolvedSchoolEnds: string
+): string {
+  const custom = settings.exitOpensAt?.trim();
+  if (custom && HM_RE.test(custom)) return custom;
+  return resolvedSchoolEnds;
+}
+
+/** Exit taps (incl. second scan on one reader) allowed only between exit opens and latest exit. */
+function isExitWindowOpen(exitOpensAt: string, maxExitTime: string, nowMin: number) {
+  const opens = parseHm(exitOpensAt);
+  const closes = parseHm(maxExitTime);
+  if (opens <= closes) {
+    return nowMin >= opens && nowMin <= closes;
+  }
+  // Overnight window (unusual): open after exitOpens OR before maxExit next day
+  return nowMin >= opens || nowMin <= closes;
+}
+
 function formatSchoolForSms(schoolName: string): string {
   return (schoolName.trim() || "Ishuri").toLocaleUpperCase("en-US");
 }
 
 function buildBilingualSms(
-  kind: "entry" | "exit" | "absent",
+  kind: "entry" | "exit" | "absent" | "permission_exit",
   studentName: string,
   timeStr: string,
   schoolName: string,
@@ -182,6 +257,12 @@ function buildBilingualSms(
       `English: Your child ${studentName} left ${school} at ${timeStr} using ShuleCard.`
     );  
   }
+  if (kind === "permission_exit") {
+    return (
+      `ShulePlus : ${school}: Umwana wawe ${studentName} yasohotse ku ishuri saa ${timeStr} kubera uruhushya rwemewe.\n` +
+      `English: Your child ${studentName} left ${school} at ${timeStr} under approved permission.`
+    );
+  }
   const classSuffix = className ? ` (${className})` : "";
   return (
     `ShulePlus : ${school}: Umwana wawe ${studentName} ntiyaje ku ishuri uyu munsi${classSuffix}. Hamagara ishuri niba bitari bisanzwe.\n` +
@@ -190,7 +271,7 @@ function buildBilingualSms(
 }
 
 function buildBilingualParentMessage(
-  kind: "entry" | "exit" | "absent",
+  kind: "entry" | "exit" | "absent" | "permission_exit",
   studentName: string,
   dateStr: string,
   timeStr: string,
@@ -211,6 +292,12 @@ function buildBilingualParentMessage(
       `English: Your child ${studentName} left ${school} at ${timeStr} on ${dateStr} using ShuleCard.`
     );
   }
+  if (kind === "permission_exit") {
+    return (
+      `ShulePlus : ${school}: Umwana wawe ${studentName} yasohotse saa ${timeStr} (${dateStr}) kubera uruhushya rwemewe. ` +
+      `English: Your child ${studentName} left ${school} at ${timeStr} on ${dateStr} under approved permission.`
+    );
+  }
   return (
     `ShulePlus : ${school}: Umwana wawe ${studentName} ntiyaje ku ishuri ku itariki ${dateStr} (${cls}). Hamagara ishuri niba bitari bisanzwe. ` +
     `English: Your child ${studentName} was marked absent from ${school} on ${dateStr}. Please contact the school if unexpected.`
@@ -222,6 +309,7 @@ function gateReasonFromError(statusCode: number, message: string): string {
   if (lower.includes("already checked in")) return "ALREADY_CHECKED_IN";
   if (lower.includes("already checked out")) return "ALREADY_CHECKED_OUT";
   if (lower.includes("entry window closed")) return "ENTRY_CLOSED";
+  if (lower.includes("exit not open")) return "EXIT_NOT_OPEN";
   if (lower.includes("exit window closed")) return "EXIT_CLOSED";
   const reasonByCode: Record<number, string> = {
     404: "UNKNOWN_CARD",
@@ -262,7 +350,7 @@ export async function getOrCreateSettings(organizationId: string) {
       nextTerm !== settings.term ||
       nextSchool !== settings.schoolName
     ) {
-      return prisma.attendanceSettings.update({
+      const synced = await prisma.attendanceSettings.update({
         where: { organizationId },
         data: {
           academicYear: nextYear,
@@ -270,12 +358,13 @@ export async function getOrCreateSettings(organizationId: string) {
           ...(nextSchool ? { schoolName: nextSchool } : {}),
         },
       });
+      return serializeAttendanceSettings(synced) as typeof synced;
     }
   } catch {
     /* IAM optional */
   }
 
-  return settings;
+  return serializeAttendanceSettings(settings) as typeof settings;
 }
 
 /** Super Admin / service: ensure gate SMS channel is on for this school. */
@@ -289,7 +378,7 @@ export async function enableAttendanceSmsChannel(organizationId: string) {
 
 export async function updateSettings(organizationId: string, body: Record<string, unknown>) {
   await getOrCreateSettings(organizationId);
-  return prisma.attendanceSettings.update({
+  const updated = await prisma.attendanceSettings.update({
     where: { organizationId },
     data: {
       ...(body.enableEntry !== undefined ? { enableEntry: Boolean(body.enableEntry) } : {}),
@@ -315,6 +404,9 @@ export async function updateSettings(organizationId: string, body: Record<string
       ...(body.schoolStarts !== undefined ? { schoolStarts: String(body.schoolStarts) } : {}),
       ...(body.lateStarts !== undefined ? { lateStarts: String(body.lateStarts) } : {}),
       ...(body.schoolEnds !== undefined ? { schoolEnds: String(body.schoolEnds) } : {}),
+      ...(body.exitOpensAt !== undefined
+        ? { exitOpensAt: normalizeHmField(body.exitOpensAt) }
+        : {}),
       ...(body.maxExitTime !== undefined ? { maxExitTime: String(body.maxExitTime) } : {}),
       ...(body.weekendStart !== undefined ? { weekendStart: String(body.weekendStart) } : {}),
       ...(body.attendanceClosingTime !== undefined
@@ -326,15 +418,24 @@ export async function updateSettings(organizationId: string, body: Record<string
       ...(body.schoolName !== undefined ? { schoolName: String(body.schoolName) } : {}),
     },
   });
+  return serializeAttendanceSettings(updated) as typeof updated;
 }
 
-function resolveEntryStatus(settings: ScheduleSettings, at: Date = new Date()) {
+function resolveEntryStatus(settings: ScheduleSettings, at: Date = new Date(), isStaff = false) {
   if (!settings.enableLateDetection) return AttendanceStatus.PRESENT;
   const now = nowMinutes(at);
-  const start = parseHm(settings.schoolStarts);
-  const late = parseHm(settings.lateStarts);
-  if (now <= start) return AttendanceStatus.PRESENT;
-  if (now <= late) return AttendanceStatus.PRESENT;
+  const threshold = lateThresholdMinutes(
+    {
+      schoolStarts: settings.schoolStarts,
+      lateStarts: settings.lateStarts,
+      schoolEnds: settings.schoolEnds,
+      attendanceClosingTime: settings.attendanceClosingTime,
+      graceMinutes: settings.graceMinutes ?? 0,
+      enableLateDetection: settings.enableLateDetection,
+    },
+    isStaff
+  );
+  if (now <= threshold) return AttendanceStatus.PRESENT;
   return AttendanceStatus.LATE;
 }
 
@@ -342,7 +443,7 @@ async function queueParentNotify(
   organizationId: string,
   studentName: string,
   studentId: string | null | undefined,
-  kind: "entry" | "exit" | "absent",
+  kind: "entry" | "exit" | "absent" | "permission_exit",
   when: Date,
   className?: string | null,
   extra?: {
@@ -390,7 +491,14 @@ async function queueParentNotify(
   const message = buildBilingualParentMessage(kind, studentName, dateStr, timeStr, schoolName, className);
   const smsBody = buildBilingualSms(kind, studentName, timeStr, schoolName, className);
 
-  const title = kind === "entry" ? "Student Arrival" : kind === "exit" ? "Student Departure" : "Student Absent";
+  const title =
+    kind === "entry"
+      ? "Student Arrival"
+      : kind === "exit"
+        ? "Student Departure"
+        : kind === "permission_exit"
+          ? "Permission Exit"
+          : "Student Absent";
 
   // One SMS blast per student per kind per school day (blocks spam from retries / multi-parent dupes)
   const { start: dayStart, end: dayEnd } = kigaliDayBounds(when);
@@ -599,7 +707,7 @@ async function queueParentNotify(
 
   if (sendParentApp) {
     const eventType = kind === "entry" ? "RFID_ENTRY" : kind === "exit" ? "RFID_EXIT" : "ABSENT";
-    void parentMisClient.ingestAttendanceEvent({
+    const notification = await parentMisClient.ingestAttendanceEvent({
       organizationId,
       studentId: resolvedStudentId,
       studentCode: extra?.studentCode ?? resolvedStudentId,
@@ -619,6 +727,9 @@ async function queueParentNotify(
         at: when.toISOString(),
       },
     });
+    if (notification?.matched === 0) {
+      console.warn(`[Attendance] No ParentMIS recipients matched for ${studentName} (${extra?.studentCode ?? resolvedStudentId})`);
+    }
   }
 
   if (!sendSms) {
@@ -874,7 +985,15 @@ export async function liveMonitor(
   ]);
   const devices = await syncDevicePresence(devicesRaw);
   const { enrichMovementRecords } = await import("./people.service");
-  const movement = await enrichMovementRecords(organizationId, movementListed);
+  const movementSerialized = await serializeAttendanceRecordsForApi(organizationId, movementListed);
+  const movementEnriched = await enrichMovementRecords(organizationId, movementListed);
+  const movement = movementEnriched.map((row, index) => ({
+    ...row,
+    ...movementSerialized[index],
+    personType:
+      movementSerialized[index]?.personType ??
+      (row.level?.startsWith("STAFF:") ? ("STAFF" as const) : ("STUDENT" as const)),
+  }));
 
   const smsByStudent = new Map<string, { status: string; detail: string; sentAt: string }>();
   for (const n of recentSms) {
@@ -1256,16 +1375,98 @@ export async function deviceHeartbeat(
   };
 }
 
+function normalizeKeyPart(value: unknown) {
+  const s = String(value ?? "").trim();
+  return s || null;
+}
+function normalizeEmailKey(value: unknown) {
+  const s = normalizeKeyPart(value);
+  return s ? s.toLowerCase() : null;
+}
+
+async function ensurePrimaryDeviceLink(deviceId: string, organizationId: string) {
+  await prisma.rfidDeviceSchool.upsert({
+    where: { deviceId_organizationId: { deviceId, organizationId } },
+    create: { deviceId, organizationId, isPrimary: true, status: DeviceSchoolLinkStatus.ACTIVE },
+    update: { isPrimary: true, status: DeviceSchoolLinkStatus.ACTIVE },
+  });
+}
+
+async function getDeviceAllowedOrganizationIds(device: { id: string; organizationId: string }) {
+  const links = await prisma.rfidDeviceSchool.findMany({
+    where: { deviceId: device.id, status: DeviceSchoolLinkStatus.ACTIVE },
+    select: { organizationId: true, isPrimary: true },
+  });
+  const ids = new Set<string>([device.organizationId]);
+  for (const l of links) ids.add(l.organizationId);
+  return [...ids];
+}
+
+async function getDeviceAllowedOrganizations(deviceId: string) {
+  const device = await prisma.rfidDevice.findUnique({
+    where: { id: deviceId },
+    select: { id: true, organizationId: true, deletedAt: true },
+  });
+  if (!device || device.deletedAt) return [];
+  return getDeviceAllowedOrganizationIds(device);
+}
+
+async function deviceSchoolLinksMap(deviceIds: string[]) {
+  if (!deviceIds.length) return new Map<string, Array<{ organizationId: string; isPrimary: boolean; status: string }>>();
+  const links = await prisma.rfidDeviceSchool.findMany({
+    where: { deviceId: { in: deviceIds } },
+    select: { deviceId: true, organizationId: true, isPrimary: true, status: true },
+  });
+  const map = new Map<string, Array<{ organizationId: string; isPrimary: boolean; status: string }>>();
+  for (const l of links) {
+    const arr = map.get(l.deviceId) ?? [];
+    arr.push({ organizationId: l.organizationId, isPrimary: l.isPrimary, status: String(l.status) });
+    map.set(l.deviceId, arr);
+  }
+  return map;
+}
+
+function decorateDeviceForOrg<T extends { id: string; organizationId: string }>(
+  device: T,
+  organizationId: string,
+  links: Array<{ organizationId: string; isPrimary: boolean; status: string }>
+) {
+  const active = links.filter((l) => l.status === "ACTIVE");
+  const linkedSchools = active.map((l) => l.organizationId);
+  const linkedCount = linkedSchools.length || 1;
+  const primaryOrg = active.find((l) => l.isPrimary)?.organizationId || device.organizationId;
+  const isShared = linkedCount > 1;
+  const isPrimaryForOrg = organizationId === primaryOrg || organizationId === device.organizationId;
+  return {
+    ...device,
+    primaryOrganizationId: primaryOrg,
+    linkedOrganizationIds: linkedSchools.length ? linkedSchools : [device.organizationId],
+    linkedSchoolsCount: linkedCount,
+    isShared,
+    accessRole: isPrimaryForOrg ? "PRIMARY" : "SHARED",
+  };
+}
+
 export async function listDevices(organizationId: string) {
   const { aliases } = await resolveOrganizationAliases(organizationId);
+  const linkRows = await prisma.rfidDeviceSchool.findMany({
+    where: { organizationId: { in: aliases }, status: DeviceSchoolLinkStatus.ACTIVE },
+    select: { deviceId: true },
+  });
+  const linkedIds = [...new Set(linkRows.map((r) => r.deviceId))];
   const devices = await prisma.rfidDevice.findMany({
     where: {
       deletedAt: null,
-      OR: aliases.map((id) => ({ organizationId: id })),
+      OR: [
+        { organizationId: { in: aliases } },
+        ...(linkedIds.length ? [{ id: { in: linkedIds } }] : []),
+      ],
     },
     orderBy: { name: "asc" },
   });
-  return syncDevicePresence(devices);
+  const synced = await syncDevicePresence(devices);
+  const linksMap = await deviceSchoolLinksMap(synced.map((d) => d.id));
+  return synced.map((d) => decorateDeviceForOrg(d, organizationId, linksMap.get(d.id) ?? []));
 }
 
 function isPrismaUniqueViolation(err: unknown): boolean {
@@ -1275,6 +1476,25 @@ function isPrismaUniqueViolation(err: unknown): boolean {
     "code" in err &&
     (err as { code: string }).code === "P2002"
   );
+}
+
+async function findManagedDevice(organizationId: string, id: string) {
+  const { aliases } = await resolveOrganizationAliases(organizationId);
+  const device = await prisma.rfidDevice.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+      OR: [
+        { organizationId: { in: aliases } },
+        { schoolLinks: { some: { organizationId: { in: aliases }, status: DeviceSchoolLinkStatus.ACTIVE } } },
+      ],
+    },
+    include: { schoolLinks: true },
+  });
+  if (!device) throw new AppError(404, "Device not found");
+  const primaryAliases = aliases;
+  const isPrimaryManager = primaryAliases.includes(device.organizationId);
+  return { device, aliases, isPrimaryManager };
 }
 
 export async function createDevice(
@@ -1325,6 +1545,12 @@ export async function createDevice(
           },
         });
 
+    await prisma.rfidDeviceSchool.updateMany({
+      where: { deviceId: device.id },
+      data: { isPrimary: false },
+    });
+    await ensurePrimaryDeviceLink(device.id, canonicalId);
+
     await prisma.deviceLog.create({
       data: {
         organizationId: canonicalId,
@@ -1339,13 +1565,15 @@ export async function createDevice(
   if (explicitCode) {
     const existing = await findDeviceByCodeGlobal(explicitCode);
     if (existing?.deletedAt == null) {
-      throw new AppError(409, `Device code ${explicitCode} already exists for this school`);
+      throw new AppError(409, `Device code ${explicitCode} already exists`);
     }
     try {
-      return await persistDevice(explicitCode, existing);
+      const device = await persistDevice(explicitCode, existing);
+      const links = await prisma.rfidDeviceSchool.findMany({ where: { deviceId: device.id } });
+      return decorateDeviceForOrg(device, canonicalId, links.map((l) => ({ organizationId: l.organizationId, isPrimary: l.isPrimary, status: String(l.status) })));
     } catch (err) {
       if (isPrismaUniqueViolation(err)) {
-        throw new AppError(409, `Device code ${explicitCode} already exists for this school`);
+        throw new AppError(409, `Device code ${explicitCode} already exists`);
       }
       throw err;
     }
@@ -1357,7 +1585,9 @@ export async function createDevice(
     if (existing?.deletedAt == null) continue;
 
     try {
-      return await persistDevice(deviceCode, existing);
+      const device = await persistDevice(deviceCode, existing);
+      const links = await prisma.rfidDeviceSchool.findMany({ where: { deviceId: device.id } });
+      return decorateDeviceForOrg(device, canonicalId, links.map((l) => ({ organizationId: l.organizationId, isPrimary: l.isPrimary, status: String(l.status) })));
     } catch (err) {
       if (isPrismaUniqueViolation(err)) continue;
       throw err;
@@ -1367,17 +1597,84 @@ export async function createDevice(
   throw new AppError(503, "No available device code for this school");
 }
 
-export async function rotateDeviceApiKey(organizationId: string, id: string) {
-  const device = await prisma.rfidDevice.findFirst({
-    where: { id, organizationId, deletedAt: null },
+export async function listDeviceSchools(organizationId: string, deviceId: string) {
+  const { device } = await findManagedDevice(organizationId, deviceId);
+  const links = await prisma.rfidDeviceSchool.findMany({
+    where: { deviceId: device.id },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
   });
-  if (!device) throw new AppError(404, "Device not found");
+  return links.map((l) => ({
+    id: l.id,
+    deviceId: l.deviceId,
+    organizationId: l.organizationId,
+    isPrimary: l.isPrimary,
+    status: String(l.status),
+    createdAt: l.createdAt,
+    updatedAt: l.updatedAt,
+  }));
+}
+
+export async function linkDeviceToSchool(
+  actingOrganizationId: string,
+  deviceId: string,
+  targetOrganizationId: string
+) {
+  const targetOrg = String(targetOrganizationId || "").trim();
+  if (!targetOrg) throw new AppError(400, "target school (organizationId) is required");
+  const { device } = await findManagedDevice(actingOrganizationId, deviceId);
+  if (targetOrg === device.organizationId) {
+    await ensurePrimaryDeviceLink(device.id, device.organizationId);
+  } else {
+    await prisma.rfidDeviceSchool.upsert({
+      where: { deviceId_organizationId: { deviceId: device.id, organizationId: targetOrg } },
+      create: { deviceId: device.id, organizationId: targetOrg, isPrimary: false, status: DeviceSchoolLinkStatus.ACTIVE },
+      update: { status: DeviceSchoolLinkStatus.ACTIVE },
+    });
+  }
+  await prisma.deviceLog.create({
+    data: {
+      organizationId: actingOrganizationId,
+      deviceId: device.id,
+      event: "SCHOOL_LINKED",
+      detail: `Linked school ${targetOrg}`,
+    },
+  });
+  return listDeviceSchools(actingOrganizationId, deviceId);
+}
+
+export async function unlinkDeviceFromSchool(
+  actingOrganizationId: string,
+  deviceId: string,
+  targetOrganizationId: string
+) {
+  const targetOrg = String(targetOrganizationId || "").trim();
+  const { device } = await findManagedDevice(actingOrganizationId, deviceId);
+  if (targetOrg === device.organizationId) {
+    throw new AppError(400, "Primary school cannot be unlinked. Transfer or delete the device instead.");
+  }
+  await prisma.rfidDeviceSchool.updateMany({
+    where: { deviceId: device.id, organizationId: targetOrg },
+    data: { status: DeviceSchoolLinkStatus.INACTIVE },
+  });
+  await prisma.deviceLog.create({
+    data: {
+      organizationId: actingOrganizationId,
+      deviceId: device.id,
+      event: "SCHOOL_UNLINKED",
+      detail: `Unlinked school ${targetOrg}`,
+    },
+  });
+  return listDeviceSchools(actingOrganizationId, deviceId);
+}
+
+export async function rotateDeviceApiKey(organizationId: string, id: string) {
+  const { device } = await findManagedDevice(organizationId, id);
   const updated = await prisma.rfidDevice.update({
-    where: { id },
+    where: { id: device.id },
     data: { apiKey: generateDeviceApiKey() },
   });
   await prisma.deviceLog.create({
-    data: { organizationId, deviceId: id, event: "API_KEY_ROTATED", detail: "Device API key regenerated" },
+    data: { organizationId, deviceId: device.id, event: "API_KEY_ROTATED", detail: "Device API key regenerated" },
   });
   return { id: updated.id, deviceCode: updated.deviceCode, apiKey: updated.apiKey };
 }
@@ -1387,12 +1684,9 @@ export async function updateDevice(
   id: string,
   body: Record<string, unknown>
 ) {
-  const device = await prisma.rfidDevice.findFirst({
-    where: { id, organizationId, deletedAt: null },
-  });
-  if (!device) throw new AppError(404, "Device not found");
-  return prisma.rfidDevice.update({
-    where: { id },
+  const { device } = await findManagedDevice(organizationId, id);
+  const updated = await prisma.rfidDevice.update({
+    where: { id: device.id },
     data: {
       ...(body.name !== undefined ? { name: String(body.name) } : {}),
       ...(body.location !== undefined ? { location: String(body.location) } : {}),
@@ -1409,21 +1703,29 @@ export async function updateDevice(
       lastSeenAt: new Date(),
     },
   });
+  const links = await prisma.rfidDeviceSchool.findMany({ where: { deviceId: updated.id } });
+  return decorateDeviceForOrg(updated, organizationId, links.map((l) => ({ organizationId: l.organizationId, isPrimary: l.isPrimary, status: String(l.status) })));
 }
 
 export async function deleteDevice(organizationId: string, id: string) {
-  const device = await prisma.rfidDevice.findFirst({
-    where: { id, organizationId, deletedAt: null },
-  });
-  if (!device) throw new AppError(404, "Device not found");
+  const { device, isPrimaryManager } = await findManagedDevice(organizationId, id);
+  if (!isPrimaryManager) {
+    // Shared school removing its access: unlink instead of deleting physical device
+    await unlinkDeviceFromSchool(organizationId, id, organizationId);
+    return { id: device.id, deleted: false, unlinked: true };
+  }
   await prisma.rfidDevice.update({
-    where: { id },
+    where: { id: device.id },
     data: { deletedAt: new Date(), status: DeviceStatus.DISABLED },
   });
-  await prisma.deviceLog.create({
-    data: { organizationId, deviceId: id, event: "DELETED", detail: "Device removed" },
+  await prisma.rfidDeviceSchool.updateMany({
+    where: { deviceId: device.id },
+    data: { status: DeviceSchoolLinkStatus.INACTIVE },
   });
-  return { id, deleted: true };
+  await prisma.deviceLog.create({
+    data: { organizationId, deviceId: device.id, event: "DELETED", detail: "Device removed" },
+  });
+  return { id: device.id, deleted: true };
 }
 
 export async function testDevice(organizationId: string, id: string) {
@@ -1573,6 +1875,63 @@ async function countEnrolledPeople(organizationId: string, kind: "STUDENT" | "ST
 
 type TapCardSource = "local" | "student_management" | "staff_smart_access" | null;
 
+function staffAccessMatchesHit(
+  access: { iamUserId?: string | null; email?: string | null; externalId?: string | null; source?: string | null; staffKey: string },
+  hit: RfidStaffHit
+) {
+  const hitIam = normalizeKeyPart(hit.iamUserId || (hit.source === "iam" ? hit.id : null));
+  const hitEmail = normalizeEmailKey(hit.email);
+  const hitExt = normalizeKeyPart(hit.employeeNumber || hit.code || hit.id);
+  const hitSource = normalizeKeyPart(hit.source)?.toLowerCase();
+  if (hitIam && normalizeKeyPart(access.iamUserId) === hitIam) return true;
+  if (hitEmail && normalizeEmailKey(access.email) === hitEmail) return true;
+  if (hitExt && normalizeKeyPart(access.externalId) === hitExt) {
+    const aSrc = normalizeKeyPart(access.source)?.toLowerCase();
+    if (!aSrc || !hitSource || aSrc === hitSource) return true;
+  }
+  // fallback staffKey patterns
+  const key = String(access.staffKey || "");
+  if (hitIam && key === `iam:${hitIam}`) return true;
+  if (hitEmail && key === `email:${hitEmail}`) return true;
+  if (hitExt && hitSource && key === `${hitSource}:${hitExt}`) return true;
+  return false;
+}
+
+async function findStaffEligibleAllowedOrgs(allowedOrganizationIds: string[], hit: RfidStaffHit) {
+  const allowed = new Set(allowedOrganizationIds);
+  const candidates = new Set<string>();
+  if (allowed.has(hit.organizationId)) candidates.add(hit.organizationId);
+
+  const or: any[] = [];
+  const iamId = normalizeKeyPart(hit.iamUserId || (hit.source === "iam" ? hit.id : null));
+  const email = normalizeEmailKey(hit.email);
+  const extId = normalizeKeyPart(hit.employeeNumber || hit.code || hit.id);
+  const source = normalizeKeyPart(hit.source);
+  const keys: string[] = [];
+  if (iamId) { or.push({ iamUserId: iamId }); keys.push(`iam:${iamId}`); }
+  if (email) { or.push({ email }); keys.push(`email:${email}`); }
+  if (extId) {
+    or.push({ externalId: extId });
+    if (source) keys.push(`${source.toLowerCase()}:${extId}`);
+  }
+  if (keys.length) or.push({ staffKey: { in: keys } });
+
+  if (or.length) {
+    const rows = await prisma.attendanceStaffSchoolAccess.findMany({
+      where: {
+        organizationId: { in: allowedOrganizationIds },
+        status: "ACTIVE",
+        OR: or,
+      },
+      select: { organizationId: true, staffKey: true, iamUserId: true, email: true, externalId: true, source: true },
+    });
+    for (const r of rows) {
+      if (staffAccessMatchesHit(r, hit)) candidates.add(r.organizationId);
+    }
+  }
+  return [...candidates].filter((o) => allowed.has(o));
+}
+
 async function findTodayAttendanceRecord(
   organizationId: string,
   today: Date,
@@ -1602,13 +1961,30 @@ async function findTodayAttendanceRecord(
 async function resolveCardForTap(
   organizationId: string,
   cardNumber: string
-): Promise<{ card: Awaited<ReturnType<typeof prisma.rfidCard.findFirst>>; source: TapCardSource }> {
+): Promise<{
+  card: Awaited<ReturnType<typeof prisma.rfidCard.findFirst>>;
+  source: TapCardSource;
+  staff: StaffMember | null;
+}> {
   // Staff Smart Access (HR / Timetable / IAM) before students so a mis-tagged local card does not block staff taps.
   if (isStaffIntegrationEnabled()) {
     const staff = await fetchStaffByRfidUid(organizationId, cardNumber);
     if (staff) {
       const card = await ensureCardFromStaff(organizationId, cardNumber, staff);
-      return { card, source: "staff_smart_access" };
+      return { card, source: "staff_smart_access", staff };
+    }
+    // Shared-device / multi-school assignment: allow staff whose home RFID is in another school
+    // but who are actively assigned to this organization.
+    const hit = await lookupStaffByRfidGlobally(cardNumber).catch(() => null);
+    if (hit) {
+      const eligible = await findStaffEligibleAllowedOrgs([organizationId], hit);
+      if (eligible.includes(organizationId)) {
+        const assignedStaff = await fetchStaffByRfidUid(organizationId, cardNumber, { allowAssignedOrg: true });
+        if (assignedStaff) {
+          const card = await ensureCardFromStaff(organizationId, cardNumber, assignedStaff);
+          return { card, source: "staff_smart_access", staff: assignedStaff };
+        }
+      }
     }
   }
 
@@ -1616,7 +1992,7 @@ async function resolveCardForTap(
     const student = await fetchStudentByRfidUid(organizationId, cardNumber);
     if (student) {
       const card = await ensureCardFromStudentManagement(organizationId, cardNumber, student);
-      return { card, source: "student_management" };
+      return { card, source: "student_management", staff: null };
     }
   }
 
@@ -1625,19 +2001,30 @@ async function resolveCardForTap(
   });
   if (local) {
     if (isStaffCard(local)) {
-      return { card: local, source: "local" };
+      return { card: local, source: "local", staff: null };
     }
     if (isStaffIntegrationEnabled()) {
       const staff = await fetchStaffByRfidUid(organizationId, cardNumber);
       if (staff) {
         const card = await ensureCardFromStaff(organizationId, cardNumber, staff);
-        return { card, source: "staff_smart_access" };
+        return { card, source: "staff_smart_access", staff };
+      }
+      const hit = await lookupStaffByRfidGlobally(cardNumber).catch(() => null);
+      if (hit) {
+        const eligible = await findStaffEligibleAllowedOrgs([organizationId], hit);
+        if (eligible.includes(organizationId)) {
+          const assignedStaff = await fetchStaffByRfidUid(organizationId, cardNumber, { allowAssignedOrg: true });
+          if (assignedStaff) {
+            const card = await ensureCardFromStaff(organizationId, cardNumber, assignedStaff);
+            return { card, source: "staff_smart_access", staff: assignedStaff };
+          }
+        }
       }
     }
-    return { card: local, source: "local" };
+    return { card: local, source: "local", staff: null };
   }
 
-  return { card: null, source: null };
+  return { card: null, source: null, staff: null };
 }
 
 export async function processTap(
@@ -1652,7 +2039,7 @@ export async function processTap(
 ) {
   const settings = await getOrCreateSettings(organizationId);
   const cardNumber = input.cardNumber.trim().toUpperCase();
-  const { card, source } = await resolveCardForTap(organizationId, cardNumber);
+  const { card, source, staff } = await resolveCardForTap(organizationId, cardNumber);
   if (!card) {
     await prisma.securityAlert.create({
       data: {
@@ -1698,9 +2085,12 @@ export async function processTap(
   let device = input.deviceCode
     ? await prisma.rfidDevice.findFirst({
         where: {
-          organizationId,
           deviceCode: input.deviceCode.trim().toUpperCase(),
           deletedAt: null,
+          OR: [
+            { organizationId },
+            { schoolLinks: { some: { organizationId, status: DeviceSchoolLinkStatus.ACTIVE } } },
+          ],
         },
       })
     : null;
@@ -1737,18 +2127,6 @@ export async function processTap(
     studentName: card.studentName,
   });
 
-  const direction = resolveTapDirection(settings, record, {
-    direction: input.direction,
-    device,
-  });
-
-  if (direction === TapDirection.ENTRY && !settings.enableEntry) {
-    throw new AppError(400, "Entry attendance is disabled");
-  }
-  if (direction === TapDirection.EXIT && !settings.enableExit) {
-    throw new AppError(400, "Exit attendance is disabled");
-  }
-
   const nowMin = nowMinutes(now);
   const staffCard = isStaffCard(card);
 
@@ -1765,7 +2143,32 @@ export async function processTap(
     maxExitTime: settings.maxExitTime,
     attendanceClosingTime: resolvedSchedule.attendanceClosingTime,
     enableLateDetection: resolvedSchedule.enableLateDetection,
+    graceMinutes: resolvedSchedule.graceMinutes,
   };
+
+  const direction = resolveTapDirection(
+    {
+      settings,
+      resolvedSchoolEnds: schedule.schoolEnds,
+      nowMin,
+    },
+    record,
+    {
+      direction: input.direction,
+      device,
+    }
+  );
+
+  if (direction === TapDirection.ENTRY && !settings.enableEntry) {
+    throw new AppError(400, "Entry attendance is disabled");
+  }
+  if (direction === TapDirection.EXIT && !settings.enableExit) {
+    throw new AppError(400, "Exit attendance is disabled");
+  }
+
+  let permissionExit = false;
+  let permissionRef: string | undefined;
+  const lessonDateIso = today.toISOString().slice(0, 10);
 
   if (direction === TapDirection.ENTRY) {
     if (record?.entryTime) {
@@ -1788,8 +2191,32 @@ export async function processTap(
           : "You already checked out today"
       );
     }
-    const maxExit = parseHm(settings.maxExitTime);
-    if (nowMin > maxExit) {
+
+    if (!staffCard && isDisciplineIntegrationEnabled()) {
+      const perm = await tryDisciplinePermissionExit(organizationId, {
+        studentId: card.studentId,
+        studentCode: card.studentCode,
+        gateLabel: device?.gateName ?? device?.name ?? undefined,
+      });
+      if (perm.allowed) {
+        permissionExit = true;
+        permissionRef = perm.referenceNumber;
+      }
+    }
+    if (staffCard && isStaffIntegrationEnabled() && card.studentId) {
+      const leave = await fetchStaffApprovedLeaveToday(organizationId, card.studentId, lessonDateIso);
+      if (leave?.active) permissionExit = true;
+    }
+
+    const exitOpensAt = resolveExitOpensAt(settings, schedule.schoolEnds);
+    if (!permissionExit && !isExitWindowOpen(exitOpensAt, settings.maxExitTime, nowMin)) {
+      const opens = parseHm(exitOpensAt);
+      if (nowMin < opens) {
+        throw new AppError(
+          400,
+          `Exit not open yet. Checkouts start at ${exitOpensAt}.`
+        );
+      }
       throw new AppError(400, "Exit window closed. Please contact the school office.");
     }
   }
@@ -1824,7 +2251,7 @@ export async function processTap(
   };
 
   if (direction === TapDirection.ENTRY) {
-    const status = resolveEntryStatus(schedule, now);
+    const status = resolveEntryStatus(schedule, now, staffCard);
     if (record) {
       record = await prisma.attendanceRecord.update({
         where: { id: record.id },
@@ -1926,18 +2353,23 @@ export async function processTap(
         },
       });
     } else {
-      const early = nowMinutes(now) < parseHm(schedule.schoolEnds);
+      const early = !permissionExit && nowMinutes(now) < parseHm(schedule.schoolEnds);
       const durationMins = Math.max(
         0,
         Math.round((now.getTime() - record.entryTime.getTime()) / 60000)
       );
+      const exitStatus = permissionExit
+        ? AttendanceStatus.PERMISSION
+        : early
+          ? AttendanceStatus.EARLY_DEPARTURE
+          : AttendanceStatus.PRESENT;
       record = await prisma.attendanceRecord.update({
         where: { id: record.id },
         data: {
           exitTime: now,
           durationMins,
           direction: TapDirection.EXIT,
-          status: early ? AttendanceStatus.EARLY_DEPARTURE : AttendanceStatus.PRESENT,
+          status: exitStatus,
           deviceId: device?.id ?? record.deviceId,
           deviceCode: device?.deviceCode ?? record.deviceCode,
           gateName: device?.gateName ?? record.gateName,
@@ -1950,7 +2382,7 @@ export async function processTap(
           organizationId,
           record.studentName,
           record.studentId,
-          "exit",
+          permissionExit ? "permission_exit" : "exit",
           now,
           record.className,
           {
@@ -1987,10 +2419,31 @@ export async function processTap(
     });
   }
 
+  if (staffCard) {
+    const timeLabel = new Intl.DateTimeFormat("en-GB", {
+      timeZone: ATTENDANCE_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(now);
+    void notifyStaffAttendanceTap({
+      organizationId,
+      direction: String(direction),
+      staffName: record.studentName || staff?.fullName || card.studentName,
+      timeLabel,
+      iamUserId: staff?.teacherUserId || staff?.id || card.studentId || undefined,
+      email: staff?.email || undefined,
+      employeeCode: staff?.employeeNumber || card.studentCode || undefined,
+    }).catch((err) => console.warn("[Attendance] Staff tap push notify failed", err));
+  }
+
   return {
     access: "GRANTED",
     direction,
-    notification: direction === TapDirection.ENTRY ? "green" : "exit",
+    permissionExit,
+    permissionRef,
+    notification:
+      direction === TapDirection.ENTRY ? "green" : permissionExit ? "permission_exit" : "exit",
     student: {
       name: record.studentName,
       code: record.studentCode,
@@ -2006,7 +2459,79 @@ export async function processTap(
   };
 }
 
-/* ─── Device gate API (Arduino / ESP32 RFID readers) ─────── */
+/* Device gate API (Arduino / ESP32 RFID readers) - supports multi-school/shared devices */
+
+async function resolveSharedTapTarget(input: {
+  device: { id: string; organizationId: string; deviceCode: string; name: string; gateName?: string | null };
+  allowedOrganizationIds: string[];
+  cardNumber: string;
+}): Promise<
+  | { ok: true; organizationId: string; personType: "STUDENT" | "STAFF" }
+  | { ok: false; reason: string; message: string }
+> {
+  const { allowedOrganizationIds, cardNumber } = input;
+  const allowedSet = new Set(allowedOrganizationIds);
+
+  // 1) Student (global owner school must be allowed)
+  if (isStudentManagementEnabled()) {
+    const owner = await lookupRfidOwner(cardNumber).catch(() => null);
+    if (owner?.organizationId) {
+      if (allowedSet.has(owner.organizationId)) {
+        return { ok: true, organizationId: owner.organizationId, personType: "STUDENT" };
+      }
+      const cardSchool = owner.organizationName ?? owner.organizationCode ?? owner.organizationId;
+      return {
+        ok: false,
+        reason: "NOT_AUTHORIZED_FOR_DEVICE",
+        message: `Card belongs to ${cardSchool}, but this device is not linked to that school.`,
+      };
+    }
+  }
+
+  // 2) Staff (must map to exactly one allowed/eligible school)
+  if (isStaffIntegrationEnabled()) {
+    const hit = await lookupStaffByRfidGlobally(cardNumber).catch(() => null);
+    if (hit) {
+      const eligible = await findStaffEligibleAllowedOrgs(allowedOrganizationIds, hit);
+      if (eligible.length === 1) {
+        return { ok: true, organizationId: eligible[0], personType: "STAFF" };
+      }
+      if (eligible.length === 0) {
+        return {
+          ok: false,
+          reason: "NOT_ASSIGNED_TO_LINKED_SCHOOL",
+          message: "Staff member is not assigned to any school linked to this device. Assign the staff to the correct school or link the device.",
+        };
+      }
+      return {
+        ok: false,
+        reason: "AMBIGUOUS_STAFF_SCHOOL",
+        message: "Staff member is assigned to multiple schools linked to this device. Cannot determine attendance school; update device links or staff assignments so only one linked school applies.",
+      };
+    }
+  }
+
+  // 3) Local/shared cards fallback: resolve in each allowed org
+  let matchedOrg = null;
+  let matchedPersonType = "STUDENT";
+  for (const orgId of allowedOrganizationIds) {
+    const resolved = await resolveCardForTap(orgId, cardNumber).catch(() => null);
+    if (resolved?.card) {
+      if (matchedOrg && matchedOrg !== orgId) {
+        return {
+          ok: false,
+          reason: "AMBIGUOUS_SCHOOL",
+          message: "Card is valid in multiple schools linked to this device. Cannot determine attendance school; review assignments/links.",
+        };
+      }
+      matchedOrg = orgId;
+      matchedPersonType = isStaffCard(resolved.card) ? "STAFF" : "STUDENT";
+    }
+  }
+  if (matchedOrg) return { ok: true, organizationId: matchedOrg, personType: matchedPersonType };
+
+  return { ok: false, reason: "CARD_NOT_REGISTERED", message: "Card not registered for any school linked to this device." };
+}
 
 export async function deviceGateTap(input: {
   apiKey?: string;
@@ -2033,7 +2558,7 @@ export async function deviceGateTap(input: {
 
   const eventId = typeof input.eventId === "string" ? input.eventId.trim().slice(0, 80) : "";
 
-  // Idempotent replay: same eventId already processed → success without double attendance
+  // Idempotent replay: same eventId already processed -> success without double attendance
   if (eventId) {
     const prior = await prisma.gateSyncEvent.findUnique({ where: { eventId } });
     if (prior) {
@@ -2048,7 +2573,7 @@ export async function deviceGateTap(input: {
         status: "PRESENT",
         message: "Event already recorded",
         eventId,
-        student: { name: "—", personType: "STUDENT" },
+        student: { name: "-", personType: "STUDENT" },
         personType: "STUDENT",
         device: { code: device.deviceCode, name: device.name, gate: device.gateName },
         time: new Date().toISOString(),
@@ -2070,8 +2595,27 @@ export async function deviceGateTap(input: {
     data: { lastSeenAt: new Date(), status: DeviceStatus.ONLINE },
   });
 
+  // Determine target school for this tap (supports multi-school/shared devices)
+  const allowedOrganizationIds = await getDeviceAllowedOrganizationIds(device);
+  let targetOrganizationId = device.organizationId;
+  let targetPersonType = null;
+  if (allowedOrganizationIds.length > 1) {
+    const resolved = await resolveSharedTapTarget({
+      device,
+      allowedOrganizationIds,
+      cardNumber,
+    });
+    if (!resolved.ok) {
+      return gateDenied(resolved.reason, resolved.message, cardNumber);
+    }
+    targetOrganizationId = resolved.organizationId;
+    targetPersonType = resolved.personType;
+  } else if (allowedOrganizationIds.length === 1) {
+    targetOrganizationId = allowedOrganizationIds[0];
+  }
+
   try {
-    const result = await processTap(device.organizationId, {
+    const result = await processTap(targetOrganizationId, {
       cardNumber,
       deviceCode: device.deviceCode,
       direction: input.direction,
@@ -2081,54 +2625,62 @@ export async function deviceGateTap(input: {
       await prisma.gateSyncEvent.create({
         data: {
           eventId,
-          organizationId: device.organizationId,
+          organizationId: targetOrganizationId,
           deviceId: device.id,
           cardNumber,
         },
       }).catch(() => {
-        /* unique race — treat as duplicate success */
+        /* unique race - treat as duplicate success */
       });
     }
     const isExit = result.direction === TapDirection.EXIT;
     const studentName = result.student.name;
+    const permissionExit = Boolean((result as { permissionExit?: boolean }).permissionExit);
     return {
       allowed: true as const,
       duplicate: false as const,
       action: isExit ? "EXIT" : "ENTRY",
       status: result.record.status,
+      permissionExit,
       message: isExit
-        ? `${studentName} checked out successfully`
+        ? permissionExit
+          ? `${studentName} - exit (approved permission)`
+          : `${studentName} checked out successfully`
         : `${studentName} checked in successfully`,
       eventId: eventId || undefined,
       student: result.student,
-      personType: result.student.personType ?? "STUDENT",
+      personType: targetPersonType ?? result.student.personType ?? "STUDENT",
       device: { code: device.deviceCode, name: device.name, gate: device.gateName },
       time: scannedAt.toISOString(),
       offline: Boolean(input.offline),
+      organizationId: targetOrganizationId,
     };
   } catch (err) {
     if (err instanceof AppError) {
       if (err.statusCode === 404 && (isStudentManagementEnabled() || isStaffIntegrationEnabled())) {
         const owner = isStudentManagementEnabled() ? await lookupRfidOwner(cardNumber) : null;
-        if (owner && owner.organizationId !== device.organizationId) {
+        if (owner && !allowedOrganizationIds.includes(owner.organizationId)) {
+          const cardSchool = owner.organizationName ?? owner.organizationCode ?? "another school";
+          return gateDenied(
+            "NOT_AUTHORIZED_FOR_DEVICE",
+            `Card belongs to ${cardSchool}, but this device is not linked to that school.`,
+            cardNumber
+          );
+        }
+        if (owner && allowedOrganizationIds.length <= 1 && owner.organizationId !== targetOrganizationId) {
           const deviceTenant = await prisma.tenant.findFirst({
-            where: { organizationId: device.organizationId },
+            where: { organizationId: targetOrganizationId },
             select: { organizationName: true, organizationCode: true },
           });
-          const cardSchool =
-            owner.organizationName ?? owner.organizationCode ?? "another school";
-          const deviceSchool =
-            deviceTenant?.organizationName ??
-            deviceTenant?.organizationCode ??
-            "this gate device school";
+          const cardSchool = owner.organizationName ?? owner.organizationCode ?? "another school";
+          const deviceSchool = deviceTenant?.organizationName ?? deviceTenant?.organizationCode ?? "this gate device school";
           return gateDenied(
             "WRONG_SCHOOL",
-            `Card belongs to ${cardSchool} but gate device is registered for ${deviceSchool}. Register a device under ${cardSchool} and use that API key.`,
+            `Card belongs to ${cardSchool} but gate device is registered for ${deviceSchool}.`,
             cardNumber
           );
         }
       }
-
       return gateDenied(gateReasonFromError(err.statusCode, err.message), err.message, cardNumber);
     }
     throw err;
@@ -2470,17 +3022,17 @@ function buildAttendanceRecordWhere(
     lessonDate: dateFilter,
     ...statusWhere,
     ...(query?.className && personFilter !== "STAFF"
-      ? { className: { equals: query.className, mode: "insensitive" as const } }
+      ? { className: { contains: query.className.trim(), mode: "insensitive" as const } }
       : {}),
     ...(query?.department && personFilter === "STAFF"
-      ? { className: { equals: query.department, mode: "insensitive" as const } }
+      ? { className: { contains: query.department.trim(), mode: "insensitive" as const } }
       : {}),
-    ...(query?.staffRole
+    ...(query?.staffRole && personFilter === "STAFF"
       ? {
-          level: {
-            contains: query.staffRole,
-            mode: "insensitive" as const,
-          },
+          AND: [
+            { level: { startsWith: "STAFF:" } },
+            { level: { contains: query.staffRole.trim(), mode: "insensitive" as const } },
+          ],
         }
       : {}),
     ...(query?.q
@@ -2545,11 +3097,45 @@ type AttendanceListQuery = {
   sortDir?: string;
 };
 
+type RawAttendanceRecordRow = Awaited<ReturnType<typeof prisma.attendanceRecord.findMany>>[number];
+
+/** Same row shape as Attendance → Records (includes schedule rules + display fields). */
+export async function serializeAttendanceRecordsForApi(
+  organizationId: string,
+  rows: RawAttendanceRecordRow[]
+) {
+  if (!rows.length) return [];
+  const settings = await getOrCreateSettings(organizationId);
+  const { listActiveScheduleRules, resolveScheduleFromRules } = await import(
+    "./attendance-schedule.service"
+  );
+  const scheduleRules = await listActiveScheduleRules(organizationId);
+
+  return rows.map((row) => {
+    const isStaff = Boolean(row.level?.startsWith("STAFF:"));
+    const resolved = resolveScheduleFromRules(settings, scheduleRules, {
+      lessonDate: row.lessonDate,
+      className: row.className,
+      isStaff,
+    });
+    const merged = {
+      ...settings,
+      schoolStarts: resolved.schoolStarts,
+      lateStarts: resolved.lateStarts,
+      schoolEnds: resolved.schoolEnds,
+      attendanceClosingTime: resolved.attendanceClosingTime,
+      enableLateDetection: resolved.enableLateDetection,
+    };
+    return serializeAttendanceRow(row, merged);
+  });
+}
+
 function serializeAttendanceRow(
-  row: Awaited<ReturnType<typeof prisma.attendanceRecord.findMany>>[number],
+  row: RawAttendanceRecordRow,
   settings: Awaited<ReturnType<typeof getOrCreateSettings>>
 ) {
   const base = withPersonType(row);
+  const isStaff = base.personType === "STAFF";
   const display = computeAttendanceDisplay(
     {
       status: row.status,
@@ -2557,10 +3143,9 @@ function serializeAttendanceRow(
       exitTime: row.exitTime,
       lessonDate: row.lessonDate,
     },
-    settings
+    settings,
+    { isStaff }
   );
-
-  const isStaff = base.personType === "STAFF";
   const department = isStaff ? staffDepartmentFromLevel(row.level, row.className) : null;
   const staffRole = isStaff ? staffRoleFromLevel(row.level) : null;
 
@@ -2699,19 +3284,80 @@ export async function listAttendancePaged(organizationId: string, query?: Attend
   };
 }
 
+function normalizeGroupLabel(value?: string | null) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, " ");
+}
+
+async function countAssignedCardsForSummary(
+  organizationId: string,
+  query?: AttendanceListQuery
+): Promise<{ assigned: number }> {
+  const cards = await prisma.rfidCard.findMany({
+    where: {
+      organizationId,
+      deletedAt: null,
+      status: { in: [CardStatus.ACTIVE, CardStatus.TEMPORARY] },
+    },
+    select: { level: true, notes: true, qrPayload: true, className: true, studentId: true, studentCode: true, cardNumber: true },
+  });
+
+  const personType = query?.personType?.toUpperCase();
+  const wantStaff = personType === "STAFF";
+  const wantStudents = personType === "STUDENT" || (!personType && personType !== "ALL" && personType !== "STAFF");
+  const wantAll = personType === "ALL";
+
+  const classFilter = query?.className?.trim();
+  const deptFilter = (query?.department ?? query?.className)?.trim();
+
+  const uniq = new Set<string>();
+  for (const card of cards) {
+    const staff = isStaffCard(card);
+    if (!wantAll) {
+      if (wantStaff && !staff) continue;
+      if (wantStudents && staff) continue;
+    }
+    if (!staff && classFilter) {
+      const cls = normalizeGroupLabel(card.className);
+      const want = normalizeGroupLabel(classFilter);
+      if (want && cls && cls !== want && !cls.includes(want) && !want.includes(cls)) continue;
+    }
+    if (staff && deptFilter) {
+      const dept = normalizeGroupLabel(card.className);
+      const want = normalizeGroupLabel(deptFilter);
+      if (want && dept && dept !== want && !dept.includes(want) && !want.includes(dept)) {
+        // best-effort: if department filter provided, keep matching or unknown
+      }
+    }
+    const key =
+      card.studentId?.trim() ||
+      card.studentCode?.trim() ||
+      card.cardNumber.trim();
+    if (key) uniq.add(key.toLowerCase());
+  }
+  return { assigned: uniq.size };
+}
+
 export async function getAttendanceRecordsSummary(organizationId: string, query?: AttendanceListQuery) {
   const where = buildAttendanceRecordWhere(organizationId, query);
   const settings = await getOrCreateSettings(organizationId);
-  const rows = await prisma.attendanceRecord.findMany({
-    where,
-    select: {
-      status: true,
-      entryTime: true,
-      exitTime: true,
-      lessonDate: true,
-      level: true,
-    },
-  });
+  const { listActiveScheduleRules, resolveScheduleFromRules } = await import(
+    "./attendance-schedule.service"
+  );
+  const scheduleRules = await listActiveScheduleRules(organizationId);
+  const [rows, assignedInfo] = await Promise.all([
+    prisma.attendanceRecord.findMany({
+      where,
+      select: {
+        status: true,
+        entryTime: true,
+        exitTime: true,
+        lessonDate: true,
+        level: true,
+        className: true,
+      },
+    }),
+    countAssignedCardsForSummary(organizationId, query),
+  ]);
 
   let present = 0;
   let late = 0;
@@ -2719,7 +3365,22 @@ export async function getAttendanceRecordsSummary(organizationId: string, query?
   let absent = 0;
 
   for (const row of rows) {
-    const display = computeAttendanceDisplay(row, settings);
+    const isStaff = Boolean(row.level?.startsWith("STAFF:"));
+    const resolved = resolveScheduleFromRules(settings, scheduleRules, {
+      lessonDate: row.lessonDate,
+      className: row.className,
+      isStaff,
+    });
+    const merged = {
+      ...settings,
+      schoolStarts: resolved.schoolStarts,
+      lateStarts: resolved.lateStarts,
+      schoolEnds: resolved.schoolEnds,
+      attendanceClosingTime: resolved.attendanceClosingTime,
+      enableLateDetection: resolved.enableLateDetection,
+      graceMinutes: resolved.graceMinutes,
+    };
+    const display = computeAttendanceDisplay(row, merged, { isStaff });
     if (display.attendanceStatus === "ABSENT") absent += 1;
     else if (display.attendanceStatus === "PRESENT") {
       present += 1;
@@ -2728,16 +3389,160 @@ export async function getAttendanceRecordsSummary(organizationId: string, query?
     }
   }
 
-  return { present, late, missingCheckout, absent, total: rows.length };
+  const assigned = assignedInfo.assigned || 0;
+  const tapped = present;
+  // In range/tap-record summaries, "absent" from records may be 0; for denominators, notTapped = assigned - tapped (clamped)
+  const notTapped = assigned > 0 ? Math.max(0, assigned - tapped) : absent;
+  return {
+    present,
+    late,
+    missingCheckout,
+    absent: assigned > 0 ? notTapped : absent,
+    total: rows.length,
+    assigned,
+    tapped,
+    notTapped,
+  };
+}
+
+export async function getAllClassesAttendanceTotals(organizationId: string, query?: AttendanceListQuery) {
+  const { fetchClassesList } = await import("../clients/student-management.client");
+  const [cards, smClasses] = await Promise.all([
+    prisma.rfidCard.findMany({
+      where: { organizationId, deletedAt: null, status: { in: [CardStatus.ACTIVE, CardStatus.TEMPORARY] } },
+      select: { level: true, notes: true, qrPayload: true, className: true, studentId: true, studentCode: true, cardNumber: true },
+    }).catch(() => []),
+    fetchClassesList(organizationId).catch(() => []),
+  ]);
+  const studentCards = cards.filter((c) => !isStaffCard(c));
+
+  const classAssigned = new Map<string, Set<string>>();
+  const addAssigned = (clsRaw: string | null | undefined, key: string) => {
+    const cls = String(clsRaw ?? "Unassigned").trim() || "Unassigned";
+    const set = classAssigned.get(cls) ?? new Set<string>();
+    const k = String(key || "").trim().toLowerCase();
+    if (k) set.add(k);
+    classAssigned.set(cls, set);
+  };
+  for (const c of studentCards) {
+    addAssigned(c.className, c.studentId || c.studentCode || c.cardNumber);
+  }
+
+  const allClassNames = new Set<string>([...classAssigned.keys()]);
+  for (const c of smClasses) {
+    const label = String((c as any).label || (c as any).name || "").trim();
+    if (label) allClassNames.add(label);
+  }
+
+  const settings = await getOrCreateSettings(organizationId);
+  const { listActiveScheduleRules, resolveScheduleFromRules } = await import("./attendance-schedule.service");
+  const scheduleRules = await listActiveScheduleRules(organizationId);
+
+  const where = buildAttendanceRecordWhere(organizationId, { ...(query || {}), personType: "STUDENT", className: undefined });
+  const rows = await prisma.attendanceRecord.findMany({
+    where,
+    select: {
+      status: true,
+      entryTime: true,
+      exitTime: true,
+      lessonDate: true,
+      level: true,
+      className: true,
+    },
+  });
+
+  const buckets = new Map<string, { className: string; present: number; late: number; missingCheckout: number }>();
+  const ensureBucket = (className: string) => {
+    const key = className || "Unassigned";
+    if (!buckets.has(key)) buckets.set(key, { className: key, present: 0, late: 0, missingCheckout: 0 });
+    return buckets.get(key)!;
+  };
+
+  const settingsCache = new Map<string, any>();
+  for (const row of rows) {
+    const cls = String(row.className ?? "Unassigned").trim() || "Unassigned";
+    allClassNames.add(cls);
+    const isStaff = Boolean(row.level?.startsWith("STAFF:"));
+    const ruleKey = `${row.lessonDate?.toISOString?.().slice(0,10) ?? ""}|${cls}|${isStaff ? "S" : "P"}`;
+    let merged = settingsCache.get(ruleKey);
+    if (!merged) {
+      const resolved = resolveScheduleFromRules(settings, scheduleRules, {
+        lessonDate: row.lessonDate,
+        className: row.className,
+        isStaff,
+      });
+      merged = {
+        ...settings,
+        schoolStarts: resolved.schoolStarts,
+        lateStarts: resolved.lateStarts,
+        schoolEnds: resolved.schoolEnds,
+        attendanceClosingTime: resolved.attendanceClosingTime,
+        enableLateDetection: resolved.enableLateDetection,
+        graceMinutes: resolved.graceMinutes,
+      };
+      settingsCache.set(ruleKey, merged);
+    }
+    const display = computeAttendanceDisplay(row as any, merged, { isStaff });
+    if (display.attendanceStatus === "PRESENT") {
+      const b = ensureBucket(cls);
+      b.present += 1;
+      if (display.punctuality === "LATE") b.late += 1;
+      if (display.checkoutStatus === "PENDING") b.missingCheckout += 1;
+    }
+  }
+
+  const results = [...allClassNames].sort((a, b) => a.localeCompare(b)).map((className) => {
+    const b = buckets.get(className) || { className, present: 0, late: 0, missingCheckout: 0 };
+    const assigned = classAssigned.get(className)?.size ?? 0;
+    const tapped = b.present;
+    const notTapped = assigned > 0 ? Math.max(0, assigned - tapped) : 0;
+    return {
+      className,
+      assigned,
+      tapped,
+      notTapped,
+      late: b.late,
+      missingCheckout: b.missingCheckout,
+      present: tapped,
+    };
+  });
+
+  const totals = results.reduce(
+    (acc, r) => {
+      acc.assigned += r.assigned;
+      acc.tapped += r.tapped;
+      acc.notTapped += r.notTapped;
+      acc.late += r.late;
+      acc.missingCheckout += r.missingCheckout;
+      return acc;
+    },
+    { assigned: 0, tapped: 0, notTapped: 0, late: 0, missingCheckout: 0 }
+  );
+
+  return { classes: results, totals, period: { from: query?.from, to: query?.to, date: query?.date } };
 }
 
 export async function getAttendanceFilterOptions(organizationId: string) {
-  const { fetchStudentsList } = await import("../clients/student-management.client");
-  const { fetchOrganizationStaffWithMeta } = await import("../clients/staff-integration.client");
+  const { fetchClassesList } = await import("../clients/student-management.client");
+  const { fetchOrganizationStaffWithMeta, fetchOrganizationDepartments } = await import("../clients/staff-integration.client");
 
-  const [students, staffMeta, dbClasses, dbDepartments] = await Promise.all([
-    fetchStudentsList(organizationId, { status: "ACTIVE" }),
-    fetchOrganizationStaffWithMeta(organizationId),
+  const withTimeout = async <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        p,
+        new Promise<T>((resolve) => {
+          timer = setTimeout(() => resolve(fallback), ms);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
+  const [smClasses, staffMeta, dbClasses, hrDepartments] = await Promise.all([
+    withTimeout(fetchClassesList(organizationId).catch(() => []), 8000, [] as Array<{ id: string; name: string; stream?: string | null; label: string }>),
+    withTimeout(fetchOrganizationStaffWithMeta(organizationId).catch(() => ({ rows: [] as any[], meta: {} as any })), 10000, { rows: [] as any[], meta: {} as any }),
     prisma.attendanceRecord.findMany({
       where: {
         organizationId,
@@ -2746,19 +3551,15 @@ export async function getAttendanceFilterOptions(organizationId: string) {
       },
       distinct: ["className"],
       select: { className: true },
-      take: 200,
-    }),
-    prisma.attendanceRecord.findMany({
-      where: { organizationId, level: { startsWith: "STAFF:" } },
-      distinct: ["className"],
-      select: { className: true },
-      take: 100,
-    }),
+      take: 300,
+    }).catch(() => [] as Array<{ className: string | null }>),
+    withTimeout(fetchOrganizationDepartments(organizationId).catch(() => [] as string[]), 8000, [] as string[]),
   ]);
 
   const classSet = new Set<string>();
-  for (const s of students) {
-    if (s.className?.trim()) classSet.add(s.className.trim());
+  for (const c of smClasses) {
+    const label = (c.label || c.name || '').trim();
+    if (label) classSet.add(label);
   }
   for (const c of dbClasses) {
     if (c.className?.trim()) classSet.add(c.className.trim());
@@ -2766,12 +3567,15 @@ export async function getAttendanceFilterOptions(organizationId: string) {
 
   const deptSet = new Set<string>();
   const roleSet = new Set<string>();
-  for (const member of staffMeta.rows) {
-    if (member.department?.trim()) deptSet.add(member.department.trim());
-    if (member.position?.trim()) roleSet.add(member.position.trim());
+  for (const name of hrDepartments) {
+    const n = String(name || '').trim();
+    if (n) deptSet.add(n);
   }
-  for (const d of dbDepartments) {
-    if (d.className?.trim()) deptSet.add(d.className.trim());
+  for (const member of staffMeta.rows || []) {
+    const dep = String((member as any).department || '').trim();
+    const pos = String((member as any).position || '').trim();
+    if (dep) deptSet.add(dep);
+    if (pos) roleSet.add(pos);
   }
 
   return {
@@ -2779,8 +3583,8 @@ export async function getAttendanceFilterOptions(organizationId: string) {
     departments: [...deptSet].sort((a, b) => a.localeCompare(b)),
     staffRoles: [...roleSet].sort((a, b) => a.localeCompare(b)),
     sources: {
-      studentManagement: students.length > 0,
-      hrIam: staffMeta.rows.length > 0,
+      studentManagement: smClasses.length > 0,
+      hrIam: (staffMeta.rows || []).length > 0 || hrDepartments.length > 0,
     },
   };
 }
@@ -3221,4 +4025,66 @@ export async function reportsSummary(organizationId: string) {
     .sort((a, b) => b._count - a._count);
 
   return { daily, weekly, byClass, lateToday: late };
+}
+
+/* -- Multi-school device links & staff access sync (service APIs) - */
+
+export async function syncStaffSchoolAccess(
+  organizationId: string,
+  records: Array<{
+    staffKey: string;
+    iamUserId?: string | null;
+    email?: string | null;
+    externalId?: string | null;
+    source?: string | null;
+    status?: string;
+  }>
+) {
+  const org = String(organizationId || "").trim();
+  if (!org) throw new AppError(400, "organizationId is required");
+  const rows = Array.isArray(records) ? records : [];
+  const now = new Date();
+  let upserted = 0;
+  for (const r of rows) {
+    const staffKey = String(r.staffKey || "").trim();
+    if (!staffKey) continue;
+    const status = String(r.status || "ACTIVE").toUpperCase() === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+    await prisma.attendanceStaffSchoolAccess.upsert({
+      where: { organizationId_staffKey: { organizationId: org, staffKey } },
+      create: {
+        organizationId: org,
+        staffKey,
+        iamUserId: normalizeKeyPart(r.iamUserId),
+        email: normalizeEmailKey(r.email),
+        externalId: normalizeKeyPart(r.externalId),
+        source: normalizeKeyPart(r.source),
+        status,
+        createdAt: now,
+        updatedAt: now,
+      },
+      update: {
+        iamUserId: normalizeKeyPart(r.iamUserId),
+        email: normalizeEmailKey(r.email),
+        externalId: normalizeKeyPart(r.externalId),
+        source: normalizeKeyPart(r.source),
+        status,
+        updatedAt: now,
+      },
+    });
+    upserted += 1;
+  }
+  return { organizationId: org, upserted };
+}
+
+export async function removeStaffSchoolAccess(organizationId: string, staffKeys: string[]) {
+  const org = String(organizationId || "").trim();
+  const keys = (Array.isArray(staffKeys) ? staffKeys : [])
+    .map((k) => String(k || "").trim())
+    .filter(Boolean);
+  if (!org || !keys.length) return { organizationId: org, removed: 0 };
+  const res = await prisma.attendanceStaffSchoolAccess.updateMany({
+    where: { organizationId: org, staffKey: { in: keys } },
+    data: { status: "INACTIVE", updatedAt: new Date() },
+  });
+  return { organizationId: org, removed: res.count };
 }

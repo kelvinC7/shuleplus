@@ -1197,7 +1197,7 @@ function CoursesTab({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          Set periods per week, room needs, double periods, and preferred days for each course.
+          Set default report marks, periods per week, room needs, and scheduling rules for each course.
         </p>
         <button type="button" className="btn-primary py-2.5" onClick={openAdd}>
           <Plus size={16} /> Add Course
@@ -1255,6 +1255,11 @@ function CoursesTab({
                     {displayCfg.prefersDoublePeriod ? (
                       <span className="rounded-lg bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-ochre">
                         Double
+                      </span>
+                    ) : null}
+                    {displayCfg.defaultCourseMarks != null ? (
+                      <span className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                        {displayCfg.defaultCourseMarks} marks
                       </span>
                     ) : null}
                     {displayCfg.isCore === false ? (

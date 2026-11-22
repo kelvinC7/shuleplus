@@ -273,6 +273,22 @@
       "shortName": "Print Card",
       "category": "Operations",
       "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "shulechat",
+      "subdomain": "shulechat",
+      "name": "ShuleChat",
+      "shortName": "Chat",
+      "category": "Communication",
+      "healthCheckUrl": "/api/health"
+    },
+    {
+      "slug": "shule-trip",
+      "subdomain": "shuletrip",
+      "name": "ShuleTrip",
+      "shortName": "ShuleTrip",
+      "category": "Education",
+      "healthCheckUrl": "/api/health"
     }
   ]
 }

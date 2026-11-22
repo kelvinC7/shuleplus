@@ -1,6 +1,15 @@
 import { prisma } from '../config/database';
-import { smListParents, type SmLinkedStudent, type SmParentRow } from '../clients/student-management.client';
+import { sanitizePhone } from '../utils/password';
+import { enableStudentManagementPortal } from './portal-features.service';
+import { clearParentShuleTripOnly } from './parent-portal-mode.service';
+import {
+  smListParents,
+  smLookupParentsByPhone,
+  type SmLinkedStudent,
+  type SmParentRow,
+} from '../clients/student-management.client';
 import type { JwtPayload } from '../middleware/auth.middleware';
+import { shouldSkipStudentManagementSync } from './parent-portal-mode.service';
 
 const SYNC_TTL_MS = 120_000;
 const lastSyncAt = new Map<string, number>();
@@ -51,7 +60,7 @@ async function upsertParentAccount(input: {
       data: {
         firstName: input.firstName,
         lastName: input.lastName,
-        phone: input.phone,
+        phone: input.phone && !input.phone.startsWith('parent-') ? input.phone : byId.phone,
         email: input.email ?? byId.email,
       },
     });
@@ -142,12 +151,90 @@ async function upsertChild(
   });
 }
 
+async function applySmParentBundle(organizationId: string, matches: SmParentRow[]) {
+  if (!matches.length) return null;
+
+  const source = matches[0];
+  await enableStudentManagementPortal(organizationId);
+
+  const phone = sanitizePhone(source.phone?.trim() || matches.find((m) => m.phone?.trim())?.phone || '');
+  if (!phone) return null;
+
+  const parent = await upsertParentAccount({
+    id: source.id,
+    organizationId,
+    firstName: source.firstName || 'Parent',
+    lastName: source.lastName || '',
+    phone,
+    email: source.email,
+  });
+
+  await clearParentShuleTripOnly(organizationId, parent.id);
+
+  const children = new Map<string, SmLinkedStudent>();
+  for (const row of matches) {
+    for (const child of row.students ?? []) {
+      if (child.studentId && !children.has(child.studentId)) {
+        children.set(child.studentId, child);
+      }
+    }
+  }
+
+  let index = 0;
+  for (const child of children.values()) {
+    await upsertChild(organizationId, parent.id, child, index === 0);
+    index += 1;
+  }
+
+  return parent;
+}
+
+/**
+ * Create or refresh a ParentMIS account from Student Management guardian phone
+ * (primary path for schools using Student Management).
+ */
+export async function provisionParentFromStudentManagement(phoneRaw: string): Promise<boolean> {
+  const phone = phoneRaw?.trim();
+  if (!phone) return false;
+
+  let rows: SmParentRow[] = [];
+  try {
+    rows = await smLookupParentsByPhone(phone);
+  } catch (err) {
+    console.warn('[parent-provision] Student Management lookup failed:', (err as Error).message);
+    return false;
+  }
+
+  if (!rows.length) return false;
+
+  const byOrg = new Map<string, SmParentRow[]>();
+  for (const row of rows) {
+    const orgId = row.organizationId?.trim();
+    if (!orgId) continue;
+    const list = byOrg.get(orgId) ?? [];
+    list.push(row);
+    byOrg.set(orgId, list);
+  }
+
+  if (!byOrg.size) return false;
+
+  let provisioned = false;
+  for (const [organizationId, matches] of byOrg) {
+    await ensureTenant(organizationId);
+    const parent = await applySmParentBundle(organizationId, matches);
+    if (parent) provisioned = true;
+  }
+
+  return provisioned;
+}
+
 /**
  * Copy the Student Management parent + all children into ParentMIS so every
  * portal page can resolve the same people enrolled against the login phone.
  */
 export async function syncParentFromStudentManagement(payload: JwtPayload) {
   if (!payload.organizationId) return payload;
+  if (await shouldSkipStudentManagementSync(payload)) return payload;
 
   const cacheKey = `${payload.organizationId}:${payload.parentId || payload.sub}:${payload.phone || ''}`;
   const previous = lastSyncAt.get(cacheKey);
@@ -161,50 +248,26 @@ export async function syncParentFromStudentManagement(payload: JwtPayload) {
       parentId: payload.parentId || payload.sub,
       phone: payload.phone,
     });
-    if (rows.length === 0) {
-      rows = await smListParents(payload.organizationId);
-    }
   } catch (err) {
     console.warn('[parent-sync] Student Management unreachable:', (err as Error).message);
+    return payload;
   }
 
-  const byId = rows.find((p) => p.id === (payload.parentId || payload.sub));
-  const byPhone = rows.filter((p) => phonesMatch(p.phone, payload.phone));
+  const byIdRaw = rows.find((p) => p.id === (payload.parentId || payload.sub));
+  const byId =
+    byIdRaw && payload.phone && phonesMatch(byIdRaw.phone, payload.phone) ? byIdRaw : undefined;
+  const byPhone = payload.phone
+    ? rows.filter((p) => phonesMatch(p.phone, payload.phone))
+    : [];
   const matches = byId ? [byId, ...byPhone.filter((p) => p.id !== byId.id)] : byPhone;
-  const source = matches[0] ?? rows[0];
+  const source = matches[0];
+  if (!source) return payload;
 
-  const firstName =
-    source?.firstName ||
-    (payload.email ? payload.email.split('@')[0] : 'Parent');
-  const lastName = source?.lastName || '';
-  const phone =
-    source?.phone ||
-    payload.phone ||
-    `parent-${payload.parentId || payload.sub}`;
-
-  const parent = await upsertParentAccount({
-    id: source?.id || payload.parentId || payload.sub,
-    organizationId: payload.organizationId,
-    firstName,
-    lastName,
-    phone,
-    email: source?.email || payload.email,
-  });
-
-  const children = new Map<string, SmLinkedStudent>();
-  for (const row of matches.length ? matches : source ? [source] : []) {
-    for (const child of row.students ?? []) {
-      if (child.studentId && !children.has(child.studentId)) {
-        children.set(child.studentId, child);
-      }
-    }
-  }
-
-  let index = 0;
-  for (const child of children.values()) {
-    await upsertChild(payload.organizationId, parent.id, child, index === 0);
-    index += 1;
-  }
+  const parent = await applySmParentBundle(
+    payload.organizationId,
+    matches.length ? matches : source ? [source] : []
+  );
+  if (!parent) return payload;
 
   lastSyncAt.set(cacheKey, Date.now());
   payload.sub = parent.id;

@@ -32,6 +32,9 @@ interface HrDataTableProps<T> {
   onView?: (row: T) => void;
   onEdit?: (row: T) => void;
   onMore?: (row: T) => void;
+  sortKey?: string;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
 }
 
 function pageNumbers(current: number, total: number): (number | '...')[] {
@@ -65,6 +68,9 @@ export function HrDataTable<T>({
   onView,
   onEdit,
   onMore,
+  sortKey,
+  sortDirection,
+  onSort,
 }: HrDataTableProps<T>) {
   const showSelection = Boolean(onSelectRow);
   const showActions = Boolean(onView || onEdit || onMore);
@@ -89,10 +95,30 @@ export function HrDataTable<T>({
               )}
               {columns.map((col) => (
                 <th key={col.key} className={`px-4 py-3 font-semibold text-navy ${col.className ?? ''}`}>
-                  <span className="inline-flex items-center gap-1">
-                    {col.header}
-                    {col.sortable ? <ChevronsUpDown size={14} className="text-muted" /> : null}
-                  </span>
+                  {col.sortable && onSort ? (
+                    <button
+                      type="button"
+                      onClick={() => onSort(col.key)}
+                      className="inline-flex items-center gap-1 transition hover:text-ochre"
+                      aria-label={`Sort by ${col.header}`}
+                    >
+                      {col.header}
+                      <ChevronsUpDown
+                        size={14}
+                        className={sortKey === col.key ? 'text-navy' : 'text-muted'}
+                      />
+                      {sortKey === col.key ? (
+                        <span className="text-[9px] font-bold uppercase text-ochre">
+                          {sortDirection === 'desc' ? 'desc' : 'asc'}
+                        </span>
+                      ) : null}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      {col.header}
+                      {col.sortable ? <ChevronsUpDown size={14} className="text-muted" /> : null}
+                    </span>
+                  )}
                 </th>
               ))}
               {showActions && (

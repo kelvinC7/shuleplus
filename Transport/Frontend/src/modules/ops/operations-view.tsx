@@ -27,7 +27,7 @@ function TripCard({
       <div className="flex items-center justify-between border-b border-border bg-navy px-5 py-3 text-white">
         <div>
           <p className="text-lg font-extrabold tracking-tight">{trip.bus.code}</p>
-          <p className="text-xs text-white/60">{trip.route?.direction ?? trip.route?.name ?? '—'}</p>
+          <p className="text-xs text-white/60">{trip.route?.direction ?? trip.route?.name ?? ''}</p>
         </div>
         <StatusBadge status={trip.status} />
       </div>
@@ -45,22 +45,22 @@ function TripCard({
         <dl className="grid grid-cols-2 gap-2 text-xs">
           <div>
             <dt className="text-muted">Driver</dt>
-            <dd className="font-semibold text-navy">{trip.driver?.name ?? '—'}</dd>
+            <dd className="font-semibold text-navy">{trip.driver?.name ?? ''}</dd>
           </div>
           <div>
             <dt className="text-muted">Attendant</dt>
-            <dd className="font-semibold text-navy">{trip.attendant?.name ?? '—'}</dd>
+            <dd className="font-semibold text-navy">{trip.attendant?.name ?? ''}</dd>
           </div>
           <div>
             <dt className="text-muted">Last RFID</dt>
             <dd className="font-semibold text-navy">
-              {trip.lastRfidName ?? '—'} {trip.lastRfidAt ? `— ${formatTime(trip.lastRfidAt)}` : ''}
+              {trip.lastRfidName ?? ''} {trip.lastRfidAt ? ` -  ${formatTime(trip.lastRfidAt)}` : ''}
             </dd>
           </div>
           <div>
             <dt className="text-muted">Location / ETA</dt>
             <dd className="font-semibold text-navy">
-              {trip.lastLocation ?? '—'} {trip.etaAt ? `· ${formatTime(trip.etaAt)}` : ''}
+              {trip.lastLocation ?? ''} {trip.etaAt ? `· ${formatTime(trip.etaAt)}` : ''}
             </dd>
           </div>
         </dl>

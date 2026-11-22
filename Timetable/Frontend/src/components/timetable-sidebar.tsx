@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import {
   TIMETABLE_NAV_SECTIONS,
   TIMETABLE_PLANNING_NAV,
+  TIMETABLE_VIEW_NAV,
+  primaryTimetableViewActive,
   timetableSectionHasActiveItem,
   isTimetableNavActive,
   isPlanningNavActive,
@@ -28,7 +30,8 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
   const { tabParam } = useTimetableTab();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
-  const planningActive = planningSectionActive(pathname);
+  const viewActive = primaryTimetableViewActive(pathname, tabParam);
+  const planningActive = planningSectionActive(pathname) && !viewActive;
 
   useEffect(() => {
     setOpenSections((prev) => {
@@ -36,13 +39,15 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
       for (const section of TIMETABLE_NAV_SECTIONS) {
         if (section.id === 'planning') {
           if (planningActive) next[section.id] = true;
+        } else if (section.id === 'views') {
+          if (viewActive) next[section.id] = true;
         } else if (timetableSectionHasActiveItem(pathname, section.items)) {
           next[section.id] = true;
         }
       }
       return next;
     });
-  }, [pathname, planningActive]);
+  }, [pathname, planningActive, viewActive]);
 
   function toggleSection(id: string) {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -52,6 +57,13 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
     return (
       TIMETABLE_PLANNING_NAV.find((item) => isPlanningNavActive(pathname, tabParam, item))?.label ??
       'Planning'
+    );
+  }
+
+  function activeViewLabel() {
+    return (
+      TIMETABLE_VIEW_NAV.find((item) => isPlanningNavActive(pathname, tabParam, item))?.label ??
+      'Class Timetable'
     );
   }
 
@@ -102,7 +114,9 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
               const sectionActive =
                 section.id === 'planning'
                   ? planningActive
-                  : timetableSectionHasActiveItem(pathname, section.items);
+                  : section.id === 'views'
+                    ? viewActive
+                    : timetableSectionHasActiveItem(pathname, section.items);
               const isOpen = openSections[section.id] ?? sectionActive;
               const panelId = `tt-nav-${section.id}`;
 
@@ -134,9 +148,11 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
                       <span className="block truncate text-[13px] font-semibold text-white/90">
                         {section.id === 'planning'
                           ? activePlanningLabel()
-                          : section.items.find((i) => isTimetableNavActive(pathname, i.href))?.label ??
-                            section.items[0]?.label ??
-                            section.title}
+                          : section.id === 'views'
+                            ? activeViewLabel()
+                            : section.items.find((i) => isTimetableNavActive(pathname, i.href))?.label ??
+                              section.items[0]?.label ??
+                              section.title}
                       </span>
                     </span>
                     <HrSidebarChevron open={isOpen} />
@@ -149,30 +165,32 @@ export function TimetableSidebar({ open, onClose, orgName, onLogout }: Timetable
                     hidden={!isOpen}
                     className={isOpen ? 'mt-1 space-y-0.5 border-l border-white/10 pb-1 pl-3 ml-4' : undefined}
                   >
-                    {isOpen && section.id === 'planning'
-                      ? TIMETABLE_PLANNING_NAV.map((item) => {
-                          const ItemIcon = item.icon;
-                          const active = isPlanningNavActive(pathname, tabParam, item);
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              onClick={onClose}
-                              aria-current={active ? 'page' : undefined}
-                              className={`group relative flex items-center rounded-xl py-2 pl-4 pr-3 text-[12px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
-                                active
-                                  ? 'bg-primary/90 text-navy shadow-[0_4px_12px_rgba(252,176,56,0.22)]'
-                                  : 'text-white/55 hover:bg-white/[0.06] hover:text-white'
-                              }`}
-                            >
-                              <ItemIcon size={14} className="mr-2 shrink-0 opacity-80" />
-                              <span className="truncate">{item.label}</span>
-                            </Link>
-                          );
-                        })
+                    {isOpen && (section.id === 'planning' || section.id === 'views')
+                      ? (section.id === 'views' ? TIMETABLE_VIEW_NAV : TIMETABLE_PLANNING_NAV).map(
+                          (item) => {
+                            const ItemIcon = item.icon;
+                            const active = isPlanningNavActive(pathname, tabParam, item);
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                onClick={onClose}
+                                aria-current={active ? 'page' : undefined}
+                                className={`group relative flex items-center rounded-xl py-2 pl-4 pr-3 text-[12px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${
+                                  active
+                                    ? 'bg-primary/90 text-navy shadow-[0_4px_12px_rgba(252,176,56,0.22)]'
+                                    : 'text-white/55 hover:bg-white/[0.06] hover:text-white'
+                                }`}
+                              >
+                                <ItemIcon size={14} className="mr-2 shrink-0 opacity-80" />
+                                <span className="truncate">{item.label}</span>
+                              </Link>
+                            );
+                          }
+                        )
                       : null}
 
-                    {isOpen && section.id !== 'planning'
+                    {isOpen && section.id !== 'planning' && section.id !== 'views'
                       ? section.items.map((item) => (
                           <HrSidebarNavLink
                             key={item.href}

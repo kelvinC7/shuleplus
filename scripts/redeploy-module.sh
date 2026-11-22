@@ -26,6 +26,11 @@ declare -A PM_BACK=(
   [Library]=library-api
   [MiniWebsite]=mini-website-api
   [PrintCardMIS]=print-card-api
+  [InternalChat]=chat-api
+  [ShuleTrip]=shule-trip-api
+  [Transport]=transport-api
+  [SchoolRepresentative]=director-console-api
+  [DirectorConsole]=director-console-api
 )
 declare -A PM_FRONT=(
   [Authentication]=auth-web
@@ -40,6 +45,11 @@ declare -A PM_FRONT=(
   [Library]=library-web
   [MiniWebsite]=mini-website-web
   [PrintCardMIS]=print-card-web
+  [InternalChat]=chat-web
+  [ShuleTrip]=shule-trip-web
+  [Transport]=transport-web
+  [SchoolRepresentative]=director-console-web
+  [DirectorConsole]=director-console-web
 )
 
 # `bash scripts/redeploy-module.sh KaziAvance` used to print skip (unchanged)
@@ -57,14 +67,45 @@ fi
 PMBACK="${PMBACK:-${PM_BACK[$MOD]:-}}"
 PMFRONT="${PMFRONT:-${PM_FRONT[$MOD]:-}}"
 
+REPO="${REPO:-/root/apps/shuleplus/ShulePlus}"
+LOG="${LOG:-/tmp/deploy-changed.log}"
+
+# Director Console (merged branch UI) is deployed as SchoolRepresentative web (Vite static dist).
+if [ "$MOD" = "SchoolRepresentative" ] || [ "$MOD" = "DirectorConsole" ]; then
+  DCDIR="$REPO/director-console"
+  echo "" | tee -a "$LOG"
+  echo "===== REDEPLOY $MOD (director-console static build) =====" | tee -a "$LOG"
+  if [ ! -d "$DCDIR" ]; then
+    echo "  ERROR: $DCDIR not found" | tee -a "$LOG"
+    exit 1
+  fi
+  cd "$DCDIR" || exit 1
+  if [ ! -f .env.production ] && [ -f .env.example ]; then
+    echo "  [frontend] bootstrapping .env.production from .env.example" | tee -a "$LOG"
+    cp .env.example .env.production
+  fi
+  echo "  [frontend] npm install..." | tee -a "$LOG"
+  npm install >> "$LOG" 2>&1
+  echo "  [frontend] npm run build..." | tee -a "$LOG"
+  npm run build >> "$LOG" 2>&1
+  if [ ! -f dist/index.html ]; then
+    echo "  ERROR: director-console build failed (dist/index.html missing)" | tee -a "$LOG"
+    exit 1
+  fi
+  pm2 delete director-console-web director-console-api school-representative-web school-representative-api >/dev/null 2>&1 || true
+  echo "  [frontend] built $DCDIR/dist (serve via nginx as SchoolRepresentative)" | tee -a "$LOG"
+  echo "  DONE $MOD" | tee -a "$LOG"
+  exit 0
+fi
+
+PMBACK="${PMBACK:-${PM_BACK[$MOD]:-}}"
+PMFRONT="${PMFRONT:-${PM_FRONT[$MOD]:-}}"
+
 if [ -z "$MOD" ] || [ -z "$PMBACK" ]; then
   echo "Usage: $0 <true|false> <ModuleDir> <pm_backend> <pm_frontend>" >&2
   echo "   or: $0 <ModuleDir>" >&2
   exit 1
 fi
-
-REPO="${REPO:-/root/apps/shuleplus/ShulePlus}"
-LOG="${LOG:-/tmp/deploy-changed.log}"
 
 declare -A BACKEND_PORT=(
   [Authentication]=4001
@@ -76,6 +117,9 @@ declare -A BACKEND_PORT=(
   [Library]=4025
   [MiniWebsite]=4026
   [PrintCardMIS]=4028
+  [InternalChat]=4029
+  [ShuleTrip]=4033
+  [Transport]=4034
 )
 declare -A FRONTEND_PORT=(
   [Authentication]=6100
@@ -87,6 +131,9 @@ declare -A FRONTEND_PORT=(
   [Library]=6124
   [MiniWebsite]=6127
   [PrintCardMIS]=6128
+  [InternalChat]=6129
+  [ShuleTrip]=6130
+  [Transport]=6131
 )
 # API host used in frontend .env.production (without scheme)
 declare -A API_HOST=(
@@ -106,6 +153,9 @@ declare -A API_HOST=(
   [Library]=library-api.shuleplus.rw
   [MiniWebsite]=website-api.shuleplus.rw
   [PrintCardMIS]=printcard-api.shuleplus.rw
+  [InternalChat]=shulechat-api.shuleplus.rw
+  [ShuleTrip]=shuletrip-api.shuleplus.rw
+  [Transport]=transport-api.shuleplus.rw
 )
 declare -A FE_HOST=(
   [Authentication]=app.shuleplus.rw
@@ -124,14 +174,18 @@ declare -A FE_HOST=(
   [Library]=library.shuleplus.rw
   [MiniWebsite]=website.shuleplus.rw
   [PrintCardMIS]=printcard.shuleplus.rw
+  [InternalChat]=shulechat.shuleplus.rw
+  [ShuleTrip]=shuletrip.shuleplus.rw
+  [Transport]=transport.shuleplus.rw
 )
 declare -A FRONTEND_DIR=(
   [Academic]=Frontend_react
   [StudentManagement]=Frontend_react
+  [ShuleTrip]=Frontend_react
 )
 
 # Vite modules: Nginx serves dist/ — no PM2 frontend process
-STATIC_MODULES=(Academic ShuleKitMIS StudentManagement TichaPortal TeacherPortal MiniWebsite)
+STATIC_MODULES=(Academic ShuleKitMIS StudentManagement TichaPortal TeacherPortal MiniWebsite InternalChat ShuleTrip SchoolRepresentative DirectorConsole)
 
 is_static() {
   local m="$1"
@@ -181,9 +235,31 @@ if [ -d "$BDIR" ]; then
     bash "$REPO/scripts/fix-print-card-db.sh" --prepare-only >> "$LOG" 2>&1 || true
   fi
 
+  if [ "$MOD" = "ShuleTrip" ] && [ -f "$REPO/scripts/fix-shule-trip-db.sh" ]; then
+    echo "  [backend] ensure ShuleTrip database + DATABASE_URL..." | tee -a "$LOG"
+    bash "$REPO/scripts/fix-shule-trip-db.sh" --prepare-only >> "$LOG" 2>&1 || true
+  fi
+
+  if [ "$MOD" = "Transport" ] && [ -f "$REPO/scripts/fix-transport-db.sh" ]; then
+    echo "  [backend] ensure Transport database + DATABASE_URL..." | tee -a "$LOG"
+    bash "$REPO/scripts/fix-transport-db.sh" --prepare-only >> "$LOG" 2>&1 || {
+      echo "  [backend] ERROR: fix-transport-db failed — check DATABASE_URL / transport_db" | tee -a "$LOG"
+      tail -n 40 "$LOG" | tee -a "$LOG" || true
+      exit 1
+    }
+  fi
+
   if [ "$MOD" = "MiniWebsite" ] && [ -f "$REPO/scripts/fix-miniwebsite-db.sh" ]; then
     echo "  [backend] ensure MiniWebsite database + schema..." | tee -a "$LOG"
     bash "$REPO/scripts/fix-miniwebsite-db.sh" --prepare-only >> "$LOG" 2>&1 || true
+  fi
+
+  if { [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; } && [ -f "$REPO/scripts/fix-ticha-db.sh" ]; then
+    echo "  [backend] ensure TichaPortal database + DATABASE_URL (Round Roll Call)..." | tee -a "$LOG"
+    bash "$REPO/scripts/fix-ticha-db.sh" --prepare-only >> "$LOG" 2>&1 || {
+      echo "  [backend] WARNING: fix-ticha-db failed — Round Roll Call may fall back to JSON" | tee -a "$LOG"
+      tail -n 30 "$LOG" | tee -a "$LOG" || true
+    }
   fi
 
   if [ "$MOD" = "BabyeyiWizard" ] && [ -f "$REPO/scripts/fix-babyeyi-db.sh" ]; then
@@ -234,7 +310,9 @@ if [ -d "$BDIR" ]; then
       fi
     fi
     if [ -n "$FEHOST" ]; then
-      CORS_VAL="https://${FEHOST},https://${APIHOST},https://shuleplus.rw,https://app.shuleplus.rw,https://www.shuleplus.rw"
+      # Web module hosts + Capacitor APK origins (Android https://localhost, iOS capacitor://localhost)
+      MOBILE_CORS=",capacitor://localhost,ionic://localhost,https://localhost,http://localhost"
+      CORS_VAL="https://${FEHOST},https://${APIHOST},https://shuleplus.rw,https://app.shuleplus.rw,https://www.shuleplus.rw,https://parents.shuleplus.rw${MOBILE_CORS}"
       if grep -q '^CORS_ORIGIN=' .env; then
         sed -i "s|^CORS_ORIGIN=.*|CORS_ORIGIN=$CORS_VAL|" .env
       else
@@ -326,6 +404,9 @@ STUDENT_MANAGEMENT_PUBLIC_URL|https://studentmanagement-api.shuleplus.rw|student
 TIMETABLE_API_URL|http://localhost:4014/api|Smart Timetable Config Class courses
 SCHOOL_FEES_API_URL|http://localhost:4004/api|exam fee eligibility lookups
 TICHA_PORTAL_API_URL|http://localhost:4003/api|teacher permissions and round roll call via Ticha BFF
+PARENT_PORTAL_PUBLIC_URL|https://parents.shuleplus.rw|report card QR verify landing
+REPORT_VERIFY_PUBLIC_URL|https://parents.shuleplus.rw/verify/report|explicit QR destination on PDFs
+ACADEMIC_PUBLIC_FRONTEND_URL|https://academic.shuleplus.rw|fallback verify page if parent URL unset
 EOF
       if ! curl -sf --max-time 3 http://localhost:4014/api/health >/dev/null 2>&1; then
         echo "  [warn] timetable-api (:4014) not reachable — exam catalog needs Timetable running" | tee -a "$LOG"
@@ -347,6 +428,28 @@ HR_API_URL|http://localhost:4007/api|staff cards and photos
 TIMETABLE_API_URL|http://localhost:4014/api|education level labels
 EOF
     fi
+    if [ "$MOD" = "Transport" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|IAM login and org context
+STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|learner roster and RFID cards
+PARENT_MIS_API_URL|http://localhost:4015/api|parent transport webhook and portal queue
+INTERNAL_CHAT_API_URL|http://localhost:4029/api|parent SMS on boarding events
+NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|IAM notification fan-out
+EOF
+      if grep -q '^MODULE_SLUG=' .env; then
+        sed -i 's|^MODULE_SLUG=.*|MODULE_SLUG=transport|' .env
+      else
+        echo 'MODULE_SLUG=transport' >> .env
+      fi
+    fi
     if [ "$MOD" = "ParentMIS" ] && [ -f .env ]; then
       while IFS='|' read -r KEY VAL WHY; do
         [ -z "$KEY" ] && continue
@@ -358,15 +461,17 @@ EOF
         fi
       done <<'EOF'
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|parent login and student profiles
+ACADEMIC_API_URL|http://localhost:4002/api|Ticha marks and assessment schedule for parent portal
 STUDENT_MANAGEMENT_PUBLIC_URL|https://studentmanagement-api.shuleplus.rw|browser-facing student photos
 SCHOOL_FEES_API_URL|http://localhost:4004/api|fee statements and payments
 ATTENDANCE_API_URL|http://localhost:4008/api|attendance records
 TIMETABLE_API_URL|http://localhost:4014/api|class timetable and period attendance
 DISCIPLINE_API_URL|http://localhost:4019/api|discipline incidents
-TRANSPORT_API_URL|http://localhost:3064/api|bus tracking
+TRANSPORT_API_URL|http://localhost:4034/api|bus tracking
 SHULEKIT_API_URL|http://localhost:4021/api|store catalog and orders
 CANTEEN_API_URL|http://localhost:4013/api|canteen wallet
 PUBLIC_SITE_URL|https://shuleplus.rw|smart-card QR links
+INTERNAL_CHAT_API_URL|http://localhost:4029/api|parent SMS packages via ShuleChat API
 EOF
       if grep -q '^MODULE_SLUG=' .env; then
         sed -i 's|^MODULE_SLUG=.*|MODULE_SLUG=parent-mis|' .env
@@ -389,6 +494,52 @@ IAM_API_URL|http://localhost:4001/api/v1|school profile and logo from Authentica
 UPLOAD_DIR|uploads|evidence file storage
 EOF
       mkdir -p uploads
+    fi
+    if [ "$MOD" = "ProcurementMIS" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|academic year/term and school profile (logo, location, website) from Authentication
+INVENTORY_API_URL|http://localhost:4011/api|item catalogue matching for Excel imports
+EOF
+      if grep -q '^MODULE_SLUG=' .env; then
+        sed -i 's|^MODULE_SLUG=.*|MODULE_SLUG=procurement-mis|' .env
+      else
+        echo 'MODULE_SLUG=procurement-mis' >> .env
+      fi
+      # QR verification links must point at the public procurement frontend.
+      if [ -n "$FEHOST" ]; then
+        if grep -q '^PUBLIC_APP_URL=' .env; then
+          sed -i "s|^PUBLIC_APP_URL=.*|PUBLIC_APP_URL=https://${FEHOST}|" .env
+        else
+          echo "PUBLIC_APP_URL=https://${FEHOST}" >> .env
+        fi
+      fi
+    fi
+    if [ "$MOD" = "SchoolUniformMIS" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|school profile and academic settings from Authentication
+STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|student roster sync (Student Management is canonical)
+EOF
+      if grep -q '^MODULE_SLUG=' .env; then
+        sed -i 's|^MODULE_SLUG=.*|MODULE_SLUG=school-uniform|' .env
+      else
+        echo 'MODULE_SLUG=school-uniform' >> .env
+      fi
     fi
     if [ "$MOD" = "KaziAvance" ] && [ -f .env ]; then
       while IFS='|' read -r KEY VAL WHY; do
@@ -432,9 +583,25 @@ HR_API_URL|http://localhost:4007/api|staff directory for payroll page
 PAYROLL_API_URL|http://localhost:4006/api|teacher payslip / salary
 STUDENT_DISCIPLINE_API_URL|http://localhost:4019/api|discipline lookups
 BABYEYI_API_URL|http://localhost:4017/api|legacy babyeyi resources
+CURRICULUM_API_URL|http://localhost:3094/api|lesson plans and curriculum proxy
 NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|push/notify
 EOF
       fi
+    fi
+    if [ "$MOD" = "StudentManagement" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|Users & Access teaching staff for class teacher picker
+HR_API_URL|http://localhost:4007/api|HR teacher directory fallback
+TIMETABLE_API_URL|http://localhost:4014/api|Timetable teacher profiles fallback
+EOF
     fi
     if [ "$MOD" = "Timetable" ] && [ -f .env ]; then
       while IFS='|' read -r KEY VAL WHY; do
@@ -492,7 +659,49 @@ EOF
       done <<'EOF'
 ATTENDANCE_API_URL|http://localhost:4008/api|Super Admin gate device provisioning
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|Smart Access student RFID lookup
+INTERNAL_CHAT_API_URL|http://localhost:4029/api|ShuleChat SMS Center school quotas
+CHAT_API_URL|http://localhost:4029/api|ShuleChat service alias
 EOF
+    fi
+    if [ "$MOD" = "InternalChat" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|org directory and JWT validation
+STUDENT_MGMT_API_URL|http://localhost:4024/api|parent phone lists for SMS
+NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|SMS dispatch via IAM
+EOF
+      SHARED_KEY=$(grep -E '^(SERVICE_API_KEY|PLATFORM_SERVICE_KEY)=' .env | head -1 | cut -d= -f2- || true)
+      if [ -n "$SHARED_KEY" ] && [ "$SHARED_KEY" != "dev-service-key" ]; then
+        if grep -q '^NOTIFICATION_SERVICE_API_KEY=' .env; then
+          sed -i "s|^NOTIFICATION_SERVICE_API_KEY=.*|NOTIFICATION_SERVICE_API_KEY=${SHARED_KEY}|" .env
+        else
+          echo "NOTIFICATION_SERVICE_API_KEY=${SHARED_KEY}" >> .env
+        fi
+        echo "  [backend] NOTIFICATION_SERVICE_API_KEY synced for ShuleChat SMS" | tee -a "$LOG"
+      fi
+    fi
+    if [ "$MOD" = "ShuleTrip" ] && [ -f .env ]; then
+      while IFS='|' read -r KEY VAL WHY; do
+        [ -z "$KEY" ] && continue
+        if grep -q "^${KEY}=" .env; then
+          sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
+        else
+          echo "${KEY}=${VAL}" >> .env
+          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+        fi
+      done <<'EOF'
+IAM_API_URL|http://localhost:4001/api/v1|SSO and org provisioning
+STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|learner manifest lookups
+EOF
+      grep -q '^NODE_ENV=' .env && sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env || echo 'NODE_ENV=production' >> .env
+      grep -q '^MODULE_SLUG=' .env || echo 'MODULE_SLUG=shule-trip' >> .env
     fi
     # MiniWebsite: server-side IAM/Babyeyi must use loopback (public shuleplus.rw:443 hairpin times out).
     if [ "$MOD" = "MiniWebsite" ] && [ -f .env ]; then
@@ -540,7 +749,7 @@ EOF
     npx prisma generate >> "$LOG" 2>&1 || true
     echo "  [backend] prisma migrate deploy..." | tee -a "$LOG"
     npx prisma migrate deploy >> "$LOG" 2>&1 || true
-    if [ "$MOD" = "KaziAvance" ] || [ "$MOD" = "AssetsPortal" ] || [ "$MOD" = "MiniWebsite" ] || [ "$MOD" = "Attendance" ]; then
+    if [ "$MOD" = "KaziAvance" ] || [ "$MOD" = "AssetsPortal" ] || [ "$MOD" = "MiniWebsite" ] || [ "$MOD" = "Attendance" ] || [ "$MOD" = "Transport" ] || [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; then
       echo "  [backend] prisma db push ($MOD has no migration history)..." | tee -a "$LOG"
       npx prisma db push --skip-generate >> "$LOG" 2>&1 || true
     fi
@@ -554,8 +763,11 @@ EOF
     fi
   fi
 
-  echo "  [backend] npm run build..." | tee -a "$LOG"
-  if grep -q '"build"' package.json 2>/dev/null && [ "$MOD" != "TichaPortal" ] && [ "$MOD" != "TeacherPortal" ]; then
+  if [ "$MOD" = "InternalChat" ] && [ -f "$REPO/scripts/build-internal-chat-backend.sh" ]; then
+    echo "  [backend] build-internal-chat-backend.sh (tsc needs devDependencies)..." | tee -a "$LOG"
+    bash "$REPO/scripts/build-internal-chat-backend.sh" >> "$LOG" 2>&1
+  elif grep -q '"build"' package.json 2>/dev/null && [ "$MOD" != "TichaPortal" ] && [ "$MOD" != "TeacherPortal" ]; then
+    echo "  [backend] npm run build..." | tee -a "$LOG"
     npm run build >> "$LOG" 2>&1
   else
     echo "  [backend] skip npm run build (plain Node)" | tee -a "$LOG"
@@ -572,6 +784,19 @@ EOF
   for f in dist/server.js dist/index.js dist/main.js dist/app.js; do
     [ -f "$f" ] && ENTRY="$f" && break
   done
+  # TichaPortal BFF is plain Node (server.js) — never a stale dist/ from another module.
+  if { [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; } && [ -f server.js ]; then
+    ENTRY="server.js"
+  fi
+
+  if [ "$MOD" = "InternalChat" ] && [ -f "$REPO/scripts/fix-internal-chat-db.sh" ]; then
+    echo "  [backend] ensure InternalChat DATABASE_URL (after env patch)..." | tee -a "$LOG"
+    bash "$REPO/scripts/fix-internal-chat-db.sh" --prepare-only >> "$LOG" 2>&1 || {
+      echo "  [backend] ERROR: fix-internal-chat-db failed — check DATABASE_URL / chat_module_db" | tee -a "$LOG"
+      tail -n 40 "$LOG" | tee -a "$LOG" || true
+      exit 1
+    }
+  fi
 
   pm2 delete "$PMBACK" >/dev/null 2>&1 || true
   if [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; then
@@ -628,6 +853,8 @@ EOF
         sleep 6
       elif [ "$MOD" = "ActionPlanMIS" ]; then
         sleep 5
+      elif [ "$MOD" = "InternalChat" ]; then
+        sleep 6
       else
         sleep 3
       fi
@@ -636,7 +863,9 @@ EOF
         HEALTH_PATH="/api/health"
       fi
       HEALTH_OK=0
-      for attempt in $(seq 1 12); do
+      HEALTH_ATTEMPTS=12
+      [ "$MOD" = "InternalChat" ] && HEALTH_ATTEMPTS=20
+      for attempt in $(seq 1 "$HEALTH_ATTEMPTS"); do
         if curl -sf "http://127.0.0.1:${BPORT}${HEALTH_PATH}" >/dev/null \
           || curl -sf "http://127.0.0.1:${BPORT}/api/health" >/dev/null \
           || curl -sf "http://127.0.0.1:${BPORT}/health" >/dev/null; then
@@ -653,7 +882,24 @@ EOF
     fi
   elif [ -f server.js ]; then
     echo "  [backend] pm2 start server.js → $PMBACK" | tee -a "$LOG"
-    pm2 start server.js --name "$PMBACK" --update-env --env NODE_ENV=production >> "$LOG" 2>&1
+    pm2 start server.js --name "$PMBACK" --cwd "$BDIR" --update-env --env NODE_ENV=production >> "$LOG" 2>&1
+    if [ -n "$BPORT" ]; then
+      sleep 3
+      HEALTH_OK=0
+      for attempt in $(seq 1 12); do
+        if curl -sf "http://127.0.0.1:${BPORT}/api/health" >/dev/null \
+          || curl -sf "http://127.0.0.1:${BPORT}/health" >/dev/null; then
+          HEALTH_OK=1
+          echo "  [backend] health ok on :${BPORT} (attempt ${attempt})" | tee -a "$LOG"
+          break
+        fi
+        sleep 2
+      done
+      if [ "$HEALTH_OK" -eq 0 ]; then
+        echo "  [backend] HEALTH CHECK FAILED on :${BPORT} — last logs:" | tee -a "$LOG"
+        pm2 logs "$PMBACK" --lines 30 --nostream | tee -a "$LOG" || true
+      fi
+    fi
   else
     echo "  [backend] no dist entry — fallback tsx src/server.ts" | tee -a "$LOG"
     if [ -f src/server.ts ]; then
@@ -671,12 +917,42 @@ else
 fi
 
 # ---------------- Frontend ----------------
-if [ -d "$FDIR" ]; then
+_skip_frontend() {
+  case "${SKIP_FRONTEND:-}" in 1|true|yes) return 0 ;; esac
+  return 1
+}
+
+if _skip_frontend && [ -d "$FDIR" ]; then
+  echo "  [frontend] SKIP_FRONTEND — no build (nginx serves existing dist)" | tee -a "$LOG"
+  if [ "$MOD" = "ShuleTrip" ]; then
+    cd "$FDIR" || exit 1
+    cat > .env.production <<EOF
+VITE_API_URL=https://${APIHOST}/api
+VITE_IAM_URL=https://shuleplus.rw
+VITE_IAM_API_URL=https://shuleplus.rw/api/v1
+VITE_PUBLIC_APP_URL=https://${FEHOST}
+EOF
+    echo "  [frontend] wrote .env.production (for PC vite build)" | tee -a "$LOG"
+  fi
+  if [ -f "$FDIR/dist/index.html" ]; then
+    echo "  [frontend] dist ok: $FDIR/dist" | tee -a "$LOG"
+  else
+    echo "  [frontend] WARN: $FDIR/dist/index.html missing — upload dist or run full redeploy" | tee -a "$LOG"
+  fi
+elif [ -d "$FDIR" ]; then
   cd "$FDIR" || exit 1
   echo "  [frontend] npm install..." | tee -a "$LOG"
   # Next.js builds need devDependencies (@tailwindcss/postcss, typescript, etc.)
   # Vite builds need devDependencies (vite, plugins, typescript, etc.)
-  if [ -f next.config.js ] || [ -f next.config.ts ] || [ -f next.config.mjs ] || [ -f vite.config.ts ] || [ -f vite.config.js ]; then
+  if [ "$MOD" = "InternalChat" ] && [ -f "$REPO/scripts/build-shulechat-frontend.sh" ]; then
+    echo "  [frontend] ShuleChat: build-shulechat-frontend.sh..." | tee -a "$LOG"
+    bash "$REPO/scripts/build-shulechat-frontend.sh" >> "$LOG" 2>&1 || {
+      echo "  [frontend] ERROR: ShuleChat frontend build failed" | tee -a "$LOG"
+      tail -n 40 "$LOG" | tee -a "$LOG" || true
+      exit 1
+    }
+    find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null || true
+  elif [ -f next.config.js ] || [ -f next.config.ts ] || [ -f next.config.mjs ] || [ -f vite.config.ts ] || [ -f vite.config.js ]; then
     npm install --include=dev >> "$LOG" 2>&1
   else
     npm install >> "$LOG" 2>&1
@@ -684,6 +960,12 @@ if [ -d "$FDIR" ]; then
   find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null || true
 
   if [ -f vite.config.ts ] || [ -f vite.config.js ]; then
+    if [ "$MOD" = "InternalChat" ] && [ -f dist/index.html ]; then
+      echo "  [frontend] ShuleChat dist ready — skip duplicate Vite build" | tee -a "$LOG"
+      if [ -n "$PMFRONT" ]; then
+        pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+      fi
+    else
     # Vite: remove local overrides that would poison production bundles
     rm -f .env.local .env.development.local
     cat > .env.production <<EOF
@@ -693,7 +975,28 @@ VITE_IAM_URL=https://shuleplus.rw
 VITE_IAM_API_URL=https://shuleplus.rw/api/v1
 VITE_KAZI_API_URL=https://kazi-api.shuleplus.rw
 EOF
-    if [ "$MOD" != "TichaPortal" ] && [ "$MOD" != "TeacherPortal" ]; then
+    if [ "$MOD" = "InternalChat" ]; then
+      cat > .env.production <<EOF
+VITE_API_URL=https://${APIHOST}/api
+VITE_SOCKET_URL=https://${FEHOST}
+VITE_IAM_URL=https://shuleplus.rw
+VITE_IAM_API_URL=https://shuleplus.rw/api/v1
+EOF
+    elif [ "$MOD" = "ShuleTrip" ]; then
+      cat > .env.production <<EOF
+VITE_API_URL=https://${APIHOST}/api
+VITE_IAM_URL=https://shuleplus.rw
+VITE_IAM_API_URL=https://shuleplus.rw/api/v1
+VITE_PUBLIC_APP_URL=https://${FEHOST}
+EOF
+    elif [ "$MOD" = "Academic" ]; then
+      cat > .env.production <<EOF
+VITE_API_URL=https://${APIHOST}/api
+VITE_IAM_URL=https://shuleplus.rw
+VITE_IAM_API_URL=https://shuleplus.rw/api/v1
+VITE_PARENT_PORTAL_URL=https://parents.shuleplus.rw
+EOF
+    elif [ "$MOD" != "TichaPortal" ] && [ "$MOD" != "TeacherPortal" ]; then
       cat > .env.production <<EOF
 VITE_API_URL=https://${APIHOST}/api
 VITE_IAM_URL=https://shuleplus.rw
@@ -701,12 +1004,17 @@ VITE_IAM_API_URL=https://shuleplus.rw/api/v1
 EOF
     fi
     echo "  [frontend] Vite build..." | tee -a "$LOG"
+    VITE_BUILD_NODE_OPTS="--max-old-space-size=4096"
+    if [ "$MOD" = "InternalChat" ]; then
+      VITE_BUILD_NODE_OPTS="--max-old-space-size=6144"
+    fi
     # Academic (and similar) may fail tsc -b on unused/MUI typings — still emit dist
-    if npm run build >> "$LOG" 2>&1; then
+    if NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" npm run build >> "$LOG" 2>&1; then
       :
     else
-      echo "  [frontend] npm run build failed — trying vite-only" | tee -a "$LOG"
-      npx vite build >> "$LOG" 2>&1 || node ./node_modules/vite/bin/vite.js build >> "$LOG" 2>&1 || true
+      echo "  [frontend] npm run build failed — trying vite-only (may take 10–20 min on small VPS)" | tee -a "$LOG"
+      NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" npx vite build >> "$LOG" 2>&1 \
+        || NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" node ./node_modules/vite/bin/vite.js build >> "$LOG" 2>&1 || true
     fi
     # Drop any leftover PM2 web process — Nginx serves dist/
     if [ -n "$PMFRONT" ]; then
@@ -727,6 +1035,7 @@ EOF
       echo "  [frontend] ERROR: dist/index.html missing — build failed. Last 60 log lines:" | tee -a "$LOG"
       tail -n 60 "$LOG" | tee -a "$LOG" || true
       exit 1
+    fi
     fi
   else
     # CRITICAL: Next.js loads .env.local OVER .env.production — leftover localhost
@@ -753,6 +1062,7 @@ NEXT_PUBLIC_IAM_URL=https://shuleplus.rw
 NEXT_PUBLIC_IAM_API_URL=https://shuleplus.rw/api/v1
 NEXT_PUBLIC_STUDENT_MGMT_API_URL=https://studentmanagement-api.shuleplus.rw/api
 NEXT_PUBLIC_FEES_PORTAL_URL=https://fees.shuleplus.rw
+NEXT_PUBLIC_PARENT_PORTAL_URL=https://parents.shuleplus.rw
 NEXT_PUBLIC_MODULE_NAME=Parent Portal
 EOF
     elif [ "$MOD" = "KaziAvance" ]; then
@@ -789,6 +1099,14 @@ NEXT_PUBLIC_STUDENT_MANAGEMENT_API_URL=https://studentmanagement-api.shuleplus.r
 NEXT_PUBLIC_HR_API_URL=https://hr-api.shuleplus.rw/api
 NEXT_PUBLIC_MODULE_SLUG=attendance
 EOF
+    elif [ "$MOD" = "Transport" ]; then
+      cat > .env.production <<EOF
+NEXT_PUBLIC_API_URL=https://${APIHOST}/api
+NEXT_PUBLIC_IAM_URL=https://shuleplus.rw
+NEXT_PUBLIC_IAM_API_URL=https://shuleplus.rw/api/v1
+NEXT_PUBLIC_MODULE_SLUG=transport
+NEXT_PUBLIC_MAP_TILE_PRESET=osm
+EOF
     else
       # Module APIs mount under /api; IAM is apex Auth
       cat > .env.production <<EOF
@@ -808,80 +1126,140 @@ module.exports = {
 };
 EOF
     fi
-    # Build into a staging dir while auth-web keeps serving the previous .next (avoids unstyled apex during build).
-    STAGING=".next-staging-$$"
-    echo "  [frontend] Next.js build → $STAGING (live .next kept until swap)..." | tee -a "$LOG"
-    rm -rf "$STAGING"
-    export NEXT_IGNORE_INCORRECT_LOCKFILE=true
-    export NEXT_DIST_DIR="$STAGING"
-    FRONT_BUILD_OK=false
-    if NEXT_IGNORE_INCORRECT_LOCKFILE=true NEXT_DIST_DIR="$STAGING" npx next build >> "$LOG" 2>&1; then
-      FRONT_BUILD_OK=true
-    else
-      echo "  [frontend] next build failed — last 60 log lines:" | tee -a "$LOG"
-      tail -n 60 "$LOG" | tee -a "$LOG" || true
-      rm -rf "$STAGING"
+    # Next.js static export (output: 'export') produces out/ and cannot run `next start`.
+    IS_NEXT_EXPORT=false
+    if [ "$MOD" = "ParentMIS" ] || grep -qE "output:[[:space:]]*['\"]export['\"]" next.config.js 2>/dev/null || grep -qE "output:[[:space:]]*['\"]export['\"]" next.config.mjs 2>/dev/null; then
+      IS_NEXT_EXPORT=true
     fi
 
-    if [ -n "$PMFRONT" ] && [ -n "$FPORT" ]; then
-      if [ "$FRONT_BUILD_OK" = true ] && [ -f "$STAGING/BUILD_ID" ]; then
-        pm2 stop "$PMFRONT" >/dev/null 2>&1 || true
-        rm -rf .next
-        mv "$STAGING" .next
+    if [ "$IS_NEXT_EXPORT" = true ]; then
+      echo "  [frontend] Next.js static export build (out/)..." | tee -a "$LOG"
+      export NEXT_IGNORE_INCORRECT_LOCKFILE=true
+      unset NEXT_DIST_DIR
+      rm -rf out
+      FRONT_BUILD_OK=false
+      if NEXT_IGNORE_INCORRECT_LOCKFILE=true npx next build >> "$LOG" 2>&1; then
+        FRONT_BUILD_OK=true
+      else
+        echo "  [frontend] next build failed — last 60 log lines:" | tee -a "$LOG"
+        tail -n 60 "$LOG" | tee -a "$LOG" || true
       fi
-      pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
-      if [ "$MOD" = "Authentication" ] || [ "$MOD" = "BabyeyiWizard" ] || [ "$MOD" = "ParentMIS" ]; then
-        if [ "$MOD" = "BabyeyiWizard" ]; then
-          pm2 delete academic-web >/dev/null 2>&1 || true
-        fi
-        echo "  [frontend] free port :${FPORT} (avoid stale next on :${FPORT} while pm2 is errored)..." | tee -a "$LOG"
+
+      if [ -n "$PMFRONT" ] && [ -n "$FPORT" ]; then
+        pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+        echo "  [frontend] free port :${FPORT}..." | tee -a "$LOG"
         fuser -k "${FPORT}/tcp" 2>/dev/null || true
         sleep 2
-      fi
-      if [ "$FRONT_BUILD_OK" != true ] || [ ! -f .next/BUILD_ID ]; then
-        echo "  [frontend] ERROR: next build failed — not starting $PMFRONT (see $LOG)" | tee -a "$LOG"
-        exit 1
-      else
-        if [ "$MOD" = "Authentication" ]; then
-          echo "  [frontend] restart auth-web (kill stale :${FPORT}, nginx apex, verify CSS)..." | tee -a "$LOG"
-          bash "$REPO/scripts/restart-auth-web.sh" >> "$LOG" 2>&1 || {
-            echo "  [frontend] ERROR: restart-auth-web failed — see $LOG" | tee -a "$LOG"
-            exit 1
-          }
-        else
-        echo "  [frontend] pm2 start next start -H 0.0.0.0 -p $FPORT → $PMFRONT" | tee -a "$LOG"
-        pm2 start "npx next start -H 0.0.0.0 -p $FPORT" --name "$PMFRONT" --interpreter none \
-          --cwd "$FDIR" --update-env \
-          --env NEXT_IGNORE_INCORRECT_LOCKFILE=true --env HOSTNAME=0.0.0.0 >> "$LOG" 2>&1
-        sleep 4
-        if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+│\s+online'; then
-          echo "  [frontend] ERROR: $PMFRONT failed to stay online (port conflict or bad .next). Last errors:" | tee -a "$LOG"
-          pm2 logs "$PMFRONT" --err --lines 35 --nostream | tee -a "$LOG" || true
+        if [ "$FRONT_BUILD_OK" != true ] || [ ! -f out/index.html ]; then
+          echo "  [frontend] ERROR: static export failed — out/index.html missing (see $LOG)" | tee -a "$LOG"
           exit 1
         fi
+        echo "  [frontend] pm2 serve out/ on :$FPORT → $PMFRONT" | tee -a "$LOG"
+        pm2 start npx --name "$PMFRONT" --cwd "$FDIR" --interpreter none \
+          -- --yes serve@latest -s out -l "tcp://0.0.0.0:${FPORT}" >> "$LOG" 2>&1
+        sleep 4
+        if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+│\s+online'; then
+          echo "  [frontend] ERROR: $PMFRONT failed to stay online. Last logs:" | tee -a "$LOG"
+          pm2 logs "$PMFRONT" --lines 40 --nostream | tee -a "$LOG" || true
+          exit 1
         fi
-        if [ "$MOD" = "BabyeyiWizard" ]; then
-          sleep 3
-          BW_HTML=$(curl -sf "http://127.0.0.1:${FPORT}/" 2>/dev/null || true)
-          if echo "$BW_HTML" | grep -qi 'Academic Dashboard\|>Academic<\|Subjects.*Examinations'; then
-            echo "  [frontend] ERROR: :${FPORT} is serving Academic — wrong app on Babyeyi port" | tee -a "$LOG"
-            pm2 describe "$PMFRONT" | tee -a "$LOG" || true
-            exit 1
-          fi
-          if echo "$BW_HTML" | grep -qi 'Babyeyi Wizard\|Create, manage and publish\|Missing access token\|Verifying license'; then
-            echo "  [frontend] ok on :${FPORT} (BabyeyiWizard)" | tee -a "$LOG"
-          else
-            echo "  [frontend] WARNING: :${FPORT} content unexpected — verify manually" | tee -a "$LOG"
-          fi
+        sleep 3
+        if curl -sf "http://127.0.0.1:${FPORT}/" >/dev/null 2>&1 || curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
+          echo "  [frontend] ok on :${FPORT} ($MOD static export)" | tee -a "$LOG"
+        else
+          echo "  [frontend] ERROR: :${FPORT} not responding — ${FEHOST:-frontend} will 502" | tee -a "$LOG"
+          pm2 logs "$PMFRONT" --lines 30 --nostream | tee -a "$LOG" || true
+          exit 1
         fi
-        if [ "$MOD" = "ParentMIS" ]; then
-          sleep 3
-          if curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
-            echo "  [frontend] ok on :${FPORT}/login (ParentMIS)" | tee -a "$LOG"
+      fi
+    else
+      # Build into a staging dir while auth-web keeps serving the previous .next (avoids unstyled apex during build).
+      STAGING=".next-staging-$$"
+      echo "  [frontend] Next.js build → $STAGING (live .next kept until swap)..." | tee -a "$LOG"
+      rm -rf "$STAGING"
+      export NEXT_IGNORE_INCORRECT_LOCKFILE=true
+      export NEXT_DIST_DIR="$STAGING"
+      FRONT_BUILD_OK=false
+      if NEXT_IGNORE_INCORRECT_LOCKFILE=true NEXT_DIST_DIR="$STAGING" npx next build >> "$LOG" 2>&1; then
+        FRONT_BUILD_OK=true
+      else
+        echo "  [frontend] next build failed — last 60 log lines:" | tee -a "$LOG"
+        tail -n 60 "$LOG" | tee -a "$LOG" || true
+        rm -rf "$STAGING"
+      fi
+
+      if [ -n "$PMFRONT" ] && [ -n "$FPORT" ]; then
+        if [ "$FRONT_BUILD_OK" = true ] && [ -f "$STAGING/BUILD_ID" ]; then
+          pm2 stop "$PMFRONT" >/dev/null 2>&1 || true
+          rm -rf .next
+          mv "$STAGING" .next
+        fi
+        pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+        if [ "$MOD" = "Authentication" ] || [ "$MOD" = "BabyeyiWizard" ] || [ "$MOD" = "ParentMIS" ]; then
+          if [ "$MOD" = "BabyeyiWizard" ]; then
+            pm2 delete academic-web >/dev/null 2>&1 || true
+          fi
+          echo "  [frontend] free port :${FPORT} (avoid stale next on :${FPORT} while pm2 is errored)..." | tee -a "$LOG"
+          fuser -k "${FPORT}/tcp" 2>/dev/null || true
+          sleep 2
+        fi
+        if [ "$FRONT_BUILD_OK" != true ] || [ ! -f .next/BUILD_ID ]; then
+          echo "  [frontend] ERROR: next build failed — not starting $PMFRONT (see $LOG)" | tee -a "$LOG"
+          exit 1
+        else
+          if [ "$MOD" = "Authentication" ]; then
+            echo "  [frontend] restart auth-web (kill stale :${FPORT}, nginx apex, verify CSS)..." | tee -a "$LOG"
+            bash "$REPO/scripts/restart-auth-web.sh" >> "$LOG" 2>&1 || {
+              echo "  [frontend] ERROR: restart-auth-web failed — see $LOG" | tee -a "$LOG"
+              exit 1
+            }
           else
-            echo "  [frontend] ERROR: :${FPORT}/login not responding — parents.shuleplus.rw will 502" | tee -a "$LOG"
-            pm2 logs "$PMFRONT" --err --lines 25 --nostream | tee -a "$LOG" || true
-            exit 1
+            echo "  [frontend] pm2 start next start -H 0.0.0.0 -p $FPORT → $PMFRONT" | tee -a "$LOG"
+            pm2 start "npx next start -H 0.0.0.0 -p $FPORT" --name "$PMFRONT" --interpreter none \
+              --cwd "$FDIR" --update-env \
+              --env NEXT_IGNORE_INCORRECT_LOCKFILE=true --env HOSTNAME=0.0.0.0 >> "$LOG" 2>&1
+            sleep 4
+            if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+│\s+online'; then
+              echo "  [frontend] ERROR: $PMFRONT failed to stay online (port conflict or bad .next). Last errors:" | tee -a "$LOG"
+              pm2 logs "$PMFRONT" --err --lines 35 --nostream | tee -a "$LOG" || true
+              exit 1
+            fi
+          fi
+          if [ "$MOD" = "BabyeyiWizard" ]; then
+            sleep 3
+            BW_HTML=$(curl -sf "http://127.0.0.1:${FPORT}/" 2>/dev/null || true)
+            if echo "$BW_HTML" | grep -qi 'Academic Dashboard\|>Academic<\|Subjects.*Examinations'; then
+              echo "  [frontend] ERROR: :${FPORT} is serving Academic — wrong app on Babyeyi port" | tee -a "$LOG"
+              pm2 describe "$PMFRONT" | tee -a "$LOG" || true
+              exit 1
+            fi
+            if echo "$BW_HTML" | grep -qi 'Babyeyi Wizard\|Create, manage and publish\|Missing access token\|Verifying license'; then
+              echo "  [frontend] ok on :${FPORT} (BabyeyiWizard)" | tee -a "$LOG"
+            else
+              echo "  [frontend] WARNING: :${FPORT} content unexpected — verify manually" | tee -a "$LOG"
+            fi
+          fi
+          if [ "$MOD" = "ParentMIS" ]; then
+            sleep 3
+            if curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
+              echo "  [frontend] ok on :${FPORT}/login (ParentMIS)" | tee -a "$LOG"
+            else
+              echo "  [frontend] ERROR: :${FPORT}/login not responding — parents.shuleplus.rw will 502" | tee -a "$LOG"
+              pm2 logs "$PMFRONT" --err --lines 25 --nostream | tee -a "$LOG" || true
+              exit 1
+            fi
+          fi
+          if [ "$MOD" = "Transport" ]; then
+            sleep 3
+            TR_HTML=$(curl -sf "http://127.0.0.1:${FPORT}/dashboard" 2>/dev/null || true)
+            if echo "$TR_HTML" | grep -qi 'Academic Dashboard\|>Academic<\|Subjects.*Examinations'; then
+              echo "  [frontend] ERROR: :${FPORT} is serving Academic — wrong app on Transport port" | tee -a "$LOG"
+              exit 1
+            fi
+            if [ -f "$REPO/scripts/generate-nginx-modules.sh" ]; then
+              echo "  [frontend] regenerate nginx (transport.shuleplus.rw → :${FPORT})..." | tee -a "$LOG"
+              sudo bash "$REPO/scripts/generate-nginx-modules.sh" >> "$LOG" 2>&1 || true
+            fi
           fi
         fi
       fi

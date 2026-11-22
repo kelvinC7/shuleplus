@@ -2,39 +2,21 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadImageDataUrl } from '@/lib/public-assets';
 import { formatFrw } from '@/utils/currency';
-import { formatPersonName } from '@/utils/person-name';
+import { formatPersonName, formatPreparedByName } from '@/utils/person-name';
 import type { PurchaseOrder, Supplier } from '@/types';
 import type { ProcurementReceiptSettings } from '@/types/settings';
+import { drawSchoolHeader, drawVerificationFooter, verificationFooterTop, type PdfSchoolInfo } from './pdf-header';
+import { ensureDocumentVerification } from './document-verification';
 
 const PRIMARY: [number, number, number] = [252, 176, 56];
 const NAVY: [number, number, number] = [0, 4, 53];
 const GRAY: [number, number, number] = [100, 116, 139];
 const LIGHT: [number, number, number] = [248, 250, 252];
 
-export interface POPdfContext {
+export interface POPdfContext extends PdfSchoolInfo {
   schoolName: string;
-  logoUrl?: string | null;
   receiptSettings?: ProcurementReceiptSettings;
   supplier?: Supplier | null;
-}
-
-function addImageSafe(
-  doc: jsPDF,
-  dataUrl: string | null,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-) {
-  if (!dataUrl) return;
-  try {
-    const fmt = dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')
-      ? 'JPEG'
-      : 'PNG';
-    doc.addImage(dataUrl, fmt, x, y, w, h);
-  } catch {
-    /* skip */
-  }
 }
 
 function drawInfoBox(
@@ -52,12 +34,12 @@ function drawInfoBox(
   doc.roundedRect(x, y, w, h, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(...NAVY);
-  doc.text(title.toUpperCase(), x + 4, y + 6);
+  doc.text(title.toUpperCase(), x + 4, y + 6.5);
 
-  let lineY = y + 12;
-  doc.setFontSize(8);
+  let lineY = y + 12.5;
+  doc.setFontSize(9);
   for (const line of lines) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...GRAY);
@@ -66,7 +48,7 @@ function drawInfoBox(
     doc.setTextColor(...NAVY);
     const valueLines = doc.splitTextToSize(line.value || '—', w - 28);
     doc.text(valueLines, x + 26, lineY);
-    lineY += Math.max(5, valueLines.length * 4.2);
+    lineY += Math.max(5.2, valueLines.length * 4.6);
   }
 }
 
@@ -80,32 +62,25 @@ function drawManualSignBlock(
   name: string,
   title: string,
 ) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PRIMARY);
+  doc.text(label.toUpperCase(), x, y + 4);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...NAVY);
+  doc.text(name || '—', x, y + 11);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  doc.text(title || '—', x, y + 16);
+  doc.text('Date: ........................', x, y + 21);
+
   doc.setDrawColor(...GRAY);
   doc.setLineWidth(0.25);
-  doc.roundedRect(x, y, w, h, 2, 2);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...NAVY);
-  doc.text(label.toUpperCase(), x + 3, y + 6);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text('Signature', x + 3, y + 12);
-  doc.line(x + 3, y + 20, x + w - 3, y + 20);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...NAVY);
-  doc.text(name || '_________________________', x + 3, y + 27);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text(title || '—', x + 3, y + 32);
-
-  doc.text('Date: _________________________', x + 3, y + h - 4);
+  doc.line(x, y + h - 2, x + w, y + h - 2);
 }
 
 export async function buildPurchaseOrderPdf(
@@ -114,38 +89,31 @@ export async function buildPurchaseOrderPdf(
 ): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 14;
   const contentW = pageW - margin * 2;
   const centerX = pageW / 2;
   const supplier = ctx.supplier ?? (po.supplier as Supplier | undefined);
   const settings = ctx.receiptSettings;
   const preparedByName =
-    formatPersonName(po.createdByName) ||
-    formatPersonName(po.purchaseRequest?.requestedByName);
-  const verifierName = formatPersonName(settings?.verifier.name);
-  const approverName = formatPersonName(settings?.approver.name);
+    formatPreparedByName(po.createdByName) ||
+    formatPreparedByName(po.purchaseRequest?.requestedByName) ||
+    '—';
+  const verifierName = formatPersonName(settings?.verifier.name) || '—';
+  const approverName = formatPersonName(settings?.approver.name) || '—';
 
-  const [logo, brandLogo] = await Promise.all([
-    loadImageDataUrl(ctx.logoUrl),
-    loadImageDataUrl('/logo.png'),
-  ]);
+  const logo = await loadImageDataUrl(ctx.logoUrl);
+  const verification = await ensureDocumentVerification('PURCHASE_ORDER', po.id);
 
-  let y = margin;
-  addImageSafe(doc, brandLogo, centerX - 22, y, 44, 14);
-  y += 16;
-
-  if (logo) {
-    addImageSafe(doc, logo, margin, y - 14, 18, 18);
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...NAVY);
-  doc.text(ctx.schoolName || 'School', centerX, y, { align: 'center' });
-  y += 6;
-  doc.setFontSize(11);
-  doc.text('PURCHASE ORDER', centerX, y, { align: 'center' });
-  y += 8;
+  let y = drawSchoolHeader({
+    doc,
+    info: ctx,
+    logoDataUrl: logo,
+    title: 'PURCHASE ORDER',
+    pageWidth: pageW,
+    margin,
+    startY: margin,
+  });
 
   doc.setFillColor(...PRIMARY);
   doc.roundedRect(margin, y, contentW, 8, 1.5, 1.5, 'F');
@@ -173,7 +141,7 @@ export async function buildPurchaseOrderPdf(
 
   const colGap = 4;
   const colW = (contentW - colGap) / 2;
-  const boxH = 42;
+  const boxH = 43;
 
   drawInfoBox(doc, margin, y, colW, boxH, 'Supplier', [
     { label: 'Company', value: supplierName },
@@ -241,8 +209,16 @@ export async function buildPurchaseOrderPdf(
   y += 16;
 
   const blockW = (contentW - colGap) / 2;
-  const blockH = 38;
-  const rowGap = 5;
+  const blockH = 28;
+  const rowGap = 3;
+  const signatureBlockHeight = blockH * 2 + rowGap;
+  const footerTop = verificationFooterTop(pageH, margin);
+
+  // Keep signatures and verification/QR together on the same page when they fit.
+  if (y + signatureBlockHeight > footerTop - 2) {
+    doc.addPage();
+    y = margin;
+  }
 
   drawManualSignBlock(
     doc,
@@ -288,9 +264,13 @@ export async function buildPurchaseOrderPdf(
     'Authorized Representative',
   );
 
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY);
-  doc.text('Generated by Shule+ Procurement MIS', centerX, 285, { align: 'center' });
+  drawVerificationFooter({
+    doc,
+    verification,
+    pageWidth: pageW,
+    pageHeight: pageH,
+    margin,
+  });
 
   return doc;
 }

@@ -93,8 +93,8 @@ export function TransportPageHeader({ onMenuOpen }: TransportPageHeaderProps) {
             ) : null}
             <div className="min-w-0">
               <p className="truncate text-xs text-muted">
-                Smart Transport <span className="text-border">›</span>{' '}
-                <span className="text-navy/80">{pageTitle}</span>
+                Transport <span className="text-border">›</span>{' '}
+                <span className="font-medium text-navy">{pageTitle}</span>
               </p>
               <h1 className="truncate text-base font-semibold text-navy lg:hidden">{pageTitle}</h1>
             </div>
@@ -141,7 +141,7 @@ export function TransportPageHeader({ onMenuOpen }: TransportPageHeaderProps) {
               >
                 <div className="border-b border-border px-4 py-3">
                   <p className="truncate text-sm font-semibold text-navy">{displayName}</p>
-                  <p className="truncate text-xs text-muted">{user?.email ?? '—'}</p>
+                  <p className="truncate text-xs text-muted">{user?.email ?? ''}</p>
                 </div>
                 <button
                   type="button"

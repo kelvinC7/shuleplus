@@ -3,6 +3,7 @@ import type { SmartAccessSchool } from '@/lib/smart-access-api';
 
 export type GateDevice = {
   id: string;
+  organizationId?: string;
   deviceCode: string;
   name: string;
   location: string;
@@ -17,6 +18,19 @@ export type GateDevice = {
   studentsToday?: number;
   lastSeenAt?: string | null;
   firmwareVersion?: string | null;
+  primaryOrganizationId?: string;
+  linkedOrganizationIds?: string[];
+  linkedSchoolsCount?: number;
+  isShared?: boolean;
+  accessRole?: 'PRIMARY' | 'SHARED' | string;
+};
+
+export type GateDeviceSchoolLink = {
+  id?: string;
+  deviceId: string;
+  organizationId: string;
+  isPrimary: boolean;
+  status: string;
 };
 
 export type { SmartAccessSchool };
@@ -90,6 +104,36 @@ export async function updateGateDeviceWifi(
   wifi: { wifiSsid: string; wifiPassword: string }
 ) {
   return updateGateDevice(organizationId, deviceId, wifi);
+}
+
+export async function fetchGateDeviceSchoolsLinks(organizationId: string, deviceId: string) {
+  const { data } = await api.get<{ success: boolean; data: GateDeviceSchoolLink[] }>(
+    `/super-admin/gate-devices/schools/${organizationId}/devices/${deviceId}/schools`
+  );
+  return data.data;
+}
+
+export async function linkGateDeviceSchool(
+  organizationId: string,
+  deviceId: string,
+  targetOrganizationId: string
+) {
+  const { data } = await api.post<{ success: boolean; data: GateDeviceSchoolLink[] | unknown }>(
+    `/super-admin/gate-devices/schools/${organizationId}/devices/${deviceId}/schools`,
+    { targetOrganizationId }
+  );
+  return data.data;
+}
+
+export async function unlinkGateDeviceSchool(
+  organizationId: string,
+  deviceId: string,
+  schoolId: string
+) {
+  const { data } = await api.delete<{ success: boolean; data: GateDeviceSchoolLink[] | unknown }>(
+    `/super-admin/gate-devices/schools/${organizationId}/devices/${deviceId}/schools/${schoolId}`
+  );
+  return data.data;
 }
 
 export const ATTENDANCE_API_BASE = 'https://attendance-api.shuleplus.rw/api';

@@ -29,6 +29,29 @@ export function verifyPassword(password: string, stored: string): boolean {
 export function sanitizePhone(raw: string): string {
   let phone = raw.replace(/[\s\-().]/g, '');
   if (phone.startsWith('+')) phone = phone.slice(1);
-  if (phone.startsWith('0')) phone = `25${phone.slice(1)}`;
+  if (phone.startsWith('0')) phone = `250${phone.slice(1)}`;
   return phone;
+}
+
+export function phoneVariants(raw: string): string[] {
+  const digits = String(raw || '').replace(/\D/g, '');
+  const variants = new Set<string>([raw, digits]);
+  if (digits.startsWith('250') && digits.length >= 12) {
+    variants.add(`0${digits.slice(3)}`);
+    variants.add(`+${digits}`);
+    variants.add(digits.slice(3));
+  }
+  if (digits.startsWith('0') && digits.length >= 10) {
+    variants.add(`+250${digits.slice(1)}`);
+    variants.add(`250${digits.slice(1)}`);
+    variants.add(digits.slice(1));
+  }
+  if (digits.length >= 9) {
+    const last9 = digits.slice(-9);
+    variants.add(last9);
+    variants.add(`0${last9}`);
+    variants.add(`250${last9}`);
+    variants.add(`+250${last9}`);
+  }
+  return [...variants].filter(Boolean);
 }

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Box, Typography, TextField, Button, IconButton, Chip, Table, TableBody, TableCell,
+  Avatar, Box, InputAdornment, Typography, TextField, Button, IconButton, Chip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Select, MenuItem, FormControl, InputLabel,
   CircularProgress, Tooltip, LinearProgress,
 } from '@mui/material';
@@ -10,10 +10,12 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
+import SearchIcon from '@mui/icons-material/Search';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAssessment, getAssessmentMarks, enterAssessmentMarks, updateAssessmentStatus } from '@/services/api';
 import { toast } from '@/lib/toast';
 import type { ApiAssessment, ApiAssessmentMark } from '@/types';
+import { sortAssessmentMarksByStudentName, studentDisplayName } from '@/lib/assessment-records';
 
 const MARK_STATUSES = [
   { value: 'PRESENT', label: 'Present', color: '#16a34a' },
@@ -42,6 +44,7 @@ export default function TeacherMarkEntryPage() {
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'offline' | null>(null);
   const [validationErrors, setValidationErrors] = useState<Map<string, string>>(new Map());
+  const [studentSearch, setStudentSearch] = useState('');
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirty = useRef(false);
 
@@ -51,10 +54,11 @@ export default function TeacherMarkEntryPage() {
     try {
       const aData = await getAssessment(assessmentId);
       setAssessment(aData);
-      setMarks(aData.marks || []);
+      const orderedMarks = sortAssessmentMarksByStudentName(aData.marks || []);
+      setMarks(orderedMarks);
 
       const entryMap = new Map<string, MarkEntry>();
-      for (const m of (aData.marks || [])) {
+      for (const m of orderedMarks) {
         entryMap.set(m.studentId, {
           studentId: m.studentId,
           score: m.score != null ? String(m.score) : '',
@@ -72,6 +76,13 @@ export default function TeacherMarkEntryPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const maxMark = assessment?.maxMark ?? 0;
+  const visibleMarks = useMemo(() => {
+    const query = studentSearch.trim().toLocaleLowerCase();
+    if (!query) return marks;
+    return marks.filter((mark) =>
+      `${studentDisplayName(mark)} ${mark.student?.studentUid ?? ''}`.toLocaleLowerCase().includes(query)
+    );
+  }, [marks, studentSearch]);
 
   const validateMark = (value: string): string => {
     if (!value) return '';
@@ -210,28 +221,28 @@ export default function TeacherMarkEntryPage() {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#f4f6f9', overflow: 'hidden' }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 2, px: 3, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', gap: 1.5, flexShrink: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', p: { xs: 1.5, md: 2 }, px: { xs: 2, md: 3 }, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', gap: 1.5, flexShrink: 0 }}>
         <IconButton onClick={() => navigate('/teacher')} size="small" sx={{ color: '#64748b' }}>
           <ArrowBackIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Box sx={{ flex: 1 }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#000435' }}>{assessment.title}</Typography>
-          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: '1rem', fontWeight: 700, color: '#000435' }}>{assessment.title}</Typography>
+          <Typography noWrap sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
             {assessment.subject?.name} — {assessment.class?.stream ? `${assessment.class?.name} ${assessment.class?.stream}` : assessment.class?.name}
           </Typography>
         </Box>
-        <Typography sx={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>Max: {maxMark}</Typography>
+        <Typography sx={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>Max: {maxMark}</Typography>
         {saveStatus === 'saved' && <CloudDoneIcon sx={{ fontSize: 16, color: '#16a34a' }} />}
         {saveStatus === 'offline' && <CloudOffIcon sx={{ fontSize: 16, color: '#d97706' }} />}
       </Box>
 
       {/* Progress Bar */}
-      <Box sx={{ px: 3, pt: 1, pb: 0.5, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <Box sx={{ px: { xs: 2, md: 3 }, pt: 1, pb: 0.5, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
         <LinearProgress variant="determinate" value={completionPct} sx={{ height: 4, borderRadius: 2, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { borderRadius: 2, bgcolor: completionPct === 100 ? '#16a34a' : '#d97706' } }} />
       </Box>
 
       {/* Status Chips */}
-      <Box sx={{ display: 'flex', gap: 1, px: 3, py: 1, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 1, px: { xs: 2, md: 3 }, py: 1, bgcolor: '#ffffff', borderBottom: '1px solid #e2e8f0', flexShrink: 0, flexWrap: 'wrap' }}>
         <Chip icon={<CheckCircleIcon sx={{ fontSize: 14 }} />} label={`${completedCount}/${totalStudents} completed (${completionPct}%)`} size="small" sx={{ fontWeight: 600, bgcolor: 'rgba(34,197,94,0.08)', color: '#16a34a' }} />
         {absentCount > 0 && <Chip label={`${absentCount} absent`} size="small" sx={{ fontWeight: 600, bgcolor: 'rgba(239,68,68,0.08)', color: '#dc2626' }} />}
         {excusedCount > 0 && <Chip label={`${excusedCount} excused/exempt`} size="small" sx={{ fontWeight: 600, bgcolor: 'rgba(124,58,237,0.08)', color: '#7c3aed' }} />}
@@ -241,8 +252,23 @@ export default function TeacherMarkEntryPage() {
       </Box>
 
       {/* Student Table */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-        <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+      <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1, sm: 2 } }}>
+        <Paper elevation={0} sx={{ overflow: 'hidden', border: '1px solid #e2e8f0', borderRadius: 2.5 }}>
+          <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.25, flexDirection: { xs: 'column', sm: 'row' }, bgcolor: '#fff' }}>
+            <Box>
+              <Typography sx={{ fontWeight: 800, color: '#000435' }}>Student marks</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>Alphabetical order · {visibleMarks.length} of {marks.length} students</Typography>
+            </Box>
+            <TextField
+              size="small"
+              value={studentSearch}
+              onChange={(event) => setStudentSearch(event.target.value)}
+              placeholder="Search name or student ID"
+              sx={{ width: { xs: '100%', sm: 280 }, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#f8fafc' } }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: '#94a3b8', fontSize: 18 }} /></InputAdornment> } }}
+            />
+          </Box>
+          <TableContainer component={Box} sx={{ borderTop: '1px solid #e2e8f0' }}>
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
@@ -255,7 +281,7 @@ export default function TeacherMarkEntryPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {marks.map((m, idx) => {
+              {visibleMarks.map((m, idx) => {
                 const entry = entries.get(m.studentId);
                 const markStatus = entry?.markStatus || 'PRESENT';
                 const score = entry?.score || '';
@@ -267,8 +293,15 @@ export default function TeacherMarkEntryPage() {
                   <TableRow key={m.studentId} sx={{ bgcolor: idx % 2 !== 0 ? 'rgba(0,31,63,0.02)' : 'white' }}>
                     <TableCell sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>{idx + 1}</TableCell>
                     <TableCell>
-                      <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500 }}>{m.student?.firstName} {m.student?.lastName}</Typography>
-                      <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>{m.student?.studentUid}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ width: 30, height: 30, bgcolor: '#eef2ff', color: '#000435', fontSize: '0.7rem', fontWeight: 800 }}>
+                          {studentDisplayName(m).slice(0, 1).toLocaleUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: '0.8125rem', fontWeight: 650, color: '#0f172a' }}>{studentDisplayName(m)}</Typography>
+                          <Typography sx={{ fontSize: '0.625rem', color: '#94a3b8' }}>{m.student?.studentUid || 'Student ID unavailable'}</Typography>
+                        </Box>
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
                       <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -311,16 +344,17 @@ export default function TeacherMarkEntryPage() {
                   </TableRow>
                 );
               })}
-              {marks.length === 0 && (
+              {visibleMarks.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} sx={{ textAlign: 'center', py: 6, color: '#94a3b8', borderBottom: 'none' }}>
-                    <Typography variant="body2">No students enrolled in this assessment. Open the assessment from the admin panel to add students.</Typography>
+                    <Typography variant="body2">{marks.length ? 'No students match your search.' : 'No students enrolled in this assessment. Open the assessment from the admin panel to add students.'}</Typography>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </TableContainer>
+          </TableContainer>
+        </Paper>
       </Box>
 
       {/* Footer Actions */}

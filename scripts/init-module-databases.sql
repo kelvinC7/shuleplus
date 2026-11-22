@@ -43,9 +43,13 @@ SELECT 'CREATE DATABASE shuleplus_task_module_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'shuleplus_task_module_db')\gexec
 SELECT 'CREATE DATABASE teacher_portal_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'teacher_portal_db')\gexec
+SELECT 'CREATE DATABASE ticha_portal_db'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ticha_portal_db')\gexec
 SELECT 'CREATE DATABASE print_card_module_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'print_card_module_db')\gexec
 SELECT 'CREATE DATABASE timetable_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'timetable_db')\gexec
 SELECT 'CREATE DATABASE library_module_db'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'library_module_db')\gexec
+SELECT 'CREATE DATABASE chat_module_db'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'chat_module_db')\gexec

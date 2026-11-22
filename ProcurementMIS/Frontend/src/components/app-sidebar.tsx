@@ -55,51 +55,58 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
-                if (item.children) {
-                  const open = openGroups.includes(item.label)
+              {(NAV_ITEMS ?? []).filter(Boolean).map((item, idx) => {
+                const itemLabel = item?.label ?? ''
+                const ItemIcon = item?.icon
+
+                if (item?.children) {
+                  const open = openGroups.includes(itemLabel)
                   return (
-                    <SidebarMenuItem key={item.label}>
+                    <SidebarMenuItem key={itemLabel || idx}>
                       <SidebarMenuButton
-                        tooltip={item.label}
-                        onClick={() => toggleGroup(item.label)}
+                        tooltip={itemLabel}
+                        onClick={() => toggleGroup(itemLabel)}
                       >
-                        <item.icon />
-                        <span>{item.label}</span>
+                        {ItemIcon ? <ItemIcon /> : null}
+                        <span>{itemLabel}</span>
                         <ChevronRight
                           className={`ml-auto transition-transform duration-200 ${open ? "rotate-90" : ""}`}
                         />
                       </SidebarMenuButton>
                       {open && (
                         <SidebarMenuSub>
-                          {item.children.map((child) => (
-                            <SidebarMenuSubItem key={child.href}>
-                              <SidebarMenuSubButton
-                                isActive={isActive(child.href)}
-                                render={
-                                  <Link href={child.href}>
-                                    <child.icon />
-                                    <span>{child.label}</span>
-                                  </Link>
-                                }
-                              />
-                            </SidebarMenuSubItem>
-                          ))}
+                          {(item.children ?? []).filter(Boolean).map((child, cIdx) =>
+                            child?.href ? (
+                              <SidebarMenuSubItem key={child.href ?? cIdx}>
+                                <SidebarMenuSubButton
+                                  isActive={isActive(child.href)}
+                                  render={
+                                    <Link href={child.href}>
+                                      {child.icon ? <child.icon /> : null}
+                                      <span>{child.label ?? ''}</span>
+                                    </Link>
+                                  }
+                                />
+                              </SidebarMenuSubItem>
+                            ) : null
+                          )}
                         </SidebarMenuSub>
                       )}
                     </SidebarMenuItem>
                   )
                 }
 
+                if (!item?.href) return null
+
                 return (
-                  <SidebarMenuItem key={item.href}>
+                  <SidebarMenuItem key={item.href ?? idx}>
                     <SidebarMenuButton
-                      isActive={isActive(item.href!)}
-                      tooltip={item.label}
+                      isActive={isActive(item.href)}
+                      tooltip={itemLabel}
                       render={
-                        <Link href={item.href!}>
-                          <item.icon />
-                          <span>{item.label}</span>
+                        <Link href={item.href}>
+                          {ItemIcon ? <ItemIcon /> : null}
+                          <span>{itemLabel}</span>
                         </Link>
                       }
                     />

@@ -30,8 +30,8 @@ function StatCard({ label, value, accent }) {
   return (
     <div className="bg-white rounded-2xl border border-black/5 p-5 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
       <div className={`absolute top-0 right-0 w-20 h-20 rounded-full opacity-5 -mr-6 -mt-6 ${accent}`} />
-      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#000435]/50 mb-1">{label}</p>
-      <p className="text-2xl font-semibold text-[#000435] tracking-tight">{value}</p>
+      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-[#13213D]/50 mb-1">{label}</p>
+      <p className="text-2xl font-semibold text-[#13213D] tracking-tight">{value}</p>
     </div>
   );
 }
@@ -159,7 +159,7 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
   const totalItems = form.items.length;
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+    <div className="ts-overlay fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="px-6 py-5 border-b border-black/5 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${T.navy} 0%, #0D2644 100%)` }}>
@@ -178,10 +178,10 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
               const done = step > n;
               return (
                 <div key={label} className="flex items-center gap-2 flex-1">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${active ? 'bg-[#F59E0B] text-[#000435]' : done ? 'bg-emerald-500 text-white' : 'bg-white border border-black/10 text-[#000435]/40'}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${active ? 'bg-[#F5A623] text-[#13213D]' : done ? 'bg-emerald-500 text-white' : 'bg-white border border-black/10 text-[#13213D]/40'}`}>
                     {done ? '✓' : n}
                   </div>
-                  <span className={`text-[10px] font-medium uppercase tracking-wide hidden sm:block ${active ? 'text-[#000435]' : 'text-[#000435]/40'}`}>{label}</span>
+                  <span className={`text-[10px] font-medium uppercase tracking-wide hidden sm:block ${active ? 'text-[#13213D]' : 'text-[#13213D]/40'}`}>{label}</span>
                   {i < 2 && <ChevronRight size={14} className="text-black/20 ml-auto" />}
                 </div>
               );
@@ -195,40 +195,40 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
           {step === 1 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Request Date</label>
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Request Date</label>
                 <input type="date" value={form.request_date} onChange={(e) => setForm((f) => ({ ...f, request_date: e.target.value }))}
                   className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm" />
               </div>
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Department</label>
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Department</label>
                 <input value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
                   placeholder="e.g. Kitchen, Science Lab"
                   className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm" />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Purpose of Request *</label>
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Purpose of Request *</label>
                 <textarea value={form.purpose} onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))}
                   rows={2} placeholder="Describe why these items are needed"
                   className="mt-1 w-full px-3 py-2 rounded-xl border border-black/10 text-sm resize-none" />
               </div>
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Priority</label>
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Priority</label>
                 <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
                   className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm">
                   {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Requested By</label>
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Requested By</label>
                 <input value={form.requested_by} readOnly className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm bg-gray-50" />
               </div>
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Reviewer (Accountant)</label>
-                <input value={form.reviewer} readOnly className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm bg-[#F7F8FC] text-[#000435]" />
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Reviewer (Accountant)</label>
+                <input value={form.reviewer} readOnly className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm bg-[#F7F8FC] text-[#13213D]" />
               </div>
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-widest text-[#000435]/50">Approver (School Manager)</label>
-                <input value={form.approver} readOnly className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm bg-[#F7F8FC] text-[#000435]" />
+                <label className="text-[10px] font-medium uppercase tracking-widest text-[#13213D]/50">Approver (School Manager)</label>
+                <input value={form.approver} readOnly className="mt-1 w-full h-10 px-3 rounded-xl border border-black/10 text-sm bg-[#F7F8FC] text-[#13213D]" />
               </div>
             </div>
           )}
@@ -256,7 +256,7 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
               <div className="overflow-x-auto rounded-2xl border border-black/5">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[#FEF3C7] text-[10px] uppercase tracking-widest text-[#000435]">
+                    <tr className="bg-[#FEF3C7] text-[10px] uppercase tracking-widest text-[#13213D]">
                       <th className="px-3 py-2.5 text-left font-semibold">Item</th>
                       <th className="px-3 py-2.5 text-left font-semibold">Description</th>
                       <th className="px-3 py-2.5 text-left font-semibold w-20">Qty</th>
@@ -300,8 +300,8 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
                 </table>
               </div>
               <button type="button" onClick={addItem}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-[#F59E0B] text-[#000435] text-xs font-semibold uppercase tracking-wide hover:bg-amber-50">
-                <Plus size={14} className="text-[#F59E0B]" /> Add More Item
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-[#F5A623] text-[#13213D] text-xs font-semibold uppercase tracking-wide hover:bg-amber-50">
+                <Plus size={14} className="text-[#F5A623]" /> Add More Item
               </button>
             </div>
           )}
@@ -309,7 +309,7 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
           {step === 3 && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-black/5 p-5 bg-[#F7F8FC] space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#000435]/60">Request Summary</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#13213D]/60">Request Summary</h3>
                 {[
                   ['Department', form.department || '-'],
                   ['Purpose', form.purpose],
@@ -318,14 +318,14 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
                   ['Total Items', totalItems],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm">
-                    <span className="text-[#000435]/50">{k}</span>
-                    <span className="font-medium text-[#000435] text-right max-w-[60%]">{v}</span>
+                    <span className="text-[#13213D]/50">{k}</span>
+                    <span className="font-medium text-[#13213D] text-right max-w-[60%]">{v}</span>
                   </div>
                 ))}
               </div>
               <div className="rounded-2xl border border-black/5 overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead><tr className="bg-[#000435] text-white"><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-left">Unit</th></tr></thead>
+                  <thead><tr className="bg-[#13213D] text-white"><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-left">Unit</th></tr></thead>
                   <tbody>
                     {form.items.map((it, i) => (
                       <tr key={i} className="border-t border-black/5">
@@ -351,7 +351,7 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
           <div className="flex gap-2">
             {step > 1 && (
               <button type="button" onClick={() => setStep((s) => s - 1)}
-                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#000435]">
+                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#13213D]">
                 <ChevronLeft size={14} /> Back
               </button>
             )}
@@ -366,12 +366,12 @@ function RequestStepperModal({ open, onClose, onSaved, portalSource, userName, e
             ) : (
               <>
                 <button type="button" onClick={() => save(true)} disabled={submitting}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#000435] disabled:opacity-50">
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#13213D] disabled:opacity-50">
                   <Save size={14} /> Save Draft
                 </button>
                 <button type="button" onClick={() => save(false)} disabled={submitting}
                   className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wide text-white disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
+                  style={{ background: 'linear-gradient(135deg, #F5A623, #D97706)' }}>
                   <Send size={14} /> Submit Request
                 </button>
               </>
@@ -393,7 +393,7 @@ function ViewRequestDrawer({ request, school, onClose, onEdit }) {
         <div className="px-6 py-5 border-b flex items-center justify-between">
           <div>
             <p className="text-[9px] uppercase tracking-widest text-black/40">Purchase Request</p>
-            <h3 className="font-semibold text-[#000435]">{request.request_number || request.id}</h3>
+            <h3 className="font-semibold text-[#13213D]">{request.request_number || request.id}</h3>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-black/5"><X size={18} /></button>
         </div>
@@ -408,7 +408,7 @@ function ViewRequestDrawer({ request, school, onClose, onEdit }) {
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between text-sm border-b border-dashed border-black/10 pb-2">
               <span className="text-black/50 text-xs uppercase tracking-wide">{k}</span>
-              <span className="font-medium text-[#000435] text-right max-w-[55%]">{v || '-'}</span>
+              <span className="font-medium text-[#13213D] text-right max-w-[55%]">{v || '-'}</span>
             </div>
           ))}
           <div>
@@ -521,8 +521,8 @@ export default function RequestOrder({
   }), [requests]);
 
   const defaultHero = (
-    <div className="relative w-full min-h-[180px] overflow-hidden bg-[#c87800] px-6 py-10">
-      <h1 className="text-2xl font-semibold text-white">Purchase <span className="text-[#FEBF10]">Requests</span></h1>
+    <div className="relative w-full min-h-[180px] overflow-hidden bg-[#B26A00] px-6 py-10">
+      <h1 className="text-2xl font-semibold text-white">Purchase <span className="text-[#F5A623]">Requests</span></h1>
       <p className="text-white/80 text-sm mt-1">Submit procurement requests for accountant review</p>
     </div>
   );
@@ -556,11 +556,11 @@ export default function RequestOrder({
                 <Plus size={14} /> Request Purchase
               </button>
               <button onClick={() => setStatusFilter(statusFilter === 'draft' ? '' : 'draft')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#000435]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#13213D]">
                 <FileText size={14} /> Drafts ({ownStats.drafts})
               </button>
               <button onClick={() => downloadSamplePdf('request')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#000435]">
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-black/10 text-xs font-semibold uppercase tracking-wide text-[#13213D]">
                 <Download size={14} /> Sample PDF
               </button>
             </div>
@@ -586,7 +586,7 @@ export default function RequestOrder({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#F7F8FC] text-[10px] uppercase tracking-widest text-[#000435]/60">
+                <tr className="bg-[#F7F8FC] text-[10px] uppercase tracking-widest text-[#13213D]/60">
                   <th className="px-5 py-3 text-left font-semibold">Request No</th>
                   <th className="px-5 py-3 text-left font-semibold">Date</th>
                   <th className="px-5 py-3 text-left font-semibold">Purpose</th>
@@ -605,7 +605,7 @@ export default function RequestOrder({
                   </td></tr>
                 ) : pagination.items.map((req) => (
                   <tr key={req.db_id || req.id} className="border-t border-black/5 hover:bg-amber-50/30 transition-colors">
-                    <td className="px-5 py-3.5 font-medium text-[#000435]">{req.request_number || req.id}</td>
+                    <td className="px-5 py-3.5 font-medium text-[#13213D]">{req.request_number || req.id}</td>
                     <td className="px-5 py-3.5 text-black/60 whitespace-nowrap">{formatProcurementDate(req.request_date)}</td>
                     <td className="px-5 py-3.5 max-w-[200px] truncate">{req.purpose}</td>
                     <td className="px-5 py-3.5">{req.requested_by}</td>

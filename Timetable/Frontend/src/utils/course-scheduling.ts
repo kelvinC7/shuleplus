@@ -97,5 +97,8 @@ export function formatCourseSummary(course: CourseConfig): string {
   if (rules.schedulingImportance && rules.schedulingImportance !== 'NORMAL') {
     parts.push(rules.schedulingImportance.toLowerCase());
   }
+  if (course.defaultCourseMarks != null && Number.isFinite(Number(course.defaultCourseMarks))) {
+    parts.push(`${Number(course.defaultCourseMarks)} marks`);
+  }
   return parts.join(' · ');
 }

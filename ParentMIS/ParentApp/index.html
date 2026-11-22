@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="text-scale" content="scale" />
+    <title>yoShule Parent App</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./appLogo.png" />
+    <link rel="apple-touch-icon" href="./appLogo.png" />
+    <meta name="theme-color" content="#13213D" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="yoShule" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="screen" id="screen">
+      <div class="views">
+        <section class="view active" id="v-home"></section>
+        <section class="view" id="v-learn"></section>
+        <section class="view" id="v-pay"></section>
+        <section class="view" id="v-kit"></section>
+        <section class="view" id="v-chat"></section>
+      </div>
+      <nav class="tabbar">
+        <button class="tab active" data-v="home"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2z"/></svg><span data-t="tab_home">Home</span></button>
+        <button class="tab" data-v="learn"><svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><span data-t="tab_learn">Learning</span></button>
+        <button class="tab" data-v="pay"><span class="badge" id="paybadge">1</span><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span data-t="tab_pay">Pay</span></button>
+        <button class="tab" data-v="kit"><svg viewBox="0 0 24 24"><path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M3 12h18"/></svg><span data-t="tab_kit">ShuleKit</span></button>
+        <button class="tab" data-v="chat"><span class="badge" id="chatbadge">2</span><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span data-t="tab_chat">Chat</span></button>
+      </nav>
+      <div class="login" id="login"></div>
+      <div class="scrim" id="scrim"></div>
+      <div class="sheet" id="sheet"></div>
+      <div class="toast" id="toast"><span></span></div>
+    </div>
+    <script>
+      window.OPENID = null;
+      (function () {
+        var reported = false;
+        function showStartupError(message) {
+          if (reported || window.__appStarted) return;
+          reported = true;
+          var panel = document.createElement('main');
+          panel.setAttribute('role', 'alert');
+          panel.style.cssText = 'position:fixed;inset:0;z-index:99999;overflow:auto;background:#F5A623;color:#13213D;padding:28px 22px;font:16px system-ui,sans-serif';
+          var title = document.createElement('h1');
+          title.textContent = 'yoShule Parent could not start';
+          title.style.cssText = 'font-size:22px;margin:12px 0';
+          var detail = document.createElement('pre');
+          detail.textContent = String(message || 'The app did not finish loading.');
+          detail.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font:13px monospace;background:rgba(255,255,255,.55);padding:14px;border-radius:12px';
+          var button = document.createElement('button');
+          button.textContent = 'Reload app';
+          button.style.cssText = 'margin-top:16px;padding:12px 18px;border:0;border-radius:10px;background:#13213D;color:white;font-weight:700';
+          button.onclick = function () { window.location.reload(); };
+          panel.append(title, detail, button);
+          document.body.appendChild(panel);
+        }
+        window.addEventListener('error', function (event) {
+          if (window.__appStarted) {
+            console.error('[ParentApp runtime error]', event.error || event.message);
+            return;
+          }
+          if (event.target && event.target.tagName === 'SCRIPT') {
+            showStartupError('Could not load app script: ' + (event.target.src || 'unknown script'));
+          } else if (event.message) {
+            showStartupError(event.message + (event.filename ? '\\n' + event.filename + ':' + event.lineno : ''));
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function (event) {
+          if (window.__appStarted) {
+            console.error('[ParentApp unhandled promise]', event.reason);
+            return;
+          }
+          var reason = event.reason;
+          showStartupError(reason && (reason.stack || reason.message) || reason || 'Unhandled app startup error');
+        });
+        window.setTimeout(function () {
+          if (!window.__appStarted && !document.querySelector('#login.land')) {
+            showStartupError('The app script loaded, but the start page did not render within 12 seconds.');
+          }
+        }, 12000);
+      })();
+    </script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

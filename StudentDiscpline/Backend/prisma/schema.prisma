@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -18,19 +19,40 @@ model Tenant {
   organizationCode String?      @map("organization_code")
   organizationName String       @map("organization_name")
   status           TenantStatus @default(ACTIVE)
-  disciplineSettings Json?      @map("discipline_settings")
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  disciplineCases         DisciplineCase[]
-  disciplineMarks         DisciplineMark[]
+  disciplineSettings        DisciplineSettings?
+  disciplineCases           DisciplineCase[]
+  disciplineMarks           DisciplineMark[]
   studentDisciplineBalances StudentDisciplineBalance[]
-  permissionRequests      PermissionRequest[]
-  gates                   Gate[]
-  gateOfficers            GateOfficer[]
-  gateLogs                GateLog[]
+  permissionRequests        PermissionRequest[]
+  gates                     Gate[]
+  gateOfficers              GateOfficer[]
+  gateLogs                  GateLog[]
+  rollCallSessions          RollCallSession[]
 
   @@map("tenants")
+}
+
+model DisciplineSettings {
+  id                       String   @id @default(uuid())
+  organizationId           String   @unique @map("organization_id")
+  defaultMaxScore          Int      @default(100) @map("default_max_score")
+  defaultStartingScore     Int      @default(100) @map("default_starting_score")
+  autoInitializeStudents   Boolean  @default(true) @map("auto_initialize_students")
+  absenceDeductionEnabled  Boolean  @default(true) @map("absence_deduction_enabled")
+  absenceDeductionPoints   Int      @default(4) @map("absence_deduction_points")
+  autoAbsenceDeductionEnabled Boolean @default(false) @map("auto_absence_deduction_enabled")
+  autoAbsenceLastRunDate   String?  @map("auto_absence_last_run_date")
+  lateDeductionEnabled     Boolean  @default(true) @map("late_deduction_enabled")
+  lateDeductionPoints      Int      @default(2) @map("late_deduction_points")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId], onDelete: Cascade)
+
+  @@map("discipline_settings")
 }
 
 model DisciplineMark {
@@ -262,4 +284,30 @@ model GateLog {
   @@index([organizationId, studentId])
   @@index([organizationId, eventType])
   @@map("gate_logs")
+}
+
+model RollCallSession {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  className      String   @map("class_name")
+  classId        String?  @map("class_id")
+  sessionDate    DateTime @map("session_date") @db.Date
+  label          String   @default("Class attendance")
+  subject        String?
+  period         String?
+  roster         Json
+  presentCount   Int      @default(0) @map("present_count")
+  absentCount    Int      @default(0) @map("absent_count")
+  excusedCount   Int      @default(0) @map("excused_count")
+  createdBy      String   @map("created_by")
+  createdByName  String?  @map("created_by_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, className, sessionDate, label])
+  @@index([organizationId, sessionDate])
+  @@index([organizationId, className])
+  @@map("roll_call_sessions")
 }

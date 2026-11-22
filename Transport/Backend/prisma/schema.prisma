@@ -47,6 +47,22 @@ enum StaffStatus {
 enum RouteStatus {
   ACTIVE
   INACTIVE
+  DRAFT
+}
+
+enum RouteServiceDirection {
+  MORNING
+  AFTERNOON
+  BOTH
+}
+
+enum StopKind {
+  ORIGIN
+  PICKUP
+  DROPOFF
+  INTERMEDIATE
+  DESTINATION
+  SCHOOL
 }
 
 enum TripStatus {
@@ -65,6 +81,59 @@ enum TripDirection {
 enum BoardingType {
   BOARDING
   EXIT
+}
+
+enum AttendanceMethod {
+  MANUAL
+  QR
+  RFID
+}
+
+enum AttendanceSyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+  CONFLICT
+}
+
+enum TransportEventType {
+  BOARDING_TO_SCHOOL
+  ARRIVED_AT_SCHOOL
+  BOARDING_TO_HOME
+  DROPPED_OFF_HOME
+  ROUTE_PICKUP_STARTED
+  ROUTE_HOME_STARTED
+  TRIP_DELAY
+  TRIP_CANCELLED
+  EXCEPTION
+}
+
+enum NotifyLanguage {
+  RW
+  EN
+  FR
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  RETRYING
+}
+
+enum TransportServiceDirection {
+  MORNING_ONLY
+  AFTERNOON_ONLY
+  BOTH
+}
+
+enum TransportEnrollmentStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ENDED
 }
 
 enum StudentTransportState {
@@ -182,10 +251,28 @@ model TransportSettings {
   academicYear          String   @default("2026-2027") @map("academic_year")
   term                  String   @default("Term 1")
   schoolName            String?  @map("school_name")
+  defaultNotifyLanguage NotifyLanguage @default(RW) @map("default_notify_language")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("transport_settings")
+}
+
+model TransportNotificationTemplate {
+  id             String              @id @default(cuid())
+  organizationId String              @map("organization_id")
+  eventType      TransportEventType    @map("event_type")
+  channel        NotificationChannel
+  language       NotifyLanguage
+  title          String
+  body           String
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  @@unique([organizationId, eventType, channel, language])
+  @@index([organizationId, eventType])
+  @@map("transport_notification_templates")
 }
 
 model Driver {
@@ -227,26 +314,40 @@ model Attendant {
 }
 
 model Route {
-  id             String      @id @default(cuid())
-  organizationId String      @map("organization_id")
-  name           String
-  code           String
-  direction      String      @default("Kicukiro → School")
-  distanceKm     Float?      @map("distance_km")
-  etaMinutes     Int?        @map("eta_minutes")
-  status         RouteStatus @default(ACTIVE)
-  notes          String?
-  deletedAt      DateTime?   @map("deleted_at")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id               String                @id @default(cuid())
+  organizationId   String                @map("organization_id")
+  name             String
+  code             String
+  direction        String                @default("")
+  serviceDirection RouteServiceDirection @default(BOTH) @map("service_direction")
+  color            String                @default("#FCB038")
+  lineWidth        Int                   @default(7) @map("line_width")
+  lineOpacity      Float                 @default(1) @map("line_opacity")
+  distanceKm       Float?                @map("distance_km")
+  etaMinutes       Int?                  @map("eta_minutes")
+  departureTime    String?               @map("departure_time")
+  arrivalTime      String?               @map("arrival_time")
+  operatingDays    Json?                 @map("operating_days")
+  pathGeoJson      Json?                 @map("path_geo_json")
+  schoolLat        Float?                @map("school_lat")
+  schoolLng        Float?                @map("school_lng")
+  schoolName       String?               @map("school_name")
+  primaryBusId     String?               @map("primary_bus_id")
+  status           RouteStatus           @default(DRAFT)
+  notes            String?
+  deletedAt        DateTime?             @map("deleted_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
 
-  stops       Stop[]
-  buses       Bus[]
-  assignments StudentAssignment[]
-  trips       Trip[]
+  stops        Stop[]
+  buses        Bus[]
+  assignments  StudentAssignment[]
+  trips        Trip[]
+  supervisors  RouteSupervisor[]
 
   @@unique([organizationId, code])
   @@index([organizationId, status])
+  @@index([organizationId, serviceDirection])
   @@map("routes")
 }
 
@@ -256,6 +357,16 @@ model Stop {
   routeId        String   @map("route_id")
   name           String
   sequence       Int
+  kind           StopKind @default(INTERMEDIATE)
+  provinceId     String?  @map("province_id")
+  districtId     String?  @map("district_id")
+  sectorId       String?  @map("sector_id")
+  cellId         String?  @map("cell_id")
+  villageId      String?  @map("village_id")
+  placeName      String?  @map("place_name")
+  adminLabel     String?  @map("admin_label")
+  address        String?
+  plannedTime    String?  @map("planned_time")
   etaMinutes     Int?     @map("eta_minutes")
   latitude       Float?
   longitude      Float?
@@ -269,6 +380,25 @@ model Stop {
 
   @@index([organizationId, routeId])
   @@map("stops")
+}
+
+model RouteSupervisor {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  routeId        String    @map("route_id")
+  iamUserId      String?   @map("iam_user_id")
+  name           String
+  email          String?
+  phone          String?
+  roleTitle      String    @map("role_title")
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, routeId])
+  @@map("route_supervisors")
 }
 
 model Bus {
@@ -332,6 +462,10 @@ model StudentAssignment {
   guardianPhone      String?               @map("guardian_phone")
   liveState          StudentTransportState @default(EXPECTED) @map("live_state")
   transportSuspended Boolean               @default(false) @map("transport_suspended")
+  enrollmentStatus   TransportEnrollmentStatus @default(ACTIVE) @map("enrollment_status")
+  serviceDirection   TransportServiceDirection @default(BOTH) @map("service_direction")
+  serviceStartDate   DateTime?             @map("service_start_date") @db.Date
+  serviceEndDate     DateTime?             @map("service_end_date") @db.Date
   academicYear       String?               @map("academic_year")
   term               String?
   deletedAt          DateTime?             @map("deleted_at")
@@ -508,19 +642,27 @@ model BoardingEvent {
   driverName     String?      @map("driver_name")
   deviceCode     String?      @map("device_code")
   type           BoardingType
+  eventType      TransportEventType @default(BOARDING_TO_SCHOOL) @map("event_type")
+  attendanceMethod AttendanceMethod @default(RFID) @map("attendance_method")
+  recordedByUserId String?          @map("recorded_by_user_id")
+  idempotencyKey   String?          @unique @map("idempotency_key")
+  syncStatus       AttendanceSyncStatus @default(SYNCED) @map("sync_status")
+  clientRecordedAt DateTime?        @map("client_recorded_at")
   outcome        String       @default("OK")
   academicYear   String?      @map("academic_year")
   term           String?
   scannedAt      DateTime     @default(now()) @map("scanned_at")
   createdAt      DateTime     @default(now()) @map("created_at")
 
-  trip   Trip?       @relation(fields: [tripId], references: [id], onDelete: SetNull)
-  card   RfidCard?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
-  device RfidDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  stop   Stop?       @relation(fields: [stopId], references: [id], onDelete: SetNull)
+  trip          Trip?                @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  card          RfidCard?            @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  device        RfidDevice?          @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  stop          Stop?                @relation(fields: [stopId], references: [id], onDelete: SetNull)
+  notifications ParentNotification[]
 
   @@index([organizationId, scannedAt])
   @@index([organizationId, studentCode, scannedAt])
+  @@index([organizationId, tripId, eventType, studentCode])
   @@map("boarding_events")
 }
 
@@ -566,20 +708,29 @@ model ParentContact {
 }
 
 model ParentNotification {
-  id             String              @id @default(cuid())
-  organizationId String              @map("organization_id")
-  parentId       String?             @map("parent_id")
-  studentName    String              @map("student_name")
-  channel        NotificationChannel @default(APP)
-  title          String
-  message        String
-  sentAt         DateTime?           @map("sent_at")
-  status         String              @default("QUEUED")
-  createdAt      DateTime            @default(now()) @map("created_at")
+  id              String                     @id @default(cuid())
+  organizationId  String                     @map("organization_id")
+  parentId        String?                    @map("parent_id")
+  boardingEventId String?                    @map("boarding_event_id")
+  studentName     String                     @map("student_name")
+  studentCode     String?                    @map("student_code")
+  eventType       TransportEventType?        @map("event_type")
+  language        NotifyLanguage?            @map("language")
+  channel         NotificationChannel        @default(APP)
+  title           String
+  message         String
+  providerRef     String?                    @map("provider_ref")
+  retryCount      Int                        @default(0) @map("retry_count")
+  sentAt          DateTime?                  @map("sent_at")
+  status          NotificationDeliveryStatus @default(QUEUED)
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @default(now()) @updatedAt @map("updated_at")
 
-  parent ParentContact? @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  parent        ParentContact? @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  boardingEvent BoardingEvent? @relation(fields: [boardingEventId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, status])
   @@map("parent_notifications")
 }
 

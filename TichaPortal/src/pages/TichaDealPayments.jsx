@@ -1,28 +1,43 @@
 /**
  * TichaDealPayments.jsx
- * Modern payment page - #000435 navy + amber
+ * Modern payment page - #13213D navy + amber
  * MTN MoMo (live collection) + Airtel / Bank / Visa (intent)
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import IconButton from '@mui/material/IconButton';
+import CircularProgress from '@mui/material/CircularProgress';
+import Paper from '@mui/material/Paper';
+import Alert from '@mui/material/Alert';
 import api from '../services/api';
-import {
-  ArrowLeft, Loader2, Smartphone, Building2, CreditCard,
-  CheckCircle2, AlertCircle, Info, Clock, Shield, ChevronRight,
-  Lock, Banknote, Copy, Check,
-} from 'lucide-react';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import { brand } from '../theme/theme';
 
 const MOMO_POLL_MS = 2500;
 const MOMO_MAX_POLLS = 48;
 
-/** Montserrat is linked in `teacher-portal/index.html` */
 const PAGE_FONT_FAMILY = "'Montserrat', system-ui, sans-serif";
 
-/**
- * Babyeyi deposit accounts per bank (same catalogue pattern as main payments.jsx).
- * Replace placeholders with live banking details when operating.
- */
 const BABYEYI_BANK_DEPOSITS = [
   { code: 'bk', name: 'Bank of Kigali (BK)', accountNo: '00000-0000000-0', accountName: 'Babyeyi Ltd' },
   { code: 'umwalimu', name: 'Umwalimu SACCO', accountNo: '0000-000000-00', accountName: 'Babyeyi Ltd' },
@@ -56,80 +71,86 @@ function formatFrw(n) {
   return `${Math.round(v).toLocaleString('en-RW')} RWF`;
 }
 
-/* ── Payment method tab ── */
+const labelSx = { display: 'block', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748B', mb: 1 };
+
 function MethodTab({ label, Icon, active, onClick }) {
   return (
-    <button type="button" onClick={onClick}
-      className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-center transition-all min-h-[60px] ${
-        active
-          ? 'border-[#000435] bg-[#000435] text-white shadow-md'
-          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-      }`}>
-      {React.createElement(Icon, { size: 18 })}
-      <span className="text-[10px] font-black uppercase tracking-wider leading-none">{label}</span>
-    </button>
+    <ButtonBase
+      type="button"
+      onClick={onClick}
+      sx={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 0.75,
+        py: 1.5,
+        px: 1,
+        borderRadius: '12px',
+        border: '2px solid',
+        borderColor: active ? brand.navy : '#E2E8F0',
+        bgcolor: active ? brand.navy : '#fff',
+        color: active ? '#fff' : '#64748B',
+        minHeight: 60,
+        boxShadow: active ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+        '&:hover': { borderColor: active ? brand.navy : '#CBD5E1', bgcolor: active ? brand.navy : '#F8FAFC' },
+      }}
+    >
+      <Icon sx={{ fontSize: 18 }} />
+      <Box component="span" sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1 }}>{label}</Box>
+    </ButtonBase>
   );
 }
 
-/* ── Input field ── */
-function PayField({ label, value, onChange, placeholder, inputMode = 'text', hint }) {
-  const [focused, setFocused] = useState(false);
+function PayField({ label, value, onChange, placeholder, inputMode = 'text', hint, ...rest }) {
   return (
-    <div>
-      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">{label}</label>
-      <div className={`flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 bg-slate-50 transition-all ${
-        focused ? 'border-[#000435] bg-white shadow-sm' : 'border-slate-200'
-      }`}>
-        <input
-          value={value} onChange={onChange} placeholder={placeholder} inputMode={inputMode}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          className="flex-1 bg-transparent text-sm font-semibold text-slate-800 placeholder:text-slate-400 outline-none"
-        />
-      </div>
-      {hint && <p className="text-[11px] text-slate-400 mt-1.5 ml-1">{hint}</p>}
-    </div>
+    <Box>
+      <Box component="label" sx={labelSx}>{label}</Box>
+      <TextField value={value} onChange={onChange} placeholder={placeholder} inputProps={{ inputMode }} {...rest} />
+      {hint ? <Typography sx={{ mt: 0.75, ml: 0.5, fontSize: 11, color: '#94A3B8' }}>{hint}</Typography> : null}
+    </Box>
   );
 }
 
-/* ── Select (banks) ── */
 function PaySelect({ label, value, onChange, children }) {
-  const [focused, setFocused] = useState(false);
   return (
-    <div>
-      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">{label}</label>
-      <div className={`flex items-center gap-2.5 px-3.5 h-12 rounded-xl border-2 bg-slate-50 transition-all ${
-        focused ? 'border-[#000435] bg-white shadow-sm' : 'border-slate-200'
-      }`}>
-        <select
-          value={value}
-          onChange={onChange}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          className="w-full bg-transparent text-sm font-semibold text-slate-800 outline-none cursor-pointer"
-        >
-          {children}
-        </select>
-      </div>
-    </div>
+    <Box>
+      <Box component="label" sx={labelSx}>{label}</Box>
+      <TextField select value={value} onChange={onChange}>{children}</TextField>
+    </Box>
   );
 }
 
-/* ── Submit button ── */
 function SubmitBtn({ onClick, disabled, loading, label, amber = false }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled || loading}
-      className={`w-full flex items-center justify-center gap-2.5 py-4 rounded-xl font-black text-sm
-      min-h-[52px] transition-all active:scale-[.98] ${
-        disabled || loading
-          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-          : amber
-            ? 'bg-amber-400 text-[#000435] hover:bg-amber-300 shadow-lg shadow-amber-400/25'
-            : 'bg-[#000435] text-white hover:bg-[#000c70] shadow-lg shadow-[#000435]/20'
-      }`}>
-      {loading
-        ? <Loader2 size={18} className="animate-spin" />
-        : label}
-    </button>
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      fullWidth
+      sx={{
+        py: 1.75,
+        minHeight: 52,
+        borderRadius: '12px',
+        fontSize: 14,
+        fontWeight: 800,
+        color: amber ? brand.navy : '#fff',
+        bgcolor: amber ? '#FBBF24' : brand.navy,
+        boxShadow: amber ? '0 10px 15px -3px rgba(251,191,36,0.25)' : '0 10px 15px -3px rgba(19,33,61,0.2)',
+        '&:hover': { bgcolor: amber ? '#FCD34D' : '#000C70' },
+        '&.Mui-disabled': { bgcolor: '#F1F5F9', color: '#94A3B8' },
+      }}
+    >
+      {loading ? <CircularProgress size={18} sx={{ color: amber ? brand.navy : '#fff' }} /> : label}
+    </Button>
+  );
+}
+
+function FullScreenShell({ children }) {
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: brand.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, fontFamily: PAGE_FONT_FAMILY }}>
+      {children}
+    </Box>
   );
 }
 
@@ -279,380 +300,349 @@ export default function TichaDealPayments() {
     }
   };
 
-  /* ── Loading ── */
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#000435] flex flex-col items-center justify-center gap-4" style={{ fontFamily: PAGE_FONT_FAMILY }}>
-        <Loader2 className="w-10 h-10 text-amber-400 animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Loading payment…</p>
-      </div>
+      <FullScreenShell>
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress size={40} sx={{ color: '#FBBF24' }} />
+          <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.4)' }}>
+            Loading payment…
+          </Typography>
+        </Stack>
+      </FullScreenShell>
     );
   }
 
-  /* ── MoMo Waiting ── */
   if (momoWaiting) {
     return (
-      <div className="min-h-screen bg-[#000435] flex items-center justify-center p-4" style={{ fontFamily: PAGE_FONT_FAMILY }}>
-        <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl">
-          <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-5">
-            <Clock size={36} className="text-amber-500 animate-pulse" />
-          </div>
-          <h2 className="text-xl font-black text-[#000435] mb-2">Approve on your phone</h2>
-          <p className="text-sm text-slate-500 font-semibold leading-relaxed mb-4">
+      <FullScreenShell>
+        <Paper elevation={24} sx={{ width: '100%', maxWidth: 384, borderRadius: 4, p: 4, textAlign: 'center' }}>
+          <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2.5 }}>
+            <AccessTimeIcon sx={{ fontSize: 36, color: '#F59E0B' }} />
+          </Box>
+          <Typography sx={{ fontSize: 20, fontWeight: 900, color: brand.navy, mb: 1 }}>Approve on your phone</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#64748B', lineHeight: 1.6, mb: 2 }}>
             A payment prompt was sent to your MTN number. Enter your PIN only when ready to pay.
-          </p>
-          <p className="text-xs text-slate-400 font-semibold mb-4">
+          </Typography>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', mb: 2 }}>
             This page will update automatically after MTN confirms.
-          </p>
+          </Typography>
           {momoWaiting.orderNumber && (
-            <div className="bg-slate-50 rounded-xl px-4 py-2.5 mb-5">
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">Reference</p>
-              <p className="text-sm font-mono font-black text-[#000435]">{momoWaiting.orderNumber}</p>
-            </div>
+            <Box sx={{ bgcolor: '#F8FAFC', borderRadius: '12px', px: 2, py: 1.25, mb: 2.5 }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94A3B8', mb: 0.25 }}>Reference</Typography>
+              <Typography sx={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 900, color: brand.navy }}>{momoWaiting.orderNumber}</Typography>
+            </Box>
           )}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <Loader2 size={16} className="text-amber-500 animate-spin" />
-            <span className="text-xs font-black uppercase tracking-wider text-amber-600">
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mb: 3 }}>
+            <CircularProgress size={16} sx={{ color: '#F59E0B' }} />
+            <Typography sx={{ fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#D97706' }}>
               Checking {momoWaiting.pollCount > 0 ? `(${momoWaiting.pollCount}/${MOMO_MAX_POLLS})` : ''}
-            </span>
-          </div>
-          <button type="button"
+            </Typography>
+          </Stack>
+          <Button
+            type="button"
+            fullWidth
             onClick={() => { stopMomoPoll(); setMomoWaiting(null); setSubmitting(false); }}
-            className="w-full py-3.5 rounded-xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 transition-all">
+            sx={{ py: 1.5, borderRadius: '12px', border: '2px solid #E2E8F0', color: '#475569', fontSize: 14, fontWeight: 900, '&:hover': { bgcolor: '#F8FAFC' } }}
+          >
             Cancel
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Paper>
+      </FullScreenShell>
     );
   }
 
-  /* ── Done ── */
   if (done) {
     return (
-      <div className="min-h-screen bg-[#000435] flex items-center justify-center p-4" style={{ fontFamily: PAGE_FONT_FAMILY }}>
-        <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl">
-          <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 size={40} className="text-emerald-500" />
-          </div>
-          <h2 className="text-xl font-black text-[#000435] mb-2">{done.title}</h2>
-          <p className="text-sm text-slate-500 font-semibold leading-relaxed mb-4">{done.detail}</p>
+      <FullScreenShell>
+        <Paper elevation={24} sx={{ width: '100%', maxWidth: 384, borderRadius: 4, p: 4, textAlign: 'center' }}>
+          <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2.5 }}>
+            <CheckCircleIcon sx={{ fontSize: 40, color: '#10B981' }} />
+          </Box>
+          <Typography sx={{ fontSize: 20, fontWeight: 900, color: brand.navy, mb: 1 }}>{done.title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#64748B', lineHeight: 1.6, mb: 2 }}>{done.detail}</Typography>
           {done.ref && (
-            <div className="bg-slate-50 rounded-xl px-4 py-2.5 mb-6">
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">Reference</p>
-              <p className="text-sm font-mono font-black text-[#000435]">{done.ref}</p>
-            </div>
+            <Box sx={{ bgcolor: '#F8FAFC', borderRadius: '12px', px: 2, py: 1.25, mb: 3 }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94A3B8', mb: 0.25 }}>Reference</Typography>
+              <Typography sx={{ fontSize: 14, fontFamily: 'monospace', fontWeight: 900, color: brand.navy }}>{done.ref}</Typography>
+            </Box>
           )}
-          <div className="space-y-3">
-            <button type="button" onClick={() => navigate('/ticha-deals/tracking')}
-              className="w-full py-4 rounded-xl bg-amber-400 text-[#000435] font-black text-sm shadow-lg shadow-amber-400/25 hover:bg-amber-300 transition-all">
+          <Stack spacing={1.5}>
+            <Button
+              type="button"
+              onClick={() => navigate('/ticha-deals/tracking')}
+              fullWidth
+              sx={{ py: 1.75, borderRadius: '12px', bgcolor: '#FBBF24', color: brand.navy, fontSize: 14, fontWeight: 900, boxShadow: '0 10px 15px -3px rgba(251,191,36,0.25)', '&:hover': { bgcolor: '#FCD34D' } }}
+            >
               Track Deal Status
-            </button>
-            <button type="button" onClick={() => navigate('/ticha-deals')}
-              className="w-full py-3.5 rounded-xl border-2 border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 transition-all">
-              Back to Catalog
-            </button>
-          </div>
-        </div>
-      </div>
+            </Button>
+            
+          </Stack>
+        </Paper>
+      </FullScreenShell>
     );
   }
 
-  /* ── Main payment UI ── */
   return (
-    <>
-      <style>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .slide-up { animation: slideUp 0.3s cubic-bezier(.22,1,.36,1) both; }
-      `}</style>
+    <Box sx={{ minHeight: '100vh', bgcolor: brand.navy, fontFamily: PAGE_FONT_FAMILY }}>
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 20, bgcolor: 'rgba(19,33,61,0.95)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ maxWidth: 512, mx: 'auto', px: 2, height: 56 }}>
+          
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.4)', lineHeight: 1 }}>
+              Teacher Deal
+            </Typography>
+            <Typography noWrap sx={{ mt: 0.25, fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>
+              {payload?.product_name || 'Payment'}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ fontSize: 10, fontWeight: 700, color: '#FBBF24' }}>
+            <LockOutlinedIcon sx={{ fontSize: 12 }} /> Secure
+          </Stack>
+        </Stack>
+      </Box>
 
-      <div className="min-h-screen bg-[#000435]" style={{ fontFamily: PAGE_FONT_FAMILY }}>
-
-        {/* Top bar */}
-        <div className="sticky top-0 z-20 bg-[#000435]/95 backdrop-blur-xl border-b border-white/8">
-          <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
-            <button type="button" onClick={() => navigate(-1)}
-              className="w-9 h-9 rounded-xl bg-white/8 border border-white/12 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/14 transition-all">
-              <ArrowLeft size={16} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wider text-white/40 leading-none">Teacher Deal</p>
-              <p className="text-sm font-black text-white truncate leading-tight mt-0.5">{payload?.product_name || 'Payment'}</p>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400">
-              <Lock size={12} /> Secure
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-lg mx-auto px-4 py-6 pb-16">
-
-          {/* Amount hero card */}
-          <div className="rounded-2xl overflow-hidden mb-5 shadow-xl shadow-black/30"
-            style={{ background: 'linear-gradient(135deg, #000435 0%, #001580 60%, #000c70 100%)' }}>
-            <div className="px-5 py-5 border-b border-white/8">
-              <p className="text-[10px] font-black uppercase tracking-wider text-white/40 mb-2">Amount Due</p>
-              <p className="text-4xl font-black text-amber-400">
-                {formatFrw(amount)}
-              </p>
-              {payload?.payer_name && (
-                <p className="text-xs text-white/50 font-semibold mt-2">Payer: {payload.payer_name}</p>
-              )}
-            </div>
-            {payload?.product_name && (
-              <div className="px-5 py-3 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <p className="text-xs text-white/60 font-semibold truncate">{payload.product_name}</p>
-              </div>
+      <Box sx={{ maxWidth: 512, mx: 'auto', px: 2, pt: 3, pb: 8 }}>
+        <Paper elevation={12} sx={{ borderRadius: 2.5, overflow: 'hidden', mb: 2.5, background: 'linear-gradient(135deg, #13213D 0%, #001580 60%, #000c70 100%)' }}>
+          <Box sx={{ px: 2.5, py: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.4)', mb: 1 }}>
+              Amount Due
+            </Typography>
+            <Typography sx={{ fontSize: 36, fontWeight: 900, color: '#FBBF24' }}>{formatFrw(amount)}</Typography>
+            {payload?.payer_name && (
+              <Typography sx={{ mt: 1, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Payer: {payload.payer_name}</Typography>
             )}
-          </div>
+          </Box>
+          {payload?.product_name && (
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2.5, py: 1.5 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#FBBF24' }} />
+              <Typography noWrap sx={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{payload.product_name}</Typography>
+            </Stack>
+          )}
+        </Paper>
 
-          {/* Error */}
-          {error && (
-            <div className="mb-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-400/25 text-red-300 text-sm font-semibold">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" /> {error}
-            </div>
+        {error && (
+          <Alert
+            severity="error"
+            icon={<ErrorOutlineIcon sx={{ fontSize: 18 }} />}
+            sx={{ mb: 2, borderRadius: '12px', bgcolor: 'rgba(239,68,68,0.1)', color: '#FCA5A5', border: '1px solid rgba(248,113,113,0.25)', fontWeight: 600, "& .MuiAlert-icon": { color: '#F87171' } }}
+          >
+            {error}
+          </Alert>
+        )}
+
+        <Box sx={{ mb: 2.5 }}>
+          <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.4)', mb: 1.5 }}>
+            Payment Method
+          </Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
+            {[
+              { id: 'momo', label: 'MTN', Icon: SmartphoneIcon },
+              { id: 'airtel', label: 'Airtel', Icon: SmartphoneIcon },
+              { id: 'bank', label: 'Bank', Icon: AccountBalanceIcon },
+              { id: 'visa', label: 'Visa', Icon: CreditCardIcon },
+            ].map(({ id, label, Icon }) => (
+              <MethodTab key={id} label={label} Icon={Icon} active={method === id} onClick={() => { setMethod(id); setError(null); }} />
+            ))}
+          </Box>
+        </Box>
+
+        <Stack direction="row" alignItems="flex-start" spacing={1.25} sx={{ px: 2, py: 1.5, borderRadius: '12px', bgcolor: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', mb: 2.5 }}>
+          <InfoOutlinedIcon sx={{ fontSize: 15, color: '#FBBF24', flexShrink: 0, mt: 0.25 }} />
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'rgba(253,230,138,0.8)', lineHeight: 1.6 }}>
+            MTN MoMo sends a live payment prompt to your phone. Other methods are recorded for school finance to process.
+          </Typography>
+        </Stack>
+
+        <Paper elevation={12} sx={{ borderRadius: 2.5, p: 2.5 }}>
+          {method === 'momo' && (
+            <Stack spacing={2.5}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{ width: 40, height: 40, borderRadius: '12px', bgcolor: '#FBBF24', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <SmartphoneIcon sx={{ fontSize: 18, color: brand.navy }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 900, color: brand.navy }}>MTN Mobile Money</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>Live push payment to your phone</Typography>
+                </Box>
+              </Stack>
+              <PayField
+                label="MTN MoMo Number"
+                value={momoPhone}
+                onChange={e => { setMomoPhone(e.target.value); setError(null); }}
+                placeholder="078 000 0000"
+                inputMode="tel"
+                hint="Enter your MTN number starting with 078 or 079"
+              />
+              <SubmitBtn
+                onClick={payMtn}
+                disabled={!isValidMtnRw(momoPhone)}
+                loading={submitting}
+                label={<Stack direction="row" spacing={1} alignItems="center"><SmartphoneIcon sx={{ fontSize: 16 }} /><span>Pay {formatFrw(amount)} with MTN</span></Stack>}
+                amber
+              />
+            </Stack>
           )}
 
-          {/* Method tabs */}
-          <div className="mb-5">
-            <p className="text-[10px] font-black uppercase tracking-wider text-white/40 mb-3">Payment Method</p>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { id: 'momo', label: 'MTN', Icon: Smartphone },
-                { id: 'airtel', label: 'Airtel', Icon: Smartphone },
-                { id: 'bank', label: 'Bank', Icon: Building2 },
-                { id: 'visa', label: 'Visa', Icon: CreditCard },
-              ].map(({ id, label, Icon }) => (
-                <MethodTab key={id} id={id} label={label} Icon={Icon}
-                  active={method === id}
-                  onClick={() => { setMethod(id); setError(null); }} />
-              ))}
-            </div>
-          </div>
+          {method === 'airtel' && (
+            <Stack spacing={2.5}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{ width: 40, height: 40, borderRadius: '12px', bgcolor: brand.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <SmartphoneIcon sx={{ fontSize: 18, color: '#fff' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 900, color: brand.navy }}>Airtel Money</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>Finance will send a payment request</Typography>
+                </Box>
+              </Stack>
+              <PayField
+                label="Airtel Money Number"
+                value={airtelPhone}
+                onChange={e => setAirtelPhone(e.target.value)}
+                placeholder="073 000 0000"
+                inputMode="tel"
+              />
+              <SubmitBtn
+                onClick={() => submitAlt('airtel_money', { phone: airtelPhone.trim(), note: 'User selected Airtel Money' })}
+                disabled={!airtelPhone.trim()}
+                loading={submitting}
+                label={<Stack direction="row" spacing={1} alignItems="center"><SmartphoneIcon sx={{ fontSize: 16 }} /><span>Continue with Airtel Money</span></Stack>}
+              />
+            </Stack>
+          )}
 
-          {/* Info banner */}
-          <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-400/8 border border-amber-400/20 mb-5">
-            <Info size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] font-semibold text-amber-200/80 leading-relaxed">
-              MTN MoMo sends a live payment prompt to your phone. Other methods are recorded for school finance to process.
-            </p>
-          </div>
+          {method === 'bank' && (
+            <Stack spacing={2.5}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{ width: 40, height: 40, borderRadius: '12px', bgcolor: brand.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AccountBalanceIcon sx={{ fontSize: 18, color: '#FBBF24' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 900, color: brand.navy }}>Bank Transfer</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>Choose Babyeyi’s receiving bank, then transfer using the reference</Typography>
+                </Box>
+              </Stack>
 
-          {/* Method form */}
-          <div className="bg-white rounded-2xl p-5 shadow-xl shadow-black/20 slide-up" key={method}>
+              <PaySelect label="Bank (deposit to)" value={bankCode} onChange={(e) => { setBankCode(e.target.value); setCopiedAcc(false); }}>
+                {BABYEYI_BANK_DEPOSITS.map((b) => (
+                  <MenuItem key={b.code} value={b.code}>{b.name}</MenuItem>
+                ))}
+              </PaySelect>
 
-            {/* ── MTN MoMo ── */}
-            {method === 'momo' && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400 flex items-center justify-center">
-                    <Smartphone size={18} className="text-[#000435]" />
-                  </div>
-                  <div>
-                    <p className="font-black text-[#000435] text-sm">MTN Mobile Money</p>
-                    <p className="text-xs text-slate-500">Live push payment to your phone</p>
-                  </div>
-                </div>
+              {selectedBankDeposit?.otherNote ? (
+                <Box sx={{ p: 2, borderRadius: '12px', bgcolor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#78350F', lineHeight: 1.6 }}>
+                    For banks not listed above, contact your school finance office for the correct Babyeyi deposit account. You can still record your intent below after you transfer using reference <Box component="span" sx={{ fontFamily: 'monospace' }}>{refCode}</Box>.
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={1.5} sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(19,33,61,0.05)', border: '1px solid rgba(19,33,61,0.1)' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94A3B8', mb: 0.25 }}>Account name (beneficiary)</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: brand.navy }}>{selectedBankDeposit.accountName || 'Babyeyi'}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94A3B8', mb: 0.5 }}>Account number</Typography>
+                    <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                      <Typography sx={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 900, color: brand.navy, letterSpacing: '-0.01em', wordBreak: 'break-all' }}>
+                        {selectedBankDeposit.accountNo}
+                      </Typography>
+                      {selectedBankDeposit.accountNo ? (
+                        <Button
+                          type="button"
+                          onClick={copyDepositAccount}
+                          startIcon={copiedAcc ? <CheckIcon sx={{ fontSize: 14 }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+                          sx={{ px: 1.5, py: 0.75, borderRadius: 1, bgcolor: brand.navy, color: '#fff', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', '&:hover': { bgcolor: '#000C70' } }}
+                        >
+                          {copiedAcc ? 'Copied' : 'Copy'}
+                        </Button>
+                      ) : null}
+                    </Stack>
+                  </Box>
+                </Stack>
+              )}
 
-                <PayField
-                  label="MTN MoMo Number"
-                  value={momoPhone}
-                  onChange={e => { setMomoPhone(e.target.value); setError(null); }}
-                  placeholder="078 000 0000"
-                  inputMode="tel"
-                  hint="Enter your MTN number starting with 078 or 079"
-                />
+              <Box sx={{ p: 2, borderRadius: '12px', bgcolor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94A3B8', mb: 0.5 }}>Payment reference (required on transfer)</Typography>
+                <Typography sx={{ fontSize: 20, fontFamily: 'monospace', fontWeight: 900, color: brand.navy }}>{refCode}</Typography>
+                <Typography sx={{ mt: 0.5, fontSize: 12, fontWeight: 600, color: '#64748B' }}>
+                  Transfer <Box component="strong" sx={{ color: brand.navy }}>{formatFrw(amount)}</Box> and include this reference in the narration / description.
+                </Typography>
+              </Box>
 
-                <SubmitBtn
-                  onClick={payMtn}
-                  disabled={!isValidMtnRw(momoPhone)}
-                  loading={submitting}
-                  label={<><Smartphone size={16} /> Pay {formatFrw(amount)} with MTN</>}
-                  amber
-                />
-              </div>
-            )}
+              <PayField
+                label="Your Full Name (as on transfer)"
+                value={bankHolder}
+                onChange={e => setBankHolder(e.target.value)}
+                placeholder="Full name"
+              />
 
-            {/* ── Airtel ── */}
-            {method === 'airtel' && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 rounded-xl bg-[#000435] flex items-center justify-center">
-                    <Smartphone size={18} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="font-black text-[#000435] text-sm">Airtel Money</p>
-                    <p className="text-xs text-slate-500">Finance will send a payment request</p>
-                  </div>
-                </div>
+              <PayField
+                label="Your bank confirmation reference (optional)"
+                value={bankRef}
+                onChange={e => setBankRef(e.target.value)}
+                placeholder="e.g. TXN ID from your banking app"
+              />
 
-                <PayField
-                  label="Airtel Money Number"
-                  value={airtelPhone}
-                  onChange={e => setAirtelPhone(e.target.value)}
-                  placeholder="073 000 0000"
-                  inputMode="tel"
-                />
+              <SubmitBtn
+                onClick={() => submitAlt('bank_transfer', {
+                  bank_reference: refCode,
+                  account_holder: bankHolder.trim(),
+                  transfer_note: bankRef.trim(),
+                  bank_code: selectedBankDeposit.code,
+                  bank_name: selectedBankDeposit.name,
+                  babyeyi_account_number: selectedBankDeposit.accountNo || null,
+                  babyeyi_account_name: selectedBankDeposit.accountName || null,
+                })}
+                disabled={!bankHolder.trim()}
+                loading={submitting}
+                label={<Stack direction="row" spacing={1} alignItems="center"><PaymentsOutlinedIcon sx={{ fontSize: 16 }} /><span>Confirm bank transfer &amp; continue</span></Stack>}
+              />
+            </Stack>
+          )}
 
-                <SubmitBtn
-                  onClick={() => submitAlt('airtel_money', { phone: airtelPhone.trim(), note: 'User selected Airtel Money' })}
-                  disabled={!airtelPhone.trim()}
-                  loading={submitting}
-                  label={<><Smartphone size={16} /> Continue with Airtel Money</>}
-                />
-              </div>
-            )}
+          {method === 'visa' && (
+            <Stack spacing={2.5}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{ width: 40, height: 40, borderRadius: '12px', bgcolor: brand.navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CreditCardIcon sx={{ fontSize: 18, color: '#FBBF24' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 900, color: brand.navy }}>Visa / Card</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#64748B' }}>School finance will process your card payment</Typography>
+                </Box>
+              </Stack>
+              <PayField
+                label="Cardholder Name"
+                value={visaName}
+                onChange={e => setVisaName(e.target.value)}
+                placeholder="Name on card"
+              />
+              <PayField
+                label="Last 4 Digits of Card"
+                value={visaLast4}
+                onChange={e => setVisaLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                placeholder="••••"
+                inputMode="numeric"
+              />
+              <SubmitBtn
+                onClick={() => submitAlt('visa_card', { cardholder: visaName.trim(), card_last4: visaLast4 })}
+                disabled={!visaName.trim() || visaLast4.length !== 4}
+                loading={submitting}
+                label={<Stack direction="row" spacing={1} alignItems="center"><CreditCardIcon sx={{ fontSize: 16 }} /><span>Submit Card Details</span></Stack>}
+              />
+            </Stack>
+          )}
+        </Paper>
 
-            {/* ── Bank Transfer ── */}
-            {method === 'bank' && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 rounded-xl bg-[#000435] flex items-center justify-center">
-                    <Building2 size={18} className="text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="font-black text-[#000435] text-sm">Bank Transfer</p>
-                    <p className="text-xs text-slate-500">Choose Babyeyi’s receiving bank, then transfer using the reference</p>
-                  </div>
-                </div>
-
-                <PaySelect
-                  label="Bank (deposit to)"
-                  value={bankCode}
-                  onChange={(e) => { setBankCode(e.target.value); setCopiedAcc(false); }}
-                >
-                  {BABYEYI_BANK_DEPOSITS.map((b) => (
-                    <option key={b.code} value={b.code}>{b.name}</option>
-                  ))}
-                </PaySelect>
-
-                {/* Babyeyi account for selected bank */}
-                {selectedBankDeposit?.otherNote ? (
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                    <p className="text-xs font-bold text-amber-900 leading-relaxed">
-                      For banks not listed above, contact your school finance office for the correct Babyeyi deposit account. You can still record your intent below after you transfer using reference <span className="font-mono">{refCode}</span>.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl bg-[#000435]/5 border border-[#000435]/10 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-0.5">Account name (beneficiary)</p>
-                        <p className="text-sm font-black text-[#000435]">{selectedBankDeposit.accountName || 'Babyeyi'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Account number</p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-lg font-mono font-black text-[#000435] tracking-tight break-all">
-                          {selectedBankDeposit.accountNo}
-                        </p>
-                        {selectedBankDeposit.accountNo ? (
-                          <button
-                            type="button"
-                            onClick={copyDepositAccount}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#000435] text-white text-[11px] font-black uppercase tracking-wider hover:bg-[#000c70] transition-all"
-                          >
-                            {copiedAcc ? <Check size={14} /> : <Copy size={14} />}
-                            {copiedAcc ? 'Copied' : 'Copy'}
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Reference box */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Payment reference (required on transfer)</p>
-                  <p className="text-xl font-mono font-black text-[#000435]">{refCode}</p>
-                  <p className="text-xs text-slate-500 mt-1 font-semibold">
-                    Transfer <strong className="text-[#000435]">{formatFrw(amount)}</strong> and include this reference in the narration / description.
-                  </p>
-                </div>
-
-                <PayField
-                  label="Your Full Name (as on transfer)"
-                  value={bankHolder}
-                  onChange={e => setBankHolder(e.target.value)}
-                  placeholder="Full name"
-                />
-
-                <PayField
-                  label="Your bank confirmation reference (optional)"
-                  value={bankRef}
-                  onChange={e => setBankRef(e.target.value)}
-                  placeholder="e.g. TXN ID from your banking app"
-                />
-
-                <SubmitBtn
-                  onClick={() => submitAlt('bank_transfer', {
-                    bank_reference: refCode,
-                    account_holder: bankHolder.trim(),
-                    transfer_note: bankRef.trim(),
-                    bank_code: selectedBankDeposit.code,
-                    bank_name: selectedBankDeposit.name,
-                    babyeyi_account_number: selectedBankDeposit.accountNo || null,
-                    babyeyi_account_name: selectedBankDeposit.accountName || null,
-                  })}
-                  disabled={!bankHolder.trim()}
-                  loading={submitting}
-                  label={<><Banknote size={16} /> Confirm bank transfer & continue</>}
-                />
-              </div>
-            )}
-
-            {/* ── Visa / Card ── */}
-            {method === 'visa' && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 rounded-xl bg-[#000435] flex items-center justify-center">
-                    <CreditCard size={18} className="text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="font-black text-[#000435] text-sm">Visa / Card</p>
-                    <p className="text-xs text-slate-500">School finance will process your card payment</p>
-                  </div>
-                </div>
-
-                <PayField
-                  label="Cardholder Name"
-                  value={visaName}
-                  onChange={e => setVisaName(e.target.value)}
-                  placeholder="Name on card"
-                />
-
-                <PayField
-                  label="Last 4 Digits of Card"
-                  value={visaLast4}
-                  onChange={e => setVisaLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="••••"
-                  inputMode="numeric"
-                />
-
-                <SubmitBtn
-                  onClick={() => submitAlt('visa_card', { cardholder: visaName.trim(), card_last4: visaLast4 })}
-                  disabled={!visaName.trim() || visaLast4.length !== 4}
-                  loading={submitting}
-                  label={<><CreditCard size={16} /> Submit Card Details</>}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Security footer */}
-          <div className="flex items-center justify-center gap-4 mt-6">
-            <span className="flex items-center gap-1.5 text-[10px] text-white/30 font-semibold">
-              <Shield size={11} /> SSL Encrypted
-            </span>
-            <span className="text-white/15">·</span>
-            <span className="text-[10px] text-white/30 font-semibold">Babyeyi Systems 🇷🇼</span>
-          </div>
-        </div>
-      </div>
-    </>
+        <Stack direction="row" alignItems="center" justifyContent="center" spacing={2} sx={{ mt: 3 }}>
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>
+            <ShieldOutlinedIcon sx={{ fontSize: 11 }} /> SSL Encrypted
+          </Stack>
+          <Box component="span" sx={{ color: 'rgba(255,255,255,0.15)' }}>·</Box>
+          <Typography sx={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.3)' }}>Babyeyi Systems</Typography>
+        </Stack>
+      </Box>
+    </Box>
   );
 }

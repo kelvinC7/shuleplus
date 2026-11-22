@@ -5,7 +5,7 @@ import { useChat } from '@/contexts/chat-context';
 import { useAuth } from '@/contexts/auth-context';
 import { AvatarWithStatus } from './avatar-with-status';
 import { NewConversationDialog } from './new-conversation-dialog';
-import { CUSTOM_SCROLLBAR, GLASS, ACCENT_BORDER, PRIMARY, ACCENT } from '@/shared/styles';
+import { CUSTOM_SCROLLBAR, GLASS, ACCENT_BORDER, PRIMARY, ACCENT, ACCENT_HOVER, ACCENT_TINT } from '@/shared/styles';
 import { conversationSubtitle, conversationTitle, formatTime } from '@/utils/chat';
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
@@ -122,7 +122,7 @@ export function ConversationList({ onBackToAdmin }: ConversationListProps) {
               fontStyle: 'italic',
             }}
           >
-            {query ? 'No conversations match' : 'No conversations yet — start one with New Chat'}
+            {query ? 'No conversations match' : 'No conversations yet. Start one with New Chat.'}
           </Typography>
         ) : (
           filtered.map((conv) => {
@@ -139,9 +139,9 @@ export function ConversationList({ onBackToAdmin }: ConversationListProps) {
                   p: 1.5,
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  bgcolor: isActive ? 'rgba(245,158,11,0.1)' : 'transparent',
+                  bgcolor: isActive ? ACCENT_HOVER : 'transparent',
                   border: isActive ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent',
-                  '&:hover': { bgcolor: isActive ? 'rgba(245,158,11,0.12)' : 'rgba(0,0,0,0.03)' },
+                  '&:hover': { bgcolor: isActive ? ACCENT_TINT : 'rgba(0,0,0,0.03)' },
                 }}
               >
                 {conv.type === 'DIRECT' ? (
@@ -161,7 +161,7 @@ export function ConversationList({ onBackToAdmin }: ConversationListProps) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: ACCENT,
-                      bgcolor: 'rgba(245,158,11,0.12)',
+                      bgcolor: ACCENT_TINT,
                       border: `1px solid ${ACCENT_BORDER}`,
                       flexShrink: 0,
                     }}
@@ -208,7 +208,7 @@ export function ConversationList({ onBackToAdmin }: ConversationListProps) {
                           px: 0.5,
                           borderRadius: '50%',
                           bgcolor: ACCENT,
-                          color: '#001121',
+                          color: PRIMARY,
                           fontSize: '0.62rem',
                           fontWeight: 800,
                           display: 'flex',

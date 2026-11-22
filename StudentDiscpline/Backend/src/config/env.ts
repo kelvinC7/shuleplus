@@ -2,6 +2,16 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const disciplineDatabaseName = process.env.STUDENT_DISCIPLINE_DATABASE_NAME?.trim();
+if (disciplineDatabaseName) {
+  if (!/^[a-zA-Z0-9_]+$/.test(disciplineDatabaseName)) {
+    throw new Error('STUDENT_DISCIPLINE_DATABASE_NAME must contain only letters, numbers, and underscores');
+  }
+  const databaseUrl = new URL(requireEnv('DATABASE_URL'));
+  databaseUrl.pathname = `/${disciplineDatabaseName}`;
+  process.env.DATABASE_URL = databaseUrl.toString();
+}
+
 function requireEnv(key: string, fallback?: string): string {
   const value = process.env[key] ?? fallback;
   if (!value) throw new Error(`Missing required environment variable: ${key}`);

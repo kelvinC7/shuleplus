@@ -16,6 +16,9 @@ import type {
   GateScanResult,
   PermissionRequest,
   PermissionStats,
+  RollCallRosterData,
+  RollCallSession,
+  RollCallRow,
   ScorePreview,
   SmClass,
   SmStudent,
@@ -221,6 +224,25 @@ export const disciplineApi = {
     pin?: string;
   }) => api.post<ApiEnvelope<{ log: GateLog; message: string }>>('/gate/emergency-exit', body),
   gateProcessOverdue: () => api.post<ApiEnvelope<{ count: number }>>('/gate/overdue/notify'),
+
+  // Round roll call (moved from TichaPortal)
+  rollCallRoster: (params: { className: string; date: string; label?: string; classId?: string; subject?: string; period?: string }) =>
+    api.get<ApiEnvelope<RollCallRosterData>>('/roll-call/roster', { params }),
+  rollCallSessions: (params?: { className?: string; date?: string }) =>
+    api.get<ApiEnvelope<RollCallSession[]>>('/roll-call/sessions', { params }),
+  rollCallHistory: (params?: { q?: string; className?: string; from?: string; to?: string }) =>
+    api.get<ApiEnvelope<RollCallSession[]>>('/roll-call/history', { params }),
+  rollCallSession: (sessionId: string) =>
+    api.get<ApiEnvelope<RollCallSession>>(`/roll-call/sessions/${sessionId}`),
+  saveRollCall: (body: {
+    className: string;
+    classId?: string;
+    date: string;
+    label?: string;
+    subject?: string;
+    period?: string;
+    records: RollCallRow[];
+  }) => api.post<ApiEnvelope<RollCallSession>>('/roll-call', body),
 };
 
 export function getApiErrorMessage(err: unknown, fallback: string): string {

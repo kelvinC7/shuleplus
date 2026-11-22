@@ -39,9 +39,10 @@ import { useAuth } from '@/contexts/auth-context';
 import { uploadAttachment } from '@/services/api';
 import { AvatarWithStatus } from './avatar-with-status';
 import { MemberPicker } from './member-picker';
-import { CUSTOM_SCROLLBAR, ACCENT, ACCENT_DARK, ACCENT_BORDER, PRIMARY } from '@/shared/styles';
+import { CUSTOM_SCROLLBAR, ACCENT, ACCENT_DARK, ACCENT_BORDER, PRIMARY, ACCENT_TINT, ACCENT_SOFT_BG } from '@/shared/styles';
 import { formatDay, formatSize, formatTime, isSameDay } from '@/utils/chat';
 import type { ConversationDetail, Message } from '@/types';
+import { useMainPaneModal } from '@/shared/main-pane-modal';
 
 function GroupIcon({ type }: { type: ConversationDetail['type'] }) {
   const map: Record<string, React.ReactNode> = {
@@ -168,6 +169,7 @@ function ConversationDetailsDialog({
 }) {
   const { user } = useAuth();
   const me = user?.sub;
+  const { disablePortal, container, scopedSx } = useMainPaneModal(open, onClose);
 
   const meta = (label: string, value: string | null | undefined) =>
     value ? (
@@ -178,7 +180,15 @@ function ConversationDetailsDialog({
     ) : null;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      disablePortal={disablePortal}
+      container={container}
+      sx={scopedSx}
+    >
       <DialogTitle sx={{ fontWeight: 800, color: PRIMARY, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 1 }}>
         <Info sx={{ fontSize: 18, color: ACCENT }} />
         {detail.type === 'DIRECT' ? 'Contact Details' : 'Group Details'}
@@ -222,7 +232,7 @@ function ConversationDetailsDialog({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: ACCENT,
-                bgcolor: 'rgba(245,158,11,0.12)',
+                bgcolor: ACCENT_TINT,
                 border: `1px solid ${ACCENT_BORDER}`,
                 flexShrink: 0,
               }}
@@ -371,6 +381,7 @@ function MembersDrawer({ detail, open, onClose }: MembersDrawerProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { disablePortal, container, scopedSx } = useMainPaneModal(open, onClose);
 
   if (!detail) return null;
   const me = user?.sub;
@@ -405,6 +416,16 @@ function MembersDrawer({ detail, open, onClose }: MembersDrawerProps) {
       anchor="right"
       open={open}
       onClose={onClose}
+      disablePortal={disablePortal}
+      container={container}
+      sx={{
+        ...scopedSx,
+        '& .MuiDrawer-paper': {
+          position: disablePortal ? 'absolute' : undefined,
+          height: disablePortal ? '100%' : undefined,
+          maxHeight: disablePortal ? '100%' : undefined,
+        },
+      }}
       slotProps={{ paper: { sx: { width: { xs: '100%', sm: 340 } } } }}
     >
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -433,7 +454,7 @@ function MembersDrawer({ detail, open, onClose }: MembersDrawerProps) {
         </Box>
 
         {canManage && addOpen && (
-          <Box sx={{ mb: 2, border: '1px solid rgba(245,158,11,0.25)', borderRadius: '4px', p: 1 }}>
+          <Box sx={{ mb: 2, border: `1px solid ${ACCENT_BORDER}`, borderRadius: '4px', p: 1 }}>
             <MemberPicker
               multi={false}
               selected={[]}
@@ -625,8 +646,8 @@ export function MessageThread() {
               alignItems: 'center',
               justifyContent: 'center',
               color: ACCENT,
-              bgcolor: 'rgba(245,158,11,0.12)',
-              border: '1px solid rgba(245,158,11,0.2)',
+              bgcolor: ACCENT_TINT,
+              border: `1px solid ${ACCENT_BORDER}`,
               flexShrink: 0,
             }}
           >
@@ -671,7 +692,7 @@ export function MessageThread() {
           <Typography
             sx={{ textAlign: 'center', py: 6, color: 'rgba(0,0,0,0.3)', fontSize: '0.8rem', fontStyle: 'italic' }}
           >
-            No messages yet — say hello!
+            No messages yet. Say hello!
           </Typography>
         ) : (
           messages.map((msg, idx) => {
@@ -730,8 +751,8 @@ export function MessageThread() {
               alignItems: 'center',
               gap: 1,
               mb: 1,
-              bgcolor: 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.2)',
+              bgcolor: ACCENT_SOFT_BG,
+              border: `1px solid ${ACCENT_BORDER}`,
               borderRadius: '4px',
               px: 1.5,
               py: 0.75,
