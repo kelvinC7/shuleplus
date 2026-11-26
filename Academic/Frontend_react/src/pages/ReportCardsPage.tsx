@@ -231,9 +231,9 @@ export default function ReportCardsPage() {
                   <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: NAVY, mt: 0.5 }}>{formatPercentage(reportCard.averagePercentage)}</Typography>
                 </Paper>
                 <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: '0.6875rem', color: '#9e9e9e', fontWeight: 600, textTransform: 'uppercase' }}>Class Rank</Typography>
+                  <Typography sx={{ fontSize: '0.6875rem', color: '#9e9e9e', fontWeight: 600, textTransform: 'uppercase' }}>Class Position</Typography>
                   <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: NAVY, mt: 0.5 }}>
-                    {reportCard.subjects[0]?.rank != null ? `${reportCard.subjects[0].rank} / ${reportCard.subjects[0].classSize ?? '?'}` : 'N/A'}
+                    {reportCard.position != null ? `${reportCard.position} / ${reportCard.classSize}` : 'N/A'}
                   </Typography>
                 </Paper>
               </Box>

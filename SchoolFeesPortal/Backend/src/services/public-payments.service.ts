@@ -55,6 +55,7 @@ type StoredDetails = {
   channel?: string;
   method?: string;
   provider?: string | null;
+  providerReference?: string | null;
   phone?: string | null;
   cardLast4?: string | null;
   cardHolder?: string | null;
@@ -340,6 +341,142 @@ class PublicPaymentsService {
       amount: num(payment.amount),
       method: payment.method,
       receiptNumber: payment.receipt?.receiptNumber ?? null,
+    };
+  }
+
+  async validateCallback(body: Record<string, unknown>) {
+    const reference = String(body.reference ?? body.transactionReference ?? body.paymentReference ?? '').trim();
+    if (!reference) throw new AppError(400, 'reference is required');
+
+    const payment = await prisma.payment.findFirst({
+      where: { reference },
+      include: { receipt: true },
+    });
+    if (!payment) throw new AppError(404, 'Payment not found');
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new AppError(409, `Payment is ${payment.status}`);
+    }
+
+    const amount = body.amount == null ? null : Number(body.amount);
+    if (amount != null && (!Number.isFinite(amount) || Math.abs(amount - num(payment.amount)) > 0.01)) {
+      throw new AppError(400, 'Payment amount does not match');
+    }
+
+    return {
+      accepted: true,
+      reference,
+      status: payment.status,
+      amount: num(payment.amount),
+    };
+  }
+
+  async confirmCallback(body: Record<string, unknown>): Promise<InitiatePaymentResponse | Record<string, unknown>> {
+    const reference = String(body.reference ?? body.transactionReference ?? body.paymentReference ?? '').trim();
+    if (!reference) throw new AppError(400, 'reference is required');
+
+    let payment = await prisma.payment.findFirst({
+      where: { reference },
+      include: { receipt: true },
+    });
+    if (!payment) throw new AppError(404, 'Payment not found');
+
+    if (body.amount != null) {
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || Math.abs(amount - num(payment.amount)) > 0.01) {
+        throw new AppError(400, 'Payment amount does not match');
+      }
+    }
+
+    const providerReference = String(
+      body.providerReference ?? body.transactionId ?? body.externalReference ?? ''
+    ).trim();
+    if (providerReference) {
+      let details: StoredDetails = {};
+      try {
+        details = payment.notes ? (JSON.parse(payment.notes) as StoredDetails) : {};
+      } catch {
+        // Staff-created payments may store free-text notes; never fail a provider callback on that.
+        details = {};
+      }
+      details.providerReference = providerReference;
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { notes: JSON.stringify(details) },
+      });
+    }
+
+    if (payment.status === PaymentStatus.PENDING) {
+      payment = await this.confirm(payment.id);
+    }
+
+    return {
+      reference,
+      status: payment.status,
+      paymentNumber: payment.paymentNumber,
+      amount: num(payment.amount),
+      receiptNumber: payment.receipt?.receiptNumber ?? null,
+    };
+  }
+
+  async reverseCallback(body: Record<string, unknown>) {
+    const reference = String(body.reference ?? body.transactionReference ?? body.paymentReference ?? '').trim();
+    if (!reference) throw new AppError(400, 'reference is required');
+
+    let payment = await prisma.payment.findFirst({
+      where: { reference },
+      include: { receipt: true, bill: true },
+    });
+    if (!payment) throw new AppError(404, 'Payment not found');
+    if (payment.status === PaymentStatus.REVERSED) {
+      return {
+        reference,
+        status: payment.status,
+        reversed: true,
+        idempotent: true,
+      };
+    }
+
+    const refundAmount = body.amount == null ? num(payment.amount) : Number(body.amount);
+    if (!Number.isFinite(refundAmount) || refundAmount <= 0 || refundAmount > num(payment.amount)) {
+      throw new AppError(400, 'Reversal amount is invalid');
+    }
+
+    if (payment.billId) {
+      const bill = await prisma.studentBill.findUnique({ where: { id: payment.billId } });
+      if (bill) {
+        const paidAmount = Math.max(num(bill.paidAmount) - refundAmount, 0);
+        const balance = Math.max(num(bill.netAmount) - paidAmount, 0);
+        await prisma.studentBill.update({
+          where: { id: bill.id },
+          data: {
+            paidAmount,
+            balance,
+            status:
+              balance <= 0
+                ? BillStatus.PAID
+                : paidAmount <= 0
+                  ? BillStatus.PENDING
+                  : BillStatus.PARTIALLY_PAID,
+          },
+        });
+      }
+    }
+
+    payment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.REVERSED,
+        reversedAt: new Date(),
+        refundAmount,
+      },
+      include: { receipt: true, bill: true },
+    });
+
+    return {
+      reference,
+      status: payment.status,
+      reversed: true,
+      refundAmount,
     };
   }
 

@@ -16,6 +16,7 @@ import GradingOutlinedIcon from '@mui/icons-material/GradingOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
 import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
+import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
@@ -167,13 +168,22 @@ export default function Sidebar({ onClose }) {
               { name: 'Students', path: '/students' },
               { name: 'My Teaching', path: '/my-teaching' },
               { name: 'My Courses', path: '/my-courses' },
-              { name: 'Class Attendance', path: '/period-attendance' },
-              { name: 'My Attendance', path: '/my-attendance' },
-              { name: 'Students Attendance', path: '/class-students-attendance' },
               { name: 'Homework', path: '/homework' },
               { name: 'Timetable', path: '/timetable' },
               { name: 'Examinations', path: '/examinations' },
               { name: 'Examination Lists', path: '/examination-lists' },
+            ],
+          },
+          {
+            type: 'group',
+            icon: HowToRegOutlinedIcon,
+            name: 'Attendance',
+            subItems: [
+              { name: 'Class Attendance', path: '/class-attendance' },
+              { name: 'My Attendance', path: '/my-attendance' },
+              { name: 'Period Attendance', path: '/period-attendance' },
+              // { name: 'Round Roll Call', path: '/round-roll-call' }, // hidden on TichaPortal for now — uncomment to bring it back
+              { name: 'Students Attendance', path: '/class-students-attendance' },
             ],
           },
           {

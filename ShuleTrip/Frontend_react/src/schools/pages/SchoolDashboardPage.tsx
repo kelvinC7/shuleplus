@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bus, CalendarClock, CheckCircle2, ClipboardList, Clock } from 'lucide-react';
+import { ArrowRight, Bus, CalendarClock, CheckCircle2, ClipboardList, Clock, Sparkles } from 'lucide-react';
 import { useSchoolAuth } from '@/contexts/school-auth-context';
 import { PageHeader } from '@/shared/layouts/portal-shell';
 import { Card } from '@/components/ui/card';
@@ -26,18 +26,18 @@ function StatCard({
   return (
     <Link
       to={href}
-      className="group rounded-2xl border border-line/80 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-line hover:shadow-md"
+      className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-elevated"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-3xl font-extrabold tracking-tight text-navy">{value}</p>
-          <p className="mt-1 text-sm font-bold text-slate-800">{label}</p>
+          <p className="text-3xl font-extrabold leading-none tracking-tight text-navy">{value}</p>
+          <p className="mt-2 text-sm font-semibold text-slate-600">{label}</p>
         </div>
-        <span className={cn('grid h-11 w-11 place-items-center rounded-xl', iconWrapClass)}>
+        <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', iconWrapClass)}>
           <Icon className={cn('h-5 w-5', iconClass)} />
         </span>
       </div>
-      <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-navy/70 group-hover:text-navy">
+      <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-navy/60 transition group-hover:gap-1.5 group-hover:text-navy">
         View details <ArrowRight className="h-3 w-3" />
       </span>
     </Link>
@@ -54,6 +54,7 @@ export default function SchoolDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="School workspace"
         title="Dashboard"
         description={`${summary?.organizationName ?? 'Your school'} · ${summary?.academicYear ?? 'Current year'}`}
         action={
@@ -64,27 +65,42 @@ export default function SchoolDashboardPage() {
       />
 
       {next ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber/30 bg-gradient-to-r from-amber/15 to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-900/80">Next step</p>
-            <p className="mt-1 font-bold text-navy">{next.message}</p>
-            {next.reference ? (
-              <p className="text-sm text-slate-600">
-                {next.reference} · {next.title}
-              </p>
-            ) : null}
+        <div className="relative overflow-hidden rounded-2xl border border-amber/30 bg-gradient-to-r from-amber/20 via-amber/10 to-white px-5 py-4 shadow-card">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber/20 blur-2xl"
+          />
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-amber-700 shadow-sm">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-900/70">Next step</p>
+                <p className="mt-0.5 font-bold text-navy">{next.message}</p>
+                {next.reference ? (
+                  <p className="text-sm text-slate-600">
+                    {next.reference} · {next.title}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <Link
+              to={next.href}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy px-5 text-sm font-bold text-white shadow-sm shadow-navy/20 transition hover:bg-navy-muted"
+            >
+              Continue <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link
-            to={next.href}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-navy px-5 text-sm font-bold text-white"
-          >
-            Continue <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-5 py-4">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          <p className="text-sm font-semibold text-emerald-900">No urgent tasks. You are ready to plan the next trip.</p>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-emerald-600 shadow-sm">
+            <CheckCircle2 className="h-5 w-5" />
+          </span>
+          <p className="text-sm font-semibold text-emerald-900">
+            No urgent tasks. You are ready to plan the next trip.
+          </p>
         </div>
       )}
 
@@ -94,7 +110,7 @@ export default function SchoolDashboardPage() {
           value={k?.totalTrips ?? 0}
           href="/school/trips"
           icon={ClipboardList}
-          iconWrapClass="bg-slate-100"
+          iconWrapClass="bg-slate-100 ring-1 ring-slate-200/70"
           iconClass="text-slate-700"
         />
         <StatCard
@@ -102,7 +118,7 @@ export default function SchoolDashboardPage() {
           value={k?.pendingApproval ?? k?.awaitingReview ?? 0}
           href="/school/trips?status=UNDER_REVIEW"
           icon={Clock}
-          iconWrapClass="bg-amber/20"
+          iconWrapClass="bg-amber/20 ring-1 ring-amber/30"
           iconClass="text-amber-900"
         />
         <StatCard
@@ -110,7 +126,7 @@ export default function SchoolDashboardPage() {
           value={k?.approvedTrips ?? 0}
           href="/school/authorizations"
           icon={CheckCircle2}
-          iconWrapClass="bg-emerald-100"
+          iconWrapClass="bg-emerald-50 ring-1 ring-emerald-200/70"
           iconClass="text-emerald-700"
         />
         <StatCard
@@ -118,7 +134,7 @@ export default function SchoolDashboardPage() {
           value={k?.approvedUpcoming ?? 0}
           href="/school/calendar"
           icon={Bus}
-          iconWrapClass="bg-blue-100"
+          iconWrapClass="bg-blue-50 ring-1 ring-blue-200/70"
           iconClass="text-blue-700"
         />
       </div>
@@ -126,12 +142,17 @@ export default function SchoolDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-navy">Upcoming departures</h2>
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy/5 text-navy">
+                <CalendarClock className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-bold text-navy">Upcoming departures</h2>
+            </div>
             <Link to="/school/calendar" className="text-xs font-bold text-navy hover:underline">
               Calendar
             </Link>
           </div>
-          <ul className="mt-4 divide-y divide-line">
+          <ul className="mt-4 divide-y divide-slate-100">
             {upcoming.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
                 <div className="min-w-0">
@@ -140,7 +161,7 @@ export default function SchoolDashboardPage() {
                     {t.reference} · {t.destination ?? 'Destination TBD'}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="flex flex-col items-end gap-1.5 text-right">
                   <p className="text-sm font-bold text-navy">{formatTripDateTime(t.departAt)}</p>
                   <StatusBadge status={t.status} />
                 </div>
@@ -148,7 +169,9 @@ export default function SchoolDashboardPage() {
             ))}
             {!upcoming.length ? (
               <li className="flex flex-col items-center py-10 text-center">
-                <CalendarClock className="mb-2 h-8 w-8 text-slate-300" />
+                <span className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-slate-100 text-slate-400">
+                  <CalendarClock className="h-6 w-6" />
+                </span>
                 <p className="text-sm text-slate-500">No upcoming trips yet.</p>
                 <Link to="/school/trips/new" className="mt-3 text-sm font-bold text-navy hover:underline">
                   Register your first trip
@@ -160,15 +183,22 @@ export default function SchoolDashboardPage() {
 
         {actions.length > 0 ? (
           <Card className="lg:col-span-2">
-            <h2 className="text-sm font-bold text-navy">Needs attention</h2>
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-red-50 text-red-600">
+                <Clock className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-bold text-navy">Needs attention</h2>
+            </div>
             <ul className="mt-4 space-y-2">
               {actions.map((a) => (
                 <li key={`${a.kind}-${a.tripId}-${a.message}`}>
                   <Link
                     to={a.href}
                     className={cn(
-                      'block rounded-xl border px-3 py-2.5 text-sm transition hover:border-navy/20',
-                      a.priority === 'high' ? 'border-red-200 bg-red-50/60' : 'border-line bg-slate-50/80'
+                      'block rounded-xl border px-3 py-2.5 text-sm transition hover:border-navy/20 hover:shadow-sm',
+                      a.priority === 'high'
+                        ? 'border-red-200 bg-red-50/60'
+                        : 'border-slate-200 bg-slate-50/80'
                     )}
                   >
                     <p className="font-bold text-slate-900">{a.title}</p>

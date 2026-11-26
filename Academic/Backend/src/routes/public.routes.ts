@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { publicLookupController } from '../controllers/public-lookup.controller';
 import { reportCardController } from '../controllers/report-card.controller';
+import { nurseryController } from '../controllers/nursery.controller';
 
 const router = Router();
 
 router.get('/report-card/verify', (req, res, next) =>
   reportCardController.verifyPublic(req, res, next)
+);
+
+router.get('/nursery-reports/verify', (req, res, next) =>
+  nurseryController.verifyPublic(req, res, next)
 );
 
 /** Public student lookup by ShuleCode or SDMS code (landing payment portal). */

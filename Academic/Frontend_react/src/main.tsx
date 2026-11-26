@@ -35,6 +35,10 @@ import AssessmentDetailPage from '@/pages/AssessmentDetailPage';
 import MarkEntryPage from '@/pages/MarkEntryPage';
 import GradingScalePage from '@/pages/GradingScalePage';
 import ReportCardV2Page from '@/pages/ReportCardV2Page';
+import ReportAnalysisPage from '@/pages/ReportAnalysisPage';
+import AcademicPerformancePage from '@/pages/AcademicPerformancePage';
+import NurseryReportsPage from '@/pages/NurseryReportsPage';
+import NurserySettingsPage from '@/pages/NurserySettingsPage';
 import ReportVerifyPage from '@/pages/ReportVerifyPage';
 import MarksDemoPage from '@/pages/MarksDemoPage';
 import AcademicDashboardPage from '@/pages/AcademicDashboardPage';
@@ -119,6 +123,10 @@ const router = createBrowserRouter([
           { path: 'report-cards', element: <ReportCardV2Page /> },
           { path: 'report-cards/v2', element: <ReportCardV2Page /> },
           { path: 'report-cards/legacy', element: <ReportCardsPage /> },
+          { path: 'report-analysis', element: <ReportAnalysisPage /> },
+          { path: 'academic-performance', element: <AcademicPerformancePage /> },
+          { path: 'nursery/reports', element: <NurseryReportsPage /> },
+          { path: 'nursery/settings', element: <NurserySettingsPage /> },
           { path: 'marks-demo', element: <MarksDemoPage /> },
           { path: 'grading-scales', element: <GradingScalePage /> },
           { path: 'academic-dashboard', element: <AcademicDashboardPage /> },

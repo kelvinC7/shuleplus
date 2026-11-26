@@ -12,6 +12,10 @@ export const disciplineCaseController = {
         studentCode: typeof req.query.studentCode === 'string' ? req.query.studentCode : undefined,
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
         search: typeof req.query.search === 'string' ? req.query.search : undefined,
+        academicYear: typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined,
+        incidentDate: typeof req.query.incidentDate === 'string' ? req.query.incidentDate : undefined,
+        caseType: typeof req.query.caseType === 'string' ? req.query.caseType : undefined,
+        markId: typeof req.query.markId === 'string' ? req.query.markId : undefined,
       });
       res.json({ success: true, data });
     } catch (e) {
@@ -66,6 +70,10 @@ export const disciplineCaseController = {
         className: typeof req.query.className === 'string' ? req.query.className : undefined,
         status: typeof req.query.status === 'string' ? req.query.status : undefined,
         search: typeof req.query.search === 'string' ? req.query.search : undefined,
+        academicYear: typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined,
+        incidentDate: typeof req.query.incidentDate === 'string' ? req.query.incidentDate : undefined,
+        caseType: typeof req.query.caseType === 'string' ? req.query.caseType : undefined,
+        markId: typeof req.query.markId === 'string' ? req.query.markId : undefined,
       });
       res.json({ success: true, data });
     } catch (e) {

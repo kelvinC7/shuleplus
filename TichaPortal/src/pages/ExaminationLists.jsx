@@ -62,7 +62,7 @@ function isPast(a) {
   const today = nowKey();
   if (dk < today) return true;
   if (dk > today) return false;
-  // same day: afternoon is "later" than morning; treat as past if end time passed
+  // Use the assigned session's actual end time for same-day status.
   const end = a.endTime || (a.session === 'MORNING' ? '12:00' : '18:00');
   const [hh, mm] = String(end).split(':').map(Number);
   const now = new Date();
@@ -160,7 +160,7 @@ export default function ExaminationLists() {
     const past = isPast(a);
     const dk = toDateKey(a.examDate);
     const classAssigned = [...new Set((roomStudents || []).map((s) => s.className).filter(Boolean))];
-    const slots = (timetable.slots || []).filter((sl) => toDateKey(sl.examDate) === dk && sl.session === a.session);
+    const slots = (timetable.slots || []).filter((sl) => toDateKey(sl.examDate) === dk && (sl.sessionCode || sl.session) === (a.sessionCode || a.session));
     const examsForRoom = slots.map((sl) => ({ courseName: sl.courseName, startTime: sl.startTime, endTime: sl.endTime, className: sl.className || null }));
     return { ...a, examCode, listCode, examName, year, term, roomStudents, invigilators: [...new Set(invigilators)], past, classAssigned, examsForRoom };
   }), [assignments]);
@@ -168,7 +168,7 @@ export default function ExaminationLists() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return enriched;
-    return enriched.filter((a) => [a.examCode,a.listCode,a.examName,a.roomName,a.year,a.term,toDateKey(a.examDate),a.session,...(a.invigilators||[]),...(a.classAssigned||[]),...(a.roomStudents||[]).map((s)=>`${s.studentName} ${s.studentCode||''} ${s.className||''}`)].join(' ').toLowerCase().includes(q));
+    return enriched.filter((a) => [a.examCode,a.listCode,a.examName,a.roomName,a.year,a.term,toDateKey(a.examDate),a.sessionName,...(a.invigilators||[]),...(a.classAssigned||[]),...(a.roomStudents||[]).map((s)=>`${s.studentName} ${s.studentCode||''} ${s.className||''}`)].join(' ').toLowerCase().includes(q));
   }, [enriched, search]);
 
   const stats = useMemo(() => {
@@ -182,16 +182,17 @@ export default function ExaminationLists() {
   const attendanceOptions = useMemo(() => {
     const map = new Map();
     for (const a of enriched) {
-      const key = `${a.examinationListId}|${a.roomId}|${toDateKey(a.examDate)}|${a.session}`;
-      if (!map.has(key)) map.set(key, { key, examinationListId: a.examinationListId, roomId: a.roomId, roomName: a.roomName, examDate: toDateKey(a.examDate), session: a.session, startTime: a.startTime || '', endTime: a.endTime || '', examCode: a.examCode, listCode: a.listCode });
+      const sessionCode = a.sessionCode || a.session;
+      const key = `${a.examinationListId}|${a.roomId}|${toDateKey(a.examDate)}|${sessionCode}`;
+      if (!map.has(key)) map.set(key, { key, examinationListId: a.examinationListId, roomId: a.roomId, roomName: a.roomName, examDate: toDateKey(a.examDate), session: a.session, sessionCode, sessionName: a.sessionName || (a.session === 'MORNING' ? 'Morning' : 'Afternoon'), startTime: a.startTime || '', endTime: a.endTime || '', examCode: a.examCode, listCode: a.listCode });
     }
-    return [...map.values()].sort((a,b)=>a.examDate.localeCompare(b.examDate)||a.session.localeCompare(b.session)||a.roomName.localeCompare(b.roomName));
+    return [...map.values()].sort((a,b)=>a.examDate.localeCompare(b.examDate)||a.startTime.localeCompare(b.startTime)||a.roomName.localeCompare(b.roomName));
   }, [enriched]);
 
   function exportAssignment(a) {
     const rows = [['No', 'Student ID', 'Student Name', 'Class']];
     (a.roomStudents || []).forEach((s, i) => rows.push([String(i + 1), s.studentCode || '—', s.studentName || '', s.className || '']));
-    downloadCsv(`exam-list-${a.listCode}-${a.roomName}-${toDateKey(a.examDate)}-${a.session}.csv`, rows);
+    downloadCsv(`exam-list-${a.listCode}-${a.roomName}-${toDateKey(a.examDate)}-${a.sessionCode}.csv`, rows);
   }
 
   async function downloadAssignmentPdf(a) {
@@ -200,7 +201,7 @@ export default function ExaminationLists() {
     const margin = 40; const pageWidth = doc.internal.pageSize.getWidth(); let y = 44;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('Examination Room List', margin, y); y += 20;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    const lines = [`Examination: ${a.examName}`, `Examination Code: ${a.examCode}   Examination List Code: ${a.listCode}`, `Academic Year / Term: ${a.year} ${a.term}`, `Date / Session: ${fmtDate(a.examDate)}  ${a.session}${a.startTime || a.endTime ? ` (${a.startTime || ''} - ${a.endTime || ''})` : ''}`, `Room: ${a.roomName}${a.roomNumber ? ` (${a.roomNumber})` : ''}`, `Class(es): ${(a.classAssigned||[]).join(', ') || '—'}`, `Invigilator(s): ${(a.invigilators || []).join(', ') || '—'}`, `Total Students: ${(a.roomStudents || []).length}`];
+    const lines = [`Examination: ${a.examName}`, `Examination Code: ${a.examCode}   Examination List Code: ${a.listCode}`, `Academic Year / Term: ${a.year} ${a.term}`, `Date / Session: ${fmtDate(a.examDate)}  ${a.sessionName}${a.startTime || a.endTime ? ` (${a.startTime || ''} - ${a.endTime || ''})` : ''}`, `Room: ${a.roomName}${a.roomNumber ? ` (${a.roomNumber})` : ''}`, `Class(es): ${(a.classAssigned||[]).join(', ') || '—'}`, `Invigilator(s): ${(a.invigilators || []).join(', ') || '—'}`, `Total Students: ${(a.roomStudents || []).length}`];
     for (const line of lines) { const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2); doc.text(wrapped, margin, y); y += wrapped.length * 14; }
     y += 8; doc.setFont('helvetica', 'bold');
     const cols = [margin, margin + 36, margin + 130, margin + 360];
@@ -208,12 +209,12 @@ export default function ExaminationLists() {
     const students = a.roomStudents || [];
     if (!students.length) doc.text('No students allocated to this room.', margin, y);
     else for (let i=0;i<students.length;i++){ const st=students[i]; if(y>doc.internal.pageSize.getHeight()-50){doc.addPage(); y=44;} const row=[String(i+1), String(st.studentCode||'—'), String(st.studentName||''), String(st.className||'—')]; const nameWrapped=doc.splitTextToSize(row[2], cols[3]-cols[2]-8); const classWrapped=doc.splitTextToSize(row[3], pageWidth-margin-cols[3]); doc.text(row[0],cols[0],y); doc.text(row[1],cols[1],y); doc.text(nameWrapped,cols[2],y); doc.text(classWrapped,cols[3],y); y+=Math.max(nameWrapped.length,classWrapped.length,1)*14; }
-    doc.save(`exam-list-${String(a.listCode||'list').replace(/[^a-z0-9_-]+/gi,'_')}-${String(a.roomName||'room').replace(/[^a-z0-9_-]+/gi,'_')}-${toDateKey(a.examDate)}-${a.session}.pdf`);
+    doc.save(`exam-list-${String(a.listCode||'list').replace(/[^a-z0-9_-]+/gi,'_')}-${String(a.roomName||'room').replace(/[^a-z0-9_-]+/gi,'_')}-${toDateKey(a.examDate)}-${a.sessionCode}.pdf`);
   }
 
   function printAssignment(a) {
     const studentRows = (a.roomStudents || []).map((s, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(s.studentCode || '—')}</td><td>${escapeHtml(s.studentName || '')}</td><td>${escapeHtml(s.className || '')}</td></tr>`).join('');
-    const body = `<h1>Examination Room List</h1><div class="meta"><b>Examination:</b> ${escapeHtml(a.examName)}<br/><b>Examination Code:</b> ${escapeHtml(a.examCode)} &nbsp; <b>Examination List Code:</b> ${escapeHtml(a.listCode)}<br/><b>Academic Year / Term:</b> ${escapeHtml(a.year)} ${escapeHtml(a.term)}<br/><b>Date / Session:</b> ${escapeHtml(fmtDate(a.examDate))} · ${escapeHtml(a.session)} ${a.startTime || a.endTime ? `(${escapeHtml(a.startTime || '')} - ${escapeHtml(a.endTime || '')})` : ''}<br/><b>Room:</b> ${escapeHtml(a.roomName)}${a.roomNumber ? ` (${escapeHtml(a.roomNumber)})` : ''}<br/><b>Class(es):</b> ${escapeHtml((a.classAssigned||[]).join(', ') || '—')}<br/><b>Invigilator(s):</b> ${escapeHtml((a.invigilators || []).join(', ') || '—')}<br/><b>Total Students:</b> ${(a.roomStudents || []).length}</div><table><thead><tr><th style="width:48px">No.</th><th>Student ID</th><th>Student Name</th><th>Class</th></tr></thead><tbody>${studentRows || '<tr><td colspan="4">No students allocated to this room.</td></tr>'}</tbody></table>`;
+    const body = `<h1>Examination Room List</h1><div class="meta"><b>Examination:</b> ${escapeHtml(a.examName)}<br/><b>Examination Code:</b> ${escapeHtml(a.examCode)} &nbsp; <b>Examination List Code:</b> ${escapeHtml(a.listCode)}<br/><b>Academic Year / Term:</b> ${escapeHtml(a.year)} ${escapeHtml(a.term)}<br/><b>Date / Session:</b> ${escapeHtml(fmtDate(a.examDate))} · ${escapeHtml(a.sessionName)} ${a.startTime || a.endTime ? `(${escapeHtml(a.startTime || '')} - ${escapeHtml(a.endTime || '')})` : ''}<br/><b>Room:</b> ${escapeHtml(a.roomName)}${a.roomNumber ? ` (${a.roomNumber})` : ''}<br/><b>Class(es):</b> ${escapeHtml((a.classAssigned||[]).join(', ') || '—')}<br/><b>Invigilator(s):</b> ${escapeHtml((a.invigilators || []).join(', ') || '—')}<br/><b>Total Students:</b> ${(a.roomStudents || []).length}</div><table><thead><tr><th style="width:48px">No.</th><th>Student ID</th><th>Student Name</th><th>Class</th></tr></thead><tbody>${studentRows || '<tr><td colspan="4">No students allocated to this room.</td></tr>'}</tbody></table>`;
     printHtml(`Examination List - ${a.roomName}`, body);
   }
 
@@ -231,7 +232,7 @@ export default function ExaminationLists() {
   async function openAttendance(opt) {
     setAttError(''); setAttLoading(true); setAttOpen(true); setAttData(null);
     try {
-      const data = await fetchExaminationAttendance({ examinationListId: opt.examinationListId, roomId: opt.roomId, examDate: opt.examDate, session: opt.session });
+      const data = await fetchExaminationAttendance({ examinationListId: opt.examinationListId, roomId: opt.roomId, examDate: opt.examDate, session: opt.session, sessionCode: opt.sessionCode });
       const students = (data?.students || []).map((s) => ({ ...s, status: s.status || 'PRESENT' }));
       setAttData({ ...data, students });
     } catch (e) {
@@ -243,7 +244,7 @@ export default function ExaminationLists() {
     if (!attData) return;
     setAttSaving(true); setAttError('');
     try {
-      const payload = { examinationListId: attData.examinationListId, roomId: attData.roomId, examDate: attData.examDate, session: attData.session, records: (attData.students || []).map((s) => ({ studentId: s.studentId, status: s.status || 'PRESENT', notes: s.notes || '' })) };
+      const payload = { examinationListId: attData.examinationListId, roomId: attData.roomId, examDate: attData.examDate, session: attData.session, sessionCode: attData.sessionCode, records: (attData.students || []).map((s) => ({ studentId: s.studentId, status: s.status || 'PRESENT', notes: s.notes || '' })) };
       const saved = await markExaminationAttendance(payload);
       setAttData(saved);
     } catch (e) {
@@ -288,7 +289,7 @@ export default function ExaminationLists() {
                     <TableBody>
                       {filtered.map((a) => (
                         <TableRow key={a.id} hover>
-                          <TableCell><Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{fmtDate(a.examDate)}</Typography><Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{a.session}{a.startTime||a.endTime?` · ${a.startTime||''}-${a.endTime||''}`:''}</Typography></TableCell>
+                          <TableCell><Typography sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{fmtDate(a.examDate)}</Typography><Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{a.sessionName || (a.session === 'MORNING' ? 'Morning' : 'Afternoon')}{a.startTime||a.endTime?` · ${a.startTime||''}-${a.endTime||''}`:''}</Typography></TableCell>
                           <TableCell><Typography sx={{ fontWeight: 600, fontSize: '0.85rem' }}>{a.examName}</Typography><Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{a.examCode} / {a.listCode}</Typography></TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>{a.roomName}{a.roomNumber?` (${a.roomNumber})`:''}</TableCell>
                           <TableCell sx={{ fontSize: '0.8rem' }}>{(a.classAssigned||[]).join(', ') || '—'}</TableCell>
@@ -316,7 +317,7 @@ export default function ExaminationLists() {
                 <InputLabel>Assigned Room / Session</InputLabel>
                 <Select label="Assigned Room / Session" value={attRoomKey} onChange={(e)=>setAttRoomKey(e.target.value)}>
                   <MenuItem value="">Select room/session...</MenuItem>
-                  {attendanceOptions.map((o) => <MenuItem key={o.key} value={o.key}>{fmtDate(o.examDate)} · {o.session} · {o.roomName} · {o.examCode}/{o.listCode}</MenuItem>)}
+                  {attendanceOptions.map((o) => <MenuItem key={o.key} value={o.key}>{fmtDate(o.examDate)} · {o.sessionName} · {o.roomName} · {o.examCode}/{o.listCode}</MenuItem>)}
                 </Select>
               </FormControl>
               <Button variant="contained" disabled={!attRoomKey} onClick={() => { const opt = attendanceOptions.find((o)=>o.key===attRoomKey); if(opt) openAttendance(opt); }} sx={{ textTransform:'none', bgcolor:NAVY }}>Open Attendance</Button>
@@ -328,7 +329,7 @@ export default function ExaminationLists() {
       <Dialog open={!!selected} onClose={() => setSelected(null)} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: { xs: 2, sm: 3 }, width: '100%', m: { xs: 1, sm: 2 } } }}>
         <DialogTitle sx={{ pr: 6 }}>
           <Typography sx={{ fontWeight: 800, color: NAVY }}>Examination Room Details</Typography>
-          {selected ? <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{selected.examName} · {selected.roomName} · {fmtDate(selected.examDate)} {selected.session}</Typography> : null}
+          {selected ? <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{selected.examName} · {selected.roomName} · {fmtDate(selected.examDate)} {selected.sessionName || (selected.session === 'MORNING' ? 'Morning' : 'Afternoon')}</Typography> : null}
           <IconButton onClick={() => setSelected(null)} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers>
@@ -339,7 +340,7 @@ export default function ExaminationLists() {
                   <Typography sx={{ fontSize: '0.85rem' }}><b>Examination Code:</b> {selected.examCode}</Typography>
                   <Typography sx={{ fontSize: '0.85rem' }}><b>Examination List Code:</b> {selected.listCode}</Typography>
                   <Typography sx={{ fontSize: '0.85rem' }}><b>Academic Year / Term:</b> {selected.year} {selected.term}</Typography>
-                  <Typography sx={{ fontSize: '0.85rem' }}><b>Date / Session:</b> {fmtDate(selected.examDate)} · {selected.session}{selected.startTime || selected.endTime ? ` (${selected.startTime || ''}-${selected.endTime || ''})` : ''}</Typography>
+                  <Typography sx={{ fontSize: '0.85rem' }}><b>Date / Session:</b> {fmtDate(selected.examDate)} · {selected.sessionName || (selected.session === 'MORNING' ? 'Morning' : 'Afternoon')}{selected.startTime || selected.endTime ? ` (${selected.startTime || ''}-${selected.endTime || ''})` : ''}</Typography>
                   <Typography sx={{ fontSize: '0.85rem' }}><b>Room:</b> {selected.roomName}{selected.roomNumber ? ` (${selected.roomNumber})` : ''}</Typography>
                   <Typography sx={{ fontSize: '0.85rem' }}><b>Class(es) assigned:</b> {(selected.classAssigned||[]).join(', ') || '—'}</Typography>
                   <Typography sx={{ fontSize: '0.85rem', gridColumn: { sm: '1 / -1' } }}><b>Exam(s) for this room/session:</b> {(selected.examsForRoom||[]).map((e)=>e.courseName).join(', ') || 'See timetable'}</Typography>
@@ -354,8 +355,8 @@ export default function ExaminationLists() {
                 const base = (v) => norm(v).replace(/\s+[a-z0-9]+$/i, '').trim();
                 const tt = selected.examinationList?.examinationTimetable || selected.timetable || null;
                 const allTimetableSlots = (tt?.slots || []);
-                const allSlots = allTimetableSlots.filter((sl) => toDateKey(sl.examDate) === dk && sl.session === selected.session);
-                const rootSlots = (selected.slots || []).filter((sl) => toDateKey(sl.examDate) === dk && sl.session === selected.session);
+                const allSlots = allTimetableSlots.filter((sl) => toDateKey(sl.examDate) === dk && (sl.sessionCode || sl.session) === (selected.sessionCode || selected.session));
+                const rootSlots = (selected.slots || []).filter((sl) => toDateKey(sl.examDate) === dk && (sl.sessionCode || sl.session) === (selected.sessionCode || selected.session));
                 const slots = allSlots.length ? allSlots : rootSlots;
                 const examSlotsFromApi = Array.isArray(selected.examSlots) ? selected.examSlots : [];
                 const examForClass = (classId, className) => {
@@ -427,7 +428,7 @@ export default function ExaminationLists() {
       <Dialog open={attOpen} onClose={() => !attSaving && setAttOpen(false)} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: { xs: 2, sm: 3 }, width: '100%', m: { xs: 1, sm: 2 } } }}>
         <DialogTitle sx={{ pr: 6 }}>
           <Typography sx={{ fontWeight: 800, color: NAVY }}>Exam Attendance</Typography>
-          {attData ? <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{attData.roomName} · {fmtDate(attData.examDate)} · {attData.session} ({attData.startTime}-{attData.endTime})</Typography> : null}
+          {attData ? <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{attData.roomName} · {fmtDate(attData.examDate)} · {attData.sessionName || (attData.session === 'MORNING' ? 'Morning' : 'Afternoon')} ({attData.startTime}-{attData.endTime})</Typography> : null}
           <IconButton onClick={() => !attSaving && setAttOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers>

@@ -44,7 +44,7 @@ const SERVICE_GROUPS = [
   {
     title: 'School',
     items: [
-      { label: 'Class attendance', icon: FactCheckOutlinedIcon, path: '/period-attendance' },
+      { label: 'Class attendance', icon: FactCheckOutlinedIcon, path: '/class-attendance' },
       { label: 'My attendance', icon: HowToRegOutlinedIcon, path: '/my-attendance' },
       { label: 'Students attendance', icon: GroupsIcon, path: '/class-students-attendance' },
       { label: 'Classroom scan', icon: QrCodeScannerOutlinedIcon, path: '/class-room-scan', warn: true },

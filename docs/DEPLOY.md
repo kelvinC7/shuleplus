@@ -385,6 +385,23 @@ pm2 status shule-trip-api
 
 ### After code changes
 
+**Standard (same as every module — builds API + Vite on the server):**
+
+```bash
+cd /root/apps/shuleplus/ShulePlus
+git fetch origin main && git reset --hard origin/main
+bash scripts/redeploy-module.sh true ShuleTrip shule-trip-api shule-trip-web
+```
+
+`redeploy-module.sh` automatically:
+
+- ensures `shule_trip_db` + `DATABASE_URL`
+- syncs `JWT_ACCESS_SECRET`, `PLATFORM_SERVICE_KEY`, `SERVICE_API_KEY` from Authentication
+- sets `CORS_ORIGIN`, `IAM_API_URL`, `STUDENT_MANAGEMENT_API_URL`
+- sets `NOTIFICATION_SERVICE_URL` + `NOTIFICATION_SERVICE_API_KEY` (registration emails)
+- sets `PARENTMIS_API_URL`, `SHULETRIP_PUBLIC_LOGIN_URL`, `UPLOAD_DIR`
+- runs `prisma migrate deploy` (existing data is kept) and rebuilds `dist/`
+
 **Fast (API + env only, ~3–10 min)** — keep or upload `Frontend_react/dist` from your PC:
 
 ```bash

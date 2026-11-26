@@ -32,7 +32,7 @@ import type { TeachingNowData } from '@/types';
 export default function TeachingNowPage() {
   const { scope, refreshKey } = useConsole();
   const { data, loading, error, reload } = useConsoleFetch<TeachingNowData>(
-    () => consoleApi.teachingNow(scope),
+    () => consoleApi.teachingNow({ ...scope }),
     [scope.organizationId, refreshKey]
   );
 

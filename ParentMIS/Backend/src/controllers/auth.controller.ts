@@ -18,11 +18,17 @@ const setPasswordSchema = z.object({
   confirmPassword: z.string().min(1).optional(),
   reset: z.boolean().optional(),
   resetToken: z.string().optional(),
+  resetMethod: z.enum(['sms']).optional(),
 }).refine((b) => Boolean(b.pin ?? b.password), { message: 'PIN is required' });
 
 const verifyResetEmailSchema = z.object({
   phone: z.string().min(1),
   email: z.string().min(3),
+});
+const requestResetOtpSchema = z.object({ phone: z.string().min(1) });
+const verifyResetOtpSchema = z.object({
+  phone: z.string().min(1),
+  code: z.string().regex(/^\d{6}$/),
 });
 
 export class AuthController {
@@ -54,7 +60,28 @@ export class AuthController {
       const data = await authService.setPassword(body.phone, pin, confirm, {
         reset: body.reset,
         resetToken: body.resetToken,
+        resetMethod: body.resetMethod,
       });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async requestPinResetOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const body = requestResetOtpSchema.parse(req.body);
+      const data = await authService.requestPinResetOtp(body.phone);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyPinResetOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const body = verifyResetOtpSchema.parse(req.body);
+      const data = await authService.verifyPinResetOtp(body.phone, body.code);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

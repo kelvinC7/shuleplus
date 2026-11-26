@@ -5,7 +5,7 @@ export function periodAttendanceHref(lesson, date) {
   const values = {
     className: lesson?.className,
     date: /^\d{4}-\d{2}-\d{2}/.test(String(date || '')) ? String(date).slice(0, 10) : getSchoolDateIso(),
-    rollName: [lesson?.subjectName, lesson?.periodLabel].filter(Boolean).join(' - ') || 'Class attendance',
+    rollName: [lesson?.subjectName, lesson?.periodLabel].filter(Boolean).join(' · ') || 'Class attendance',
     subject: lesson?.subjectName,
     periodLabel: lesson?.periodLabel,
   };

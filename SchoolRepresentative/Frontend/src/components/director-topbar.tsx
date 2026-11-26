@@ -80,6 +80,8 @@ export function DirectorTopbar({
   const [results, setResults] = useState<SearchData | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const searchItems = (results?.groups ?? []).flatMap((group) => group.items);
+
   const unread = notifications?.unread ?? ctx?.counts.unreadNotifications ?? 0;
   const pending = ctx?.counts.pendingApprovals ?? 0;
 
@@ -558,12 +560,12 @@ export function DirectorTopbar({
           />
           {results ? (
             <List dense sx={{ mt: 1, maxHeight: 360, overflow: 'auto' }}>
-              {(results.items ?? []).length === 0 ? (
+              {searchItems.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 2 }}>
                   No results for “{search}”.
                 </Typography>
               ) : (
-                (results.items ?? []).map((item) => (
+                searchItems.map((item) => (
                   <ListItemButton
                     key={item.id}
                     component={Link}

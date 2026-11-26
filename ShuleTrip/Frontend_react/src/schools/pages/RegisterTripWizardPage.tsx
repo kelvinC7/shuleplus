@@ -39,7 +39,7 @@ export default function RegisterTripWizardPage() {
   const [tripReference, setTripReference] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
+  const [, setReadiness] = useState<ReadinessReport | null>(null);
 
   const [title, setTitle] = useState('');
   const [purpose, setPurpose] = useState('');

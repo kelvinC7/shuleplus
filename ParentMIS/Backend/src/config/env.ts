@@ -38,6 +38,12 @@ export const env = {
     process.env.SERVICE_API_KEY?.trim() ||
     process.env.PLATFORM_SERVICE_KEY?.trim() ||
     'dev-service-key',
+  NOTIFICATION_SERVICE_URL: firstOf('NOTIFICATION_SERVICE_URL', ''),
+  NOTIFICATION_SERVICE_API_KEY:
+    process.env.NOTIFICATION_SERVICE_API_KEY?.trim() ||
+    process.env.SERVICE_API_KEY?.trim() ||
+    process.env.PLATFORM_SERVICE_KEY?.trim() ||
+    '',
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? 'http://localhost:3049',
   MODULE_SLUG: process.env.MODULE_SLUG ?? 'parentmis',
 

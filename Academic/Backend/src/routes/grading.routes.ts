@@ -30,6 +30,8 @@ router.get(
   '/report-card/class-summaries/:classId/:academicYear',
   gradingEngineController.getClassReportSummaries
 );
+router.get('/report-analysis', gradingEngineController.getReportAnalysis);
+router.get('/report-analysis/comparison', gradingEngineController.getReportAnalysisComparison);
 router.get('/report-card/:studentId/:classId/:academicYear', gradingEngineController.getReportCard);
 router.get('/growth/:studentId/:classId', gradingEngineController.getTermlyGrowth);
 

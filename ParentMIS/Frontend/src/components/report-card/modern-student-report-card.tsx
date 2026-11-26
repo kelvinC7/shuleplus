@@ -395,20 +395,6 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     return list;
   }, [report.subjects]);
 
-  const coreSubjects = useMemo(
-    () => sortedSubjects.filter((s) => s.isCore !== false),
-    [sortedSubjects],
-  );
-  const nonCoreSubjects = useMemo(
-    () => sortedSubjects.filter((s) => s.isCore === false),
-    [sortedSubjects],
-  );
-
-  const singleTermColCount = useMemo(
-    () => 2 + 1 + componentColumns.length + 2,
-    [componentColumns.length],
-  );
-
   const positionDisplay =
     report.position && report.classSize ? `${report.position}/${report.classSize}` : NOT_RECORDED;
 
@@ -485,14 +471,6 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
         </td>
       );
     });
-  }
-
-  function renderSectionHeader(label: string) {
-    return (
-      <tr key={label} className="section-row">
-        <td colSpan={singleTermColCount}>{label}</td>
-      </tr>
-    );
   }
 
   function renderSubjectRow(s: ReportSubject) {
@@ -744,19 +722,7 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
               )}
             </thead>
             <tbody>
-              {isSingleTermReport ? (
-                <>
-                  {coreSubjects.length ? renderSectionHeader('CORE COURSES') : null}
-                  {coreSubjects.map((s) => renderSubjectRow(s))}
-                  {nonCoreSubjects.length ? renderSectionHeader('NON-CORE COURSES') : null}
-                  {nonCoreSubjects.map((s) => renderSubjectRow(s))}
-                  {!coreSubjects.length && !nonCoreSubjects.length
-                    ? sortedSubjects.map((s) => renderSubjectRow(s))
-                    : null}
-                </>
-              ) : (
-                sortedSubjects.map((s) => renderSubjectRow(s))
-              )}
+              {sortedSubjects.map((s) => renderSubjectRow(s))}
             </tbody>
             <tfoot>
               <tr>

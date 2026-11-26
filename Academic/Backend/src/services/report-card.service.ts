@@ -169,7 +169,7 @@ function defaultVerifyEndpoint(): string {
   return withVerifyReportPath(parentDev);
 }
 
-function resolveVerifyBase(settingsBase: string | null | undefined): string {
+export function resolveVerifyBase(settingsBase: string | null | undefined): string {
   const fromSettings = settingsBase?.trim().replace(/\/$/, '');
   if (fromSettings && !LOCAL_ORIGIN.test(fromSettings)) {
     return withVerifyReportPath(fromSettings);

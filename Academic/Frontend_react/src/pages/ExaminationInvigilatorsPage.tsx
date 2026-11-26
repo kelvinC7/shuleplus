@@ -79,6 +79,14 @@ function toDateKey(value?: string) {
   return m ? `${m[1]}-${m[2]}-${m[3]}` : String(value).slice(0, 10);
 }
 
+function sessionCodeOf(record: any) {
+  return record?.sessionCode || record?.session || 'MORNING';
+}
+
+function sessionNameOf(record: any) {
+  return record?.sessionName || (record?.session === 'AFTERNOON' ? 'Afternoon' : 'Morning');
+}
+
 function fmtDate(value?: string) {
   const k = toDateKey(value);
   if (!k) return '—';
@@ -142,13 +150,13 @@ export default function ExaminationInvigilatorsPage() {
   const [pickedTeacherIds, setPickedTeacherIds] = useState<string[]>([]);
   const [manualCounts, setManualCounts] = useState<Record<string, number>>({}); // roomId -> count
   const [generating, setGenerating] = useState(false);
-  const [unassigned, setUnassigned] = useState<Array<{ roomName: string; date: string; session: string; needed: number; assigned: number }>>([]);
+  const [unassigned, setUnassigned] = useState<Array<{ roomName: string; date: string; session: string; sessionCode?: string; needed: number; assigned: number }>>([]);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editAssignment, setEditAssignment] = useState<ExaminationInvigilatorAssignment | null>(null);
   const [editTeacherId, setEditTeacherId] = useState('');
   const [addInvigOpen, setAddInvigOpen] = useState(false);
-  const [addInvigCtx, setAddInvigCtx] = useState<{ examinationListId: string; roomId: string; roomName: string; examDate: string; session: 'MORNING' | 'AFTERNOON' } | null>(null);
+  const [addInvigCtx, setAddInvigCtx] = useState<{ examinationListId: string; roomId: string; roomName: string; examDate: string; session: 'MORNING' | 'AFTERNOON'; sessionCode: string; sessionName: string } | null>(null);
   const [availableInvigilators, setAvailableInvigilators] = useState<Array<{ id: string; name: string; email?: string | null }>>([]);
   const [addInvigTeacherId, setAddInvigTeacherId] = useState('');
   const [addInvigLoading, setAddInvigLoading] = useState(false);
@@ -183,8 +191,8 @@ export default function ExaminationInvigilatorsPage() {
     if (!selected) return null;
     const daySet = new Set((selected.sessions || []).map((s: any) => toDateKey(s.examDate)));
     const roomSessionKeys = new Set<string>();
-    for (const s of selected.sessions || []) for (const r of selected.rooms || []) roomSessionKeys.add(`${toDateKey(s.examDate)}|${s.session}|${r.id}`);
-    const assignedKeys = new Set(assignments.map((a) => `${toDateKey(a.examDate)}|${a.session}|${a.roomId}`));
+    for (const s of selected.sessions || []) for (const r of selected.rooms || []) roomSessionKeys.add(`${toDateKey(s.examDate)}|${sessionCodeOf(s)}|${r.id}`);
+    const assignedKeys = new Set(assignments.map((a) => `${toDateKey(a.examDate)}|${sessionCodeOf(a)}|${a.roomId}`));
     const unassignedRooms = [...roomSessionKeys].filter((k) => !assignedKeys.has(k)).length;
     const teacherSet = new Set(assignments.map((a) => a.teacherUserId));
     return {
@@ -197,34 +205,44 @@ export default function ExaminationInvigilatorsPage() {
   }, [selected, assignments, teachers]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, { date: string; session: string; items: ExaminationInvigilatorAssignment[] }>();
+    const map = new Map<string, { date: string; sessionCode: string; sessionName: string; startTime: string; items: ExaminationInvigilatorAssignment[] }>();
     for (const a of assignments) {
-      const key = `${toDateKey(a.examDate)}|${a.session}`;
-      if (!map.has(key)) map.set(key, { date: toDateKey(a.examDate), session: a.session, items: [] });
+      const sessionCode = sessionCodeOf(a);
+      const key = `${toDateKey(a.examDate)}|${sessionCode}`;
+      if (!map.has(key)) map.set(key, { date: toDateKey(a.examDate), sessionCode, sessionName: sessionNameOf(a), startTime: a.startTime || '', items: [] });
       map.get(key)!.items.push(a);
     }
-    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.session.localeCompare(b.session));
+    return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   }, [assignments]);
 
-  const filteredGrouped = useMemo(() => grouped.filter((g) => (!filterDate || g.date === filterDate) && (!filterSession || g.session === filterSession)), [grouped, filterDate, filterSession]);
+  const filteredGrouped = useMemo(() => grouped.filter((g) => (!filterDate || g.date === filterDate) && (!filterSession || g.sessionCode === filterSession)), [grouped, filterDate, filterSession]);
   const filterDates = useMemo(() => [...new Set([...grouped.map((g) => g.date), ...coverage.map((c: any) => c.examDate)])].sort(), [grouped, coverage]);
+  const filterSessions = useMemo(() => {
+    const sessions = new Map<string, { code: string; name: string; startTime: string }>();
+    for (const record of [...grouped, ...coverage]) {
+      const code = sessionCodeOf(record);
+      if (!sessions.has(code)) sessions.set(code, { code, name: sessionNameOf(record), startTime: record.startTime || '' });
+    }
+    return [...sessions.values()].sort((a, b) => a.startTime.localeCompare(b.startTime) || a.name.localeCompare(b.name));
+  }, [grouped, coverage]);
 
-  const filteredCoverage = useMemo(() => coverage.filter((c: any) => (!filterDate || c.examDate === filterDate) && (!filterSession || c.session === filterSession)), [coverage, filterDate, filterSession]);
+  const filteredCoverage = useMemo(() => coverage.filter((c: any) => (!filterDate || c.examDate === filterDate) && (!filterSession || sessionCodeOf(c) === filterSession)), [coverage, filterDate, filterSession]);
   const coverageBySlot = useMemo(() => {
-    const map = new Map<string, { date: string; session: string; startTime: string; endTime: string; rows: any[] }>();
+    const map = new Map<string, { date: string; sessionCode: string; sessionName: string; startTime: string; endTime: string; rows: any[] }>();
     for (const c of filteredCoverage) {
-      const key = `${c.examDate}|${c.session}`;
-      if (!map.has(key)) map.set(key, { date: c.examDate, session: c.session, startTime: c.startTime, endTime: c.endTime, rows: [] });
+      const sessionCode = sessionCodeOf(c);
+      const key = `${c.examDate}|${sessionCode}`;
+      if (!map.has(key)) map.set(key, { date: c.examDate, sessionCode, sessionName: sessionNameOf(c), startTime: c.startTime, endTime: c.endTime, rows: [] });
       map.get(key)!.rows.push(c);
     }
-    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.session.localeCompare(b.session));
+    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.startTime.localeCompare(b.startTime));
   }, [filteredCoverage]);
   const freeTeachersBySlot = useMemo(() => {
     const m = new Map<string, any[]>();
     const active = teachers.filter((t: any) => t.active !== false);
     for (const slot of coverageBySlot) {
-      const key = `${slot.date}|${slot.session}`;
-      const busy = new Set(assignments.filter((a: any) => toDateKey(a.examDate) === slot.date && a.session === slot.session).map((a: any) => a.teacherUserId));
+      const key = `${slot.date}|${slot.sessionCode}`;
+      const busy = new Set(assignments.filter((a: any) => toDateKey(a.examDate) === slot.date && sessionCodeOf(a) === slot.sessionCode).map((a: any) => a.teacherUserId));
       m.set(key, active.filter((t: any) => !busy.has(t.id)));
     }
     return m;
@@ -232,13 +250,13 @@ export default function ExaminationInvigilatorsPage() {
 
   const roomSummaries = useMemo(() => {
     const map = new Map<string, any>();
-    const filteredCov = coverage.filter((c: any) => (!filterDate || c.examDate === filterDate) && (!filterSession || c.session === filterSession));
+    const filteredCov = coverage.filter((c: any) => (!filterDate || c.examDate === filterDate) && (!filterSession || sessionCodeOf(c) === filterSession));
     for (const c of filteredCov) {
       if (!map.has(c.roomId)) map.set(c.roomId, { roomId: c.roomId, roomName: c.roomName, roomNumber: c.roomNumber || '', classAssigned: new Set<string>(), classWithExamSlots: new Set<string>(), invigilators: new Set<string>(), totalSlots: 0, coveredSlots: 0, missingDates: new Set<string>(), details: [] });
       const r = map.get(c.roomId);
       (c.classNames || []).forEach((n: string) => { r.classAssigned.add(n); r.classWithExamSlots.add(n); });
       r.totalSlots += 1;
-      if (c.status === 'COVERED') r.coveredSlots += 1; else r.missingDates.add(`${c.examDate} ${c.session}`);
+      if (c.status === 'COVERED') r.coveredSlots += 1; else r.missingDates.add(`${c.examDate} ${sessionNameOf(c)}`);
       (c.invigilators || []).forEach((i: any) => r.invigilators.add(i.teacherName));
       r.details.push(c);
     }
@@ -345,13 +363,13 @@ export default function ExaminationInvigilatorsPage() {
     }
   }
 
-  async function openAddInvigilator(ctx: { examinationListId: string; roomId: string; roomName: string; examDate: string; session: 'MORNING' | 'AFTERNOON' }) {
+  async function openAddInvigilator(ctx: { examinationListId: string; roomId: string; roomName: string; examDate: string; session: 'MORNING' | 'AFTERNOON'; sessionCode: string; sessionName: string }) {
     setAddInvigCtx(ctx);
     setAddInvigTeacherId('');
     setAddInvigOpen(true);
     setAddInvigLoading(true);
     try {
-      const rows = await getAvailableInvigilatorTeachers({ examinationListId: ctx.examinationListId, examDate: ctx.examDate, session: ctx.session });
+      const rows = await getAvailableInvigilatorTeachers({ examinationListId: ctx.examinationListId, examDate: ctx.examDate, session: ctx.session, sessionCode: ctx.sessionCode });
       setAvailableInvigilators(rows);
     } catch {
       setAvailableInvigilators([]);
@@ -381,7 +399,7 @@ export default function ExaminationInvigilatorsPage() {
     if (!selected) return;
     const rows: string[][] = [['Date', 'Session', 'Room', 'Invigilator', 'Email', 'Type', 'Status']];
     for (const a of assignments) {
-      rows.push([toDateKey(a.examDate), a.session, a.roomName, a.teacherName, a.teacherEmail || '', a.assignmentType, a.status]);
+      rows.push([toDateKey(a.examDate), sessionNameOf(a), a.roomName, a.teacherName, a.teacherEmail || '', a.assignmentType, a.status]);
     }
     downloadCsv(`invigilators-${selected.list.listCode || selected.list.id}.csv`, rows);
   }
@@ -396,7 +414,7 @@ export default function ExaminationInvigilatorsPage() {
         byRoom.get(k)!.push(a);
       }
       const rows = [...byRoom.entries()].map(([room, items]) => `<tr><td>${room}</td><td>${items.map((i) => i.teacherName).join(', ') || '—'}</td><td>${items[0]?.status || ''}</td></tr>`).join('');
-      return `<div class="block"><h2>${fmtDate(g.date)} · ${g.session}</h2><table><thead><tr><th>Room</th><th>Invigilator(s)</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="3">No assignments</td></tr>'}</tbody></table></div>`;
+      return `<div class="block"><h2>${fmtDate(g.date)} · ${g.sessionName}</h2><table><thead><tr><th>Room</th><th>Invigilator(s)</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="3">No assignments</td></tr>'}</tbody></table></div>`;
     }).join('');
     printHtml('Invigilator Assignments', `<h1>Invigilator Assignments</h1><div class="meta"><b>${selected.list.examinationName || 'Examination'}</b> · Exam: ${selected.list.examinationCode || '—'} · List: ${selected.list.listCode || '—'} · ${selected.list.academicYear} ${selected.list.term}</div>${blocks || '<p>No assignments generated.</p>'}`);
   }
@@ -498,7 +516,7 @@ export default function ExaminationInvigilatorsPage() {
                       <TableCell>
                         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                           {slots.slice(0, 6).map((sl: any, i: number) => (
-                            <Chip key={i} size="small" variant="outlined" label={`${sl.examDate} ${sl.session === 'MORNING' ? 'AM' : 'PM'} ${sl.startTime || ''}-${sl.endTime || ''}`} sx={{ fontSize: '0.68rem' }} />
+                            <Chip key={i} size="small" variant="outlined" label={`${sl.examDate} ${sl.sessionName || (sl.session === 'MORNING' ? 'Morning' : 'Afternoon')} ${sl.startTime || ''}-${sl.endTime || ''}`} sx={{ fontSize: '0.68rem' }} />
                           ))}
                           {slots.length > 6 ? <Chip size="small" label={`+${slots.length - 6} more`} /> : null}
                         </Stack>
@@ -534,7 +552,7 @@ export default function ExaminationInvigilatorsPage() {
                     <Select label="Date" value={filterDate} onChange={(e)=>setFilterDate(e.target.value)}><MenuItem value="">All dates</MenuItem>{filterDates.map((d)=><MenuItem key={d} value={d}>{d}</MenuItem>)}</Select>
                   </FormControl>
                   <FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Session</InputLabel>
-                    <Select label="Session" value={filterSession} onChange={(e)=>setFilterSession(e.target.value)}><MenuItem value="">All</MenuItem><MenuItem value="MORNING">Morning</MenuItem><MenuItem value="AFTERNOON">Afternoon</MenuItem></Select>
+                    <Select label="Session" value={filterSession} onChange={(e)=>setFilterSession(e.target.value)}><MenuItem value="">All</MenuItem>{filterSessions.map((session) => <MenuItem key={session.code} value={session.code}>{session.name}{session.startTime ? ` · ${session.startTime}` : ''}</MenuItem>)}</Select>
                   </FormControl>
                   <TextField size="small" label="Room" value={filterRoom} onChange={(e)=>setFilterRoom(e.target.value)} sx={{ minWidth: 140 }} />
                   <TextField size="small" label="Invigilator name" value={filterInvigilator} onChange={(e)=>setFilterInvigilator(e.target.value)} sx={{ minWidth: 170 }} />
@@ -595,10 +613,10 @@ export default function ExaminationInvigilatorsPage() {
                 <Table size="small">
                   <TableHead><TableRow>{['Date','Session','Time','Classes with Exam','Invigilator(s)','Status'].map(h=><TableCell key={h} sx={{ fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>{h}</TableCell>)}</TableRow></TableHead>
                   <TableBody>
-                    {(roomView.details || []).sort((a:any,b:any)=>a.examDate.localeCompare(b.examDate)||a.session.localeCompare(b.session)).map((d:any, i:number) => (
+                    {(roomView.details || []).sort((a:any,b:any)=>a.examDate.localeCompare(b.examDate)||String(a.startTime || '').localeCompare(String(b.startTime || ''))).map((d:any, i:number) => (
                       <TableRow key={i} hover>
                         <TableCell sx={{ fontWeight: 600 }}>{fmtDate(d.examDate)}</TableCell>
-                        <TableCell>{d.session}</TableCell>
+                        <TableCell>{sessionNameOf(d)}</TableCell>
                         <TableCell>{d.startTime} - {d.endTime}</TableCell>
                         <TableCell>{(d.classNames||[]).join(', ') || '—'}</TableCell>
                         <TableCell>{(d.invigilators||[]).map((x:any)=>x.teacherName).join(', ') || <Typography component="span" sx={{ color: '#dc2626', fontSize: '0.8rem' }}>Missing</Typography>}</TableCell>
@@ -812,7 +830,7 @@ export default function ExaminationInvigilatorsPage() {
         <DialogContent sx={{ px: 3, py: 3, bgcolor: '#f8fafc' }}>
           {editAssignment ? (
             <Stack spacing={2} sx={{ mt: 0.5 }}>
-              <Alert severity="info">{editAssignment.roomName} · {toDateKey(editAssignment.examDate)} · {editAssignment.session}<br />Current: <b>{editAssignment.teacherName}</b></Alert>
+              <Alert severity="info">{editAssignment.roomName} · {toDateKey(editAssignment.examDate)} · {sessionNameOf(editAssignment)}<br />Current: <b>{editAssignment.teacherName}</b></Alert>
               <FormControl fullWidth size="small">
                 <InputLabel>Teacher</InputLabel>
                 <Select label="Teacher" value={editTeacherId} onChange={(e) => setEditTeacherId(e.target.value)}>
@@ -838,7 +856,7 @@ export default function ExaminationInvigilatorsPage() {
         <DialogContent sx={{ px: 3, py: 3, bgcolor: '#f8fafc' }}>
           {addInvigCtx ? (
             <Stack spacing={2}>
-              <Alert severity="info">{addInvigCtx.roomName} · {addInvigCtx.examDate} · {addInvigCtx.session}</Alert>
+              <Alert severity="info">{addInvigCtx.roomName} · {addInvigCtx.examDate} · {addInvigCtx.sessionName}</Alert>
               <FormControl fullWidth size="small">
                 <InputLabel>Available teacher</InputLabel>
                 <Select label="Available teacher" value={addInvigTeacherId} onChange={(e) => setAddInvigTeacherId(e.target.value)} disabled={addInvigLoading}>

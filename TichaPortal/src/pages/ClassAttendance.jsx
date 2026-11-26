@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import InputBase from '@mui/material/InputBase';
 import Typography from '@mui/material/Typography';
-import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
@@ -12,25 +12,29 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import MenuItem from '@mui/material/MenuItem';
-import Pagination from '@mui/material/Pagination';
-import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Collapse from '@mui/material/Collapse';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import SearchIcon from '@mui/icons-material/Search';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
-import EventIcon from '@mui/icons-material/Event';
-import DateRangeIcon from '@mui/icons-material/DateRange';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import CloseIcon from '@mui/icons-material/Close';
 import api from '../services/api';
 import { formatSchoolTime, getSchoolDateIso } from '../utils/schoolTime';
-import { Page, EmptyState } from '../components/ui';
+import { EmptyState } from '../components/ui';
+import TablePagination from '../components/TablePagination';
+import {
+  ListPage,
+  StickyFilterBar,
+  BarSelect,
+  ListPageBody,
+  PageTitleRow,
+  NavyStats,
+  SectionPaper,
+  headCellSx,
+  cellSx,
+} from '../components/ListPageKit';
 import { brand } from '../theme/theme';
 import {
   getTeacherPortalPushState,
@@ -38,7 +42,6 @@ import {
   subscribeTeacherPortalPush,
 } from '../utils/webPushTeacherPortal';
 
-const PAGE_SIZE = 10;
 
 function toIsoDate(value) {
   if (!value) return '';
@@ -119,6 +122,7 @@ export default function ClassAttendance({
   const [mode, setMode] = useState('all'); // all | date | week
   const [selectedDate, setSelectedDate] = useState(getSchoolDateIso() || new Date().toISOString().slice(0, 10));
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [pushState, setPushState] = useState({ supported: false, permission: 'default', subscribed: false });
   const [pushBusy, setPushBusy] = useState(false);
   const [pushHint, setPushHint] = useState('');
@@ -265,12 +269,12 @@ export default function ClassAttendance({
     setPage(1);
   }, [mode, selectedDate, query]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const paged = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, safePage]);
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
 
   const stats = useMemo(() => {
     let present = 0;
@@ -285,25 +289,6 @@ export default function ClassAttendance({
     return { total: rows.length, present, late, absent };
   }, [rows]);
 
-  const tableHeadSx = {
-    fontSize: 11,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    color: '#64748B',
-    bgcolor: '#F8FAFC',
-    borderBottom: `1px solid ${brand.border}`,
-    whiteSpace: 'nowrap',
-    py: 1.25,
-  };
-  const tableCellSx = {
-    fontSize: 13,
-    color: brand.text,
-    borderBottom: `1px solid ${brand.border}`,
-    py: 1.25,
-    verticalAlign: 'middle',
-  };
-
   const rangeLabel = mode === 'date'
     ? (selectedDate ? formatDayLabel(selectedDate) : 'Selected date')
     : mode === 'week'
@@ -316,35 +301,57 @@ export default function ClassAttendance({
     !pushState.subscribed &&
     pushState.permission !== 'denied';
 
+  const dateInputSx = {
+    width: '100%',
+    fontSize: 12,
+    fontWeight: 600,
+    color: brand.navy,
+    py: 0.25,
+    '& input': { py: 0.5, px: 0 },
+  };
+
   return (
-    <Page>
-      <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.5}>
-          <Box>
-            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 800, color: brand.navy, letterSpacing: '-0.01em' }}>
-              {title}
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: brand.muted, mt: 0.25 }}>
-              {description}
-            </Typography>
-            {lastUpdatedAt && (
-              <Typography sx={{ fontSize: 11, color: brand.muted, mt: 0.35 }}>
-                Updated {lastUpdatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Typography>
-            )}
+    <ListPage>
+      <StickyFilterBar search={query} onSearch={setQuery} searchPlaceholder="Search date, time, status…">
+        <BarSelect
+          label="Filter"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'all', label: 'All dates' },
+            { value: 'date', label: 'Specific date' },
+            { value: 'week', label: 'Week' },
+          ]}
+        />
+        {mode === 'date' || mode === 'week' ? (
+          <Box key="date" sx={{ flex: 1, minWidth: 0 }}>
+            <InputBase
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value || getSchoolDateIso())}
+              inputProps={{ 'aria-label': mode === 'week' ? 'Pick a day in week' : 'Date' }}
+              sx={dateInputSx}
+            />
           </Box>
-          <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+        ) : null}
+      </StickyFilterBar>
+
+      <ListPageBody>
+        <PageTitleRow
+          title={title}
+          subtitle={`${description}${lastUpdatedAt ? ` · Updated ${lastUpdatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+          actions={
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={() => load()}
               disabled={loading}
-              sx={{ textTransform: 'none', fontWeight: 700, borderColor: brand.border, flex: { xs: 1, sm: 'unset' } }}
+              sx={{ borderColor: brand.border, fontWeight: 700, textTransform: 'none' }}
             >
               Refresh
             </Button>
-          </Stack>
-        </Stack>
+          }
+        />
 
         <Collapse in={showPushPrompt || Boolean(pushHint)}>
           <Alert
@@ -353,13 +360,7 @@ export default function ClassAttendance({
             action={
               <Stack direction="row" spacing={0.5} alignItems="center">
                 {showPushPrompt && (
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={enablePush}
-                    disabled={pushBusy}
-                    sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}
-                  >
+                  <Button color="inherit" size="small" onClick={enablePush} disabled={pushBusy} sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {pushBusy ? 'Enabling…' : 'Enable alerts'}
                   </Button>
                 )}
@@ -370,7 +371,7 @@ export default function ClassAttendance({
                 )}
               </Stack>
             }
-            sx={{ borderRadius: 2, border: `1px solid ${brand.border}` }}
+            sx={{ borderRadius: 1, border: `1px solid ${brand.border}` }}
           >
             <Typography sx={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>
               {pushState.subscribed ? 'Tap in/out notifications enabled' : 'Get notified when you tap in or out'}
@@ -384,96 +385,19 @@ export default function ClassAttendance({
           </Alert>
         </Collapse>
 
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 180px))' },
-            gap: 1.25,
-          }}
-        >
-          {[
-            { label: 'Records', value: stats.total },
-            { label: 'Present', value: stats.present },
-            { label: 'Late', value: stats.late },
-            { label: 'Absent', value: stats.absent },
-          ].map((s) => (
-            <Paper key={s.label} elevation={0} sx={{ p: 1.5, border: `1px solid ${brand.border}`, borderRadius: 2, bgcolor: '#fff' }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {s.label}
-              </Typography>
-              <Typography sx={{ fontSize: { xs: 20, sm: 24 }, fontWeight: 800, color: brand.navy, mt: 0.25, lineHeight: 1.1 }}>
-                {s.value}
-              </Typography>
-            </Paper>
-          ))}
-        </Box>
+        <NavyStats
+          stats={[
+            { label: 'Records', value: loading ? '—' : stats.total },
+            { label: 'Present', value: loading ? '—' : stats.present },
+            { label: 'Late', value: loading ? '—' : stats.late },
+            { label: 'Absent', value: loading ? '—' : stats.absent },
+          ]}
+        />
 
-        <Paper elevation={0} sx={{ border: `1px solid ${brand.border}`, borderRadius: 2, overflow: 'hidden', bgcolor: '#fff' }}>
-          <Box sx={{ p: { xs: 1.25, sm: 1.5 }, borderBottom: `1px solid ${brand.border}`, bgcolor: '#fff' }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }}>
-              <TextField
-                select
-                size="small"
-                label="Filter"
-                value={mode}
-                onChange={(e) => setMode(e.target.value)}
-                sx={{ minWidth: { xs: '100%', md: 150 } }}
-              >
-                <MenuItem value="all">All dates</MenuItem>
-                <MenuItem value="date">Specific date</MenuItem>
-                <MenuItem value="week">Week</MenuItem>
-              </TextField>
-
-              {(mode === 'date' || mode === 'week') && (
-                <TextField
-                  size="small"
-                  type="date"
-                  label={mode === 'week' ? 'Pick a day in week' : 'Date'}
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value || getSchoolDateIso())}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: { xs: '100%', md: 200 } }}
-                />
-              )}
-
-              {mode === 'week' && (
-                <Chip
-                  icon={<DateRangeIcon sx={{ fontSize: 16 }} />}
-                  label={week.label || 'Select a week'}
-                  variant="outlined"
-                  sx={{ height: 40, borderRadius: 2, fontWeight: 600, color: brand.navy, borderColor: brand.border, bgcolor: '#F8FAFC' }}
-                />
-              )}
-
-              <TextField
-                size="small"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by date, time, status…"
-                fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ fontSize: 18, color: brand.muted }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Stack>
-
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.25, flexWrap: 'wrap' }}>
-              <EventIcon sx={{ fontSize: 15, color: brand.muted }} />
-              <Typography sx={{ fontSize: 12, color: brand.muted, fontWeight: 600 }}>{rangeLabel}</Typography>
-              <Divider orientation="vertical" flexItem sx={{ mx: 0.25, display: { xs: 'none', sm: 'block' } }} />
-              <Typography sx={{ fontSize: 12, color: brand.muted }}>
-                Card or tab tap in/out records · auto-updates when you return
-              </Typography>
-            </Stack>
-          </Box>
-
+        <SectionPaper title={rangeLabel} count={filtered.length}>
           {loading ? (
             <Stack alignItems="center" justifyContent="center" sx={{ py: 7 }}>
-              <CircularProgress size={28} />
+              <CircularProgress size={26} />
               <Typography sx={{ mt: 1.5, fontSize: 13, color: brand.muted }}>Loading attendance records…</Typography>
             </Stack>
           ) : error ? (
@@ -493,47 +417,40 @@ export default function ClassAttendance({
             </Box>
           ) : (
             <>
-              {/* Mobile cards */}
-              <Stack spacing={1.25} sx={{ display: { xs: 'flex', md: 'none' }, p: 1.25 }}>
+              {/* Mobile rows */}
+              <Stack sx={{ display: { xs: 'flex', md: 'none' } }}>
                 {paged.map((row, idx) => {
                   const date = toIsoDate(row?.date || row?.lessonDate);
                   const status = normalizeStatus(row);
                   const inTime = normalizeTime(row, 'in') || '—';
                   const outTime = normalizeTime(row, 'out') || '—';
                   return (
-                    <Box key={row?.id || row?.lessonDate || `${date}-${idx}`} sx={{ border: `1px solid ${brand.border}`, borderRadius: 2, p: 1.5, bgcolor: '#fff' }}>
-                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ mb: 1 }}>
+                    <Box
+                      key={row?.id || row?.lessonDate || `${date}-${idx}`}
+                      sx={{
+                        px: 1.5,
+                        py: 1.25,
+                        bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
+                        borderBottom: idx < paged.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none',
+                      }}
+                    >
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ mb: 0.75 }}>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy, lineHeight: 1.3 }}>
-                            {formatDayLabel(date)}
-                          </Typography>
-                          <Typography sx={{ fontSize: 12, color: brand.muted, mt: 0.25 }}>
-                            {date || '—'} · Card/tab tap attendance
-                          </Typography>
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: brand.navy, lineHeight: 1.3 }}>{formatDayLabel(date)}</Typography>
+                          <Typography sx={{ fontSize: 11.5, color: brand.muted }}>{date || '—'} · Card/tab tap</Typography>
                         </Box>
-                        <Chip
-                          size="small"
-                          label={status}
-                          variant="outlined"
-                          sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }}
-                        />
+                        <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
                       </Stack>
-                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                        <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: '#F8FAFC', border: `1px solid ${brand.border}` }}>
-                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                            <LoginIcon sx={{ fontSize: 14, color: '#168a55' }} />
-                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>In</Typography>
-                          </Stack>
-                          <Typography sx={{ fontSize: 14, fontWeight: 700, color: inTime !== '—' ? '#168a55' : brand.muted }}>{inTime}</Typography>
-                        </Box>
-                        <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: '#F8FAFC', border: `1px solid ${brand.border}` }}>
-                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                            <LogoutIcon sx={{ fontSize: 14, color: brand.navy }} />
-                            <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>Out</Typography>
-                          </Stack>
-                          <Typography sx={{ fontSize: 14, fontWeight: 700, color: outTime !== '—' ? brand.navy : brand.muted }}>{outTime}</Typography>
-                        </Box>
-                      </Box>
+                      <Stack direction="row" spacing={2}>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <LoginIcon sx={{ fontSize: 14, color: '#168a55' }} />
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: inTime !== '—' ? '#168a55' : brand.muted }}>{inTime}</Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <LogoutIcon sx={{ fontSize: 14, color: brand.navy }} />
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: outTime !== '—' ? brand.navy : brand.muted }}>{outTime}</Typography>
+                        </Stack>
+                      </Stack>
                     </Box>
                   );
                 })}
@@ -541,15 +458,15 @@ export default function ClassAttendance({
 
               {/* Desktop table */}
               <TableContainer sx={{ display: { xs: 'none', md: 'block' }, width: '100%', overflowX: 'auto' }}>
-                <Table size="small" sx={{ minWidth: 720 }}>
+                <Table size="small" sx={{ minWidth: 640 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={tableHeadSx}>Date</TableCell>
-                      <TableCell sx={tableHeadSx}>Day</TableCell>
-                      <TableCell sx={tableHeadSx}>In</TableCell>
-                      <TableCell sx={tableHeadSx}>Out</TableCell>
-                      <TableCell sx={tableHeadSx}>Status</TableCell>
-                      <TableCell sx={tableHeadSx}>Source</TableCell>
+                      <TableCell sx={headCellSx}>Date</TableCell>
+                      <TableCell sx={headCellSx}>Day</TableCell>
+                      <TableCell sx={headCellSx}>In</TableCell>
+                      <TableCell sx={headCellSx}>Out</TableCell>
+                      <TableCell sx={headCellSx}>Status</TableCell>
+                      <TableCell sx={headCellSx}>Source</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -559,30 +476,29 @@ export default function ClassAttendance({
                       const inTime = normalizeTime(row, 'in') || '—';
                       const outTime = normalizeTime(row, 'out') || '—';
                       return (
-                        <TableRow key={row?.id || row?.lessonDate || `${date}-${idx}`} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                          <TableCell sx={{ ...tableCellSx, fontWeight: 600, whiteSpace: 'nowrap' }}>{date}</TableCell>
-                          <TableCell sx={{ ...tableCellSx, whiteSpace: 'nowrap' }}>{date !== '—' ? formatDayLabel(date) : '—'}</TableCell>
-                          <TableCell sx={{ ...tableCellSx, color: inTime !== '—' ? '#168a55' : brand.muted, fontWeight: inTime !== '—' ? 700 : 500 }}>
+                        <TableRow
+                          key={row?.id || row?.lessonDate || `${date}-${idx}`}
+                          hover
+                          sx={{ bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff', '&:last-child td': { borderBottom: 0 } }}
+                        >
+                          <TableCell sx={{ ...cellSx, fontWeight: 600, color: brand.navy, whiteSpace: 'nowrap' }}>{date}</TableCell>
+                          <TableCell sx={{ ...cellSx, whiteSpace: 'nowrap' }}>{date !== '—' ? formatDayLabel(date) : '—'}</TableCell>
+                          <TableCell sx={{ ...cellSx, color: inTime !== '—' ? '#168a55' : brand.muted, fontWeight: inTime !== '—' ? 700 : 500 }}>
                             <Stack direction="row" spacing={0.5} alignItems="center">
                               {inTime !== '—' ? <LoginIcon sx={{ fontSize: 14, color: '#168a55' }} /> : null}
                               <span>{inTime}</span>
                             </Stack>
                           </TableCell>
-                          <TableCell sx={{ ...tableCellSx, color: outTime !== '—' ? brand.navy : brand.muted, fontWeight: outTime !== '—' ? 700 : 500 }}>
+                          <TableCell sx={{ ...cellSx, color: outTime !== '—' ? brand.navy : brand.muted, fontWeight: outTime !== '—' ? 700 : 500 }}>
                             <Stack direction="row" spacing={0.5} alignItems="center">
                               {outTime !== '—' ? <LogoutIcon sx={{ fontSize: 14, color: brand.navy }} /> : null}
                               <span>{outTime}</span>
                             </Stack>
                           </TableCell>
-                          <TableCell sx={tableCellSx}>
-                            <Chip
-                              size="small"
-                              label={status}
-                              variant="outlined"
-                              sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }}
-                            />
+                          <TableCell sx={cellSx}>
+                            <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
                           </TableCell>
-                          <TableCell sx={{ ...tableCellSx, color: brand.muted, fontSize: 12 }}>Card / Tab</TableCell>
+                          <TableCell sx={{ ...cellSx, color: brand.muted }}>Card / Tab</TableCell>
                         </TableRow>
                       );
                     })}
@@ -590,39 +506,23 @@ export default function ClassAttendance({
                 </Table>
               </TableContainer>
 
-              <Box
-                sx={{
-                  px: 1.5,
-                  py: 1.25,
-                  borderTop: `1px solid ${brand.border}`,
-                  bgcolor: '#FAFBFC',
-                  display: 'flex',
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  alignItems: { xs: 'stretch', sm: 'center' },
-                  justifyContent: 'space-between',
-                  gap: 1,
+              <TablePagination
+                page={safePage}
+                totalPages={pageCount}
+                total={filtered.length}
+                pageSize={pageSize}
+                itemCount={paged.length}
+                pageStartIndex={(safePage - 1) * pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(n) => {
+                  setPageSize(n);
+                  setPage(1);
                 }}
-              >
-                <Typography sx={{ fontSize: 12, color: brand.muted }}>
-                  Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} record{filtered.length === 1 ? '' : 's'}
-                  {filtered.length !== rows.length ? ` (filtered from ${rows.length})` : ''}
-                </Typography>
-                {pageCount > 1 && (
-                  <Pagination
-                    count={pageCount}
-                    page={safePage}
-                    onChange={(_, value) => setPage(value)}
-                    color="primary"
-                    size="small"
-                    shape="rounded"
-                    sx={{ alignSelf: { xs: 'center', sm: 'auto' } }}
-                  />
-                )}
-              </Box>
+              />
             </>
           )}
-        </Paper>
-      </Stack>
-    </Page>
+        </SectionPaper>
+      </ListPageBody>
+    </ListPage>
   );
 }

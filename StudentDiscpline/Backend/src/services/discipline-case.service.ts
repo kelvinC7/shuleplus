@@ -25,15 +25,25 @@ function startOfMonth() {
 export const disciplineCaseService = {
   async list(
     organizationId: string,
-    filters?: { className?: string; studentCode?: string; status?: string; search?: string }
+    filters?: { className?: string; studentCode?: string; status?: string; search?: string; academicYear?: string; incidentDate?: string; caseType?: string; markId?: string }
   ) {
     const q = filters?.search?.trim();
+    const caseQ = filters?.caseType?.trim();
+    const incidentDate = filters?.incidentDate ? parseCalendarDateInput(filters.incidentDate) : null;
+    const dayStart = incidentDate ? new Date(incidentDate) : null;
+    if (dayStart) dayStart.setHours(0,0,0,0);
+    const dayEnd = incidentDate ? new Date(incidentDate) : null;
+    if (dayEnd) dayEnd.setHours(23,59,59,999);
     return prisma.disciplineCase.findMany({
       where: {
         organizationId,
         ...(filters?.className ? { className: { equals: filters.className, mode: 'insensitive' } } : {}),
         ...(filters?.studentCode ? { studentCode: filters.studentCode } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
+        ...(filters?.academicYear ? { academicYear: { equals: filters.academicYear, mode: 'insensitive' } } : {}),
+        ...(filters?.markId ? { markId: filters.markId } : {}),
+        ...(dayStart && dayEnd ? { incidentDate: { gte: dayStart, lte: dayEnd } } : {}),
+        ...(caseQ ? { OR: [{ markName: { contains: caseQ, mode: 'insensitive' } }, { customCaseName: { contains: caseQ, mode: 'insensitive' } }, { category: { contains: caseQ, mode: 'insensitive' } }] } : {}),
         ...(q
           ? {
               OR: [
@@ -41,6 +51,7 @@ export const disciplineCaseService = {
                 { caseNumber: { contains: q, mode: 'insensitive' } },
                 { studentCode: { contains: q, mode: 'insensitive' } },
                 { markName: { contains: q, mode: 'insensitive' } },
+                { className: { contains: q, mode: 'insensitive' } },
               ],
             }
           : {}),

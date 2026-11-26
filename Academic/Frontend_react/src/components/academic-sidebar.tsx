@@ -32,6 +32,7 @@ import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccount
 import SensorsOutlinedIcon from '@mui/icons-material/SensorsOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import {
   ACADEMIC_NAV,
   isAcademicNavActive,
@@ -110,6 +111,8 @@ function NavIcon({ item }: { item: AcademicNavItem }) {
 }
 
 function ChildIcon({ href }: { href: string }) {
+  if (href === '/nursery/settings') return <SettingsOutlinedIcon sx={{ fontSize: 18 }} />;
+  if (href.startsWith('/nursery')) return <SummarizeOutlinedIcon sx={{ fontSize: 18 }} />;
   if (href === '/examination-timetable') return <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />;
   if (href === '/examination-lists') return <SummarizeOutlinedIcon sx={{ fontSize: 18 }} />;
   if (href === '/examination-invigilators') return <SupervisorAccountOutlinedIcon sx={{ fontSize: 18 }} />;

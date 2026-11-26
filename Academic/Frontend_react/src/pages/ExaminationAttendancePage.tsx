@@ -236,7 +236,7 @@ export default function ExaminationAttendancePage() {
                   <TableRow key={r.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>
                       <Typography sx={{ fontWeight: 700, fontSize: '0.84rem', color: '#0f172a' }}>{fmtDate(r.examDate)}</Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{r.session === 'MORNING' ? 'Morning' : 'Afternoon'}</Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{r.sessionName || (r.session === 'MORNING' ? 'Morning' : 'Afternoon')}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>{r.studentName}</Typography>

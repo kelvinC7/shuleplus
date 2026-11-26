@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import CreateAssessmentSheet from './CreateAssessmentSheet';
+import AssessmentFormSheet from './assessments/AssessmentFormSheet';
 
 /**
  * Route wrapper for /assessments/create — opens the same bottom sheet
@@ -20,11 +20,11 @@ export default function CreateAssessment() {
   );
 
   return (
-    <CreateAssessmentSheet
+    <AssessmentFormSheet
       open
       preset={preset}
       onClose={() => navigate('/assessments/schedule', { replace: true })}
-      onCreated={() => navigate('/assessments/schedule', { replace: true })}
+      onSaved={() => navigate('/assessments/schedule', { replace: true })}
     />
   );
 }

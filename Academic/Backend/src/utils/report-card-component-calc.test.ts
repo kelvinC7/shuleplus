@@ -131,6 +131,15 @@ function runCaseWeightedTermAverage() {
     ]),
     76.31
   );
+  assert.equal(
+    percentageFromTotalMarks(
+      [
+        { totalScore: 60, totalMax: 100, marksEntered: true },
+        { totalScore: 0, totalMax: 100, marksEntered: false },
+      ]
+    ),
+    60
+  );
 }
 
 function runCase7MultiQuizDifferentMax() {

@@ -13,7 +13,7 @@ export function isSchoolTripAuthorized(status: string) {
   return status === 'APPROVED' || status === 'TRIP_IN_PROGRESS' || status === 'COMPLETED';
 }
 
-export function SchoolAuthorizationActions({ tripId, authorizationNo, variant = 'toolbar', className }: Props) {
+export function SchoolAuthorizationActions({ tripId, variant = 'toolbar', className }: Props) {
   const letterHref = `/school/trips/${tripId}/approval-letter`;
 
   const items = [

@@ -55,23 +55,29 @@ export function PortalSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col bg-navy text-white">
+    <div className="flex h-full flex-col bg-gradient-to-b from-[#000435] via-[#000435] to-[#0a1150] text-white">
       <div className="border-b border-white/10 px-5 py-5">
-        <Link to={homeHref} onClick={onNavigate} className="block">
+        <Link to={homeHref} onClick={onNavigate} className="flex items-center gap-3">
           <img
             src={SIDEBAR_LOGO}
             alt="Shule+"
-            className="h-9 w-auto max-w-[180px] object-contain object-left"
+            className="h-9 w-auto max-w-[160px] object-contain object-left"
           />
         </Link>
-        <p className="mt-3 text-xs font-semibold tracking-wide text-white/85">{moduleLabel}</p>
+        <div className="mt-4 flex items-center gap-2">
+          <span className="rounded-full bg-amber/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber">
+            {moduleLabel}
+          </span>
+        </div>
         {orgLabel ? (
-          <p className="mt-0.5 truncate text-[11px] font-semibold text-white/55">{orgLabel}</p>
+          <p className="mt-2.5 truncate text-[11px] font-semibold text-white/55" title={orgLabel}>
+            {orgLabel}
+          </p>
         ) : null}
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/35">Workspace</p>
+        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">Workspace</p>
         <ul className="flex flex-col gap-1">
           {nav.map((item) => {
             if (item.children?.length) {
@@ -85,8 +91,8 @@ export function PortalSidebar({
                     className={cn(
                       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition',
                       groupActive
-                        ? 'bg-amber/15 text-amber'
-                        : 'text-white/72 hover:bg-white/6 hover:text-white'
+                        ? 'bg-white/10 text-amber'
+                        : 'text-white/70 hover:bg-white/6 hover:text-white'
                     )}
                   >
                     <item.icon className="h-5 w-5 shrink-0 opacity-90" />
@@ -107,8 +113,8 @@ export function PortalSidebar({
                               className={cn(
                                 'flex items-center rounded-xl py-2 pl-4 pr-3 text-[13px] font-semibold transition',
                                 active
-                                  ? 'bg-amber text-navy hover:bg-[#fdd067]'
-                                  : 'text-white/65 hover:bg-white/8 hover:text-white'
+                                  ? 'bg-amber text-navy shadow-sm shadow-amber/30'
+                                  : 'text-white/60 hover:bg-white/8 hover:text-white'
                               )}
                             >
                               {child.label}
@@ -125,13 +131,21 @@ export function PortalSidebar({
             const href = item.href!;
             const active = isPortalNavActive(pathname, href);
             return (
-              <li key={href}>
+              <li key={href} className="relative">
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-amber"
+                  />
+                ) : null}
                 <NavLink
                   to={href}
                   onClick={onNavigate}
                   className={cn(
                     'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
-                    active ? 'bg-amber text-navy hover:bg-amber' : 'text-white/72 hover:bg-white/8 hover:text-white'
+                    active
+                      ? 'bg-white/10 text-amber'
+                      : 'text-white/70 hover:bg-white/8 hover:text-white'
                   )}
                 >
                   <item.icon className="h-5 w-5 shrink-0 opacity-90" />
@@ -143,15 +157,18 @@ export function PortalSidebar({
         </ul>
       </div>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/10 p-3">
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full items-center gap-3 rounded-xl border border-red-400/15 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/15"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/70 transition hover:bg-white/8 hover:text-white"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           Log out
         </button>
+        <p className="mt-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/25">
+          Shule+ · Edupoto
+        </p>
       </div>
     </div>
   );

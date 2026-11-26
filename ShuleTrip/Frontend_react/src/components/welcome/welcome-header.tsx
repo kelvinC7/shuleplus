@@ -49,7 +49,7 @@ export function WelcomeHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 sm:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <Link
             to="/login?portal=government"
             className="hidden text-sm font-semibold text-slate-600 transition hover:text-navy md:inline-flex"

@@ -38,7 +38,7 @@ type RequestRow = RequestsData['items'][number];
 export default function RequestsPage() {
   const { scope, refreshKey, refresh } = useConsole();
   const { data, loading, error, reload } = useConsoleFetch<RequestsData>(
-    () => consoleApi.requests(scope),
+    () => consoleApi.requests({ ...scope }),
     [scope.organizationId, refreshKey]
   );
 
@@ -163,7 +163,7 @@ export default function RequestsPage() {
                       <StatusBadge value={row.status} />
                     </TableCell>
                     <TableCell>
-                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{formatDate(row.createdAt)}</Typography>
+                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{formatDate(row.date)}</Typography>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -201,8 +201,8 @@ export default function RequestsPage() {
                 { label: 'Requester', value: selected.requester },
                 { label: 'Amount', value: selected.amount != null ? formatFrw(selected.amount) : '—' },
                 { label: 'Status', value: <StatusBadge value={selected.status} /> },
-                { label: 'Submitted', value: formatDate(selected.createdAt) },
-                { label: 'Notes', value: selected.notes ?? selected.description ?? '—' },
+                { label: 'Submitted', value: formatDate(selected.date) },
+                { label: 'Notes', value: selected.description ?? '—' },
               ]}
             />
           </DrawerSection>

@@ -2,7 +2,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { BrandMark } from '@/components/brand-logo';
 import { Button } from '@/components/ui/button';
 import type { AccessFailureCode } from '@/shared/access-error';
-import { openOrganizationDashboard, redirectToIamLogin } from '@/shared/iam-login';
+import { openOrganizationDashboard } from '@/shared/iam-login';
 
 type PanelCopy = {
   title: string;
@@ -70,11 +70,11 @@ const COPY: Record<AccessFailureCode, PanelCopy> = {
 export function AccessDeniedPanel({
   failureCode,
   onRetry,
-  returnPath,
 }: {
   failureCode: AccessFailureCode;
   onRetry?: () => void;
-  returnPath: string;
+  /** Kept for callers that pass the originating route; navigation is handled by the copy actions. */
+  returnPath?: string;
 }) {
   const copy = COPY[failureCode] ?? COPY.unknown;
 

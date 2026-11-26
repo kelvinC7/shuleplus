@@ -195,6 +195,7 @@ export interface PersonRow {
   attendanceToday: string;
   attendanceRate: number;
   /** Legacy / alternate field names some endpoints still return */
+  email?: string;
   name?: string;
   class?: string;
   branch?: string;

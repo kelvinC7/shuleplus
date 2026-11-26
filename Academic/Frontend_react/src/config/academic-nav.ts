@@ -95,6 +95,7 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
     icon: 'reports',
     children: [
       { label: 'Report Cards', href: '/report-cards/v2' },
+      { label: 'Report Analysis', href: '/report-analysis' },
       { label: 'Publishing', href: '/publishing' },
       { label: 'Grading Scales', href: '/grading-scales' },
       { label: 'Competency', href: '/competency' },
@@ -102,6 +103,23 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
       { label: 'Teachers permission', href: '/teachers-permission' },
       { label: 'Round roll call', href: '/round-roll-call' },
       { label: 'Graduation', href: '/graduation' },
+    ],
+  },
+  {
+    label: 'Academic Performance',
+    icon: 'analytics',
+    children: [
+      { label: 'Beginning', href: '/academic-performance?kind=beginning' },
+      { label: 'Mid Term', href: '/academic-performance?kind=midterm' },
+      { label: 'Term', href: '/academic-performance?kind=standard' },
+    ],
+  },
+  {
+    label: 'Nursery',
+    icon: 'reports',
+    children: [
+      { label: 'Reports', href: '/nursery/reports' },
+      { label: 'Nursery Settings', href: '/nursery/settings' },
     ],
   },
   {
@@ -134,6 +152,7 @@ export function isExaminationsGroupActive(pathname: string): boolean {
 export function isResultsGroupActive(pathname: string): boolean {
   return (
     pathname.startsWith('/report-cards') ||
+    pathname.startsWith('/report-analysis') ||
     pathname.startsWith('/publishing') ||
     pathname.startsWith('/grading-scales') ||
     pathname.startsWith('/competency') ||
@@ -153,6 +172,8 @@ export function isAcademicNavGroupActive(label: string, pathname: string): boole
   if (label === 'Examination' || label === 'Examinations') return isExaminationsGroupActive(pathname);
   if (label === 'Results') return isResultsGroupActive(pathname);
   if (label === 'Courses') return isCoursesGroupActive(pathname);
+  if (label === 'Nursery') return pathname.startsWith('/nursery');
+  if (label === 'Academic Performance') return pathname.startsWith('/academic-performance');
   if (label === 'Analytics') return pathname.startsWith('/analytics');
   return false;
 }
@@ -167,6 +188,8 @@ export function isAcademicNavActive(pathname: string, href: string): boolean {
   if (href === '/report-cards/v2' || href === '/report-cards') {
     return pathname.startsWith('/report-cards');
   }
+  if (href.startsWith('/academic-performance')) return pathname.startsWith('/academic-performance');
+  if (href === '/report-analysis') return pathname.startsWith('/report-analysis');
   if (href === '/courses/catalog') return pathname.startsWith('/courses/catalog') || pathname === '/courses';
   if (href === '/courses/by-class') return pathname.startsWith('/courses/by-class');
   if (href === '/courses') return pathname.startsWith('/courses') || pathname.startsWith('/subjects');
@@ -207,6 +230,10 @@ export function pageTitleFromPath(pathname: string): string {
   if (pathname.startsWith('/assignments')) return 'Assignments';
   if (pathname.startsWith('/publishing')) return 'Publishing';
   if (pathname.startsWith('/report-cards')) return 'Report Cards';
+  if (pathname.startsWith('/report-analysis')) return 'Report Analysis';
+  if (pathname.startsWith('/academic-performance')) return 'Academic Performance';
+  if (pathname.startsWith('/nursery/settings')) return 'Nursery Settings';
+  if (pathname.startsWith('/nursery')) return 'Nursery Reports';
   if (pathname.startsWith('/grading-scales')) return 'Grading Scales';
   if (pathname.startsWith('/courses/catalog') || pathname === '/courses') return 'Course catalog';
   if (pathname.startsWith('/courses/by-class')) return 'Class courses';

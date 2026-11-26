@@ -14,6 +14,9 @@ export interface ExportOptions {
   fileName?: string
   userName?: string
   orientation?: "portrait" | "landscape"
+  logoUrl?: string | null
+  schoolName?: string | null
+  subtitle?: string | null
 }
 
 function formatDate(): string {
@@ -44,24 +47,28 @@ const FALLBACK_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
 </svg>`
 const FALLBACK_LOGO = `data:image/svg+xml;base64,${btoa(FALLBACK_LOGO_SVG)}`
 
-async function loadLogo(): Promise<string> {
-  try {
-    const res = await fetch('/logo.png')
-    const blob = await res.blob()
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return FALLBACK_LOGO
+async function toDataUrl(url: string): Promise<string> {
+  const res = await fetch(url, { credentials: 'include' })
+  const blob = await res.blob()
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function loadLogo(logoUrl?: string | null): Promise<string> {
+  const candidates = [logoUrl, '/logo.png', '/favicon.png'].filter(Boolean) as string[]
+  for (const url of candidates) {
+    try { return await toDataUrl(url) } catch { /* try next */ }
   }
+  return FALLBACK_LOGO
 }
 
 export async function exportToPdf(options: ExportOptions): Promise<void> {
-  const { title, columns, data, userName, orientation } = options
-  const logoBase64 = await loadLogo()
+  const { title, columns, data, userName, orientation, logoUrl, schoolName, subtitle } = options
+  const logoBase64 = await loadLogo(logoUrl)
 
   const isLandscape = orientation === "landscape"
   const doc = new jsPDF({
@@ -84,36 +91,44 @@ export async function exportToPdf(options: ExportOptions): Promise<void> {
 
   const drawHeader = () => {
     try {
-      doc.addImage(logoBase64, "PNG", margin, 10, 40, 15)
+      doc.addImage(logoBase64, "PNG", margin, 8, 18, 18)
     } catch {
       doc.setFillColor(252, 176, 56)
-      doc.roundedRect(margin, 10, 12, 12, 2, 2, "F")
+      doc.roundedRect(margin, 8, 16, 16, 2, 2, "F")
       doc.setFont("helvetica", "bold")
-      doc.setFontSize(8)
+      doc.setFontSize(10)
       doc.setTextColor(0, 4, 53)
-      doc.text("S", margin + 4, 19)
+      doc.text("S+", margin + 3, 18)
     }
 
+    const textX = margin + 22
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(11)
+    doc.setFontSize(13)
     doc.setTextColor(navyColor[0], navyColor[1], navyColor[2])
-    const titleX = pageWidth - margin - doc.getTextWidth(title)
-    doc.text(title, titleX, 16)
+    doc.text(schoolName || 'School', textX, 14)
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(10)
+    doc.setTextColor(60, 60, 60)
+    doc.text(title, textX, 20)
+    if (subtitle) {
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(8)
+      doc.setTextColor(grayColor[0], grayColor[1], grayColor[2])
+      doc.text(doc.splitTextToSize(subtitle, contentWidth - 80), textX, 25)
+    }
 
     doc.setFont("helvetica", "normal")
     doc.setFontSize(8)
     doc.setTextColor(grayColor[0], grayColor[1], grayColor[2])
-    doc.text(dateStr, pageWidth - margin - doc.getTextWidth(dateStr), 21)
-
+    doc.text(dateStr, pageWidth - margin - doc.getTextWidth(dateStr), 14)
     if (userName) {
       const issuerText = `Issued by: ${userName}`
-      doc.text(issuerText, pageWidth - margin - doc.getTextWidth(issuerText), 26)
+      doc.text(issuerText, pageWidth - margin - doc.getTextWidth(issuerText), 19)
     }
 
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2])
-    doc.setLineWidth(0.5)
-    const sepY = userName ? 31 : 26
-    doc.line(margin, sepY, pageWidth - margin, sepY)
+    doc.setLineWidth(0.6)
+    doc.line(margin, 30, pageWidth - margin, 30)
   }
 
   const drawFooter = () => {
@@ -135,7 +150,7 @@ export async function exportToPdf(options: ExportOptions): Promise<void> {
 
   const tableHeaders = columns.map((col) => col.header)
 
-  const headerEndY = userName ? 37 : 32
+  const headerEndY = 34
 
   autoTableFn(doc, {
     head: [tableHeaders],
@@ -183,15 +198,16 @@ export async function exportToPdf(options: ExportOptions): Promise<void> {
 }
 
 export function exportToExcel(options: ExportOptions): void {
-  const { title, columns, data, userName } = options
+  const { title, columns, data, userName, schoolName, subtitle } = options
 
   const wb = XLSX.utils.book_new()
 
   const dateStr = formatDate()
 
   const metaData: (string | undefined)[][] = [
+    [schoolName || 'School'],
     [title],
-    [],
+    [subtitle || ''],
     ["Exported by:", userName || "N/A"],
     ["Date:", dateStr],
     [],
@@ -287,13 +303,10 @@ export function exportToExcel(options: ExportOptions): void {
     }
   }
 
-  const titleRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
-  if (ws[titleRef]) {
-    ws[titleRef].s = {
-      font: { bold: true, color: { rgb: "000435" }, sz: 14 },
-      alignment: { horizontal: "left", vertical: "center" },
-    }
-  }
+  const schoolRef = XLSX.utils.encode_cell({ r: 0, c: 0 })
+  if (ws[schoolRef]) ws[schoolRef].s = { font: { bold: true, color: { rgb: "000435" }, sz: 14 }, alignment: { horizontal: "left", vertical: "center" } }
+  const titleRef = XLSX.utils.encode_cell({ r: 1, c: 0 })
+  if (ws[titleRef]) ws[titleRef].s = { font: { bold: true, color: { rgb: "334155" }, sz: 11 }, alignment: { horizontal: "left", vertical: "center" } }
 
   XLSX.utils.book_append_sheet(wb, ws, "Report")
 

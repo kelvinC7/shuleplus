@@ -79,3 +79,34 @@ export function requireServiceAuth(req: Request, _res: Response, next: NextFunct
 
   next();
 }
+
+export function requirePaymentIntegrationAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void {
+  if (!env.PAYMENT_INTEGRATION_API_KEY) {
+    return next(new AppError(
+      503,
+      'Payment integration authentication is not configured'
+    ));
+  }
+
+  const apiKey = req.headers['x-api-key'];
+  const authorization = req.headers.authorization;
+  const bearerKey = typeof authorization === 'string' && authorization.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : null;
+  const suppliedKey =
+    typeof apiKey === 'string'
+      ? apiKey
+      : Array.isArray(apiKey)
+        ? apiKey[0]
+        : bearerKey;
+
+  if (suppliedKey !== env.PAYMENT_INTEGRATION_API_KEY) {
+    return next(new AppError(401, 'Invalid payment integration credentials'));
+  }
+
+  next();
+}

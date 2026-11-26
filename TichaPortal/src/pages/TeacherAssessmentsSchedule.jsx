@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -19,10 +19,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
-import useAutoRefresh from '../hooks/useAutoRefresh';
 import useTpAcademic from '../hooks/useTpAcademic';
 import { fetchAssessments } from '../services/teacherPortalApi';
-import CreateAssessmentSheet from './CreateAssessmentSheet';
+import AssessmentFormSheet from './assessments/AssessmentFormSheet';
 import AssessmentRowMenu from './coursesMarks/AssessmentRowMenu.jsx';
 import { brand } from '../theme/theme';
 
@@ -110,6 +109,7 @@ function StatusChip({ status }) {
 }
 
 export default function TeacherAssessmentsSchedule() {
+  const navigate = useNavigate();
   const { term, academicYear, ready, settings } = useTpAcademic();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -163,9 +163,6 @@ export default function TeacherAssessmentsSchedule() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Keep assessments/courses list in sync with upstream timetable/config changes.
-  useAutoRefresh(load, { enabled: ready });
 
   const filtered = useMemo(() => {
     let rows = assessments;
@@ -378,6 +375,7 @@ export default function TeacherAssessmentsSchedule() {
                 {filtered.length}
               </Box>
             </Stack>
+            <Box sx={{ display: { xs: 'none', md: 'block' } }}>
             <TableContainer sx={{ overflowX: 'auto' }}>
               <Table size="small" sx={{ width: '100%', minWidth: 560, borderCollapse: 'collapse' }}>
                 <TableHead>
@@ -415,10 +413,16 @@ export default function TeacherAssessmentsSchedule() {
                       <TableRow
                         key={a.id || idx}
                         hover
-                        component={RouterLink}
-                        to={a.id ? `/assessments/${a.id}/marks` : '/marks'}
+                        tabIndex={0}
+                        role="link"
+                        onClick={() => navigate(a.id ? `/assessments/${a.id}/marks` : '/marks')}
+                        onKeyDown={(e) => {
+                          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            navigate(a.id ? `/assessments/${a.id}/marks` : '/marks');
+                          }
+                        }}
                         sx={{
-                          textDecoration: 'none',
                           cursor: 'pointer',
                           bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff',
                           '&:hover': { bgcolor: 'rgba(245,166,35,0.06)' },
@@ -457,13 +461,7 @@ export default function TeacherAssessmentsSchedule() {
                         <TableCell sx={cellSx}>
                           <StatusChip status={a.status} />
                         </TableCell>
-                        <TableCell
-                          sx={{ ...cellSx, textAlign: 'right' }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                        >
+                        <TableCell sx={{ ...cellSx, textAlign: 'right' }}>
                           <AssessmentRowMenu assessment={a} onChanged={load} />
                         </TableCell>
                       </TableRow>
@@ -472,14 +470,68 @@ export default function TeacherAssessmentsSchedule() {
                 </TableBody>
               </Table>
             </TableContainer>
+            </Box>
+
+            <Stack sx={{ display: { xs: 'flex', md: 'none' }, p: 1.25, spacing: 1 }}>
+              {filtered.length === 0 ? (
+                <Typography sx={{ py: 4, textAlign: 'center', fontSize: 13, color: '#94A3B8' }}>
+                  No assessments match this filter.
+                </Typography>
+              ) : (
+                filtered.map((a, idx) => (
+                  <Box
+                    key={a.id || idx}
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(a.id ? `/assessments/${a.id}/marks` : '/marks')}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        navigate(a.id ? `/assessments/${a.id}/marks` : '/marks');
+                      }
+                    }}
+                    sx={{
+                      borderRadius: 2,
+                      border: `1px solid ${BORDER}`,
+                      bgcolor: '#fff',
+                      p: 1.5,
+                      cursor: 'pointer',
+                      transition: 'background-color 120ms ease, box-shadow 120ms ease',
+                      '&:active': { bgcolor: '#F8F9FC' },
+                      '&:focus-visible': { outline: `2px solid ${NAVY}`, outlineOffset: 2 },
+                    }}
+                  >
+                    <Stack direction="row" alignItems="flex-start" spacing={1}>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography noWrap sx={{ fontSize: 14, fontWeight: 700, color: NAVY }}>
+                          {assessmentTitle(a)}
+                        </Typography>
+                        <Typography noWrap sx={{ mt: 0.25, fontSize: 12, color: '#64748B' }}>
+                          {assessmentClass(a)}
+                          <Box component="span" sx={{ color: 'rgba(19,33,61,0.25)' }}> · </Box>
+                          {a.subject?.name || a.subjectName || '—'}
+                        </Typography>
+                      </Box>
+                      <StatusChip status={a.status} />
+                    </Stack>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                      <Typography sx={{ fontSize: 11.5, color: '#94A3B8', fontWeight: 600 }}>
+                        {prettyDate(a.assessmentDate || a.date)}
+                      </Typography>
+                      <AssessmentRowMenu assessment={a} onChanged={load} sx={{ mr: -0.5 }} />
+                    </Stack>
+                  </Box>
+                ))
+              )}
+            </Stack>
           </Paper>
         )}
       </Stack>
 
-      <CreateAssessmentSheet
+      <AssessmentFormSheet
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={() => {
+        onSaved={() => {
           setCreateOpen(false);
           void load();
         }}

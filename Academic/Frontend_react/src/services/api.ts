@@ -10,6 +10,24 @@ import {
 } from '@/shared/auth-token';
 import { apiErrorMessage, toast } from '@/lib/toast';
 import type { AssessmentComponentCategory, ReportingStage } from '@/types';
+import type {
+  ReportAnalysisClassComparison,
+  ReportAnalysisData,
+  ReportAnalysisKind,
+  ReportAnalysisSettings,
+  ReportAnalysisStatus,
+} from '@/types/report-analysis';
+import type {
+  NurseryClassRow,
+  NurseryPerformanceBand,
+  NurseryReport,
+  NurseryReportKind,
+  NurseryReportsResponse,
+  NurserySettings,
+  NurserySubjectRow,
+  NurserySubjectsResponse,
+  NurseryTemplateSettings,
+} from '@/types/nursery';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3003/api';
 const IAM_API_URL = import.meta.env.VITE_IAM_API_URL ?? 'http://localhost:3001/api/v1';
@@ -1006,6 +1024,40 @@ export async function getReportCardSettings() {
   return res.data.data;
 }
 
+export async function getReportAnalysis(params: {
+  classId: string;
+  academicYear: string;
+  term?: string;
+  reportKind: ReportAnalysisKind;
+  status: ReportAnalysisStatus;
+}): Promise<ReportAnalysisData> {
+  const res = await api.get('/grading/report-analysis', { params });
+  return res.data.data;
+}
+
+export async function getReportAnalysisComparison(params: {
+  classIds: string[];
+  academicYear: string;
+  term?: string;
+  reportKind: ReportAnalysisKind;
+  status: ReportAnalysisStatus;
+}): Promise<ReportAnalysisClassComparison> {
+  const res = await api.get('/grading/report-analysis/comparison', {
+    params: { ...params, classIds: params.classIds.join(',') },
+  });
+  return res.data.data;
+}
+
+export async function getReportAnalysisSettings(): Promise<ReportAnalysisSettings> {
+  const res = await api.get('/academic-settings/report-analysis');
+  return res.data.data;
+}
+
+export async function saveReportAnalysisSettings(body: ReportAnalysisSettings): Promise<ReportAnalysisSettings> {
+  const res = await api.put('/academic-settings/report-analysis', body);
+  return res.data.data;
+}
+
 export async function getTermlyGrowth(studentId: string, classId: string) {
   const res = await api.get(`/grading/growth/${studentId}/${classId}`);
   return res.data.data;
@@ -1377,7 +1429,16 @@ export type ClassExaminationSlot = {
   timetableId: string;
   examDate: string;
   session: ExaminationSessionPeriod;
+  sessionCode?: string;
+  sessionName?: string;
   courseName: string;
+  startTime: string;
+  endTime: string;
+};
+
+export type ExaminationSessionDefinition = {
+  id: string;
+  name: string;
   startTime: string;
   endTime: string;
 };
@@ -1398,6 +1459,7 @@ export type ClassExaminationTimetable = {
   startDate: string;
   endDate: string;
   excludeWeekends: boolean;
+  sessions?: ExaminationSessionDefinition[];
   createdAt?: string;
   updatedAt?: string;
   slots: ClassExaminationSlot[];
@@ -1449,7 +1511,8 @@ export type ExaminationTimetableProposal = {
   startDate: string;
   endDate: string;
   excludeWeekends: boolean;
-  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; courseName: string; startTime: string; endTime: string }>;
+  sessions?: ExaminationSessionDefinition[];
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; startTime: string; endTime: string }>;
   generated?: boolean;
   persisted?: boolean;
 };
@@ -1462,6 +1525,7 @@ export async function generateExaminationTimetable(data: {
   startDate: string;
   endDate: string;
   excludeWeekends?: boolean;
+  sessions?: ExaminationSessionDefinition[];
 }) {
   const res = await api.post('/examination-timetables/generate', data);
   return res.data.data as ExaminationTimetableProposal;
@@ -1479,8 +1543,9 @@ export async function saveExaminationTimetable(data: {
   startDate: string;
   endDate: string;
   excludeWeekends?: boolean;
+  sessions?: ExaminationSessionDefinition[];
   confirmImpact?: boolean;
-  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; courseName: string; startTime: string; endTime: string }>;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; startTime: string; endTime: string }>;
 }) {
   if (data.id) {
     const res = await api.put(`/examination-timetables/${data.id}`, data);
@@ -1576,7 +1641,7 @@ export type ExaminationListsContext = {
   totalStudents: number;
   examinationTypes?: Array<{ id: string; name: string; academicYear: string; term: string }>;
   examinationTimetables?: Array<{ id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; name: string; classId: string; className: string; academicYear: string; term: string; startDate?: string | null; endDate?: string | null; slotCount?: number }>;
-  selectedExamination?: { id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; name: string; classId: string; className: string; academicYear: string; term: string; startDate?: string | null; endDate?: string | null; slots?: any[] } | null;
+  selectedExamination?: { id: string; examinationCode?: string | null; examinationTypeId?: string | null; examinationTypeName?: string | null; name: string; classId: string; className: string; academicYear: string; term: string; startDate?: string | null; endDate?: string | null; slots?: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; startTime: string; endTime: string }> } | null;
 };
 
 export async function getExaminationListsDashboard(params?: { academicYear?: string; term?: string; examinationTypeId?: string }) {
@@ -1691,6 +1756,8 @@ export type ExaminationInvigilatorAssignment = {
   roomNumber?: string | null;
   examDate: string;
   session: ExaminationSessionPeriod;
+  sessionCode?: string;
+  sessionName?: string;
   startTime?: string | null;
   endTime?: string | null;
   teacherUserId: string;
@@ -1704,6 +1771,8 @@ export type ExaminationInvigilatorAssignment = {
 export type ExaminationInvigilatorCoverageRow = {
   examDate: string;
   session: ExaminationSessionPeriod;
+  sessionCode?: string;
+  sessionName?: string;
   startTime: string;
   endTime: string;
   roomId: string;
@@ -1723,7 +1792,7 @@ export type ExaminationTypeTimetableSummary = {
   examinationCode?: string | null;
   startDate: string;
   endDate: string;
-  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; startTime?: string | null; endTime?: string | null; courseName?: string | null }>;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; startTime?: string | null; endTime?: string | null; courseName?: string | null }>;
 };
 
 export type ExaminationInvigilatorsContext = {
@@ -1734,7 +1803,7 @@ export type ExaminationInvigilatorsContext = {
   selected: {
     list: { id: string; listCode?: string | null; examinationCode?: string | null; examinationName?: string | null; examinationTypeId?: string | null; academicYear: string; term: string; startDate?: string; endDate?: string };
     rooms: Array<{ id: string; roomName: string; roomNumber?: string | null; capacity: number }>;
-    sessions: Array<{ examDate: string; session: ExaminationSessionPeriod; startTime?: string; endTime?: string; courseName?: string | null }>;
+    sessions: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; startTime?: string; endTime?: string; courseName?: string | null }>;
     assignments: ExaminationInvigilatorAssignment[];
     coverage?: ExaminationInvigilatorCoverageRow[];
   } | null;
@@ -1761,7 +1830,7 @@ export async function generateExaminationInvigilators(data: {
   replaceExisting?: boolean;
 }) {
   const res = await api.post('/examination-invigilators/generate', data);
-  return res.data.data as { created: number; unassigned: Array<{ roomName: string; date: string; session: string; needed: number; assigned: number }>; assignments: ExaminationInvigilatorAssignment[] };
+  return res.data.data as { created: number; unassigned: Array<{ roomName: string; date: string; session: string; sessionCode?: string; needed: number; assigned: number }>; assignments: ExaminationInvigilatorAssignment[] };
 }
 
 export async function updateExaminationInvigilatorAssignment(id: string, data: { teacherUserId?: string; status?: string; roomId?: string }) {
@@ -1769,12 +1838,12 @@ export async function updateExaminationInvigilatorAssignment(id: string, data: {
   return res.data.data as ExaminationInvigilatorAssignment;
 }
 
-export async function getAvailableInvigilatorTeachers(params: { examinationListId: string; examDate: string; session: 'MORNING' | 'AFTERNOON' }) {
+export async function getAvailableInvigilatorTeachers(params: { examinationListId: string; examDate: string; session?: ExaminationSessionPeriod; sessionCode?: string }) {
   const res = await api.get('/examination-invigilators/available-teachers', { params });
   return (res.data.data ?? []) as Array<{ id: string; name: string; email?: string | null }>;
 }
 
-export async function addExaminationInvigilatorAssignment(data: { examinationListId: string; roomId: string; examDate: string; session: 'MORNING' | 'AFTERNOON'; teacherUserId: string }) {
+export async function addExaminationInvigilatorAssignment(data: { examinationListId: string; roomId: string; examDate: string; session?: ExaminationSessionPeriod; sessionCode?: string; teacherUserId: string }) {
   const res = await api.post('/examination-invigilators/assignments', data);
   return res.data.data as ExaminationInvigilatorAssignment;
 }
@@ -1793,6 +1862,8 @@ export interface ExaminationAttendanceRecord {
   className?: string | null;
   examDate: string;
   session: 'MORNING' | 'AFTERNOON';
+  sessionCode?: string;
+  sessionName?: string;
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
   notes?: string | null;
   markedByName?: string | null;
@@ -1804,4 +1875,113 @@ export interface ExaminationAttendanceRecord {
 export async function listExaminationAttendance(params: Record<string, any>) {
   const res = await api.get('/examination-invigilators/attendance/records', { params });
   return res.data.data as { rows: ExaminationAttendanceRecord[]; stats: { total: number; present: number; absent: number; late: number; excused: number }; pagination: { page: number; limit: number; total: number; pages: number }; filters: { rooms: any[]; classes: any[] } };
+}
+
+// --- Nursery academic reports -----------------------------
+
+export async function getNurserySettings() {
+  const res = await api.get('/nursery/settings');
+  return res.data.data as NurserySettings;
+}
+
+export async function saveNurseryPerformanceBands(bands: NurseryPerformanceBand[]) {
+  const res = await api.put('/nursery/settings/performance', { bands });
+  return res.data.data as { performance: NurseryPerformanceBand[] };
+}
+
+export async function saveNurseryTemplate(template: NurseryTemplateSettings) {
+  const res = await api.put('/nursery/settings/template', { template });
+  return res.data.data as { template: NurseryTemplateSettings };
+}
+
+export async function listNurseryClasses(academicYear?: string) {
+  const res = await api.get('/nursery/classes', { params: academicYear ? { academicYear } : undefined });
+  return res.data.data as NurseryClassRow[];
+}
+
+export async function saveNurseryClassConfig(body: {
+  classId: string;
+  className?: string;
+  academicYear: string;
+  templateKey?: string;
+  enabled?: boolean;
+}) {
+  const res = await api.post('/nursery/classes', body);
+  return res.data.data;
+}
+
+export async function deleteNurseryClassConfig(id: string) {
+  const res = await api.delete(`/nursery/classes/${id}`);
+  return res.data.data as { deleted: boolean };
+}
+
+export async function getNurserySubjects(params: { classId: string; academicYear: string; term?: string }) {
+  const res = await api.get('/nursery/subjects', { params });
+  return res.data.data as NurserySubjectsResponse;
+}
+
+export async function saveNurserySubjects(body: {
+  classId: string;
+  academicYear: string;
+  subjects: Array<Omit<NurserySubjectRow, 'configId'>>;
+}) {
+  const res = await api.put('/nursery/subjects', body);
+  return res.data.data as NurserySubjectsResponse;
+}
+
+export async function listNurseryReports(params: {
+  classId: string;
+  academicYear: string;
+  term: string;
+  reportKind?: NurseryReportKind;
+  search?: string;
+}) {
+  const res = await api.get('/nursery/reports', { params });
+  return res.data.data as NurseryReportsResponse;
+}
+
+export async function generateNurseryReport(body: {
+  studentId: string;
+  classId: string;
+  academicYear: string;
+  term: string;
+  reportKind?: NurseryReportKind;
+}) {
+  const res = await api.post('/nursery/reports/generate', body);
+  return res.data.data as { report: NurseryReport };
+}
+
+export async function generateNurseryClassReports(body: {
+  classId: string;
+  academicYear: string;
+  term: string;
+  reportKind?: NurseryReportKind;
+  studentIds?: string[];
+}) {
+  const res = await api.post('/nursery/reports/generate-class', body);
+  return res.data.data as { generated: number; skipped: number; total: number; errors: string[]; classAverage: number | null };
+}
+
+export async function getNurseryReport(id: string) {
+  const res = await api.get(`/nursery/reports/${id}`);
+  return res.data.data as NurseryReport;
+}
+
+export async function updateNurseryReportComments(
+  id: string,
+  body: { teacherComment?: string | null; headTeacherComment?: string | null }
+) {
+  const res = await api.put(`/nursery/reports/${id}/comments`, body);
+  return res.data.data as NurseryReport;
+}
+
+export async function publishNurseryReports(body: {
+  ids?: string[];
+  classId?: string;
+  academicYear?: string;
+  term?: string;
+  reportKind?: NurseryReportKind;
+}) {
+  const res = await api.post('/nursery/reports/publish', body);
+  return res.data.data as { published: number };
 }

@@ -54,6 +54,7 @@ export class ExaminationInvigilatorController {
         examinationListId: String(req.query.examinationListId || ''),
         examDate: String(req.query.examDate || ''),
         session: String(req.query.session || '') as 'MORNING' | 'AFTERNOON',
+        sessionCode: typeof req.query.sessionCode === 'string' ? req.query.sessionCode : undefined,
       });
       res.json({ success: true, data });
     } catch (e) { next(e); }
@@ -73,6 +74,7 @@ export class ExaminationInvigilatorController {
         roomId: String(req.query.roomId || ''),
         examDate: String(req.query.examDate || ''),
         session: String(req.query.session || '') as any,
+        sessionCode: typeof req.query.sessionCode === 'string' ? req.query.sessionCode : undefined,
       });
       res.json({ success: true, data });
     } catch (e) { next(e); }

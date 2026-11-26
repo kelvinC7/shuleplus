@@ -15,6 +15,10 @@ type VerifyPayload = {
   reportNumber: string;
   schoolName: string | null;
   message: string;
+  className?: string | null;
+  academicYear?: string | null;
+  term?: string | null;
+  status?: string | null;
 };
 
 export default function ReportVerifyPage() {
@@ -135,6 +139,26 @@ export default function ReportVerifyPage() {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
                     <Typography color="text.secondary">School</Typography>
                     <Typography sx={{ fontWeight: 700 }}>{payload.schoolName}</Typography>
+                  </Box>
+                ) : null}
+                {payload.className ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f1f5f9' }}>
+                    <Typography color="text.secondary">Class</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{payload.className}</Typography>
+                  </Box>
+                ) : null}
+                {payload.academicYear || payload.term ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: '1px solid #f1f5f9' }}>
+                    <Typography color="text.secondary">Period</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>
+                      {[payload.term, payload.academicYear].filter(Boolean).join(' · ')}
+                    </Typography>
+                  </Box>
+                ) : null}
+                {payload.status ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
+                    <Typography color="text.secondary">Status</Typography>
+                    <Typography sx={{ fontWeight: 700 }}>{payload.status === 'PUBLISHED' ? 'Published' : 'Generated'}</Typography>
                   </Box>
                 ) : null}
               </Box>

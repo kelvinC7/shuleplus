@@ -85,6 +85,7 @@ export default function MidTermStudentReportCard({ report, documentRef, classTea
         scaled,
         grade,
         entered: s.marksEntered,
+        assessedInReportPeriod: s.assessedInReportPeriod,
         displayedMarks,
         displayedDefault: Math.round((s.totalMax ?? courseDefault) * 10) / 10,
         isCore: s.isCore !== false,
@@ -98,13 +99,20 @@ export default function MidTermStudentReportCard({ report, documentRef, classTea
   }, [report.subjects]);
 
   const footerStats = useMemo(() => {
-    const entered = subjectRows.filter((r) => r.entered);
-    const totalScored = entered.reduce((n, r) => n + r.displayedMarks, 0);
-    const totalDefault = entered.reduce((n, r) => n + r.displayedDefault, 0);
+    const included = subjectRows.filter((r) =>
+      r.assessedInReportPeriod === true ||
+      (r.assessedInReportPeriod == null && r.entered)
+    );
+    const totalScored = included.reduce((n, r) => n + (r.entered ? r.displayedMarks : 0), 0);
+    const totalDefault = included.reduce((n, r) => n + r.displayedDefault, 0);
     return {
       totalScored: Math.round(totalScored * 10) / 10,
       totalDefault: Math.round(totalDefault * 10) / 10,
-      avgPct: entered.length ? report.overallScore : null,
+      avgPct: totalDefault > 0
+        ? Math.round((totalScored / totalDefault) * 10000) / 100
+        : included.length
+          ? report.overallScore
+          : null,
     };
   }, [subjectRows, report.overallScore]);
 

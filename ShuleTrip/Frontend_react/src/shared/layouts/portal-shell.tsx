@@ -36,11 +36,11 @@ export function PortalShell({
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] print:bg-white">
+    <div className="min-h-screen print:bg-white">
       <aside
         data-portal-chrome
         className={cn(
-          'fixed inset-y-0 left-0 z-40 shadow-[4px_0_24px_rgba(0,4,53,0.12)] transition-transform print:hidden lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 shadow-[4px_0_32px_rgba(0,4,53,0.16)] transition-transform duration-200 print:hidden lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         style={{ width: PORTAL_SIDEBAR_WIDTH }}
@@ -59,7 +59,7 @@ export function PortalShell({
         <button
           type="button"
           data-portal-chrome
-          className="fixed inset-0 z-30 bg-black/40 print:hidden lg:hidden"
+          className="fixed inset-0 z-30 bg-navy/40 backdrop-blur-[2px] print:hidden lg:hidden"
           aria-label="Close menu"
           onClick={() => setMobileOpen(false)}
         />
@@ -68,43 +68,45 @@ export function PortalShell({
       <div data-portal-main className="min-w-0 lg:ml-[272px] print:ml-0">
         <header
           data-portal-chrome
-          className="sticky top-0 z-20 border-b border-navy/8 bg-white/92 backdrop-blur-md print:hidden"
+          className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl print:hidden"
         >
-          <div className="flex h-[60px] items-center gap-3 px-4 md:px-6">
+          <div className="flex h-16 items-center gap-3 px-4 md:px-6 lg:px-8">
             <button
               type="button"
-              className="rounded-lg border border-navy/10 p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
             </button>
 
-            <div className="min-w-0 flex-1 lg:flex-none">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{moduleLabel}</p>
-              <h1 className="truncate text-base font-bold text-navy sm:text-lg">{pageTitle}</h1>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{moduleLabel}</p>
+              <h1 className="truncate text-base font-extrabold tracking-tight text-navy sm:text-lg">{pageTitle}</h1>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
               {primaryAction ? (
                 <Link to={primaryAction.href} className="hidden sm:inline-flex">
-                  <Button variant="amber" type="button">
+                  <Button variant="amber" type="button" size="sm">
                     {primaryAction.label}
                   </Button>
                 </Link>
               ) : null}
+              <span aria-hidden className="hidden h-8 w-px bg-slate-200 sm:block" />
               <button
                 type="button"
-                className="rounded-xl p-2 text-slate-600 hover:bg-slate-100"
+                className="relative rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 hover:text-navy"
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber ring-2 ring-white" />
               </button>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8 print:mx-0 print:max-w-none print:px-0 print:py-0">
+        <main className="mx-auto max-w-[1440px] px-4 py-6 md:px-6 md:py-8 lg:px-8 print:mx-0 print:max-w-none print:px-0 print:py-0">
           {children}
         </main>
       </div>
@@ -113,30 +115,38 @@ export function PortalShell({
 }
 
 export function PageHeader({
+  eyebrow,
   title,
   description,
   action,
 }: {
+  eyebrow?: string;
   title: string;
   description?: string;
   action?: ReactNode;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">{title}</h2>
-        {description ? <p className="mt-1 max-w-2xl text-sm text-slate-600">{description}</p> : null}
+      <div className="min-w-0">
+        {eyebrow ? (
+          <p className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
+            <span aria-hidden className="h-1 w-6 rounded-full bg-amber" />
+            {eyebrow}
+          </p>
+        ) : null}
+        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-[1.7rem]">{title}</h2>
+        {description ? <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600">{description}</p> : null}
       </div>
-      {action}
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </div>
   );
 }
 
 export function PlaceholderPanel({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-10 text-center">
       <p className="text-lg font-bold text-slate-800">{title}</p>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-slate-600">{body}</p>
+      <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-slate-600">{body}</p>
       <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-900">
         Coming soon <ChevronRight className="h-3 w-3" />
       </p>

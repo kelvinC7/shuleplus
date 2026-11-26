@@ -41,7 +41,7 @@ export default function MyTripsPage() {
     });
   }, [rows, statusFilter, q]);
 
-  async function deleteTrip(tripId: string, reference: string) {
+  async function deleteTrip(tripId: string) {
     try {
       await api.delete(`/trips/${tripId}`);
       await reload();
@@ -163,7 +163,7 @@ export default function MyTripsPage() {
                             tripReference={t.reference}
                             status={t.status}
                             onView={() => setDrawerTripId(t.id)}
-                            onDelete={() => deleteTrip(t.id, t.reference)}
+                            onDelete={() => deleteTrip(t.id)}
                           />
                         </div>
                       </td>
@@ -193,7 +193,7 @@ export default function MyTripsPage() {
                       tripReference={t.reference}
                       status={t.status}
                       onView={() => setDrawerTripId(t.id)}
-                      onDelete={() => deleteTrip(t.id, t.reference)}
+                      onDelete={() => deleteTrip(t.id)}
                     />
                   </div>
                 </li>

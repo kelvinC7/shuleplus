@@ -58,7 +58,8 @@ const ic = (Icon) => <Icon sx={{ fontSize: 19 }} />;
 // group: 'Quick actions' | 'Go to' | 'Account'
 const COMMANDS = [
   // ── Quick actions
-  { id: 'a-attendance', group: 'Quick actions', label: 'Take period attendance', to: '/period-attendance', icon: ic(FactCheckOutlinedIcon), keywords: 'roll call register present absent' },
+  { id: 'a-attendance', group: 'Quick actions', label: 'Take period attendance', to: '/period-attendance', icon: ic(FactCheckOutlinedIcon), keywords: 'register present absent lesson subject' },
+  // { id: 'a-rollcall', group: 'Quick actions', label: 'Take round roll call', to: '/round-roll-call', icon: ic(FactCheckOutlinedIcon), keywords: 'roll call morning prep register' }, // hidden on TichaPortal for now — uncomment to bring it back
   { id: 'a-scan', group: 'Quick actions', label: 'Scan to enter class', to: '/class-room-scan', icon: ic(QrCodeScannerOutlinedIcon), keywords: 'qr clock in exit' },
   { id: 'a-record', group: 'Quick actions', label: 'Record marks', to: '/marks/marks-center?record=1', icon: ic(EditNoteOutlinedIcon), keywords: 'grades scores enter' },
   { id: 'a-assess', group: 'Quick actions', label: 'Create assessment', to: '/assessments/create', icon: ic(QuizOutlinedIcon), keywords: 'test exam quiz new' },

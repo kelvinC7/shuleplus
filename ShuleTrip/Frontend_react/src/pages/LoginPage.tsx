@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Eye, EyeOff, Landmark, Loader2, Lock } from 'lucide-react';
+import { Building2, Eye, EyeOff, Landmark, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { WelcomeHeader } from '@/components/welcome/welcome-header';
 import { useToast } from '@/components/ui/toast-provider';
 import { loginShuleTripPortal } from '@/services/portal-public-api';
@@ -9,6 +9,12 @@ import { cn } from '@/shared/cn';
 import { loginErrorToast } from '@/shared/login-error-toast';
 
 type Portal = 'school' | 'government';
+
+const FEATURES = [
+  'Plan and register educational trips in minutes',
+  'Collect digital parent consent, no paper forms',
+  'Government review with a complete audit trail',
+];
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -63,108 +69,146 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb]">
+    <div className="relative min-h-screen overflow-hidden bg-[#f8f9fb]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-amber/20 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-navy/10 blur-3xl"
+      />
       <WelcomeHeader />
-      <div className="mx-auto grid min-h-[calc(100vh-64px)] max-w-6xl lg:grid-cols-2">
-        <div className="relative hidden overflow-hidden lg:block">
+
+      <div className="relative mx-auto grid min-h-[calc(100vh-64px)] max-w-6xl items-center gap-10 px-4 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+        {/* Brand panel */}
+        <div className="relative hidden overflow-hidden rounded-[2rem] border border-white/60 bg-navy shadow-elevated lg:block">
           <img
             src="/shuletrip-bg.png"
             alt=""
-            className="absolute inset-0 h-full w-full bg-[#fff8eb] object-contain object-left"
+            className="absolute inset-0 h-full w-full object-cover opacity-60"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-navy/40 to-transparent" />
-          <div className="relative flex h-full flex-col justify-end p-12 text-white">
-            <img src="/shule_logo.png" alt="ShuleTrip" className="mb-6 h-12 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            <h2 className="text-3xl font-extrabold leading-tight">One platform for safer school journeys</h2>
-            <p className="mt-3 max-w-md text-sm text-white/80">
+          <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/70 to-navy/20" />
+          <div className="relative flex h-full min-h-[560px] flex-col justify-end p-10 text-white">
+            <div className="mb-auto inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-amber backdrop-blur">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Safe school journeys
+            </div>
+            <h2 className="max-w-md text-3xl font-extrabold leading-tight tracking-tight">
+              One platform for safer school journeys.
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/75">
               Schools plan trips, parents give digital consent, and government teams review with full audit trails.
             </p>
+            <ul className="mt-6 space-y-2.5">
+              {FEATURES.map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-sm text-white/85">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-amber/20 text-amber">
+                    <ShieldCheck className="h-3 w-3" />
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
-        <div className="flex items-center justify-center px-4 py-10 sm:px-8">
-          <div className="w-full max-w-md">
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Sign in</p>
-            <h1 className="mt-2 text-2xl font-extrabold text-navy">Welcome back</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              {portal === 'government'
-                ? 'All government roles — intake, education, transport, checkpoint, approval, monitoring, and admin.'
-                : 'Schools — use your registered email or username.'}
-            </p>
+        {/* Form panel */}
+        <div className="mx-auto w-full max-w-md">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">Sign in</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-navy">Welcome back</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {portal === 'government'
+              ? 'All government roles — intake, education, transport, checkpoint, approval, monitoring, and admin.'
+              : 'Schools — use your registered email or username.'}
+          </p>
 
-            <div className="mt-6 flex gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-line">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setPortal(t.id)}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-bold transition sm:text-sm',
-                    portal === t.id ? 'bg-navy text-white' : 'text-slate-600 hover:text-navy'
-                  )}
-                >
-                  <t.icon className="h-3.5 w-3.5" />
-                  {t.label}
-                </button>
-              ))}
-            </div>
+          <div className="mt-6 grid grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setPortal(t.id)}
+                className={cn(
+                  'flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold transition sm:text-sm',
+                  portal === t.id
+                    ? 'bg-navy text-white shadow-sm shadow-navy/25'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-navy'
+                )}
+              >
+                <t.icon className="h-4 w-4" />
+                {t.label}
+              </button>
+            ))}
+          </div>
 
-            <form onSubmit={onSubmit} className="mt-6 space-y-4 rounded-3xl border border-line bg-white p-6 shadow-sm">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Username or email</label>
+          <form
+            onSubmit={onSubmit}
+            className="mt-5 space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-card"
+          >
+            <div>
+              <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Username or email</label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none focus:border-navy/30 focus:ring-2 focus:ring-navy/10"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-3.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-amber/70 focus:ring-4 focus:ring-amber/15"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
+                  placeholder="you@school.rw"
                   required
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    className="w-full rounded-xl border border-line py-2.5 pl-10 pr-11 text-sm outline-none focus:border-navy/30 focus:ring-2 focus:ring-navy/10"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword((v) => !v)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Password</label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-11 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-amber/70 focus:ring-4 focus:ring-amber/15"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-navy text-sm font-bold text-white shadow-lg transition hover:bg-navy-muted disabled:opacity-60"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Sign in
-              </button>
-            </form>
-
-            <p className="mt-6 text-center text-sm text-slate-500">
-              First time here?{' '}
-              <Link to="/register" className="font-bold text-navy hover:underline">
-                Register your school
-              </Link>{' '}
-              to get started.
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-navy to-navy-muted text-sm font-bold text-white shadow-lg shadow-navy/20 transition hover:brightness-110 disabled:opacity-60"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Sign in
+            </button>
+            <p className="flex items-center justify-center gap-1.5 text-center text-[11px] font-semibold text-slate-400">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Secured by Shule+ identity
             </p>
-            {portal === 'government' ? (
-              <p className="mt-3 text-center text-xs text-slate-400">
-                Demo: <span className="font-semibold text-slate-500">gov.reviewer</span> / GovReview@2026
-              </p>
-            ) : null}
-          </div>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-slate-500">
+            First time here?{' '}
+            <Link to="/register" className="font-bold text-navy hover:underline">
+              Register your school
+            </Link>{' '}
+            to get started.
+          </p>
+          {portal === 'government' ? (
+            <p className="mt-3 text-center text-xs text-slate-400">
+              Demo: <span className="font-semibold text-slate-500">gov.reviewer</span> / GovReview@2026
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

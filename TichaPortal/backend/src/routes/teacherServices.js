@@ -757,7 +757,7 @@ router.get('/examinations/attendance', async (req, res) => {
     const t = teacher(req);
     if (!organizationId || !t?.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const payload = await serviceFetch(env.ACADEMIC_API_URL, '/service/examination-attendance', {
-      query: { organizationId, examinationListId: req.query.examinationListId, roomId: req.query.roomId, examDate: req.query.examDate, session: req.query.session },
+      query: { organizationId, examinationListId: req.query.examinationListId, roomId: req.query.roomId, examDate: req.query.examDate, session: req.query.session, sessionCode: req.query.sessionCode },
     });
     send(res, unwrap(payload));
   } catch (err) { fail(res, err); }

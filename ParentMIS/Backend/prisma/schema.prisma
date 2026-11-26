@@ -112,10 +112,30 @@ model ParentAccount {
   communicationPreference ParentCommunicationPreference?
   transportChangeRequests TransportChangeRequest[]
   transportIssueReports   TransportIssueReport[]
+  passwordResetOtp ParentPasswordResetOtp?
 
   @@unique([organizationId, phone])
   @@index([organizationId])
   @@map("parents")
+}
+
+model ParentPasswordResetOtp {
+  id              String   @id @default(uuid())
+  parentId        String   @unique @map("parent_id")
+  phone           String
+  otpHash         String   @map("otp_hash")
+  expiresAt       DateTime @map("expires_at")
+  attempts        Int      @default(0)
+  lastSentAt      DateTime @map("last_sent_at")
+  verifiedAt      DateTime? @map("verified_at")
+  resetTokenHash  String?  @map("reset_token_hash")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  parent ParentAccount @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("parent_password_reset_otps")
 }
 
 model Student {

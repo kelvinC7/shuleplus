@@ -7,10 +7,24 @@ import { smListClasses } from '../clients/student-management.client';
 type SlotInput = {
   examDate: string;
   session: 'MORNING' | 'AFTERNOON';
+  sessionCode?: string;
+  sessionName?: string;
   courseName: string;
   startTime: string;
   endTime: string;
 };
+
+type SessionInput = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+};
+
+const DEFAULT_SESSIONS: SessionInput[] = [
+  { id: 'MORNING', name: 'Morning', startTime: '08:00', endTime: '10:00' },
+  { id: 'AFTERNOON', name: 'Afternoon', startTime: '14:00', endTime: '16:00' },
+];
 
 async function generateUniqueExaminationCode(organizationId: string) {
   for (let i = 0; i < 10; i++) {
@@ -93,13 +107,51 @@ async function findClassCourses(organizationId: string, classId: string, academi
   return { className: className || match?.className || '', courses: unique };
 }
 
-function validateSlots(slots: SlotInput[], startDate: string, endDate: string, excludeWeekends: boolean) {
+function normalizeSessions(sessions?: SessionInput[]) {
+  const configured = Array.isArray(sessions) && sessions.length ? sessions : DEFAULT_SESSIONS;
+  const seen = new Set<string>();
+  const seenNames = new Set<string>();
+  const result = configured.map((session) => {
+    const id = String(session?.id || '').trim();
+    const name = String(session?.name || '').trim();
+    if (!id || !name) throw new AppError(400, 'Each examination session needs an ID and name');
+    if (id.length > 80 || name.length > 80) throw new AppError(400, 'Examination session IDs and names must be 80 characters or fewer');
+    if (seen.has(id)) throw new AppError(400, `Duplicate examination session: ${name}`);
+    const normalizedName = name.toLocaleLowerCase();
+    if (seenNames.has(normalizedName)) throw new AppError(400, `Duplicate examination session name: ${name}`);
+    seen.add(id);
+    seenNames.add(normalizedName);
+    const startTime = String(session?.startTime || '').trim();
+    const endTime = String(session?.endTime || '').trim();
+    if (parseMinutes(endTime) <= parseMinutes(startTime)) {
+      throw new AppError(400, `End time must be after start time for ${name}`);
+    }
+    return { id, name, startTime, endTime };
+  });
+  if (result.length > 12) throw new AppError(400, 'A timetable can have at most 12 examination sessions');
+  const ordered = result.sort((a, b) => parseMinutes(a.startTime) - parseMinutes(b.startTime));
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (parseMinutes(ordered[index - 1].endTime) > parseMinutes(ordered[index].startTime)) {
+      throw new AppError(400, `${ordered[index - 1].name} and ${ordered[index].name} sessions overlap`);
+    }
+  }
+  return ordered;
+}
+
+function sessionPeriod(startTime: string): 'MORNING' | 'AFTERNOON' {
+  return parseMinutes(startTime) < 12 * 60 ? 'MORNING' : 'AFTERNOON';
+}
+
+function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: string, endDate: string, excludeWeekends: boolean) {
   const start = toDateKey(startDate);
   const end = toDateKey(endDate);
-  const byDay: Record<string, { MORNING?: SlotInput; AFTERNOON?: SlotInput }> = {};
+  const byDay = new Map<string, SlotInput[]>();
+  const sessionsById = new Map(sessions.map((session) => [session.id, session]));
   const scheduledCourses = new Set<string>();
   for (const slot of slots) {
-    if (!['MORNING', 'AFTERNOON'].includes(slot.session)) throw new AppError(400, 'Session must be MORNING or AFTERNOON');
+    const sessionCode = slot.sessionCode || slot.session;
+    const session = sessionsById.get(sessionCode);
+    if (!session) throw new AppError(400, `Unknown examination session: ${sessionCode}`);
     const day = toDateKey(slot.examDate);
     if (day < start || day > end) throw new AppError(400, `Exam date ${day} is outside the selected range`);
     if (excludeWeekends) {
@@ -111,20 +163,33 @@ function validateSlots(slots: SlotInput[], startDate: string, endDate: string, e
     const courseKey = slot.courseName.trim().toLowerCase();
     if (scheduledCourses.has(courseKey)) throw new AppError(409, `Duplicate examination course: ${slot.courseName.trim()}`);
     scheduledCourses.add(courseKey);
-    const s = parseMinutes(slot.startTime);
-    const e = parseMinutes(slot.endTime);
-    if (e <= s) throw new AppError(400, `End time must be after start time for ${slot.courseName} on ${day}`);
-    byDay[day] ??= {};
-    if (byDay[day][slot.session]) throw new AppError(409, `Duplicate ${slot.session.toLowerCase()} session on ${day}`);
-    byDay[day][slot.session] = slot;
+    const startMinutes = parseMinutes(slot.startTime);
+    const endMinutes = parseMinutes(slot.endTime);
+    if (endMinutes <= startMinutes) throw new AppError(400, `End time must be after start time for ${slot.courseName} on ${day}`);
+    const daySlots = byDay.get(day) || [];
+    if (daySlots.some((existing) => (existing.sessionCode || existing.session) === sessionCode)) {
+      throw new AppError(409, `Duplicate ${session.name} session on ${day}`);
+    }
+    daySlots.push({ ...slot, session: sessionPeriod(slot.startTime), sessionCode, sessionName: session.name });
+    byDay.set(day, daySlots);
   }
-  for (const [day, pair] of Object.entries(byDay)) {
-    if (pair.MORNING && pair.AFTERNOON) {
-      const mEnd = parseMinutes(pair.MORNING.endTime);
-      const aStart = parseMinutes(pair.AFTERNOON.startTime);
-      if (mEnd > aStart) throw new AppError(409, `Morning and afternoon sessions overlap on ${day}`);
+  for (const [day, daySlots] of byDay) {
+    const sorted = daySlots.slice().sort((a, b) => parseMinutes(a.startTime) - parseMinutes(b.startTime));
+    for (let index = 1; index < sorted.length; index += 1) {
+      if (parseMinutes(sorted[index - 1].endTime) > parseMinutes(sorted[index].startTime)) {
+        throw new AppError(409, `Examination sessions overlap on ${day}`);
+      }
     }
   }
+  return slots.map((slot) => {
+    const session = sessionsById.get(slot.sessionCode || slot.session)!;
+    return {
+      ...slot,
+      session: sessionPeriod(slot.startTime),
+      sessionCode: session.id,
+      sessionName: session.name,
+    };
+  });
 }
 
 export class ExaminationTimetableService {
@@ -223,26 +288,30 @@ export class ExaminationTimetableService {
     startDate: string;
     endDate: string;
     excludeWeekends?: boolean;
+    sessions?: SessionInput[];
   }) {
     if (!body.classId || !body.academicYear || !body.term || !body.startDate || !body.endDate) {
       throw new AppError(400, 'classId, academicYear, term, startDate and endDate are required');
     }
     const days = datesBetween(body.startDate, body.endDate, !!body.excludeWeekends);
     if (!days.length) throw new AppError(400, 'No examination days available in the selected range');
+    const sessions = normalizeSessions(body.sessions);
     const { className, courses } = await findClassCourses(organizationId, body.classId, body.academicYear, body.term);
     if (!courses.length) throw new AppError(400, 'No courses found for this class in the existing class timetable');
 
     const slots: SlotInput[] = [];
     let i = 0;
     for (const day of days) {
-      for (const session of ['MORNING', 'AFTERNOON'] as const) {
+      for (const session of sessions) {
         if (i >= courses.length) break;
         slots.push({
           examDate: day,
-          session,
+          session: sessionPeriod(session.startTime),
+          sessionCode: session.id,
+          sessionName: session.name,
           courseName: courses[i].subjectName,
-          startTime: session === 'MORNING' ? '08:00' : '14:00',
-          endTime: session === 'MORNING' ? '10:00' : '16:00',
+          startTime: session.startTime,
+          endTime: session.endTime,
         });
         i += 1;
       }
@@ -278,6 +347,7 @@ export class ExaminationTimetableService {
       startDate: body.startDate,
       endDate: body.endDate,
       excludeWeekends: !!body.excludeWeekends,
+      sessions,
       slots,
       generated: true,
       persisted: false,
@@ -295,13 +365,15 @@ export class ExaminationTimetableService {
     startDate: string;
     endDate: string;
     excludeWeekends?: boolean;
+    sessions?: SessionInput[];
     slots: SlotInput[];
     confirmImpact?: boolean;
   }) {
     if (!body.classId || !body.academicYear || !body.term || !body.startDate || !body.endDate) {
       throw new AppError(400, 'classId, academicYear, term, startDate and endDate are required');
     }
-    validateSlots(body.slots || [], body.startDate, body.endDate, !!body.excludeWeekends);
+    const sessions = normalizeSessions(body.sessions);
+    const validSlots = validateSlots(body.slots || [], sessions, body.startDate, body.endDate, !!body.excludeWeekends);
     let className = body.className?.trim() || '';
     if (!className) {
       const classes = await smListClasses(organizationId).catch(() => [] as any[]);
@@ -347,9 +419,11 @@ export class ExaminationTimetableService {
 
     const startDate = atNoonUtc(body.startDate);
     const endDate = atNoonUtc(body.endDate);
-    const slotsData = (body.slots || []).map((s) => ({
+    const slotsData = validSlots.map((s) => ({
       examDate: atNoonUtc(s.examDate),
       session: s.session,
+      sessionCode: s.sessionCode!,
+      sessionName: s.sessionName!,
       courseName: s.courseName.trim(),
       startTime: s.startTime.trim(),
       endTime: s.endTime.trim(),
@@ -369,6 +443,7 @@ export class ExaminationTimetableService {
             startDate,
             endDate,
             excludeWeekends: !!body.excludeWeekends,
+            sessions,
           },
         });
         await tx.classExaminationSlot.deleteMany({ where: { timetableId: existing.id } });
@@ -403,6 +478,7 @@ export class ExaminationTimetableService {
         startDate,
         endDate,
         excludeWeekends: !!body.excludeWeekends,
+        sessions,
         slots: { create: slotsData },
       },
       include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },

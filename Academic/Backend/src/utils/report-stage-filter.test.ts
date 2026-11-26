@@ -6,6 +6,7 @@ import {
   componentWeightedMax,
   convertedComponentPoints,
 } from './report-card-component-calc';
+import { overallPercentageFromSubjects } from './report-card-overall-percentage';
 
 /** Mimic the existing continuous-assessment name heuristic. */
 const isMidTermName = (name: string) =>
@@ -94,6 +95,25 @@ function runTermlyCombinationTest() {
   assert.equal(convertedComponentPoints(80, componentWeightedMax(courseDefault, 30)), 24);
 }
 
+function runStageOverallPercentageTest() {
+  const subjects = [
+    { studentMarksOnDefault: 20, totalScore: 20, totalMax: 20, marksEntered: true },
+    { studentMarksOnDefault: 0, totalScore: 0, totalMax: 80, marksEntered: false },
+  ];
+
+  assert.equal(
+    overallPercentageFromSubjects(subjects, true, true),
+    20,
+    'stage percentage includes the maximum of an assessed subject with no mark'
+  );
+  assert.equal(
+    overallPercentageFromSubjects(subjects, true),
+    100,
+    'standard percentage keeps its existing entered-subject behavior'
+  );
+}
+
 runStageFilterTests();
 runTermlyCombinationTest();
+runStageOverallPercentageTest();
 console.log('report-stage-filter tests passed');

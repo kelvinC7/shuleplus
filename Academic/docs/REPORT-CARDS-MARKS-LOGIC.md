@@ -113,7 +113,7 @@ For each student in the class (among students with at least one mark):
 overallScore = Σ subjectTotalScore / Σ subjectTotalMax × 100
 ```
 
-The same total-marks calculation is used by the report table, bulk class summaries, and opened report cards. Beginning-term and mid-term marks are pooled on each subject DEFAULT before this percentage is calculated. Term reports sum weighted component contributions on the course scale (normally 100). Calculation and ranking retain two decimal places; display formatting may show fewer decimals.
+The denominator includes every course assessed for the class in the selected report period, even when an individual student has no marks for one of those courses; that course contributes zero earned marks and its full course maximum. Beginning-term and mid-term marks are pooled on each subject DEFAULT before this percentage is calculated, and an assessed subject with no student mark still contributes its DEFAULT to the denominator. The same total-marks calculation is used by the report table, bulk class summaries, and opened report cards. Term reports sum weighted component contributions on the course scale (normally 100). Calculation and ranking retain two decimal places; display formatting may show fewer decimals.
 
 This is **not** the simple average of subject percentages unless every subject has the same DEFAULT and all subjects have marks.
 
@@ -138,6 +138,7 @@ Students with **no marks** in a subject: `marksEntered: false`, position shown a
 
 - Same tie algorithm on **overallScore** (§4).
 - Only students who appear in the aggregated class report (at least one PRESENT mark in the term) are eligible.
+- In the per-student report viewer, single-term and stage reports use the same class-wide summary average and position as the class list, so an individual report cannot show a position from a different calculation path.
 
 ### Legacy `calculateFinalResults` (template engine API)
 
@@ -145,6 +146,8 @@ Separate workflow used when persisting **studentResult** via template calculatio
 
 - Ranks by `finalPercentage` with **dense** rank (1, 2, 3…) — **no** tie skip.
 - Report card path **E** uses `rankWithTies`, not this rank.
+
+The legacy **Report Cards** page also shows an overall class position. It is calculated from each student's average across the selected class/year/term results; it must not use the first subject's rank, which is only that student's position in that one subject.
 
 ---
 

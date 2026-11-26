@@ -9,7 +9,7 @@ const ASSESSMENT_CREATE_FIELDS = [
 ];
 const ASSESSMENT_UPDATE_FIELDS = [
   'title', 'maxMark', 'assessmentDate', 'assessmentTime', 'duration', 'description',
-  'assessmentCategory', 'catAllocationStage', 'reportingStage',
+  'assessmentCategory', 'catAllocationStage', 'reportingStage', 'templateId', 'componentId',
 ];
 
 /** Keep only known assessment fields and validate classification enums before forwarding to Academic. */

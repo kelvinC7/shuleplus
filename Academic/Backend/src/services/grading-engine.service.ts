@@ -13,11 +13,20 @@ import {
   accumulateAssessmentMark,
   buildSubjectScoresFromComponents,
   poolMarksOnCourseDefault,
-  percentageFromTotalMarks,
   normalizeComponentKey,
   resolveToTemplateComponentName,
   type ComponentAccumulator,
 } from '../utils/report-card-component-calc';
+import { overallPercentageFromSubjects } from '../utils/report-card-overall-percentage';
+import { fetchIamUser } from '../clients/iam.client';
+import {
+  bandForAverage,
+  meanOf,
+  parseReportAnalysisSettings,
+  roundPct,
+  type ReportAnalysisSettings,
+  type ReportAnalysisStatusFilter,
+} from '../utils/report-analysis-settings';
 import {
   filterAssessmentsForMidTerm,
   filterTemplateComponentsForMidTerm,
@@ -646,11 +655,28 @@ export class GradingEngineService {
     const avgRounded = Math.round(avgPercentage * 100) / 100;
     const overallGrade = this.matchGradeScale(avgRounded, gradingScale);
 
-    const allClassResults = await prisma.studentResult.findMany({
-      where: { assignmentId: results[0]?.assignmentId, classId: resolvedClassId, subjectId: results[0]?.subjectId },
-      orderBy: { percentage: 'desc' },
+    const allClassStudentResults = await prisma.studentResult.findMany({
+      where: {
+        organizationId,
+        classId: resolvedClassId,
+        academicYear,
+        ...(activeTerm ? { term: activeTerm } : {}),
+      },
+      select: { studentId: true, percentage: true },
     });
-    const position = allClassResults.findIndex((r) => r.studentId === resolvedStudentId) + 1;
+    const totalsByStudent = new Map<string, { sum: number; count: number }>();
+    for (const r of allClassStudentResults) {
+      const prev = totalsByStudent.get(r.studentId) || { sum: 0, count: 0 };
+      prev.sum += Number(r.percentage || 0);
+      prev.count += 1;
+      totalsByStudent.set(r.studentId, prev);
+    }
+    const classAverages = [...totalsByStudent.entries()].map(([sid, v]) => ({
+      sid,
+      avg: v.count ? v.sum / v.count : 0,
+    })).sort((a, b) => b.avg - a.avg);
+    const position = classAverages.findIndex((r) => r.sid === resolvedStudentId) + 1;
+    const classSize = classAverages.length || 1;
 
     const subjects = results.map((r) => {
       const pct = Math.round(Number(r.percentage) * 100) / 100;
@@ -687,7 +713,7 @@ export class GradingEngineService {
       overallGrade: overallGrade?.grade ?? null,
       overallGradeDescription: overallGrade?.description ?? null,
       position: position || 1,
-      classSize: allClassResults.length || 1,
+      classSize,
       growth: growthData,
     };
 
@@ -1038,6 +1064,7 @@ export class GradingEngineService {
     await this.mergeTimetableCoursesIntoSubjects(organizationId, cls, academicYear, term, merged);
 
     const coreMap = await this.loadSubjectCoreMap(organizationId, cls, academicYear, term);
+    const assessedSubjectIds = new Set(assessments.map((assessment) => assessment.subjectId));
 
     const subjects = this.applyCoreFlagsAndSort(
       [...merged.values()].map((bucket) => {
@@ -1078,6 +1105,7 @@ export class GradingEngineService {
         defaultCourseMarks: totalMax,
         percentage: pct,
         marksEntered,
+        assessedInReportPeriod: assessedSubjectIds.has(bucket.subjectId),
         courseComplete,
         missingComponents: (bucket as { missingComponents?: string[] }).missingComponents ?? [],
         grade: subjectGrade?.grade ?? null,
@@ -1089,12 +1117,11 @@ export class GradingEngineService {
       coreMap
     );
 
-    const overallFromSubjects = percentageFromTotalMarks(
-      subjects.map((s) => ({
-        totalScore: s.totalScore,
-        totalMax: s.totalMax ?? 0,
-        marksEntered: s.marksEntered,
-      }))
+    const useDisplayedMarks = midTermOnly || beginningOnly;
+    const overallFromSubjects = overallPercentageFromSubjects(
+      subjects.filter((subject) => assessedSubjectIds.has(subject.subjectId)),
+      useDisplayedMarks,
+      useDisplayedMarks
     );
     let overallScore =
       overallFromSubjects > 0 || subjects.some((s) => s.marksEntered)
@@ -1494,8 +1521,10 @@ export class GradingEngineService {
     };
 
     const byStudent = new Map<string, Map<string, SubjectAcc>>();
+    const subjectNames = new Map<string, string>();
 
     for (const assessment of assessments) {
+      subjectNames.set(assessment.subjectId, assessment.subject.name);
       const rawCompName = assessment.component?.name || assessment.title || 'Assessment';
       const compName = resolveToTemplateComponentName(rawCompName, templateComponents);
       const templateComp = templateComponents.find(
@@ -1596,6 +1625,8 @@ export class GradingEngineService {
           }
         >;
         totalScore: number;
+        /** Pooled teacher marks on DEFAULT (Σscore/Σmax × DEFAULT). */
+        studentMarksOnDefault?: number;
         totalMax: number;
         percentage: number;
         defaultCourseMarks: number;
@@ -1607,7 +1638,22 @@ export class GradingEngineService {
 
       for (const subjectId of subjectIds) {
         const acc = subjectMap.get(subjectId);
-        if (!acc) continue;
+        if (!acc) {
+          const totalMax = subjectDefaultMarks.get(subjectId) ?? defaultCourseMarks;
+          subjectRows.push({
+            subjectId,
+            subject: subjectNames.get(subjectId) ?? '',
+            categoryScores: {},
+            totalScore: 0,
+            totalMax,
+            percentage: 0,
+            defaultCourseMarks: totalMax,
+            hasComponentMarks: false,
+            courseComplete: false,
+            missingComponents: [],
+          });
+          continue;
+        }
 
         const subjectDcm = subjectDefaultMarks.get(subjectId) ?? defaultCourseMarks;
         const built = this.buildNormalizedSubjectScores(acc, subjectDcm, templateComponents, stageOnly);
@@ -1624,14 +1670,7 @@ export class GradingEngineService {
       subjectRows.sort((a, b) => a.subject.localeCompare(b.subject));
       subjectPctByStudent.set(sid, pctMap);
 
-      const marked = subjectRows.filter((r) => r.hasComponentMarks);
-      const overallScore = percentageFromTotalMarks(
-        marked.map((subject) => ({
-          totalScore: subject.totalScore,
-          totalMax: subject.totalMax,
-          hasComponentMarks: subject.hasComponentMarks,
-        }))
-      );
+      const overallScore = overallPercentageFromSubjects(subjectRows, stageOnly, stageOnly);
 
       reports.set(sid, {
         subjects: subjectRows,
@@ -1661,9 +1700,8 @@ export class GradingEngineService {
       }
     }
 
-    const minCovered = Math.max(1, Math.ceil(subjectIds.length * RANK_MIN_SUBJECT_COVERAGE));
     const overallEligible = [...reports.entries()]
-      .filter(([, rep]) => rep.subjects.filter((s) => s.hasComponentMarks).length >= minCovered)
+      .filter(([, rep]) => rep.subjects.some((s) => s.hasComponentMarks))
       .map(([sid, rep]) => ({ sid, score: rep.overallScore }));
     const overallRankMap = this.rankWithTies(overallEligible, (r) => r.score);
     for (const [sid, rep] of reports) {
@@ -2162,7 +2200,11 @@ export class GradingEngineService {
 
     const generatedAt = new Date().toISOString();
     const summaries = [...classReports.entries()].map(([studentId, report]) => {
-      const avg = Math.round(report.overallScore * 100) / 100;
+      /** Stage reports display pooled teacher marks, so their percentage must use the same basis. */
+      const stageAverage = midTermOnly || beginningOnly
+        ? overallPercentageFromSubjects(report.subjects, true, true)
+        : null;
+      const avg = Math.round((stageAverage ?? report.overallScore) * 100) / 100;
       const gradeEntry = this.matchGradeScale(avg, gradingScale);
       const hasMarks = report.subjects.some((s) => s.hasComponentMarks);
       const g = (gradeEntry?.grade ?? '').toUpperCase();
@@ -2173,7 +2215,7 @@ export class GradingEngineService {
       return {
         studentId,
         average: avg,
-        position: report.overallRank || null,
+        position: null as number | null,
         classSize: report.overallClassSize,
         overallGrade: gradeEntry?.grade ?? null,
         result,
@@ -2182,7 +2224,512 @@ export class GradingEngineService {
       };
     });
 
+    const ranked = summaries
+      .filter((s) => s.hasMarks)
+      .sort((a, b) => b.average - a.average);
+    let lastAvg: number | null = null;
+    let lastRank = 0;
+    ranked.forEach((s, i) => {
+      const a = Math.round(s.average * 100) / 100;
+      if (lastAvg === null || a !== lastAvg) {
+        lastRank = i + 1;
+        lastAvg = a;
+      }
+      s.position = lastRank;
+    });
+    const rankedSize = ranked.length || 1;
+    for (const s of summaries) s.classSize = rankedSize;
+
     return { summaries, generatedAt };
+  }
+
+  private static readonly REPORT_ANALYSIS_STATUSES: Record<ReportAnalysisStatusFilter, string[]> = {
+    all: ['OPEN', 'MARK_ENTRY', 'SUBMITTED', 'REVIEWED', 'APPROVED', 'LOCKED'],
+    in_progress: ['OPEN', 'MARK_ENTRY'],
+    submitted: ['SUBMITTED', 'REVIEWED'],
+    approved: ['APPROVED', 'LOCKED'],
+  };
+
+  /**
+   * Same report pipeline as getClassReportSummaries, but keeps per-course rows so the
+   * analysis page can show course averages, missing marks and student detail.
+   */
+  private async buildReportAnalysisDataset(
+    organizationId: string,
+    classId: string,
+    academicYear: string,
+    term: string | undefined,
+    reportKind: 'standard' | 'midterm' | 'beginning',
+    status: ReportAnalysisStatusFilter
+  ) {
+    const midTermOnly = reportKind === 'midterm';
+    const beginningOnly = reportKind === 'beginning';
+    const cls = await resolveAcademicClass(organizationId, { classId });
+    if (!cls) throw new AppError(404, 'Class not found');
+
+    const assessmentWhere: Record<string, unknown> = {
+      organizationId,
+      classId: cls.id,
+      academicYear,
+      status: { in: GradingEngineService.REPORT_ANALYSIS_STATUSES[status] },
+    };
+    if (term) assessmentWhere.term = term;
+
+    let assessments = await prisma.assessment.findMany({
+      where: assessmentWhere,
+      include: { subject: true, component: true, marks: true },
+      orderBy: [{ assessmentDate: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    const roster = await smListStudents(organizationId, { classId, academicYear })
+      .then((rows) =>
+        (Array.isArray(rows) ? rows : []).map((r: any) => ({
+          id: String(r.id),
+          firstName: r.firstName ?? '',
+          lastName: r.lastName ?? '',
+          admissionNo: r.studentCode || r.studentUid || null,
+        }))
+      );
+
+    const classLabel = [cls.name, cls.stream].filter(Boolean).join(' ').trim();
+    const base = {
+      cls,
+      classLabel,
+      roster,
+      rows: new Map<string, { average: number; hasMarks: boolean; subjects: Map<string, { percentage: number; marksEntered: boolean }> }>(),
+      positions: new Map<string, number>(),
+      rankedSize: 0,
+      subjectMeta: new Map<string, { name: string; teacherId: string | null }>(),
+      accounted: new Set<string>(),
+      assessmentCount: 0,
+    };
+    if (!assessments.length) return base;
+
+    const primaryTemplateId = await this.resolveReportTemplateId(
+      organizationId,
+      cls.id,
+      academicYear,
+      term ?? assessments[0]?.term,
+      assessments.map((a) => a.templateId)
+    );
+    const templateMeta = primaryTemplateId
+      ? await prisma.assessmentTemplate.findUnique({
+          where: { id: primaryTemplateId },
+          include: { components: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } } },
+        })
+      : null;
+    const defaultCourseMarks = Math.max(1, Number(templateMeta?.defaultCourseMarks ?? 100));
+    let templateComponents =
+      templateMeta?.components.map((c) => ({
+        name: c.name,
+        weightPercentage: Number(c.weightPercentage ?? 0),
+        maxMark: Number(c.maxMark ?? 0),
+        sortOrder: c.sortOrder,
+        code: c.code,
+        reportingStage: c.reportingStage,
+      })) ?? [];
+
+    if (midTermOnly || beginningOnly) {
+      assessments = filterAssessmentsByReportingStage(assessments as any, { midTermOnly, beginningOnly }, isLegacyContinuousForMidTerm) as any;
+      templateComponents = filterTemplateComponentsForStage(templateComponents, midTermOnly ? 'MID_TERM' : 'BEGINNING_TERM');
+    }
+    base.assessmentCount = assessments.length;
+    if (!assessments.length) return base;
+
+    for (const a of assessments) {
+      const existing = base.subjectMeta.get(a.subjectId);
+      if (!existing) {
+        base.subjectMeta.set(a.subjectId, { name: a.subject.name, teacherId: a.createdBy ?? null });
+      } else if (!existing.teacherId && a.createdBy) {
+        existing.teacherId = a.createdBy;
+      }
+      for (const m of a.marks) {
+        const scored = m.markStatus === 'PRESENT' && m.score != null;
+        if (scored || m.markStatus !== 'PRESENT') base.accounted.add(`${m.studentId}|${a.subjectId}`);
+      }
+    }
+
+    const { subjectDefaultMarks } = await resolveSubjectDefaults(
+      organizationId,
+      cls.id,
+      academicYear,
+      term ?? assessments[0]?.term,
+      cls,
+      assessments
+    );
+    const classReports = this.buildClassSubjectReportsFromAssessments(assessments, {
+      defaultCourseMarks,
+      subjectDefaultMarks,
+      templateComponents,
+      stageOnly: midTermOnly || beginningOnly,
+    });
+    for (const [studentId, report] of classReports.entries()) {
+      const stageAverage = midTermOnly || beginningOnly
+        ? overallPercentageFromSubjects(report.subjects, true, true)
+        : null;
+      const subjects = new Map<string, { percentage: number; marksEntered: boolean }>();
+      for (const s of report.subjects) {
+        subjects.set(s.subjectId, {
+          percentage: roundPct(Number(s.percentage) || 0),
+          marksEntered: Boolean((s as { marksEntered?: boolean }).marksEntered ?? s.hasComponentMarks),
+        });
+      }
+      base.rows.set(studentId, {
+        average: roundPct(stageAverage ?? report.overallScore),
+        hasMarks: report.subjects.some((s) => s.hasComponentMarks),
+        subjects,
+      });
+    }
+
+    const ranked = [...base.rows.entries()]
+      .filter(([, r]) => r.hasMarks)
+      .sort((a, b) => b[1].average - a[1].average);
+    let lastAvg: number | null = null;
+    let lastRank = 0;
+    ranked.forEach(([id, r], i) => {
+      if (lastAvg === null || r.average !== lastAvg) {
+        lastRank = i + 1;
+        lastAvg = r.average;
+      }
+      base.positions.set(id, lastRank);
+    });
+    base.rankedSize = ranked.length;
+    return base;
+  }
+
+  async getReportAnalysis(
+    organizationId: string,
+    input: {
+      classId: string;
+      academicYear: string;
+      term?: string;
+      reportKind: 'standard' | 'midterm' | 'beginning';
+      status: ReportAnalysisStatusFilter;
+    }
+  ) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { organizationId },
+      select: { reportAnalysisSettings: true },
+    });
+    const settings: ReportAnalysisSettings = parseReportAnalysisSettings(tenant?.reportAnalysisSettings);
+    const threshold = settings.atRiskBelow;
+    const bands = settings.bands;
+
+    const current = await this.buildReportAnalysisDataset(
+      organizationId, input.classId, input.academicYear, input.term, input.reportKind, input.status
+    );
+
+    // Compare only with an earlier stage that has marks and has been published for this term.
+    const previousKind = input.reportKind === 'standard' ? 'midterm' : input.reportKind === 'midterm' ? 'beginning' : null;
+    let previous: typeof current | null = null;
+    if (previousKind && input.term) {
+      const candidate = await this.buildReportAnalysisDataset(
+        organizationId, input.classId, input.academicYear, input.term, previousKind, input.status
+      );
+      if (candidate.rows.size > 0 && candidate.cls) {
+        const published = await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count FROM report_card_publications
+          WHERE organization_id = ${organizationId}
+            AND class_id = ${candidate.cls.id}
+            AND academic_year = ${input.academicYear}
+            AND term = ${input.term}
+            AND report_kind = ${previousKind}
+        `;
+        if (Number(published[0]?.count ?? 0) > 0) previous = candidate;
+      }
+    }
+
+    const rosterById = new Map(current.roster.map((r) => [r.id, r]));
+    const allIds = new Set<string>([...current.roster.map((r) => r.id), ...current.rows.keys()]);
+    const subjectIds = [...current.subjectMeta.keys()];
+
+    const students = [...allIds].map((id) => {
+      const roster = rosterById.get(id);
+      const row = current.rows.get(id);
+      const subjects = subjectIds.map((sid) => {
+        const name = current.subjectMeta.get(sid)!.name;
+        const entry = row?.subjects.get(sid);
+        if (entry?.marksEntered) {
+          return { subjectId: sid, subject: name, percentage: entry.percentage, status: 'entered' as const };
+        }
+        if (current.accounted.has(`${id}|${sid}`)) {
+          return { subjectId: sid, subject: name, percentage: null, status: 'absent' as const };
+        }
+        return { subjectId: sid, subject: name, percentage: null, status: 'missing' as const };
+      });
+      const entered = subjects.filter((s): s is typeof s & { percentage: number } => s.status === 'entered' && s.percentage != null);
+      const below = entered.filter((s) => s.percentage < threshold).sort((a, b) => a.percentage - b.percentage);
+      const average = row?.hasMarks ? row.average : null;
+      const prevRow = previous?.rows.get(id);
+      const previousAverage = prevRow?.hasMarks ? prevRow.average : null;
+      const delta = average != null && previousAverage != null ? roundPct(average - previousAverage) : null;
+      const band = average != null ? bandForAverage(average, bands) : null;
+      const best = [...entered].sort((a, b) => b.percentage - a.percentage)[0] ?? null;
+      return {
+        studentId: id,
+        name: roster ? [roster.firstName, roster.lastName].filter(Boolean).join(' ') || 'Student' : 'Student',
+        admissionNo: roster?.admissionNo ?? null,
+        classLabel: current.classLabel,
+        average,
+        position: average != null ? current.positions.get(id) ?? null : null,
+        classSize: current.rankedSize,
+        band: band ? { label: band.label, color: band.color, min: band.min } : null,
+        coursesAssessed: entered.length,
+        coursesBelow: below.length,
+        missingCourses: subjects.filter((s) => s.status === 'missing').length,
+        weakCourses: below.map((s) => subjects.find((x) => x.subjectId === s.subjectId)?.subject ?? ''),
+        bestCourse: best ? { subject: subjects.find((x) => x.subjectId === best.subjectId)?.subject ?? '', percentage: best.percentage } : null,
+        previousAverage,
+        delta,
+        subjects,
+      };
+    });
+
+    students.sort((a, b) => a.name.localeCompare(b.name));
+    const assessed = students.filter((s) => s.average != null);
+    const bandOf = (s: { average: number | null }) => (s.average != null ? bandForAverage(s.average, bands).min : null);
+
+    const distribution = bands.map((b) => {
+      const count = assessed.filter((s) => bandOf(s) === b.min).length;
+      return {
+        label: b.label,
+        color: b.color,
+        min: b.min,
+        count,
+        percent: assessed.length ? roundPct((count / assessed.length) * 100) : 0,
+      };
+    });
+    const goodCount = assessed.filter((s) => {
+      const idx = bands.findIndex((b) => b.min === bandOf(s));
+      return idx >= 0 && idx < 2;
+    }).length;
+    const needsCount = assessed.filter((s) => (s.average ?? 0) < threshold).length;
+    const classAverage = meanOf(assessed.map((s) => s.average as number));
+
+    const courseSamples = new Map<string, Array<{ studentId: string; name: string; status: string; percentage: number | null }>>();
+    for (const s of students) {
+      for (const sub of s.subjects) {
+        const list = courseSamples.get(sub.subjectId) ?? [];
+        list.push({ studentId: s.studentId, name: s.name, status: sub.status, percentage: sub.percentage });
+        courseSamples.set(sub.subjectId, list);
+      }
+    }
+
+    const previousCourseAverage = (sid: string) => {
+      if (!previous) return null;
+      const vals: number[] = [];
+      for (const r of previous.rows.values()) {
+        const e = r.subjects.get(sid);
+        if (e?.marksEntered) vals.push(e.percentage);
+      }
+      return meanOf(vals);
+    };
+
+    const teacherIds = [...new Set([...current.subjectMeta.values()].map((m) => m.teacherId).filter((x): x is string => Boolean(x)))];
+    const teacherNames = new Map<string, string>();
+    await Promise.all(
+      teacherIds.map(async (id) => {
+        const user = await fetchIamUser(id).catch(() => null);
+        const name = user ? user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') : '';
+        if (name) teacherNames.set(id, name);
+      })
+    );
+
+    const courses = subjectIds.map((sid) => {
+      const meta = current.subjectMeta.get(sid)!;
+      const samples = courseSamples.get(sid) ?? [];
+      const entered = samples.filter((x) => x.status === 'entered' && x.percentage != null) as Array<{ studentId: string; name: string; status: string; percentage: number }>;
+      const pcts = entered.map((x) => x.percentage);
+      const average = meanOf(pcts);
+      const prevAvg = previousCourseAverage(sid);
+      const dist = bands.map((b, idx) => {
+        const lower = b.min;
+        const upper = idx === 0 ? Infinity : bands[idx - 1].min;
+        return {
+          label: b.label,
+          color: b.color,
+          count: pcts.filter((p) => p >= lower && (idx === 0 ? true : p < upper)).length,
+        };
+      });
+      return {
+        subjectId: sid,
+        subject: meta.name,
+        teacherId: meta.teacherId,
+        teacherName: meta.teacherId ? teacherNames.get(meta.teacherId) ?? null : null,
+        average,
+        band: average != null ? bandForAverage(average, bands) : null,
+        highest: pcts.length ? roundPct(Math.max(...pcts)) : null,
+        lowest: pcts.length ? roundPct(Math.min(...pcts)) : null,
+        assessed: entered.length,
+        above: pcts.filter((p) => p >= threshold).length,
+        below: pcts.filter((p) => p < threshold).length,
+        missing: samples.filter((x) => x.status === 'missing').length,
+        absent: samples.filter((x) => x.status === 'absent').length,
+        distribution: dist,
+        needsImprovement: entered
+          .filter((x) => x.percentage < threshold)
+          .sort((a, b) => a.percentage - b.percentage)
+          .map((x) => ({ studentId: x.studentId, name: x.name, percentage: x.percentage })),
+        previousAverage: prevAvg,
+        delta: average != null && prevAvg != null ? roundPct(average - prevAvg) : null,
+      };
+    });
+    courses.sort((a, b) => a.subject.localeCompare(b.subject));
+
+    const previousClassAverage = previous
+      ? meanOf([...previous.rows.values()].filter((r) => r.hasMarks).map((r) => r.average))
+      : null;
+    const deltas = students.filter((s) => s.delta != null) as Array<(typeof students)[number] & { delta: number }>;
+
+    const byAverageDesc = [...assessed].sort((a, b) => (b.average ?? 0) - (a.average ?? 0));
+    const lists = {
+      topPerformers: byAverageDesc.slice(0, 10),
+      consistentPerformers: byAverageDesc.filter((s) => s.coursesAssessed >= 2 && s.coursesBelow === 0).slice(0, 10),
+      bestImprovement: deltas.filter((s) => s.delta >= settings.trendDelta).sort((a, b) => b.delta - a.delta).slice(0, 10),
+      declining: deltas.filter((s) => s.delta <= -settings.trendDelta).sort((a, b) => a.delta - b.delta).slice(0, 10),
+      needsImprovement: assessed.filter((s) => (s.average ?? 0) < threshold).sort((a, b) => (a.average ?? 0) - (b.average ?? 0)),
+      weakestCourses: courses.filter((c) => c.average != null).sort((a, b) => (a.average ?? 0) - (b.average ?? 0)).slice(0, 5),
+      missingAssessments: students.filter((s) => s.missingCourses > 0).sort((a, b) => b.missingCourses - a.missingCourses),
+    };
+
+    return {
+      period: {
+        academicYear: input.academicYear,
+        term: input.term ?? null,
+        reportKind: input.reportKind,
+        status: input.status,
+        classId: current.cls?.id ?? input.classId,
+        classLabel: current.classLabel,
+        assessmentCount: current.assessmentCount,
+      },
+      settings,
+      summary: {
+        totalStudents: allIds.size,
+        assessedStudents: assessed.length,
+        classAverage,
+        goodPerformers: goodCount,
+        goodPercent: assessed.length ? roundPct((goodCount / assessed.length) * 100) : 0,
+        needsImprovement: needsCount,
+        needsImprovementPercent: assessed.length ? roundPct((needsCount / assessed.length) * 100) : 0,
+        missingMarksStudents: students.filter((s) => s.missingCourses > 0).length,
+        courseCount: courses.length,
+      },
+      distribution,
+      comparison: previous
+        ? {
+            previousReportKind: previousKind,
+            previousClassAverage,
+            classAverageDelta:
+              classAverage != null && previousClassAverage != null ? roundPct(classAverage - previousClassAverage) : null,
+            improvedStudents: deltas.filter((s) => s.delta >= settings.trendDelta).length,
+            declinedStudents: deltas.filter((s) => s.delta <= -settings.trendDelta).length,
+          }
+        : null,
+      courses,
+      students,
+      lists,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Compare one report stage across parallel classes (same class name, different streams).
+   * Uses the same dataset builder, so marks are never mixed across report types.
+   */
+  async getReportAnalysisClassComparison(
+    organizationId: string,
+    input: {
+      classIds: string[];
+      academicYear: string;
+      term?: string;
+      reportKind: 'standard' | 'midterm' | 'beginning';
+      status: ReportAnalysisStatusFilter;
+    }
+  ) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { organizationId },
+      select: { reportAnalysisSettings: true },
+    });
+    const settings: ReportAnalysisSettings = parseReportAnalysisSettings(tenant?.reportAnalysisSettings);
+    const bands = settings.bands;
+    const ids = [...new Set(input.classIds.filter(Boolean))].slice(0, 20);
+
+    const rows = (
+      await Promise.all(
+        ids.map(async (classId) => {
+          const dataset = await this.buildReportAnalysisDataset(
+            organizationId,
+            classId,
+            input.academicYear,
+            input.term,
+            input.reportKind,
+            input.status
+          );
+          if (!dataset?.cls) return null;
+          const assessed = [...dataset.rows.values()].filter((r) => r.hasMarks);
+          const average = meanOf(assessed.map((r) => r.average));
+          const good = assessed.filter((r) => {
+            const idx = bands.findIndex((b) => b.min === bandForAverage(r.average, bands).min);
+            return idx >= 0 && idx < 2;
+          }).length;
+          return {
+            classId: dataset.cls.id,
+            classLabel: dataset.classLabel,
+            average,
+            band: average != null ? bandForAverage(average, bands) : null,
+            assessed: assessed.length,
+            students: dataset.roster.length,
+            good,
+            below: assessed.filter((r) => r.average < settings.atRiskBelow).length,
+          };
+        })
+      )
+    ).filter((c): c is NonNullable<typeof c> => Boolean(c));
+
+    rows.sort((a, b) => (b.average ?? -1) - (a.average ?? -1));
+    return { settings, classes: rows, generatedAt: new Date().toISOString() };
+  }
+
+  /**
+   * Per-student, per-subject percentages for nursery reports. Reuses the report-card
+   * assessment pipeline so nursery reports never duplicate or re-enter marks.
+   */
+  async getNurserySubjectMarks(
+    organizationId: string,
+    classId: string,
+    academicYear: string,
+    term?: string,
+    reportKind: 'standard' | 'midterm' | 'beginning' = 'standard'
+  ) {
+    const dataset = await this.buildReportAnalysisDataset(
+      organizationId,
+      classId,
+      academicYear,
+      term,
+      reportKind,
+      'all'
+    );
+    const subjects = [...dataset.subjectMeta.entries()]
+      .map(([subjectId, meta]) => ({ subjectId, subject: meta.name }))
+      .sort((a, b) => a.subject.localeCompare(b.subject));
+
+    const marks: Record<string, Record<string, number | null>> = {};
+    for (const [studentId, row] of dataset.rows.entries()) {
+      const perSubject: Record<string, number | null> = {};
+      for (const subject of subjects) {
+        const entry = row.subjects.get(subject.subjectId);
+        perSubject[subject.subjectId] = entry?.marksEntered ? entry.percentage : null;
+      }
+      marks[studentId] = perSubject;
+    }
+
+    return {
+      classLabel: dataset.classLabel,
+      academicClassId: dataset.cls?.id ?? null,
+      subjects,
+      marks,
+      assessmentCount: dataset.assessmentCount,
+    };
   }
 
   /**

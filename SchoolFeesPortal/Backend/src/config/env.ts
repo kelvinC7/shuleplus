@@ -34,6 +34,18 @@ export const env = {
   ACADEMIC_API_URL: process.env.ACADEMIC_API_URL ?? 'http://localhost:3003/api',
   PAYMENT_PORTAL_URL: process.env.PAYMENT_PORTAL_URL ?? 'http://localhost:3000/pay-fees',
   FEES_PORTAL_URL: process.env.FEES_PORTAL_URL ?? process.env.CORS_ORIGIN ?? 'http://localhost:3015',
+  PAYMENT_AUTH_URL:
+    process.env.PAYMENT_AUTH_URL ?? 'http://localhost:3001/api/v1/developers/oauth/token',
+  PAYMENT_VALIDATION_URL:
+    process.env.PAYMENT_VALIDATION_URL ?? 'http://localhost:3014/api/integrations/payments/validate',
+  PAYMENT_NOTIFICATION_URL:
+    process.env.PAYMENT_NOTIFICATION_URL ?? 'http://localhost:3014/api/integrations/payments/notify',
+  PAYMENT_REVERSAL_URL:
+    process.env.PAYMENT_REVERSAL_URL ?? 'http://localhost:3014/api/integrations/payments/reverse',
+  PAYMENT_CALLBACK_URL:
+    process.env.PAYMENT_CALLBACK_URL ?? 'http://localhost:3014/api/integrations/payments/callback',
+  PAYMENT_INTEGRATION_API_KEY:
+    process.env.PAYMENT_INTEGRATION_API_KEY ?? '',
 } as const;
 
 export function receiptPublicUrl(receiptNumber: string) {

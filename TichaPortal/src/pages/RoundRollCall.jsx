@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -34,6 +34,8 @@ import { normalizeGradebookLabel } from '../utils/teacherGradebookUi';
 import { getSchoolDateIso } from '../utils/schoolTime';
 import TablePagination from '../components/TablePagination';
 import { brand } from '../theme/theme';
+import { NavyStats, PageTitleRow } from '../components/ListPageKit';
+import { RollStartModal } from '../components/AttendanceModals';
 
 function normalizeRollLabel(s) {
     return String(s ?? '').trim().slice(0, 160);
@@ -45,8 +47,7 @@ function validDateParam(value) {
 }
 
 export default function RoundRollCall() {
-    const { pathname } = useLocation();
-    const [searchParams] = useSearchParams();
+        const [searchParams] = useSearchParams();
     const requestedClass = searchParams.get('className') || searchParams.get('class_name') || '';
     const requestedDate = searchParams.get('date') || '';
     const requestedRollName = searchParams.get('rollName') || searchParams.get('roll_label') || '';
@@ -76,6 +77,7 @@ export default function RoundRollCall() {
     const [historyLoading, setHistoryLoading] = useState(false);
 
     const [viewSession, setViewSession] = useState(null);
+    const [startOpen, setStartOpen] = useState(() => !requestedClass && !requestedRollName);
 
     const shiftDateByDays = (delta) => {
         const d = new Date(selectedDate + 'T12:00:00');
@@ -113,9 +115,13 @@ export default function RoundRollCall() {
         setSelectedClass(match || '');
     }, [classes, requestedClass]);
 
-    const lessonContext = [requestedSubject, requestedPeriod].filter(Boolean).join(' ┬À ');
-    const isPeriodAttendance =
-        pathname === '/period-attendance' || Boolean(requestedSubject || requestedPeriod);
+    useEffect(() => {
+        if (tab === 'take' && !selectedClass && !rollName.trim()) setStartOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
+
+    const lessonContext = [requestedSubject, requestedPeriod].filter(Boolean).join(' · ');
+    const isPeriodAttendance = false; // this page is Round Roll Call only; period attendance lives in PeriodAttendance.jsx
     const attendanceName = isPeriodAttendance ? 'attendance' : 'roll';
     const requestedClassMissing =
         Boolean(requestedClass) &&
@@ -246,7 +252,7 @@ export default function RoundRollCall() {
         if (!rollLabelNorm) {
             return alert(
                 isPeriodAttendance
-                    ? 'Enter an attendance name (e.g. Mathematics ┬À P4).'
+                    ? 'Enter an attendance name (e.g. Mathematics · P4).'
                     : 'Enter a roll name (e.g. Morning Prep).'
             );
         }
@@ -285,7 +291,7 @@ export default function RoundRollCall() {
                 records,
             });
             if (res.data.success) {
-                alert(`Saved ÔÇ£${rollLabelNorm}ÔÇØ ${attendanceName} for ${selectedClass}.`);
+                alert(`Saved “${rollLabelNorm}” ${attendanceName} for ${selectedClass}.`);
                 const sr = await api.get('/teacher-portal/round-roll-call/sessions', {
                     params: { class_name: cn, date: selectedDate },
                 });
@@ -431,7 +437,7 @@ export default function RoundRollCall() {
                                     <TextField
                                         size="small"
                                         fullWidth
-                                        placeholder={isPeriodAttendance ? 'SearchÔÇª' : 'SearchÔÇª'}
+                                        placeholder={isPeriodAttendance ? 'Search…' : 'Search…'}
                                         value={historyQ}
                                         onChange={(e) => setHistoryQ(e.target.value)}
                                         InputProps={{
@@ -529,7 +535,7 @@ export default function RoundRollCall() {
                                     {viewSession?.roll_label}
                                 </Typography>
                                 <Typography noWrap sx={{ fontSize: 11, color: '#64748B' }}>
-                                    {[viewSession?.class_name, viewSession?.date, viewSession?.teacher_name].filter(Boolean).join(' ┬À ')}
+                                    {[viewSession?.class_name, viewSession?.date, viewSession?.teacher_name].filter(Boolean).join(' · ')}
                                 </Typography>
                             </Box>
                         </Stack>
@@ -590,7 +596,7 @@ export default function RoundRollCall() {
                                     <TextField
                                         size="small"
                                         fullWidth
-                                        placeholder="Search studentÔÇª"
+                                        placeholder="Search student…"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         InputProps={{
@@ -614,12 +620,12 @@ export default function RoundRollCall() {
                 {lessonContext && tab === 'take' ? (
                     <Alert severity="info" sx={{ borderRadius: 1 }}>
                         Lesson: {lessonContext}
-                        {requestedClass ? ` ┬À ${requestedClass}` : ''}
+                        {requestedClass ? ` · ${requestedClass}` : ''}
                     </Alert>
                 ) : null}
                 {requestedClassMissing && tab === 'take' ? (
                     <Alert severity="warning" sx={{ borderRadius: 1 }}>
-                        Could not match ÔÇ£{requestedClass}ÔÇØ to a class. Choose the correct class above.
+                        Could not match “{requestedClass}” to a class. Choose the correct class above.
                     </Alert>
                 ) : null}
                 {readOnly && tab === 'take' ? (
@@ -630,48 +636,27 @@ export default function RoundRollCall() {
                     </Alert>
                 ) : null}
 
-                {/* Navy squarish stats */}
+                {tab === 'take' && (
+                    <PageTitleRow
+                        title={rollLabelNorm ? `${rollLabelNorm}${selectedClass ? ` · ${selectedClass}` : ''}` : 'Round roll call'}
+                        subtitle={selectedDate}
+                        actions={
+                            <Button variant="outlined" onClick={() => setStartOpen(true)} disabled={readOnly} sx={{ borderColor: brand.border, fontWeight: 700, textTransform: 'none' }}>
+                                Change roll
+                            </Button>
+                        }
+                    />
+                )}
+
                 {(tab === 'take' || tab === 'view') && (
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(2, 1fr)',
-                            gap: 0,
-                            border: `1px solid ${brand.navy}`,
-                            overflow: 'hidden',
-                        }}
-                    >
-                        {[
+                    <NavyStats
+                        stats={[
                             { label: 'Class size', value: stats.total },
                             { label: 'Present', value: stats.present },
                             { label: 'Absent', value: stats.absent },
                             { label: 'Excused', value: stats.excused },
-                        ].map((s, i) => (
-                            <Box
-                                key={s.label}
-                                sx={{
-                                    bgcolor: brand.navy,
-                                    color: '#fff',
-                                    px: 1.75,
-                                    py: 1.5,
-                                    minHeight: 84,
-                                    borderRadius: 0,
-                                    borderRight: i % 2 === 0 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                }}
-                            >
-                                <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.65)' }}>
-                                    {s.label}
-                                </Typography>
-                                <Typography sx={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-                                    {s.value}
-                                </Typography>
-                            </Box>
-                        ))}
-                    </Box>
+                        ]}
+                    />
                 )}
 
                 {tab === 'take' && sessions.length > 0 && (
@@ -743,7 +728,7 @@ export default function RoundRollCall() {
                                                 <TableCell sx={cellSx}>{row.roll_label}</TableCell>
                                                 <TableCell sx={cellSx}>{row.class_name}</TableCell>
                                                 <TableCell sx={{ ...cellSx, display: { xs: 'none', sm: 'table-cell' }, color: '#64748B' }}>
-                                                    {row.teacher_name || 'ÔÇö'}
+                                                    {row.teacher_name || '—'}
                                                 </TableCell>
                                                 <TableCell sx={cellSx} align="center">{row.present}</TableCell>
                                                 <TableCell sx={cellSx} align="center">{row.absent}</TableCell>
@@ -811,6 +796,20 @@ export default function RoundRollCall() {
                     </Paper>
                 )}
             </Stack>
+
+            <RollStartModal
+                open={startOpen && tab === 'take'}
+                onClose={() => setStartOpen(false)}
+                date={selectedDate}
+                onDateChange={setSelectedDate}
+                classes={classes}
+                initialClass={selectedClass}
+                onStart={({ className, rollName: name }) => {
+                    setSelectedClass(className);
+                    setRollName(name);
+                    setStartOpen(false);
+                }}
+            />
 
             {tab === 'take' && !readOnly && (
                 <Box
@@ -946,7 +945,7 @@ function RosterTable({
                             </TableCell>
                             <TableCell sx={{ ...cellSx, display: { xs: 'none', md: 'table-cell' }, minWidth: 120 }}>
                                 {rosterReadOnly ? (
-                                    <Typography sx={{ fontSize: 12, color: '#64748B' }}>{student.remarks || 'ÔÇö'}</Typography>
+                                    <Typography sx={{ fontSize: 12, color: '#64748B' }}>{student.remarks || '—'}</Typography>
                                 ) : (
                                     <TextField
                                         size="small"

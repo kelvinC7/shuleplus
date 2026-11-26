@@ -114,11 +114,14 @@ export function weightedTermAveragePct(
 
 /** Overall percentage from earned marks divided by the corresponding total possible marks. */
 export function percentageFromTotalMarks(
-  subjects: Array<{ totalScore: number; totalMax: number; marksEntered?: boolean; hasComponentMarks?: boolean }>
+  subjects: Array<{ totalScore: number; totalMax: number; marksEntered?: boolean; hasComponentMarks?: boolean }>,
+  includeUnmarkedSubjects = false
 ): number {
-  const marked = subjects.filter((s) => s.marksEntered ?? s.hasComponentMarks);
-  const totalScore = marked.reduce((sum, s) => sum + s.totalScore, 0);
-  const totalMax = marked.reduce((sum, s) => sum + s.totalMax, 0);
+  const includedSubjects = includeUnmarkedSubjects
+    ? subjects
+    : subjects.filter((s) => s.marksEntered ?? s.hasComponentMarks);
+  const totalScore = includedSubjects.reduce((sum, s) => sum + s.totalScore, 0);
+  const totalMax = includedSubjects.reduce((sum, s) => sum + s.totalMax, 0);
   return totalMax > 0 ? Math.round((totalScore / totalMax) * 10000) / 100 : 0;
 }
 

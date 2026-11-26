@@ -193,11 +193,60 @@ export function deriveResult(report: ReportCardDataV2): ReportResultStatus {
   return pct >= 50 ? 'PASS' : 'FAIL';
 }
 
+/**
+ * Percentage from the marks actually printed on the report card:
+ * Σ(student marks on DEFAULT for assessed subjects) ÷ Σ(course DEFAULT for those subjects) × 100.
+ * Mid-term / beginning reports must use this so the summary card and the table agree.
+ */
+export function displayedOverallPercentage(report: ReportCardDataV2): number | null {
+  const stageReport = isStageReport(report);
+  const included = report.subjects.filter((s) =>
+    stageReport
+      ? s.assessedInReportPeriod === true ||
+        (s.assessedInReportPeriod == null && s.marksEntered)
+      : s.marksEntered
+  );
+  if (!included.length) return null;
+  let scored = 0;
+  let total = 0;
+  for (const s of included) {
+    /** Report cards print marks to 1 decimal; use those same rounded values. */
+    const marks = s.marksEntered
+      ? Math.round(Number(s.studentMarksOnDefault ?? s.totalScore) * 10) / 10
+      : 0;
+    const max = Math.round(Number(s.totalMax ?? s.defaultCourseMarks ?? 0) * 10) / 10;
+    if (!Number.isFinite(marks) || !Number.isFinite(max) || max <= 0) continue;
+    scored += marks;
+    total += max;
+  }
+  return total > 0 ? Math.round((scored / total) * 10000) / 100 : null;
+}
+
+export function isStageReport(report: ReportCardDataV2): boolean {
+  return report.reportKind === 'midterm' || report.reportKind === 'beginning';
+}
+
+/** Competition ranking (1, 1, 3) from the percentage shown to the user. */
+export function competitionRank(
+  rows: Array<{ average?: number | null; hasMarks?: boolean }>,
+  score: number | null | undefined
+): { position: number | null; classSize: number | null } {
+  if (score == null || !Number.isFinite(score)) return { position: null, classSize: null };
+  const eligible = rows.filter(
+    (r) => r.hasMarks !== false && r.average != null && Number.isFinite(Number(r.average))
+  );
+  if (!eligible.length) return { position: null, classSize: null };
+  const rounded = Math.round(score * 100) / 100;
+  const better = eligible.filter((r) => Math.round(Number(r.average) * 100) / 100 > rounded).length;
+  return { position: better + 1, classSize: eligible.length };
+}
+
 export function summaryFromReport(report: ReportCardDataV2): ReportStudentSummary {
   const entered = report.subjects.filter((s) => s.marksEntered).length;
+  const stagePct = isStageReport(report) ? displayedOverallPercentage(report) : null;
   return {
     studentId: report.student?.id ?? '',
-    average: report.summary?.currentTermAverage ?? report.overallScore ?? null,
+    average: stagePct ?? report.overallScore ?? report.summary?.currentTermAverage ?? null,
     position: report.position ?? null,
     classSize: report.classSize ?? null,
     result: deriveResult(report),

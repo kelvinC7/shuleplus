@@ -53,6 +53,12 @@ router.get('/public/report-cards/verify', (req, res, next) =>
 
 router.get('/public/parents/auth/status', (req, res, next) => authController.status(req, res, next));
 router.post('/public/parents/auth/login', (req, res, next) => authController.login(req, res, next));
+router.post('/public/parents/auth/request-reset-otp', (req, res, next) =>
+  authController.requestPinResetOtp(req, res, next)
+);
+router.post('/public/parents/auth/verify-reset-otp', (req, res, next) =>
+  authController.verifyPinResetOtp(req, res, next)
+);
 router.post('/public/parents/auth/set-password', (req, res, next) =>
   authController.setPassword(req, res, next)
 );

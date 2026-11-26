@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Paper from '@mui/material/Paper';
+import InputBase from '@mui/material/InputBase';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
@@ -12,25 +12,30 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
-import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
-import GroupsIcon from '@mui/icons-material/Groups';
-import EventIcon from '@mui/icons-material/Event';
-import DateRangeIcon from '@mui/icons-material/DateRange';
 import PersonIcon from '@mui/icons-material/Person';
 import api from '../services/api';
 import { formatSchoolTime, getSchoolDateIso } from '../utils/schoolTime';
-import { Page, EmptyState } from '../components/ui';
+import { EmptyState } from '../components/ui';
+import {
+  ListPage,
+  StickyFilterBar,
+  BarSelect,
+  ListPageBody,
+  PageTitleRow,
+  NavyStats,
+  SectionPaper,
+  headCellSx,
+  cellSx,
+} from '../components/ListPageKit';
 import { brand } from '../theme/theme';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -115,6 +120,7 @@ export default function ClassStudentsAttendance() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetail, setStudentDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [query, setQuery] = useState('');
 
   const loadClasses = useCallback(async () => {
     setLoadingClasses(true);
@@ -226,148 +232,150 @@ export default function ClassStudentsAttendance() {
     }
   }, [className]);
 
-  const tableHeadSx = {
-    fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
-    color: '#64748B', bgcolor: '#F8FAFC', borderBottom: `1px solid ${brand.border}`,
-    whiteSpace: 'nowrap', py: 1.25,
-  };
-  const cellSx = { fontSize: 13, color: brand.text, borderBottom: `1px solid ${brand.border}`, py: 1.1, verticalAlign: 'middle' };
+  const q = query.trim().toLowerCase();
+  const matches = (name, code) => !q || String(name || '').toLowerCase().includes(q) || String(code || '').toLowerCase().includes(q);
+  const dayItems = useMemo(() => dayRoster.items.filter((i) => matches(studentName(i), i?.studentCode)), [dayRoster.items, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  const weekRows = useMemo(() => weekData.byStudent.filter((s) => matches(s.studentName, s.studentCode)), [weekData.byStudent, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const daySummary = dayRoster.summary || {};
-  const presentCount = Number(daySummary.present ?? dayRoster.items.filter((i) => ['Present', 'Late'].includes(normalizeDayStatus(i))).length);
-  const absentCount = Number(daySummary.absent ?? dayRoster.items.filter((i) => normalizeDayStatus(i) === 'Absent').length);
+  const stats = useMemo(() => {
+    const tally = { total: 0, present: 0, late: 0, absent: 0 };
+    if (view === 'day') {
+      const sm = dayRoster.summary || {};
+      const items = dayRoster.items;
+      tally.total = items.length;
+      tally.late = items.filter((i) => normalizeDayStatus(i) === 'Late').length;
+      tally.present = Number(sm.present ?? items.filter((i) => ['Present', 'Late'].includes(normalizeDayStatus(i))).length);
+      tally.absent = Number(sm.absent ?? items.filter((i) => normalizeDayStatus(i) === 'Absent').length);
+    } else {
+      tally.total = weekData.byStudent.length;
+      weekData.byStudent.forEach((s) =>
+        Object.values(s.days).forEach((item) => {
+          const st = normalizeDayStatus(item);
+          if (st === 'Late') tally.late += 1;
+          if (st === 'Present' || st === 'Late') tally.present += 1;
+          if (st === 'Absent') tally.absent += 1;
+        })
+      );
+    }
+    return tally;
+  }, [view, dayRoster, weekData]);
+
+  const statusChip = (status) => (
+    <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
+  );
+
+  const refresh = () => (view === 'day' ? loadDay() : loadWeek());
+  const sectionTitle = `${className || 'Select a class'} · ${view === 'day' ? date : weekLabel(date)}`;
 
   return (
-    <Page>
-      <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.5}>
-          <Box>
-            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 800, color: brand.navy, letterSpacing: '-0.01em' }}>
-              Class Students Attendance
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: brand.muted, mt: 0.25 }}>
-              Tap in/out attendance for students in your assigned class (from Attendance module).
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => (view === 'day' ? loadDay() : loadWeek())}
-            disabled={loading || !className}
-            sx={{ textTransform: 'none', fontWeight: 700, borderColor: brand.border, width: { xs: '100%', sm: 'auto' } }}
-          >
-            Refresh
-          </Button>
-        </Stack>
+    <ListPage>
+      <StickyFilterBar search={query} onSearch={setQuery} searchPlaceholder="Search student or code…">
+        <BarSelect
+          label="Class"
+          value={className}
+          onChange={setClassName}
+          options={classes}
+          allLabel={classes.length === 0 ? (loadingClasses ? 'Loading…' : 'No assigned class') : undefined}
+        />
+        <BarSelect
+          label="View"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+          ]}
+        />
+        <Box key="date" sx={{ flex: 1, minWidth: 0 }}>
+          <InputBase
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value || getSchoolDateIso())}
+            inputProps={{ 'aria-label': view === 'week' ? 'Pick a day in week' : 'Date' }}
+            sx={{ width: '100%', fontSize: 12, fontWeight: 600, color: brand.navy, py: 0.25, '& input': { py: 0.5, px: 0 } }}
+          />
+        </Box>
+      </StickyFilterBar>
 
-        <Paper elevation={0} sx={{ p: { xs: 1.25, sm: 1.5 }, border: `1px solid ${brand.border}`, borderRadius: 2, bgcolor: '#fff' }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }}>
-            <TextField
-              select size="small" label="My class (class teacher)" value={className}
-              onChange={(e) => setClassName(e.target.value)}
-              disabled={loadingClasses}
-              sx={{ minWidth: { xs: '100%', md: 240 } }}
+      <ListPageBody>
+        <PageTitleRow
+          title="Students Attendance"
+          subtitle="Tap in/out attendance for students in your assigned class (from Attendance module)."
+          actions={
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={refresh}
+              disabled={loading || !className}
+              sx={{ borderColor: brand.border, fontWeight: 700, textTransform: 'none' }}
             >
-              {classes.length === 0 ? <MenuItem value="">No assigned class</MenuItem> : null}
-              {classes.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-            </TextField>
-            <TextField
-              select size="small" label="View" value={view}
-              onChange={(e) => setView(e.target.value)}
-              sx={{ minWidth: { xs: '100%', md: 140 } }}
-            >
-              <MenuItem value="day">Day</MenuItem>
-              <MenuItem value="week">Week</MenuItem>
-            </TextField>
-            <TextField
-              size="small" type="date" label={view === 'week' ? 'Pick a day in week' : 'Date'}
-              value={date} onChange={(e) => setDate(e.target.value || getSchoolDateIso())}
-              InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: { xs: '100%', md: 200 } }}
-            />
-            {view === 'week' && (
-              <Chip icon={<DateRangeIcon sx={{ fontSize: 16 }} />} label={weekLabel(date)} variant="outlined"
-                sx={{ height: 40, borderRadius: 2, fontWeight: 600, color: brand.navy, borderColor: brand.border, bgcolor: '#F8FAFC' }} />
-            )}
-          </Stack>
-        </Paper>
+              Refresh
+            </Button>
+          }
+        />
 
-        {view === 'day' && dayRoster.items.length > 0 && (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, minmax(0,1fr))', sm: 'repeat(3, minmax(0,180px))' }, gap: 1.25 }}>
-            {[{ label: 'Students', value: dayRoster.items.length }, { label: 'Present', value: presentCount }, { label: 'Absent', value: absentCount }].map((s) => (
-              <Paper key={s.label} elevation={0} sx={{ p: 1.5, border: `1px solid ${brand.border}`, borderRadius: 2, bgcolor: '#fff' }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</Typography>
-                <Typography sx={{ fontSize: { xs: 20, sm: 24 }, fontWeight: 800, color: brand.navy, mt: 0.25, lineHeight: 1.1 }}>{s.value}</Typography>
-              </Paper>
-            ))}
-          </Box>
-        )}
+        <NavyStats
+          stats={[
+            { label: 'Students', value: loading ? '—' : stats.total },
+            { label: 'Present', value: loading ? '—' : stats.present },
+            { label: 'Late', value: loading ? '—' : stats.late },
+            { label: 'Absent', value: loading ? '—' : stats.absent },
+          ]}
+        />
 
-        <Paper elevation={0} sx={{ border: `1px solid ${brand.border}`, borderRadius: 2, overflow: 'hidden', bgcolor: '#fff' }}>
-          <Box sx={{ px: 1.5, py: 1.25, borderBottom: `1px solid ${brand.border}`, bgcolor: '#fff' }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <GroupsIcon sx={{ fontSize: 16, color: brand.muted }} />
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: brand.navy }}>
-                {className || 'Select a class'}
-              </Typography>
-              <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-              <Typography sx={{ fontSize: 12, color: brand.muted }}>
-                {view === 'day' ? `Day view · ${date}` : `Week view · ${weekLabel(date)}`}
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: brand.muted, ml: { sm: 'auto' } }}>Tap a student for attendance history</Typography>
-            </Stack>
-          </Box>
-
+        <SectionPaper title={sectionTitle} count={view === 'day' ? dayItems.length : weekRows.length}>
           {loadingClasses ? (
-            <Stack alignItems="center" justifyContent="center" sx={{ py: 7 }}><CircularProgress size={28} /></Stack>
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 7 }}><CircularProgress size={26} /></Stack>
           ) : !className ? (
             <Box sx={{ p: 2 }}>
               <EmptyState title="No class teacher assignment" description="You are not assigned as a class teacher to any class in Student Management." />
             </Box>
           ) : loading ? (
             <Stack alignItems="center" justifyContent="center" sx={{ py: 7 }}>
-              <CircularProgress size={28} />
+              <CircularProgress size={26} />
               <Typography sx={{ mt: 1.5, fontSize: 13, color: brand.muted }}>Loading attendance…</Typography>
             </Stack>
           ) : error ? (
             <Box sx={{ p: 2 }}><EmptyState title="Could not load attendance" description={error} /></Box>
           ) : view === 'day' ? (
-            dayRoster.items.length === 0 ? (
-              <Box sx={{ p: 2 }}><EmptyState title="No students found" description="No attendance roster found for this class and date." /></Box>
+            dayItems.length === 0 ? (
+              <Box sx={{ p: 2 }}>
+                <EmptyState
+                  title={dayRoster.items.length ? 'No matching students' : 'No students found'}
+                  description={dayRoster.items.length ? 'Try a different search term.' : 'No attendance roster found for this class and date.'}
+                />
+              </Box>
             ) : (
               <>
-                {/* Mobile cards */}
-                <Stack spacing={1.25} sx={{ display: { xs: 'flex', md: 'none' }, p: 1.25 }}>
-                  {dayRoster.items.map((item, idx) => {
+                {/* Mobile rows */}
+                <Stack sx={{ display: { xs: 'flex', md: 'none' } }}>
+                  {dayItems.map((item, idx) => {
                     const status = normalizeDayStatus(item);
                     const inT = fmtTime(item?.entryTime || item?.check_in) || '—';
                     const outT = fmtTime(item?.exitTime || item?.check_out) || '—';
                     return (
-                      <Box key={studentKey(item) || idx} onClick={() => openStudent(item)}
-                        sx={{ border: `1px solid ${brand.border}`, borderRadius: 2, p: 1.5, bgcolor: '#fff', cursor: 'pointer', '&:active': { bgcolor: '#F8FAFC' } }}>
-                        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ mb: 1 }}>
+                      <Box
+                        key={studentKey(item) || idx}
+                        onClick={() => openStudent(item)}
+                        sx={{ px: 1.5, py: 1.25, cursor: 'pointer', bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff', borderBottom: idx < dayItems.length - 1 ? '1px solid rgba(19,33,61,0.06)' : 'none' }}
+                      >
+                        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ mb: 0.75 }}>
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy }}>{studentName(item)}</Typography>
-                            <Typography sx={{ fontSize: 12, color: brand.muted }}>{item?.studentCode || item?.className || className}</Typography>
+                            <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: brand.navy, lineHeight: 1.3 }}>{studentName(item)}</Typography>
+                            <Typography sx={{ fontSize: 11.5, color: brand.muted }}>{item?.studentCode || item?.className || className}</Typography>
                           </Box>
-                          <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
+                          {statusChip(status)}
                         </Stack>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                          <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: '#F8FAFC', border: `1px solid ${brand.border}` }}>
-                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                              <LoginIcon sx={{ fontSize: 14, color: '#168a55' }} />
-                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>In</Typography>
-                            </Stack>
-                            <Typography sx={{ fontSize: 14, fontWeight: 700, color: inT !== '—' ? '#168a55' : brand.muted }}>{inT}</Typography>
-                          </Box>
-                          <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: '#F8FAFC', border: `1px solid ${brand.border}` }}>
-                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.25 }}>
-                              <LogoutIcon sx={{ fontSize: 14, color: brand.navy }} />
-                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>Out</Typography>
-                            </Stack>
-                            <Typography sx={{ fontSize: 14, fontWeight: 700, color: outT !== '—' ? brand.navy : brand.muted }}>{outT}</Typography>
-                          </Box>
-                        </Box>
+                        <Stack direction="row" spacing={2}>
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <LoginIcon sx={{ fontSize: 14, color: '#168a55' }} />
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: inT !== '—' ? '#168a55' : brand.muted }}>{inT}</Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <LogoutIcon sx={{ fontSize: 14, color: brand.navy }} />
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: outT !== '—' ? brand.navy : brand.muted }}>{outT}</Typography>
+                          </Stack>
+                        </Stack>
                       </Box>
                     );
                   })}
@@ -375,112 +383,110 @@ export default function ClassStudentsAttendance() {
 
                 {/* Desktop table */}
                 <TableContainer sx={{ display: { xs: 'none', md: 'block' }, width: '100%', overflowX: 'auto' }}>
-                  <Table size="small" sx={{ minWidth: 760 }}>
+                  <Table size="small" sx={{ minWidth: 700 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={tableHeadSx}>Student</TableCell>
-                        <TableCell sx={tableHeadSx}>Code</TableCell>
-                        <TableCell sx={tableHeadSx}>In</TableCell>
-                        <TableCell sx={tableHeadSx}>Out</TableCell>
-                        <TableCell sx={tableHeadSx}>Status</TableCell>
-                        <TableCell sx={tableHeadSx}>Card/Tab</TableCell>
+                        <TableCell sx={{ ...headCellSx, width: 40 }}>#</TableCell>
+                        <TableCell sx={headCellSx}>Student</TableCell>
+                        <TableCell sx={headCellSx}>Code</TableCell>
+                        <TableCell sx={headCellSx}>In</TableCell>
+                        <TableCell sx={headCellSx}>Out</TableCell>
+                        <TableCell sx={headCellSx}>Status</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {dayRoster.items.map((item, idx) => {
+                      {dayItems.map((item, idx) => {
                         const status = normalizeDayStatus(item);
                         const inT = fmtTime(item?.entryTime || item?.check_in) || '—';
                         const outT = fmtTime(item?.exitTime || item?.check_out) || '—';
                         return (
-                          <TableRow key={studentKey(item) || idx} hover onClick={() => openStudent(item)}
-                            sx={{ cursor: 'pointer', '&:last-child td': { borderBottom: 0 } }}>
-                            <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{studentName(item)}</TableCell>
+                          <TableRow
+                            key={studentKey(item) || idx}
+                            hover
+                            onClick={() => openStudent(item)}
+                            sx={{ cursor: 'pointer', bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff', '&:last-child td': { borderBottom: 0 } }}
+                          >
+                            <TableCell sx={{ ...cellSx, color: '#94A3B8', fontSize: 12 }}>{idx + 1}</TableCell>
+                            <TableCell sx={{ ...cellSx, fontWeight: 600, color: brand.navy }}>{studentName(item)}</TableCell>
                             <TableCell sx={{ ...cellSx, color: brand.muted }}>{item?.studentCode || '—'}</TableCell>
                             <TableCell sx={{ ...cellSx, color: inT !== '—' ? '#168a55' : brand.muted, fontWeight: inT !== '—' ? 700 : 500 }}>{inT}</TableCell>
                             <TableCell sx={{ ...cellSx, color: outT !== '—' ? brand.navy : brand.muted, fontWeight: outT !== '—' ? 700 : 500 }}>{outT}</TableCell>
-                            <TableCell sx={cellSx}>
-                              <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
-                            </TableCell>
-                            <TableCell sx={{ ...cellSx, fontSize: 12, color: brand.muted }}>Tap in/out</TableCell>
+                            <TableCell sx={cellSx}>{statusChip(status)}</TableCell>
                           </TableRow>
                         );
                       })}
                     </TableBody>
                   </Table>
                 </TableContainer>
-                <Box sx={{ px: 1.5, py: 1.25, borderTop: `1px solid ${brand.border}`, bgcolor: '#FAFBFC' }}>
-                  <Typography sx={{ fontSize: 12, color: brand.muted }}>{dayRoster.items.length} student{dayRoster.items.length === 1 ? '' : 's'} · {date}</Typography>
-                </Box>
               </>
             )
+          ) : weekRows.length === 0 ? (
+            <Box sx={{ p: 2 }}>
+              <EmptyState
+                title={weekData.byStudent.length ? 'No matching students' : 'No attendance data'}
+                description={weekData.byStudent.length ? 'Try a different search term.' : 'No student tap attendance found for this class in the selected week.'}
+              />
+            </Box>
           ) : (
-            // Week view
-            weekData.byStudent.length === 0 ? (
-              <Box sx={{ p: 2 }}><EmptyState title="No attendance data" description="No student tap attendance found for this class in the selected week." /></Box>
-            ) : (
-              <>
-                <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
-                  <Table size="small" sx={{ minWidth: 720 }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ ...tableHeadSx, position: { md: 'sticky' }, left: 0, zIndex: 2 }}>Student</TableCell>
-                        {weekData.days.map((d, i) => (
-                          <TableCell key={d} align="center" sx={tableHeadSx}>
-                            <Box>{WEEKDAYS[i]}</Box>
-                            <Box sx={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', textTransform: 'none' }}>{d.slice(5)}</Box>
-                          </TableCell>
-                        ))}
+            <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+              <Table size="small" sx={{ minWidth: 640 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ ...headCellSx, position: 'sticky', left: 0, zIndex: 2, width: 40, minWidth: 40 }}>#</TableCell>
+                    <TableCell sx={{ ...headCellSx, position: 'sticky', left: 40, zIndex: 2, minWidth: 170, borderRight: '1px solid rgba(19,33,61,0.08)' }}>Student</TableCell>
+                    {weekData.days.map((d, i) => (
+                      <TableCell key={d} align="center" sx={{ ...headCellSx, minWidth: 96 }}>
+                        <Box>{WEEKDAYS[i]}</Box>
+                        <Box sx={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', textTransform: 'none' }}>{d.slice(5)}</Box>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {weekRows.map((s, idx) => {
+                    const bg = idx % 2 === 1 ? '#F8F9FC' : '#fff';
+                    return (
+                      <TableRow key={s.key} hover sx={{ bgcolor: bg, '&:last-child td': { borderBottom: 0 } }}>
+                        <TableCell sx={{ ...cellSx, position: 'sticky', left: 0, zIndex: 1, bgcolor: bg, color: '#94A3B8', fontSize: 12, width: 40, minWidth: 40 }}>{idx + 1}</TableCell>
+                        <TableCell
+                          onClick={() => openStudent(s)}
+                          sx={{ ...cellSx, cursor: 'pointer', position: 'sticky', left: 40, zIndex: 1, bgcolor: bg, minWidth: 170, borderRight: '1px solid rgba(19,33,61,0.08)' }}
+                        >
+                          <Typography noWrap sx={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>{s.studentName}</Typography>
+                          <Typography noWrap sx={{ fontSize: 11, color: brand.muted }}>{s.studentCode || ''}</Typography>
+                        </TableCell>
+                        {weekData.days.map((d) => {
+                          const item = s.days[d];
+                          const status = item ? normalizeDayStatus(item) : '—';
+                          const inT = item ? fmtTime(item.entryTime || item.check_in) || '' : '';
+                          const outT = item ? fmtTime(item.exitTime || item.check_out) || '' : '';
+                          const label = status === '—' ? '—' : status === 'Present' ? 'P' : status === 'Late' ? 'L' : status === 'Absent' ? 'A' : status.slice(0, 1);
+                          return (
+                            <TableCell key={d} align="center" sx={cellSx}>
+                              {status === '—' ? (
+                                <Typography sx={{ fontSize: 12, color: '#CBD5E1' }}>—</Typography>
+                              ) : (
+                                <Tooltip title={`${status}${inT ? ` · In ${inT}` : ''}${outT ? ` · Out ${outT}` : ''}`} arrow>
+                                  <Box>
+                                    <Chip size="small" label={label} variant="outlined" sx={{ fontWeight: 800, fontSize: 10, height: 22, minWidth: 28, ...statusStyles(status) }} />
+                                    <Typography sx={{ fontSize: 10, color: brand.muted, mt: 0.35, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                                      {inT || '—'}{inT || outT ? ' / ' : ''}{outT || '—'}
+                                    </Typography>
+                                  </Box>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {weekData.byStudent.map((s) => (
-                        <TableRow key={s.key} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                          <TableCell
-                            onClick={() => openStudent(s)}
-                            sx={{ ...cellSx, fontWeight: 600, cursor: 'pointer', position: { md: 'sticky' }, left: 0, bgcolor: '#fff', zIndex: 1, minWidth: 180 }}
-                          >
-                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>{s.studentName}</Typography>
-                            <Typography sx={{ fontSize: 11, color: brand.muted }}>{s.studentCode || ''}</Typography>
-                          </TableCell>
-                          {weekData.days.map((d) => {
-                            const item = s.days[d];
-                            const status = item ? normalizeDayStatus(item) : '—';
-                            const inT = item ? (fmtTime(item.entryTime || item.check_in) || '') : '';
-                            const outT = item ? (fmtTime(item.exitTime || item.check_out) || '') : '';
-                            const label = status === '—' ? '—' : status === 'Present' ? 'P' : status === 'Late' ? 'L' : status === 'Absent' ? 'A' : status.slice(0, 1);
-                            return (
-                              <TableCell key={d} align="center" sx={{ ...cellSx, minWidth: 110 }}>
-                                {status === '—' ? (
-                                  <Typography sx={{ fontSize: 12, color: '#CBD5E1' }}>—</Typography>
-                                ) : (
-                                  <Tooltip title={`${status}${inT ? ` · In ${inT}` : ''}${outT ? ` · Out ${outT}` : ''}`} arrow>
-                                    <Box>
-                                      <Chip size="small" label={label} variant="outlined"
-                                        sx={{ fontWeight: 800, fontSize: 10, height: 22, minWidth: 28, ...statusStyles(status) }} />
-                                      <Typography sx={{ fontSize: 10, color: brand.muted, mt: 0.35, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-                                        {inT || '—'}{inT || outT ? ' / ' : ''}{outT || '—'}
-                                      </Typography>
-                                    </Box>
-                                  </Tooltip>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                <Box sx={{ px: 1.5, py: 1.25, borderTop: `1px solid ${brand.border}`, bgcolor: '#FAFBFC' }}>
-                  <Typography sx={{ fontSize: 12, color: brand.muted }}>
-                    {weekData.byStudent.length} student{weekData.byStudent.length === 1 ? '' : 's'} · {weekLabel(date)} · tap a student for history
-                  </Typography>
-                </Box>
-              </>
-            )
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
-        </Paper>
-      </Stack>
+        </SectionPaper>
+      </ListPageBody>
 
       <Dialog open={Boolean(selectedStudent)} onClose={() => setSelectedStudent(null)} fullWidth maxWidth="md">
         <DialogTitle sx={{ pr: 6 }}>
@@ -506,42 +512,33 @@ export default function ClassStudentsAttendance() {
             <EmptyState title="No attendance history" description="Could not load attendance records for this student." />
           ) : (
             <Stack spacing={2}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0,1fr))', sm: 'repeat(4, minmax(0,1fr))' }, gap: 1 }}>
-                {(studentDetail.statusBreakdown || []).map((b) => (
-                  <Paper key={b.label} elevation={0} sx={{ p: 1.25, border: `1px solid ${brand.border}`, borderRadius: 2 }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>{b.label}</Typography>
-                    <Typography sx={{ fontSize: 22, fontWeight: 800, color: brand.navy, mt: 0.25 }}>{b.value ?? 0}</Typography>
-                  </Paper>
-                ))}
-                <Paper elevation={0} sx={{ p: 1.25, border: `1px solid ${brand.border}`, borderRadius: 2 }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: brand.muted, textTransform: 'uppercase' }}>Days (period)</Typography>
-                  <Typography sx={{ fontSize: 22, fontWeight: 800, color: brand.navy, mt: 0.25 }}>{studentDetail.totalEvents ?? (studentDetail.dailyTrend || []).length}</Typography>
-                </Paper>
-              </Box>
-
+              <NavyStats
+                stats={[
+                  ...(studentDetail.statusBreakdown || []).slice(0, 3).map((b) => ({ label: b.label, value: b.value ?? 0 })),
+                  { label: 'Days (period)', value: studentDetail.totalEvents ?? (studentDetail.dailyTrend || []).length },
+                ]}
+              />
               <Box>
                 <Typography sx={{ fontSize: 13, fontWeight: 700, color: brand.navy, mb: 1 }}>Daily attendance records</Typography>
                 {(studentDetail.dailyTrend || []).length === 0 ? (
                   <Typography sx={{ fontSize: 13, color: brand.muted }}>No records in this period.</Typography>
                 ) : (
-                  <TableContainer sx={{ border: `1px solid ${brand.border}`, borderRadius: 2, maxHeight: 420 }}>
+                  <TableContainer sx={{ border: '1px solid rgba(19,33,61,0.08)', maxHeight: 420 }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={tableHeadSx}>Date</TableCell>
-                          <TableCell sx={tableHeadSx}>Status</TableCell>
-                          <TableCell sx={tableHeadSx}>Source</TableCell>
+                          <TableCell sx={headCellSx}>Date</TableCell>
+                          <TableCell sx={headCellSx}>Status</TableCell>
+                          <TableCell sx={headCellSx}>Source</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {[...(studentDetail.dailyTrend || [])].reverse().map((d) => {
+                        {[...(studentDetail.dailyTrend || [])].reverse().map((d, idx) => {
                           const status = d.late > 0 ? 'Late' : d.absent > 0 ? 'Absent' : d.present > 0 ? 'Present' : '—';
                           return (
-                            <TableRow key={d.date} hover>
+                            <TableRow key={d.date} sx={{ bgcolor: idx % 2 === 1 ? '#F8F9FC' : '#fff' }}>
                               <TableCell sx={{ ...cellSx, fontWeight: 600, whiteSpace: 'nowrap' }}>{d.date}</TableCell>
-                              <TableCell sx={cellSx}>
-                                <Chip size="small" label={status} variant="outlined" sx={{ fontWeight: 700, fontSize: 10, height: 22, ...statusStyles(status) }} />
-                              </TableCell>
+                              <TableCell sx={cellSx}>{statusChip(status)}</TableCell>
                               <TableCell sx={{ ...cellSx, fontSize: 12, color: brand.muted }}>Card / Tab tap</TableCell>
                             </TableRow>
                           );
@@ -558,6 +555,6 @@ export default function ClassStudentsAttendance() {
           )}
         </DialogContent>
       </Dialog>
-    </Page>
+    </ListPage>
   );
 }

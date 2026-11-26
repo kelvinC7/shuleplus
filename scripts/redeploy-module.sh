@@ -383,7 +383,15 @@ STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|student/class/parent lookup
 BABYEYI_API_URL|http://localhost:4017/api|Babyeyi fee-structure items failed to load
 NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|notification dispatch failed
 IAM_API_URL|http://localhost:4001/api/v1|IAM service calls failed
+PAYMENT_AUTH_URL|https://shuleplus.rw/api/v1/developers/oauth/token|payment provider OAuth token endpoint
+PAYMENT_VALIDATION_URL|https://fees.shuleplus.rw/api/integrations/payments/validate|provider student/fee validation callback
+PAYMENT_NOTIFICATION_URL|https://fees.shuleplus.rw/api/integrations/payments/notify|provider payment notification callback
+PAYMENT_REVERSAL_URL|https://fees.shuleplus.rw/api/integrations/payments/reverse|provider reversal callback
+PAYMENT_CALLBACK_URL|https://fees.shuleplus.rw/api/integrations/payments/callback|provider generic payment callback
 EOF
+      if ! grep -q '^PAYMENT_INTEGRATION_API_KEY=' .env; then
+        echo "  [backend] WARNING: PAYMENT_INTEGRATION_API_KEY is missing — payment callbacks will return 503" | tee -a "$LOG"
+      fi
     fi
     # Academic exam planning reads Config Class courses from Timetable — missing/wrong
     # TIMETABLE_API_URL falls back to dead dev port 3010 and shows "fetch failed" in UI.
@@ -699,9 +707,35 @@ EOF
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|SSO and org provisioning
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|learner manifest lookups
+NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|registration confirmation emails
+PARENTMIS_API_URL|http://localhost:4015/api|publish approved trips to ParentMIS
 EOF
       grep -q '^NODE_ENV=' .env && sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env || echo 'NODE_ENV=production' >> .env
       grep -q '^MODULE_SLUG=' .env || echo 'MODULE_SLUG=shule-trip' >> .env
+      # Registration emails must use the real notification service + shared service key
+      SHARED_KEY=$(grep -E '^(SERVICE_API_KEY|PLATFORM_SERVICE_KEY)=' .env | head -1 | cut -d= -f2- || true)
+      if [ -n "$SHARED_KEY" ] && [ "$SHARED_KEY" != "dev-service-key" ]; then
+        if grep -q '^NOTIFICATION_SERVICE_API_KEY=' .env; then
+          sed -i "s|^NOTIFICATION_SERVICE_API_KEY=.*|NOTIFICATION_SERVICE_API_KEY=${SHARED_KEY}|" .env
+        else
+          echo "NOTIFICATION_SERVICE_API_KEY=${SHARED_KEY}" >> .env
+        fi
+        echo "  [backend] NOTIFICATION_SERVICE_API_KEY synced for registration emails" | tee -a "$LOG"
+      fi
+      # Public links in emails / QR codes must use the UI host, never the API host
+      if [ -n "$FEHOST" ]; then
+        if grep -q '^SHULETRIP_PUBLIC_LOGIN_URL=' .env; then
+          sed -i "s|^SHULETRIP_PUBLIC_LOGIN_URL=.*|SHULETRIP_PUBLIC_LOGIN_URL=https://${FEHOST}/login|" .env
+        else
+          echo "SHULETRIP_PUBLIC_LOGIN_URL=https://${FEHOST}/login" >> .env
+        fi
+      fi
+      if grep -q '^UPLOAD_DIR=' .env; then
+        sed -i 's|^UPLOAD_DIR=.*|UPLOAD_DIR=/var/lib/shuleplus/shule-trip/uploads|' .env
+      else
+        echo 'UPLOAD_DIR=/var/lib/shuleplus/shule-trip/uploads' >> .env
+      fi
+      mkdir -p /var/lib/shuleplus/shule-trip/uploads 2>/dev/null || true
     fi
     # MiniWebsite: server-side IAM/Babyeyi must use loopback (public shuleplus.rw:443 hairpin times out).
     if [ "$MOD" = "MiniWebsite" ] && [ -f .env ]; then
@@ -1135,8 +1169,13 @@ EOF
     if [ "$IS_NEXT_EXPORT" = true ]; then
       echo "  [frontend] Next.js static export build (out/)..." | tee -a "$LOG"
       export NEXT_IGNORE_INCORRECT_LOCKFILE=true
+      export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=4096"
       unset NEXT_DIST_DIR
-      rm -rf out
+      # Never wipe the live export before the new one is verified: an interrupted
+      # or OOM-killed build would otherwise leave the running `serve` process
+      # with no out/, so every URL returns 404 "The requested path could not be found".
+      rm -rf out.prev
+      if [ -d out ]; then mv out out.prev; fi
       FRONT_BUILD_OK=false
       if NEXT_IGNORE_INCORRECT_LOCKFILE=true npx next build >> "$LOG" 2>&1; then
         FRONT_BUILD_OK=true
@@ -1145,15 +1184,22 @@ EOF
         tail -n 60 "$LOG" | tee -a "$LOG" || true
       fi
 
+      if [ "$FRONT_BUILD_OK" != true ] || [ ! -f out/index.html ]; then
+        rm -rf out
+        if [ -d out.prev ]; then
+          mv out.prev out
+          echo "  [frontend] build failed — restored previous out/ (site stays up)" | tee -a "$LOG"
+        fi
+        echo "  [frontend] ERROR: static export failed — out/index.html missing (see $LOG)" | tee -a "$LOG"
+        exit 1
+      fi
+      rm -rf out.prev
+
       if [ -n "$PMFRONT" ] && [ -n "$FPORT" ]; then
         pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
         echo "  [frontend] free port :${FPORT}..." | tee -a "$LOG"
         fuser -k "${FPORT}/tcp" 2>/dev/null || true
         sleep 2
-        if [ "$FRONT_BUILD_OK" != true ] || [ ! -f out/index.html ]; then
-          echo "  [frontend] ERROR: static export failed — out/index.html missing (see $LOG)" | tee -a "$LOG"
-          exit 1
-        fi
         echo "  [frontend] pm2 serve out/ on :$FPORT → $PMFRONT" | tee -a "$LOG"
         pm2 start npx --name "$PMFRONT" --cwd "$FDIR" --interpreter none \
           -- --yes serve@latest -s out -l "tcp://0.0.0.0:${FPORT}" >> "$LOG" 2>&1
@@ -1163,8 +1209,17 @@ EOF
           pm2 logs "$PMFRONT" --lines 40 --nostream | tee -a "$LOG" || true
           exit 1
         fi
-        sleep 3
-        if curl -sf "http://127.0.0.1:${FPORT}/" >/dev/null 2>&1 || curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
+        # npx may need to download serve@latest on first run — retry instead of failing once.
+        FRONT_OK=false
+        for _ in $(seq 1 12); do
+          if curl -sf "http://127.0.0.1:${FPORT}/" >/dev/null 2>&1 \
+             || curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
+            FRONT_OK=true
+            break
+          fi
+          sleep 2
+        done
+        if [ "$FRONT_OK" = true ]; then
           echo "  [frontend] ok on :${FPORT} ($MOD static export)" | tee -a "$LOG"
         else
           echo "  [frontend] ERROR: :${FPORT} not responding — ${FEHOST:-frontend} will 502" | tee -a "$LOG"

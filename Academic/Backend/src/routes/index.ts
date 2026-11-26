@@ -40,6 +40,7 @@ import roundRollCallRoutes from './round-roll-call.routes';
 import marksDemoRoutes from './marks-demo.routes';
 import marksSubmissionRoutes from './marks-submission.routes';
 import academicAuditRoutes from './academic-audit.routes';
+import nurseryRoutes from './nursery.routes';
 
 const router = Router();
 
@@ -92,6 +93,7 @@ router.get('/service/examination-attendance', requireServiceAuth, requireService
       roomId: String(req.query.roomId || ''),
       examDate: String(req.query.examDate || ''),
       session: String(req.query.session || '') as any,
+      sessionCode: typeof req.query.sessionCode === 'string' ? req.query.sessionCode : undefined,
     });
     res.json({ success: true, data });
   } catch (e) { next(e); }
@@ -152,6 +154,7 @@ router.use('/examination-lists', examinationListRoutes);
 router.use('/examination-invigilators', examinationInvigilatorManagementRoutes);
 router.use('/marks-submissions', marksSubmissionRoutes);
 router.use('/academic-audit', academicAuditRoutes);
+router.use('/nursery', nurseryRoutes);
 
 const protectedRouter = Router();
 protectedRouter.use(authenticate, requireModuleLicense, requireTenant);

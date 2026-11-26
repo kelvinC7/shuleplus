@@ -20,6 +20,7 @@ import Timetable from './pages/Timetable';
 import ExaminationEligibility from './pages/ExaminationEligibility';
 import ClassRoomScan from './pages/ClassRoomScan';
 import RoundRollCall from './pages/RoundRollCall';
+import PeriodAttendance from './pages/PeriodAttendance';
 import ClassAttendance from './pages/ClassAttendance';
 import ClassStudentsAttendance from './pages/ClassStudentsAttendance';
 import Requisitions from './pages/Requisitions';
@@ -68,12 +69,6 @@ const ProtectedRoute = ({ children, title }) => {
   );
 };
 
-const AttendancePageRoute = ({ title = 'Attendance' }) => (
-  <ProtectedRoute title={title}>
-    <RoundRollCall />
-  </ProtectedRoute>
-);
-
 const HomeRoute = () => (
   <ProtectedRoute title="Dashboard">
     <Dashboard />
@@ -120,17 +115,18 @@ function AppContent() {
       <Route path="/assessments/:id/marks" element={<ProtectedRoute title="Enter marks"><AssessmentMarks /></ProtectedRoute>} />
       <Route path="/classroom-scan" element={<Navigate to="/class-room-scan" replace />} />
       <Route path="/my-attendance" element={<ProtectedRoute title="My Attendance"><ClassAttendance title="My Attendance" description="Your in/out attendance records from card or tab taps." /></ProtectedRoute>} />
-      <Route path="/roll-call" element={<AttendancePageRoute title="Class Attendance" />} />
+      <Route path="/class-attendance" element={<ProtectedRoute title="Class Attendance"><ClassAttendance title="Class Attendance" description="Your in/out attendance records from card or tab taps." /></ProtectedRoute>} />
+      <Route path="/roll-call" element={<Navigate to="/round-roll-call" replace />} />
+      <Route path="/attendance" element={<Navigate to="/period-attendance" replace />} />
+      <Route path="/teacher-attendance" element={<Navigate to="/my-attendance" replace />} />
       <Route path="/calendar" element={<Navigate to="/school-calendar" replace />} />
 
       {/* New sidebar pages */}
       <Route path="/students" element={<ProtectedRoute title="Students">          <Students />                                                     </ProtectedRoute>} />
       <Route path="/timetable" element={<ProtectedRoute title="Timetable">         <Timetable />                                                    </ProtectedRoute>} />
-      <Route path="/attendance" element={<AttendancePageRoute title="Class Attendance" />} />
       <Route path="/class-room-scan" element={<ProtectedRoute title="Classroom scan"><ClassRoomScan /></ProtectedRoute>} />
-      <Route path="/round-roll-call" element={<AttendancePageRoute title="Round Roll Call" />} />
-      <Route path="/period-attendance" element={<ProtectedRoute title="Class Attendance"><ClassAttendance title="Class Attendance" description="Your in/out attendance records from card or tab taps." /></ProtectedRoute>} />
-      <Route path="/teacher-attendance" element={<ProtectedRoute title="My Attendance"><ClassAttendance title="My Attendance" description="Your in/out attendance records from card or tab taps." /></ProtectedRoute>} />
+      <Route path="/period-attendance" element={<ProtectedRoute title="Period Attendance"><PeriodAttendance /></ProtectedRoute>} />
+      <Route path="/round-roll-call" element={<ProtectedRoute title="Round Roll Call"><RoundRollCall /></ProtectedRoute>} />
       <Route path="/class-students-attendance" element={<ProtectedRoute title="Class Students Attendance"><ClassStudentsAttendance /></ProtectedRoute>} />
       <Route path="/requisitions" element={<ProtectedRoute title="Requisitions">    <Requisitions />                                                 </ProtectedRoute>} />
       <Route path="/purchase-requests" element={<ProtectedRoute title="Purchase Requests"><PurchaseRequests /></ProtectedRoute>} />

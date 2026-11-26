@@ -14,5 +14,11 @@ router.get('/report-footer/staff', requireAcademicPublishAccess, (req, res, next
 router.put('/report-footer', requireAcademicPublishAccess, (req, res, next) =>
   academicSettingsController.saveReportFooter(req, res, next)
 );
+router.get('/report-analysis', (req, res, next) =>
+  academicSettingsController.getReportAnalysisSettings(req, res, next)
+);
+router.put('/report-analysis', requireAcademicPublishAccess, (req, res, next) =>
+  academicSettingsController.saveReportAnalysisSettings(req, res, next)
+);
 
 export default router;

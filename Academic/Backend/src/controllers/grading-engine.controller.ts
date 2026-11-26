@@ -52,6 +52,67 @@ export class GradingEngineController {
     } catch (err) { next(err); }
   }
 
+  async getReportAnalysis(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orgId = orgIdOf(req);
+      const q = req.query as Record<string, string | undefined>;
+      const classId = q.classId?.trim();
+      const academicYear = q.academicYear?.trim();
+      if (!classId || !academicYear) {
+        res.status(400).json({ success: false, message: 'classId and academicYear are required' });
+        return;
+      }
+      const statusRaw = (q.status ?? 'all').trim();
+      const status = (['all', 'in_progress', 'submitted', 'approved'].includes(statusRaw) ? statusRaw : 'all') as
+        | 'all'
+        | 'in_progress'
+        | 'submitted'
+        | 'approved';
+      const result = await gradingEngineService.getReportAnalysis(orgId, {
+        classId,
+        academicYear,
+        term: q.term?.trim() || undefined,
+        reportKind: normalizeReportKind(q.reportKind),
+        status,
+      });
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getReportAnalysisComparison(req: Request, res: Response, next: NextFunction) {
+    try {
+      const orgId = orgIdOf(req);
+      const q = req.query as Record<string, string | undefined>;
+      const classIds = (q.classIds ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const academicYear = q.academicYear?.trim();
+      if (!classIds.length || !academicYear) {
+        res.status(400).json({ success: false, message: 'classIds and academicYear are required' });
+        return;
+      }
+      const statusRaw = (q.status ?? 'all').trim();
+      const status = (['all', 'in_progress', 'submitted', 'approved'].includes(statusRaw) ? statusRaw : 'all') as
+        | 'all'
+        | 'in_progress'
+        | 'submitted'
+        | 'approved';
+      const result = await gradingEngineService.getReportAnalysisClassComparison(orgId, {
+        classIds,
+        academicYear,
+        term: q.term?.trim() || undefined,
+        reportKind: normalizeReportKind(q.reportKind),
+        status,
+      });
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getClassReportSummaries(req: Request, res: Response, next: NextFunction) {
     try {
       const orgId = orgIdOf(req);

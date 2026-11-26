@@ -182,7 +182,7 @@ export class ExaminationListService {
           ...(params.term ? { term: params.term } : {}),
           ...(params.examinationTypeId ? { examinationTypeId: params.examinationTypeId } : {}),
         },
-        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] }, examinationType: true },
         orderBy: [{ academicYear: 'desc' }, { term: 'asc' }, { className: 'asc' }],
       }),
       prisma.examinationType.findMany({
@@ -196,7 +196,7 @@ export class ExaminationListService {
       params.examinationTimetableId
         ? prisma.classExaminationTimetable.findFirst({
             where: { id: params.examinationTimetableId, organizationId },
-            include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+            include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] }, examinationType: true },
           })
         : Promise.resolve(null),
     ]);
@@ -269,7 +269,7 @@ export class ExaminationListService {
         term: timetable.term,
         startDate: toDateOnly(timetable.startDate),
         endDate: toDateOnly(timetable.endDate),
-        slots: timetable.slots.map((s: any) => ({ examDate: toDateOnly(s.examDate), session: s.session, courseName: s.courseName, startTime: s.startTime, endTime: s.endTime })),
+        slots: timetable.slots.map((s: any) => ({ examDate: toDateOnly(s.examDate), session: s.session, sessionCode: s.sessionCode, sessionName: s.sessionName, courseName: s.courseName, startTime: s.startTime, endTime: s.endTime })),
       } : null,
     };
   }
@@ -299,7 +299,7 @@ export class ExaminationListService {
       include: {
         examinationTimetable: {
           include: {
-            slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] },
+            slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] },
           },
         },
         rooms: {

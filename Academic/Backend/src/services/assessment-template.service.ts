@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error.middleware';
 import { smListClasses } from '../clients/student-management.client';
 import { resolveAcademicClass } from './sm-resolve.service';
 import { classCategoryMatchesTemplateLevel } from '../utils/education-level';
+import { rankStudentResults } from '../utils/student-result-ranking';
 
 function applyTemplateTermFilter(where: Record<string, unknown>, term: string) {
   const t = term.trim();
@@ -923,6 +924,22 @@ export class AssessmentTemplateService {
       throw new AppError(404, 'No results found for this student');
     }
 
+    const classResults = await prisma.studentResult.findMany({
+      where: {
+        organizationId,
+        classId,
+        academicYear,
+        ...(term ? { term } : {}),
+      },
+      select: { studentId: true, percentage: true },
+    });
+    const classRanking = rankStudentResults(
+      classResults.map((result) => ({
+        studentId: result.studentId,
+        percentage: result.percentage == null ? null : Number(result.percentage),
+      }))
+    );
+
     const student = await prisma.student.findFirst({
       where: { id: studentId, organizationId },
       select: { id: true, firstName: true, lastName: true, studentUid: true, gender: true, dateOfBirth: true },
@@ -955,6 +972,8 @@ export class AssessmentTemplateService {
       subjects,
       totalPercentage: Math.round(totalPercentage * 100) / 100,
       averagePercentage: Math.round(avgPercentage * 100) / 100,
+      position: classRanking.positions.get(studentId) ?? null,
+      classSize: classRanking.classSize,
     };
   }
 

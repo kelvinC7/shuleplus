@@ -72,6 +72,8 @@ import {
   studentCodeLabel,
   studentDisplayName,
   summaryFromReport,
+  displayedOverallPercentage,
+  competitionRank,
   formatReportAverage,
   formatReportPosition,
   reportTypeLabel,
@@ -192,6 +194,7 @@ export default function ReportCardsWorkspace() {
 
   const [publications, setPublications] = useState<PubRow[]>([]);
   const [summaries, setSummaries] = useState<Record<string, ReportStudentSummary>>({});
+  const [classwideSummaries, setClasswideSummaries] = useState<Record<string, ReportStudentSummary>>({});
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [loadingSummaries, setLoadingSummaries] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState(0);
@@ -210,6 +213,10 @@ export default function ReportCardsWorkspace() {
   const [batchBusy, setBatchBusy] = useState<null | 'pdf' | 'print'>(null);
   const [batchProgress, setBatchProgress] = useState('');
   const batchRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  /** Only the latest class-summary request may update the table (prevents stale class/tab data). */
+  const summariesRequestRef = useRef(0);
+  /** Only the latest student-list request may replace the table rows. */
+  const studentsRequestRef = useRef(0);
 
   const classNames = useMemo(() => {
     const set = new Set<string>();
@@ -262,11 +269,16 @@ export default function ReportCardsWorkspace() {
   }, []);
 
   useEffect(() => {
+    const requestId = ++studentsRequestRef.current;
     if (!classNameKey || !activeClassIds.length) {
       setStudents([]);
       setStudentId('');
+      setLoadingStudents(false);
       return;
     }
+    /** Clear the previous class immediately so its rows/percentages never appear under the new class. */
+    setStudents([]);
+    setStudentId('');
     setLoadingStudents(true);
     Promise.all(
       activeClassIds.map((classId) =>
@@ -276,6 +288,7 @@ export default function ReportCardsWorkspace() {
       )
     )
       .then((lists) => {
+        if (requestId !== studentsRequestRef.current) return;
         const merged: SmStudent[] = [];
         const seen = new Set<string>();
         lists.forEach(({ classId, list }) => {
@@ -288,8 +301,13 @@ export default function ReportCardsWorkspace() {
         merged.sort((a, b) => studentDisplayName(a).localeCompare(studentDisplayName(b)));
         setStudents(merged);
       })
-      .catch(() => setStudents([]))
-      .finally(() => setLoadingStudents(false));
+      .catch(() => {
+        if (requestId !== studentsRequestRef.current) return;
+        setStudents([]);
+      })
+      .finally(() => {
+        if (requestId === studentsRequestRef.current) setLoadingStudents(false);
+      });
   }, [classNameKey, activeClassIds.join(','), academicYear]);
 
   const loadPublications = useCallback(async () => {
@@ -320,61 +338,112 @@ export default function ReportCardsWorkspace() {
   const reportKindParam = isBeginningMode ? ('beginning' as const) : isMidTermMode ? ('midterm' as const) : undefined;
 
   const loadClassSummaries = useCallback(async () => {
+    const requestId = ++summariesRequestRef.current;
     if (!students.length || !academicYear || !term || !primaryClassId) {
       setSummaries({});
+      setClasswideSummaries({});
+      setLoadingSummaries(false);
       return;
     }
     const includeTerms =
       isStageReportMode ? undefined : resolveIncludeTerms(reportScope, settings?.terms ?? [], term);
     setLoadingSummaries(true);
     setSummaryProgress(0);
+    /** Never show rows from another class/report kind while this request is running. */
+    setSummaries({});
+    setClasswideSummaries({});
     const total = students.length;
     let done = 0;
     try {
-      const useBulkSummaries = !includeTerms || includeTerms.length <= 1;
+      const useBulkSummaries =
+        !isStageReportMode && (!includeTerms || includeTerms.length <= 1);
       const next: Record<string, ReportStudentSummary> = {};
+      const classwideNext: Record<string, ReportStudentSummary> = {};
 
       if (useBulkSummaries && activeClassIds.length) {
         const classIds = [...new Set(activeClassIds)];
         const bulks = await Promise.all(
           classIds.map((cid) => getClassReportSummaries(cid, academicYear, term, reportKindParam))
         );
-        bulks.forEach((bulk) => {
+        bulks.forEach((bulk, index) => {
+          const classId = classIds[index];
           for (const row of bulk.summaries) {
-            next[row.studentId] = {
+            const studentClassId = classIdByStudent.get(row.studentId);
+            if (studentClassId && studentClassId !== classId) continue;
+            const stageRank = isStageReportMode && row.hasMarks
+              ? competitionRank(bulk.summaries, row.average)
+              : null;
+            const summary: ReportStudentSummary = {
               studentId: row.studentId,
               average: row.average,
-              position: row.position,
-              classSize: row.classSize,
+              position: isStageReportMode ? stageRank?.position ?? null : row.position,
+              classSize: stageRank?.classSize ?? row.classSize,
               result: row.result === '—' ? 'Pending' : row.result,
               generatedAt: row.generatedAt ?? bulk.generatedAt,
               hasMarks: row.hasMarks,
             };
+            next[row.studentId] = summary;
+            classwideNext[row.studentId] = summary;
           }
         });
-        setSummaryProgress(100);
       } else {
         const pairs = await mapPool(students, 5, async (s) => {
           const cid = classIdByStudent.get(s.id) || primaryClassId;
           try {
             const data = await getReportCardV2(s.id, cid, academicYear, term, includeTerms, reportKindParam);
             done += 1;
-            setSummaryProgress(Math.round((done / total) * 100));
+            if (requestId === summariesRequestRef.current) {
+              setSummaryProgress(Math.round((done / total) * 100));
+            }
             return { id: s.id, summary: summaryFromReport(data) };
           } catch {
             done += 1;
-            setSummaryProgress(Math.round((done / total) * 100));
+            if (requestId === summariesRequestRef.current) {
+              setSummaryProgress(Math.round((done / total) * 100));
+            }
             return { id: s.id, summary: null };
           }
         });
         pairs.forEach(({ id, summary }) => {
-          if (summary) next[id] = summary;
+          if (summary && (!isStageReportMode || summary.hasMarks)) next[id] = summary;
         });
+        if (isStageReportMode) {
+          const byClass = new Map<string, Array<{ studentId: string; summary: ReportStudentSummary }>>();
+          students.forEach((student) => {
+            const summary = next[student.id];
+            if (!summary?.hasMarks || summary.average == null) return;
+            const cid = classIdByStudent.get(student.id) || primaryClassId;
+            const group = byClass.get(cid) ?? [];
+            group.push({ studentId: student.id, summary });
+            byClass.set(cid, group);
+          });
+          byClass.forEach((group) => {
+            const rankingRows = group.map(({ summary }) => ({
+              average: summary.average,
+              hasMarks: summary.hasMarks,
+            }));
+            group.forEach(({ studentId, summary }) => {
+              const rank = competitionRank(rankingRows, summary.average);
+              next[studentId] = {
+                ...summary,
+                position: rank.position,
+                classSize: rank.classSize,
+              };
+            });
+          });
+        }
       }
 
+      if (requestId !== summariesRequestRef.current) return;
       setSummaries(next);
+      setClasswideSummaries(classwideNext);
+      setSummaryProgress(100);
+    } catch {
+      if (requestId !== summariesRequestRef.current) return;
+      setSummaries({});
+      setClasswideSummaries({});
     } finally {
-      setLoadingSummaries(false);
+      if (requestId === summariesRequestRef.current) setLoadingSummaries(false);
     }
   }, [students, academicYear, term, primaryClassId, activeClassIds, reportScope, settings?.terms, classIdByStudent, isStageReportMode, reportKindParam]);
 
@@ -389,14 +458,18 @@ export default function ReportCardsWorkspace() {
         [...activeClassIds].sort().join(','),
         students.length,
       ].join('|'),
-    [classNameKey, term, academicYear, reportScope, isStageReportMode, activeClassIds, students.length]
+    [classNameKey, term, academicYear, reportScope, reportKindParam, activeClassIds, students.length]
   );
 
   useEffect(() => {
+    summariesRequestRef.current += 1;
     if (!classNameKey || !term || !academicYear || !students.length) {
       setSummaries({});
+      setClasswideSummaries({});
       return;
     }
+    setSummaries({});
+    setClasswideSummaries({});
     const t = window.setTimeout(() => {
       void Promise.all([loadPublications(), loadClassSummaries()]);
     }, 280);
@@ -428,7 +501,7 @@ export default function ReportCardsWorkspace() {
 
   const tableRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return students
+    const filteredRows = students
       .map((s, index) => {
         const sum = summaries[s.id];
         const st = rowStatus(s.id);
@@ -459,9 +532,23 @@ export default function ReportCardsWorkspace() {
         if (pubFilter === 'unpublished' && row.status === 'published') return false;
         return true;
       });
+    if (!isStageReportMode) return filteredRows;
+
+    return filteredRows
+      .sort((a, b) => {
+        const positionA = a.position ?? Number.MAX_SAFE_INTEGER;
+        const positionB = b.position ?? Number.MAX_SAFE_INTEGER;
+        if (positionA !== positionB) return positionA - positionB;
+        const averageA = a.average ?? Number.NEGATIVE_INFINITY;
+        const averageB = b.average ?? Number.NEGATIVE_INFINITY;
+        if (averageA !== averageB) return averageB - averageA;
+        return studentDisplayName(a.student).localeCompare(studentDisplayName(b.student));
+      })
+      .map((row, index) => ({ ...row, index: index + 1 }));
   }, [
     students,
     summaries,
+    isStageReportMode,
     search,
     statusFilter,
     resultFilter,
@@ -515,9 +602,78 @@ export default function ReportCardsWorkspace() {
       const includeTerms = isStageReportMode
         ? undefined
         : resolveIncludeTerms(reportScope, settings?.terms ?? [], term);
-      const data = await getReportCardV2(id, cid, academicYear, term, includeTerms, reportKindParam);
-      setReport(data);
-      setSummaries((prev) => ({ ...prev, [id]: summaryFromReport(data) }));
+      const needsClasswideSummary = !includeTerms || includeTerms.length <= 1;
+      const [data, fetchedClasswide] = await Promise.all([
+        getReportCardV2(id, cid, academicYear, term, includeTerms, reportKindParam),
+        needsClasswideSummary
+          ? getClassReportSummaries(cid, academicYear, term, reportKindParam)
+          : Promise.resolve(null),
+      ]);
+      const summaryRows = fetchedClasswide?.summaries ?? [];
+      const classwideSummary = summaryRows
+        .filter((row) => row.studentId === id)
+        .map((row): ReportStudentSummary => ({
+          studentId: row.studentId,
+          average: row.average,
+          position: row.position,
+          classSize: row.classSize,
+          result: row.result === '—' ? 'Pending' : row.result,
+          generatedAt: row.generatedAt ?? fetchedClasswide?.generatedAt ?? null,
+          hasMarks: row.hasMarks,
+        }))[0];
+      let reportForView = data;
+      if (needsClasswideSummary && isStageReportMode) {
+        /** Mid-term: the card prints pooled marks, so percentage and rank must use them. */
+        const stagePct = displayedOverallPercentage(data) ?? data.overallScore;
+        /** Rank against the same displayed percentage; never let the student's own stale row count as "better". */
+        const comparisonRows = summaryRows.map((row) => {
+          const loadedSummary = summaries[row.studentId];
+          return {
+            ...row,
+            average: row.studentId === id
+              ? stagePct
+              : loadedSummary?.average ?? row.average,
+            hasMarks: loadedSummary?.hasMarks ?? row.hasMarks,
+          };
+        });
+        const hasStageMarks = data.subjects.some(
+          (subject: ReportCardDataV2['subjects'][number]) => subject.marksEntered
+        );
+        const rank = hasStageMarks
+          ? competitionRank(comparisonRows, stagePct)
+          : { position: null, classSize: null };
+        reportForView = {
+          ...data,
+          overallScore: stagePct,
+          position: rank.position ?? classwideSummary?.position ?? data.position ?? null,
+          classSize: rank.classSize ?? classwideSummary?.classSize ?? data.classSize ?? null,
+        };
+      } else if (needsClasswideSummary) {
+        reportForView = {
+          ...data,
+          overallScore: classwideSummary?.average ?? data.overallScore,
+          position: classwideSummary?.position ?? data.position ?? null,
+          classSize:
+            classwideSummary?.classSize ??
+            summaryRows[0]?.classSize ??
+            data.classSize ??
+            null,
+        };
+      }
+      setReport(reportForView);
+      const baseSummary = summaryFromReport(reportForView);
+      const viewSummary = classwideSummary
+        ? {
+            ...baseSummary,
+            result: classwideSummary.result,
+            hasMarks: classwideSummary.hasMarks || baseSummary.hasMarks,
+            generatedAt: classwideSummary.generatedAt ?? baseSummary.generatedAt,
+          }
+        : baseSummary;
+      setSummaries((prev) => ({ ...prev, [id]: viewSummary }));
+      if (needsClasswideSummary) {
+        setClasswideSummaries((prev) => ({ ...prev, [id]: viewSummary }));
+      }
       setViewerOpen(true);
     } catch (err: unknown) {
       const raw =
@@ -622,7 +778,7 @@ export default function ReportCardsWorkspace() {
         Student: studentDisplayName(r.student),
         Code: studentCodeLabel(r.student),
         Class: r.classLabel,
-        Average: r.average != null ? `${r.average.toFixed(1)}%` : '',
+        Percentage: r.average != null ? `${r.average.toFixed(1)}%` : '',
         Position: r.position && r.classSize ? `${r.position}/${r.classSize}` : '',
         Result: r.result,
         Status: STATUS_META[r.status].label,
@@ -746,6 +902,19 @@ export default function ReportCardsWorkspace() {
       : managementTab === 'annual' || reportScope === 'year'
         ? 'Annual'
         : reportTypeLabel(reportScope, term);
+
+  // The students table "Report" column names the report stage the same way on
+  // every tab (Beginning Term / Mid-Term / Termly), like the Mid-Term table.
+  const reportColumnLabel =
+    managementTab === 'beginning'
+      ? 'Beginning Term'
+      : managementTab === 'midterm'
+        ? 'Mid-Term'
+        : managementTab === 'annual' || reportScope === 'year'
+          ? 'Annual'
+          : managementTab.startsWith('period:')
+            ? 'Termly'
+            : activeReportPeriodLabel;
 
   function handleManagementTabChange(_: unknown, value: string) {
     setManagementTab(value);
@@ -1397,7 +1566,7 @@ export default function ReportCardsWorkspace() {
                       slotProps={{ input: { 'aria-label': 'Select all visible students' } }}
                     />
                   </TableCell>
-                  {['#', 'Student', 'Class', 'Report', 'Average', 'Position', 'Status', 'Generated', 'Actions'].map((h) => (
+                  {['#', 'Student', 'Class', 'Report', 'Percentage', 'Position', 'Status', 'Generated', 'Actions'].map((h) => (
                     <TableCell
                       key={h}
                       sx={{
@@ -1440,7 +1609,7 @@ export default function ReportCardsWorkspace() {
                     </TableCell>
                     <TableCell>{row.classLabel}</TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
-                      {activeReportPeriodLabel}
+                      {reportColumnLabel}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>{formatReportAverage(row.average)}</TableCell>
                     <TableCell>{formatReportPosition(row.position, row.classSize)}</TableCell>

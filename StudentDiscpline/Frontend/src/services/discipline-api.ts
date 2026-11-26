@@ -79,7 +79,7 @@ export const disciplineApi = {
 
   // Cases
   caseStats: () => api.get<ApiEnvelope<CaseStats>>('/discipline/cases/stats'),
-  cases: (params?: { className?: string; status?: string; search?: string }) =>
+  cases: (params?: { className?: string; status?: string; search?: string; academicYear?: string; incidentDate?: string; caseType?: string; markId?: string }) =>
     api.get<ApiEnvelope<DisciplineCase[]>>('/discipline/cases', { params }),
   seedSamples: () => api.post<ApiEnvelope<{ seeded: boolean }>>('/discipline/seed-samples'),
   createCase: (body: {

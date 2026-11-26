@@ -16,6 +16,8 @@ import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DownloadIcon from '@mui/icons-material/Download';
 import SaveIcon from '@mui/icons-material/Save';
@@ -23,6 +25,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import SearchIcon from '@mui/icons-material/Search';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import {
   enterAssessmentMarks,
   fetchAssessment,
@@ -36,6 +39,7 @@ import {
 import { exportAssessmentMarksPdf } from '../utils/exportAssessmentMarksPdf.js';
 import { submitAssessmentMarks, fetchAssessmentActivity, fetchMyCorrectionRequests } from '../services/coursesMarksApi.js';
 import RequestEditModal from './coursesMarks/RequestEditModal.jsx';
+import AssessmentFormSheet from './assessments/AssessmentFormSheet';
 import { useTpToast } from '../components/TpToast.jsx';
 import {
   assessmentMaxMark,
@@ -109,10 +113,13 @@ export default function AssessmentMarks() {
   const [courseDefaultTotal, setCourseDefaultTotal] = useState(null);
   const [gradingScale, setGradingScale] = useState([]);
   const toast = useTpToast();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('marks');
   const [activity, setActivity] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
+  const [assessmentEditOpen, setAssessmentEditOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const inputRefs = useRef([]);
   const saveTimer = useRef(null);
@@ -489,9 +496,23 @@ export default function AssessmentMarks() {
             </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' }, flexWrap: 'wrap', rowGap: 1 }}
+          >
             {editable ? (
               <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setAssessmentEditOpen(true)}
+                  startIcon={<EditOutlinedIcon />}
+                  sx={{ textTransform: 'none', fontWeight: 600, flex: { xs: 1, sm: 'unset' } }}
+                >
+                  Edit
+                </Button>
                 <Button
                   variant="outlined"
                   size="small"
@@ -725,6 +746,124 @@ export default function AssessmentMarks() {
                     {assessment?.academicYear || 'this year'}.
                   </Typography>
                 </Box>
+              ) : isMobile ? (
+                <Stack spacing={1} sx={{ p: 1.25 }}>
+                  {filtered.map((s, idx) => {
+                    const e = entries[s.id] || {};
+                    const scoreNum = parseMarkScore(e.score);
+                    const scoreError = scoreNum != null ? markScoreValidationError(scoreNum, maxMark) : null;
+                    const invalid = Boolean(scoreError);
+                    const grade = invalid ? null : gradeFromScale(scoreNum, maxMark, gradingScale);
+                    const missing = e.markStatus === 'PRESENT' && (e.score === '' || e.score == null) && !invalid;
+                    return (
+                      <Box
+                        key={s.id}
+                        sx={{
+                          border: '1px solid rgba(19,33,61,0.08)',
+                          borderRadius: 2,
+                          bgcolor: '#fff',
+                          px: 1.5,
+                          py: 1.25,
+                          boxShadow: '0 1px 2px rgba(19,33,61,0.04)',
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1.25}>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography noWrap sx={{ fontWeight: 700, fontSize: 13.5, color: brand.navy }}>
+                              {s.fullName}
+                            </Typography>
+                            <Typography sx={{ mt: 0.1, fontSize: 11, color: '#94A3B8' }}>
+                              {idx + 1}. {s.studentCode || '—'}
+                            </Typography>
+                          </Box>
+                          {editable ? (
+                            <TextField
+                              inputRef={(el) => {
+                                inputRefs.current[idx] = el;
+                              }}
+                              type="number"
+                              size="small"
+                              value={e.score ?? ''}
+                              onChange={(ev) => updateEntry(s.id, { score: ev.target.value })}
+                              error={invalid}
+                              onKeyDown={(ev) => {
+                                if (ev.key === 'ArrowDown' || ev.key === 'Enter') {
+                                  ev.preventDefault();
+                                  focusRow(idx + 1);
+                                }
+                                if (ev.key === 'ArrowUp') {
+                                  ev.preventDefault();
+                                  focusRow(idx - 1);
+                                }
+                              }}
+                              inputProps={{ min: 0, max: maxMark, step: 'any', 'aria-invalid': invalid }}
+                              sx={{
+                                flexShrink: 0,
+                                width: 92,
+                                '& .MuiOutlinedInput-input': {
+                                  textAlign: 'center',
+                                  fontWeight: 700,
+                                  fontVariantNumeric: 'tabular-nums',
+                                  py: 1,
+                                  fontSize: 15,
+                                },
+                              }}
+                            />
+                          ) : (
+                            <Typography
+                              sx={{
+                                flexShrink: 0,
+                                minWidth: 52,
+                                textAlign: 'right',
+                                fontWeight: 800,
+                                fontSize: 17,
+                                fontVariantNumeric: 'tabular-nums',
+                                color: brand.navy,
+                              }}
+                            >
+                              {scoreNum ?? '-'}
+                              <Box component="span" sx={{ ml: 0.25, fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
+                                /{maxMark}
+                              </Box>
+                            </Typography>
+                          )}
+                        </Stack>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              minWidth: 28,
+                              justifyContent: 'center',
+                              borderRadius: 1,
+                              bgcolor: '#F1F5F9',
+                              px: 0.75,
+                              py: 0.2,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: brand.navy,
+                            }}
+                          >
+                            {grade || '-'}
+                          </Box>
+                          {invalid ? (
+                            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>Fix score</Typography>
+                          ) : missing ? (
+                            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#B45309' }}>Missing</Typography>
+                          ) : scoreNum != null ? (
+                            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#047857' }}>Done</Typography>
+                          ) : (
+                            <Typography sx={{ fontSize: 12, color: '#94A3B8' }}>{e.markStatus}</Typography>
+                          )}
+                        </Stack>
+                        {invalid && scoreError ? (
+                          <Typography sx={{ mt: 0.75, fontSize: 11, fontWeight: 500, color: '#B91C1C' }}>
+                            {scoreError}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    );
+                  })}
+                </Stack>
               ) : (
                 <TableContainer>
                   <Table size="small" sx={{ width: '100%', tableLayout: 'auto' }}>
@@ -857,6 +996,17 @@ export default function AssessmentMarks() {
           </>
         )}
       </Stack>
+
+      <AssessmentFormSheet
+        open={assessmentEditOpen}
+        mode="edit"
+        assessment={assessment}
+        onClose={() => setAssessmentEditOpen(false)}
+        onSaved={() => {
+          setAssessmentEditOpen(false);
+          void load();
+        }}
+      />
 
       <RequestEditModal
         open={editOpen}

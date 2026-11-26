@@ -216,6 +216,33 @@ export class FeesController {
     }
   }
 
+  async validatePaymentCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await publicPaymentsService.validateCallback(req.body ?? {});
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async notifyPaymentCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await publicPaymentsService.confirmCallback(req.body ?? {});
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async reversePaymentCallback(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await publicPaymentsService.reverseCallback(req.body ?? {});
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  }
+
   async publicStudentFees(req: Request, res: Response, next: NextFunction) {
     try {
       const organizationId = String(req.query.organizationId ?? '');

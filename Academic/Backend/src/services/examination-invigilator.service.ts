@@ -29,8 +29,24 @@ function parseMins(t?: string | null) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-function sessionKey(date: string | Date, session: 'MORNING' | 'AFTERNOON') {
-  return `${toDateKey(date)}|${session}`;
+function sessionCodeOf(slot: any) {
+  return String(slot?.sessionCode || slot?.session || 'MORNING');
+}
+
+function sessionNameOf(slot: any) {
+  return String(slot?.sessionName || (slot?.session === 'AFTERNOON' ? 'Afternoon' : 'Morning'));
+}
+
+function sessionKey(date: string | Date, sessionCode: string) {
+  return `${toDateKey(date)}|${sessionCode}`;
+}
+
+function findSessionSlot(slots: any[], date: string, session?: 'MORNING' | 'AFTERNOON', sessionCode?: string) {
+  const daySlots = slots.filter((slot) => toDateKey(slot.examDate) === date);
+  if (sessionCode) return daySlots.find((slot) => sessionCodeOf(slot) === sessionCode) || null;
+  const matches = daySlots.filter((slot) => slot.session === session);
+  if (matches.length > 1) throw new AppError(400, 'sessionCode is required when multiple sessions share this period');
+  return matches[0] || null;
 }
 
 async function getTeachers(organizationId: string) {
@@ -59,7 +75,7 @@ async function loadExamAndList(organizationId: string, examinationListId: string
     where: { id: examinationListId, organizationId },
     include: {
       rooms: { orderBy: { sortOrder: 'asc' }, include: { allocations: { select: { classId: true, className: true, studentId: true } } } },
-      examinationTimetable: { include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] } } },
+      examinationTimetable: { include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] } } },
       examinationType: true,
     },
   });
@@ -73,6 +89,8 @@ function deriveSessions(list: any) {
     return slots.map((s: any) => ({
       examDate: toDateKey(s.examDate),
       session: s.session as 'MORNING' | 'AFTERNOON',
+      sessionCode: sessionCodeOf(s),
+      sessionName: sessionNameOf(s),
       startTime: s.startTime || (s.session === 'MORNING' ? '08:00' : '14:00'),
       endTime: s.endTime || (s.session === 'MORNING' ? '10:00' : '16:00'),
       courseName: s.courseName || null,
@@ -82,8 +100,8 @@ function deriveSessions(list: any) {
   const start = list.startDate || list.examinationTimetable?.startDate || new Date();
   const day = toDateKey(start);
   return [
-    { examDate: day, session: 'MORNING' as const, startTime: '08:00', endTime: '10:00', courseName: null },
-    { examDate: day, session: 'AFTERNOON' as const, startTime: '14:00', endTime: '16:00', courseName: null },
+    { examDate: day, session: 'MORNING' as const, sessionCode: 'MORNING', sessionName: 'Morning', startTime: '08:00', endTime: '10:00', courseName: null },
+    { examDate: day, session: 'AFTERNOON' as const, sessionCode: 'AFTERNOON', sessionName: 'Afternoon', startTime: '14:00', endTime: '16:00', courseName: null },
   ];
 }
 
@@ -105,7 +123,7 @@ export class ExaminationInvigilatorService {
       params.examinationTypeId
         ? prisma.classExaminationTimetable.findMany({
             where: { organizationId, examinationTypeId: params.examinationTypeId },
-            include: { slots: { select: { id: true, examDate: true, session: true, startTime: true, endTime: true, courseName: true } , orderBy: [{ examDate: 'asc' }, { session: 'asc' }] } },
+            include: { slots: { select: { id: true, examDate: true, session: true, sessionCode: true, sessionName: true, startTime: true, endTime: true, courseName: true } , orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] } },
             orderBy: [{ className: 'asc' }],
           }).catch(() => [])
         : Promise.resolve([]),
@@ -116,7 +134,7 @@ export class ExaminationInvigilatorService {
       const list = await loadExamAndList(organizationId, params.examinationListId);
       const assignments = await prisma.examinationInvigilatorAssignment.findMany({
         where: { organizationId, examinationListId: list.id },
-        orderBy: [{ examDate: 'asc' }, { session: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
+        orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
       });
 
       // Compute required room-slots based on timetable slots for classes allocated in each room
@@ -137,7 +155,7 @@ export class ExaminationInvigilatorService {
         for (const tt of tts) {
           const n = normName(tt.className); const b = baseName(tt.className);
           const keys = [tt.classId, `name:${n}`, b && b !== n ? `base:${b}` : null].filter(Boolean) as string[];
-          for (const k of keys) { if (!m.has(k)) m.set(k, new Map()); const cm = m.get(k)!; for (const sl of (tt.slots || [])) { const sk = sessionKey(sl.examDate, sl.session as any); if (!cm.has(sk)) cm.set(sk, sl); } }
+          for (const k of keys) { if (!m.has(k)) m.set(k, new Map()); const cm = m.get(k)!; for (const sl of (tt.slots || [])) { const sk = sessionKey(sl.examDate, sessionCodeOf(sl)); if (!cm.has(sk)) cm.set(sk, sl); } }
         }
         return m;
       };
@@ -155,7 +173,7 @@ export class ExaminationInvigilatorService {
         if (withSlots.length) { scopeTT = [...scopeTT, ...withSlots]; cMap = buildSlotMap(scopeTT); }
       }
 
-      const requiredSlots: Array<{ examDate: string; session: 'MORNING' | 'AFTERNOON'; startTime: string; endTime: string; roomId: string; roomName: string; roomNumber?: string | null; classNames: string[] }> = [];
+      const requiredSlots: Array<{ examDate: string; session: 'MORNING' | 'AFTERNOON'; sessionCode: string; sessionName: string; startTime: string; endTime: string; roomId: string; roomName: string; roomNumber?: string | null; classNames: string[] }> = [];
       const seenReq = new Set<string>();
       for (const r of list.rooms as any[]) {
         const allocClassIds = [...new Set(((r.allocations || []) as any[]).map((a) => a.classId).filter(Boolean))];
@@ -178,6 +196,8 @@ export class ExaminationInvigilatorService {
             requiredSlots.push({
               examDate: toDateKey(sl.examDate),
               session: sl.session as 'MORNING' | 'AFTERNOON',
+              sessionCode: sessionCodeOf(sl),
+              sessionName: sessionNameOf(sl),
               startTime: sl.startTime || (sl.session === 'MORNING' ? '08:00' : '14:00'),
               endTime: sl.endTime || (sl.session === 'MORNING' ? '10:00' : '16:00'),
               roomId: r.id, roomName: r.roomName, roomNumber: r.roomNumber,
@@ -186,16 +206,15 @@ export class ExaminationInvigilatorService {
           }
         }
       }
-      requiredSlots.sort((a,b)=>a.examDate.localeCompare(b.examDate)||a.session.localeCompare(b.session)||a.roomName.localeCompare(b.roomName));
+      requiredSlots.sort((a,b)=>a.examDate.localeCompare(b.examDate)||a.startTime.localeCompare(b.startTime)||a.roomName.localeCompare(b.roomName));
 
       const sessions = requiredSlots.length
-        ? [...new Map(requiredSlots.map((s) => [`${s.examDate}|${s.session}`, { examDate: s.examDate, session: s.session, startTime: s.startTime, endTime: s.endTime, courseName: null }])).values()]
+        ? [...new Map(requiredSlots.map((s) => [`${s.examDate}|${s.sessionCode}`, { examDate: s.examDate, session: s.session, sessionCode: s.sessionCode, sessionName: s.sessionName, startTime: s.startTime, endTime: s.endTime, courseName: null }])).values()]
         : deriveSessions(list);
 
-      const assignmentKey = (a: any) => `${toDateKey(a.examDate)}|${a.session}|${a.roomId}`;
-      const assignedKeys = new Set(assignments.map(assignmentKey));
+      const assignmentKey = (a: any) => `${toDateKey(a.examDate)}|${sessionCodeOf(a)}|${a.roomId}`;
       const coverage = requiredSlots.map((rs) => {
-        const key = `${rs.examDate}|${rs.session}|${rs.roomId}`;
+        const key = `${rs.examDate}|${rs.sessionCode}|${rs.roomId}`;
         const roomAssignments = assignments.filter((a: any) => assignmentKey(a) === key);
         return { ...rs, required: 1, assigned: roomAssignments.length, status: roomAssignments.length > 0 ? 'COVERED' : 'MISSING', invigilators: roomAssignments.map((a: any) => ({ id: a.id, teacherUserId: a.teacherUserId, teacherName: a.teacherName })) };
       });
@@ -228,7 +247,7 @@ export class ExaminationInvigilatorService {
         examinationCode: tt.examinationCode,
         startDate: toDateKey(tt.startDate),
         endDate: toDateKey(tt.endDate),
-        slots: (tt.slots || []).map((sl: any) => ({ examDate: toDateKey(sl.examDate), session: sl.session, startTime: sl.startTime, endTime: sl.endTime, courseName: sl.courseName })),
+        slots: (tt.slots || []).map((sl: any) => ({ examDate: toDateKey(sl.examDate), session: sl.session, sessionCode: sessionCodeOf(sl), sessionName: sessionNameOf(sl), startTime: sl.startTime, endTime: sl.endTime, courseName: sl.courseName })),
       })),
       lists: lists.map((l: any) => ({
         id: l.id,
@@ -255,9 +274,9 @@ export class ExaminationInvigilatorService {
     const daySet = new Set(sessions.map((s: any) => s.examDate));
     const coverageRows = Array.isArray(coverage) ? coverage : [];
     const requiredKeys = coverageRows.length
-      ? coverageRows.map((c: any) => `${c.examDate}|${c.session}|${c.roomId}`)
-      : (() => { const keys: string[] = []; for (const s of sessions) for (const r of rooms) keys.push(`${s.examDate}|${s.session}|${r.id}`); return keys; })();
-    const assignedKeys = new Set(assignments.map((a: any) => `${toDateKey(a.examDate)}|${a.session}|${a.roomId}`));
+      ? coverageRows.map((c: any) => `${c.examDate}|${sessionCodeOf(c)}|${c.roomId}`)
+      : (() => { const keys: string[] = []; for (const s of sessions) for (const r of rooms) keys.push(`${s.examDate}|${sessionCodeOf(s)}|${r.id}`); return keys; })();
+    const assignedKeys = new Set(assignments.map((a: any) => `${toDateKey(a.examDate)}|${sessionCodeOf(a)}|${a.roomId}`));
     const unassignedRooms = requiredKeys.filter((k: string) => !assignedKeys.has(k)).length;
     const teacherSet = new Set(assignments.map((a: any) => a.teacherUserId));
     return {
@@ -340,7 +359,7 @@ export class ExaminationInvigilatorService {
           if (!m.has(k)) m.set(k, new Map());
           const cm = m.get(k)!;
           for (const sl of (tt.slots || [])) {
-            const sk = sessionKey(sl.examDate, sl.session as 'MORNING' | 'AFTERNOON');
+            const sk = sessionKey(sl.examDate, sessionCodeOf(sl));
             if (!cm.has(sk)) cm.set(sk, sl);
           }
         }
@@ -403,6 +422,8 @@ export class ExaminationInvigilatorService {
           const session = {
             examDate: toDateKey(sl.examDate),
             session: sl.session as 'MORNING' | 'AFTERNOON',
+            sessionCode: sessionCodeOf(sl),
+            sessionName: sessionNameOf(sl),
             startTime: sl.startTime || (sl.session === 'MORNING' ? '08:00' : '14:00'),
             endTime: sl.endTime || (sl.session === 'MORNING' ? '10:00' : '16:00'),
             courseName: sl.courseName || null,
@@ -410,7 +431,7 @@ export class ExaminationInvigilatorService {
           let count = defaultPerRoom;
           const cfg = manualRooms.get(r.id);
           if (body.mode === 'MANUAL' && cfg) {
-            const sk = sessionKey(session.examDate, session.session);
+            const sk = sessionKey(session.examDate, session.sessionCode);
             if (cfg.sessions && typeof cfg.sessions[sk] === 'number') count = Math.max(1, cfg.sessions[sk]);
             else if (typeof cfg.defaultCount === 'number') count = Math.max(1, cfg.defaultCount);
             else count = Math.max(1, defaultPerRoom);
@@ -428,7 +449,7 @@ export class ExaminationInvigilatorService {
         const applies = !allocClassIds.length || allocClassIds.includes(listClassId);
         if (!applies) continue;
         for (const sl of (list.examinationTimetable.slots as any[])) {
-          const key = sessionKey(sl.examDate, sl.session as 'MORNING' | 'AFTERNOON');
+          const key = sessionKey(sl.examDate, sessionCodeOf(sl));
           const needKey = `${r.id}|${key}`;
           if (seenNeed.has(needKey)) continue;
           seenNeed.add(needKey);
@@ -437,6 +458,8 @@ export class ExaminationInvigilatorService {
             session: {
               examDate: toDateKey(sl.examDate),
               session: sl.session as 'MORNING' | 'AFTERNOON',
+              sessionCode: sessionCodeOf(sl),
+              sessionName: sessionNameOf(sl),
               startTime: sl.startTime || (sl.session === 'MORNING' ? '08:00' : '14:00'),
               endTime: sl.endTime || (sl.session === 'MORNING' ? '10:00' : '16:00'),
               courseName: sl.courseName || null,
@@ -447,7 +470,7 @@ export class ExaminationInvigilatorService {
       }
     }
 
-    needs.sort((a, b) => a.session.examDate.localeCompare(b.session.examDate) || a.session.session.localeCompare(b.session.session) || a.room.roomName.localeCompare(b.room.roomName));
+    needs.sort((a, b) => a.session.examDate.localeCompare(b.session.examDate) || a.session.startTime.localeCompare(b.session.startTime) || a.room.roomName.localeCompare(b.room.roomName));
     if (!needs.length) {
       const roomClassNames = [...new Set(rooms.flatMap((r: any) => ((r.allocations || []) as any[]).map((a) => a.className).filter(Boolean)))];
       const ttNames = scopeTimetables.map((t: any) => `${t.className}(${(t.slots||[]).length})`).slice(0, 8).join(', ');
@@ -464,10 +487,10 @@ export class ExaminationInvigilatorService {
     const stickyByRoomDay = new Map<string, string[]>(); // roomId|date -> teacherIds
 
     const assignmentsToCreate: any[] = [];
-    const unassigned: Array<{ roomName: string; date: string; session: string; needed: number; assigned: number }> = [];
+    const unassigned: Array<{ roomName: string; date: string; session: string; sessionCode: string; needed: number; assigned: number }> = [];
 
     for (const need of needs) {
-      const slot = sessionKey(need.session.examDate, need.session.session);
+      const slot = sessionKey(need.session.examDate, need.session.sessionCode);
       if (!assignedInSlot.has(slot)) assignedInSlot.set(slot, new Set());
       const busy = assignedInSlot.get(slot)!;
       const roomDayKey = `${need.room.id}|${need.session.examDate}`;
@@ -488,6 +511,8 @@ export class ExaminationInvigilatorService {
           roomNumber: need.room.roomNumber ?? null,
           examDate: atNoonUtc(need.session.examDate),
           session: need.session.session,
+          sessionCode: need.session.sessionCode,
+          sessionName: need.session.sessionName,
           startTime: need.session.startTime ?? null,
           endTime: need.session.endTime ?? null,
           teacherUserId: t.id,
@@ -518,12 +543,12 @@ export class ExaminationInvigilatorService {
         pick(t);
       }
 
-      const assignedIds = assignmentsToCreate.filter((a) => a.roomId === need.room.id && toDateKey(a.examDate) === need.session.examDate && a.session === need.session.session).map((a) => a.teacherUserId);
+      const assignedIds = assignmentsToCreate.filter((a) => a.roomId === need.room.id && toDateKey(a.examDate) === need.session.examDate && a.sessionCode === need.session.sessionCode).map((a) => a.teacherUserId);
       if (rotationMode === 'NONE') stickyByRoom.set(need.room.id, assignedIds);
       if (rotationMode === 'DAILY') stickyByRoomDay.set(roomDayKey, assignedIds);
 
       if (assignedCount < need.count) {
-        unassigned.push({ roomName: need.room.roomName, date: need.session.examDate, session: need.session.session, needed: need.count, assigned: assignedCount });
+        unassigned.push({ roomName: need.room.roomName, date: need.session.examDate, session: need.session.sessionName, sessionCode: need.session.sessionCode, needed: need.count, assigned: assignedCount });
       }
     }
 
@@ -537,7 +562,7 @@ export class ExaminationInvigilatorService {
 
     const results = await prisma.examinationInvigilatorAssignment.findMany({
       where: { organizationId, examinationListId: list.id },
-      orderBy: [{ examDate: 'asc' }, { session: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
+      orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
     });
 
     return { created: assignmentsToCreate.length, unassigned, assignments: results };
@@ -546,7 +571,7 @@ export class ExaminationInvigilatorService {
   async listAssignments(organizationId: string, examinationListId: string) {
     return prisma.examinationInvigilatorAssignment.findMany({
       where: { organizationId, examinationListId },
-      orderBy: [{ examDate: 'asc' }, { session: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
+      orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }, { roomName: 'asc' }, { teacherName: 'asc' }],
     });
   }
 
@@ -568,7 +593,7 @@ export class ExaminationInvigilatorService {
           organizationId,
           examinationListId: existing.examinationListId,
           examDate: existing.examDate,
-          session: existing.session,
+          sessionCode: existing.sessionCode,
           teacherUserId: body.teacherUserId,
           NOT: { id: existing.id },
         },
@@ -586,7 +611,7 @@ export class ExaminationInvigilatorService {
       if (!room) throw new AppError(404, 'Room not found');
       // prevent duplicate teacher-room-session
       const dup = await prisma.examinationInvigilatorAssignment.findFirst({
-        where: { examinationListId: existing.examinationListId, roomId: body.roomId, examDate: existing.examDate, session: existing.session, teacherUserId: body.teacherUserId || existing.teacherUserId, NOT: { id: existing.id } },
+        where: { examinationListId: existing.examinationListId, roomId: body.roomId, examDate: existing.examDate, sessionCode: existing.sessionCode, teacherUserId: body.teacherUserId || existing.teacherUserId, NOT: { id: existing.id } },
       });
       if (dup) throw new AppError(409, 'Teacher already assigned to this room/session');
       data.roomId = room.id;
@@ -598,13 +623,14 @@ export class ExaminationInvigilatorService {
     return prisma.examinationInvigilatorAssignment.update({ where: { id: existing.id }, data });
   }
 
-  async availableTeachersForSlot(organizationId: string, params: { examinationListId: string; examDate: string; session: 'MORNING' | 'AFTERNOON' }) {
-    if (!params.examinationListId || !params.examDate || !params.session) throw new AppError(400, 'examinationListId, examDate and session are required');
+  async availableTeachersForSlot(organizationId: string, params: { examinationListId: string; examDate: string; session?: 'MORNING' | 'AFTERNOON'; sessionCode?: string }) {
+    const sessionCode = params.sessionCode || params.session;
+    if (!params.examinationListId || !params.examDate || !sessionCode) throw new AppError(400, 'examinationListId, examDate and sessionCode are required');
     const date = atNoonUtc(params.examDate);
     const [teachers, busy] = await Promise.all([
       getTeachers(organizationId),
       prisma.examinationInvigilatorAssignment.findMany({
-        where: { organizationId, examDate: date, session: params.session },
+        where: { organizationId, examDate: date, sessionCode },
         select: { teacherUserId: true },
       }),
     ]);
@@ -612,12 +638,13 @@ export class ExaminationInvigilatorService {
     return teachers.filter((t: any) => t.active && !busySet.has(t.id)).map((t: any) => ({ id: t.id, name: t.name, email: t.email }));
   }
 
-  async addAssignment(organizationId: string, body: { examinationListId: string; roomId: string; examDate: string; session: 'MORNING' | 'AFTERNOON'; teacherUserId: string }) {
-    const { examinationListId, roomId, examDate, session, teacherUserId } = body || ({} as any);
-    if (!examinationListId || !roomId || !examDate || !session || !teacherUserId) throw new AppError(400, 'examinationListId, roomId, examDate, session and teacherUserId are required');
+  async addAssignment(organizationId: string, body: { examinationListId: string; roomId: string; examDate: string; session?: 'MORNING' | 'AFTERNOON'; sessionCode?: string; teacherUserId: string }) {
+    const { examinationListId, roomId, examDate, session, sessionCode: requestedSessionCode, teacherUserId } = body || ({} as any);
+    const sessionCode = requestedSessionCode || session;
+    if (!examinationListId || !roomId || !examDate || !sessionCode || !teacherUserId) throw new AppError(400, 'examinationListId, roomId, examDate, sessionCode and teacherUserId are required');
     const list = await prisma.examinationList.findFirst({
       where: { id: examinationListId, organizationId },
-      include: { rooms: true, examinationTimetable: true },
+      include: { rooms: true, examinationTimetable: { include: { slots: true } } },
     });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status === 'PUBLISHED') {
@@ -627,12 +654,8 @@ export class ExaminationInvigilatorService {
     if (!room) throw new AppError(404, 'Room not found in this examination list');
 
     const date = atNoonUtc(examDate);
-    const busy = await prisma.examinationInvigilatorAssignment.findFirst({
-      where: { organizationId, examDate: date, session, teacherUserId, NOT: { roomId, examinationListId } },
-    });
-    // busy in another room same slot? block
     const busyAny = await prisma.examinationInvigilatorAssignment.findFirst({
-      where: { organizationId, examDate: date, session, teacherUserId },
+      where: { organizationId, examDate: date, sessionCode, teacherUserId },
     });
     if (busyAny) throw new AppError(409, 'Teacher is already assigned to another room in this session');
 
@@ -641,11 +664,12 @@ export class ExaminationInvigilatorService {
     if (!teacher) throw new AppError(404, 'Teacher not found');
 
     const dup = await prisma.examinationInvigilatorAssignment.findFirst({
-      where: { examinationListId, roomId, examDate: date, session, teacherUserId },
+      where: { examinationListId, roomId, examDate: date, sessionCode, teacherUserId },
     });
     if (dup) throw new AppError(409, 'Teacher already assigned to this room/session');
 
-    const sessionInfo = deriveSessions(list).find((s: any) => s.examDate === toDateKey(examDate) && s.session === session);
+    const sessionInfo = deriveSessions(list).find((s: any) => s.examDate === toDateKey(examDate) && s.sessionCode === sessionCode);
+    if (!sessionInfo) throw new AppError(404, 'Examination session not found');
     return prisma.examinationInvigilatorAssignment.create({
       data: {
         organizationId,
@@ -657,7 +681,9 @@ export class ExaminationInvigilatorService {
         roomName: room.roomName,
         roomNumber: room.roomNumber ?? null,
         examDate: date,
-        session,
+        session: sessionInfo.session,
+        sessionCode: sessionInfo.sessionCode,
+        sessionName: sessionInfo.sessionName,
         startTime: sessionInfo?.startTime ?? null,
         endTime: sessionInfo?.endTime ?? null,
         teacherUserId: teacher.id,
@@ -681,36 +707,52 @@ export class ExaminationInvigilatorService {
     return { deleted: res.count };
   }
 
-  async getExamAttendance(organizationId: string, params: { examinationListId: string; roomId: string; examDate: string; session: 'MORNING'|'AFTERNOON' }) {
-    const { examinationListId, roomId, examDate, session } = params;
-    if (!examinationListId || !roomId || !examDate || !session) throw new AppError(400, 'examinationListId, roomId, examDate and session are required');
+  async getExamAttendance(organizationId: string, params: { examinationListId: string; roomId: string; examDate: string; session?: 'MORNING'|'AFTERNOON'; sessionCode?: string }) {
+    const { examinationListId, roomId, examDate, session: requestedSession, sessionCode: requestedSessionCode } = params;
+    if (!examinationListId || !roomId || !examDate || (!requestedSession && !requestedSessionCode)) throw new AppError(400, 'examinationListId, roomId, examDate and sessionCode are required');
     const list = await prisma.examinationList.findFirst({ where: { id: examinationListId, organizationId }, include: { rooms: { include: { allocations: { orderBy: [{ className: 'asc' }, { studentName: 'asc' }] } } }, examinationTimetable: { include: { slots: true } } } });
     if (!list) throw new AppError(404, 'Examination list not found');
     const room = (list.rooms || []).find((r: any) => r.id === roomId);
     if (!room) throw new AppError(404, 'Room not found');
     const dateKey = toDateKey(examDate);
-    const slot = (list.examinationTimetable?.slots || []).find((sl: any) => toDateKey(sl.examDate) === dateKey && sl.session === session);
+    const timetableSlots = list.examinationTimetable?.slots || [];
+    const slot = findSessionSlot(timetableSlots, dateKey, requestedSession, requestedSessionCode);
+    if (requestedSessionCode && timetableSlots.some((item: any) => toDateKey(item.examDate) === dateKey) && !slot) {
+      throw new AppError(404, 'Examination session not found');
+    }
+    const sessionCode = requestedSessionCode || (slot ? sessionCodeOf(slot) : requestedSession!);
+    const session = slot?.session || requestedSession;
+    if (!session) throw new AppError(404, 'Examination session not found');
+    const sessionName = slot ? sessionNameOf(slot) : session === 'MORNING' ? 'Morning' : 'Afternoon';
     const startTime = slot?.startTime || (session === 'MORNING' ? '08:00' : '14:00');
     const endTime = slot?.endTime || (session === 'MORNING' ? '10:00' : '16:00');
-    const existing = await prisma.examinationAttendance.findMany({ where: { organizationId, examinationListId, roomId, examDate: atNoonUtc(dateKey), session } });
+    const existing = await prisma.examinationAttendance.findMany({ where: { organizationId, examinationListId, roomId, examDate: atNoonUtc(dateKey), sessionCode } });
     const byStudent = new Map(existing.map((r: any) => [r.studentId, r]));
     const students = ((room as any).allocations || []).map((a: any) => {
       const rec = byStudent.get(a.studentId);
       return { studentId: a.studentId, studentCode: a.studentCode || null, studentName: a.studentName, classId: a.classId, className: a.className, status: rec?.status || null, markedAt: rec?.markedAt || null, markedByName: rec?.markedByName || null, notes: rec?.notes || null };
     });
-    return { examinationListId, roomId, roomName: room.roomName, roomNumber: (room as any).roomNumber || null, examDate: dateKey, session, startTime, endTime, students };
+    return { examinationListId, roomId, roomName: room.roomName, roomNumber: (room as any).roomNumber || null, examDate: dateKey, session, sessionCode, sessionName, startTime, endTime, students };
   }
 
-  async markExamAttendance(organizationId: string, actor: { id?: string; name?: string }, body: { examinationListId: string; roomId: string; examDate: string; session: 'MORNING'|'AFTERNOON'; records: Array<{ studentId: string; status: 'PRESENT'|'ABSENT'|'LATE'|'EXCUSED'; notes?: string }> }) {
-    const { examinationListId, roomId, examDate, session, records } = body || ({} as any);
-    if (!examinationListId || !roomId || !examDate || !session) throw new AppError(400, 'examinationListId, roomId, examDate and session are required');
+  async markExamAttendance(organizationId: string, actor: { id?: string; name?: string }, body: { examinationListId: string; roomId: string; examDate: string; session?: 'MORNING'|'AFTERNOON'; sessionCode?: string; records: Array<{ studentId: string; status: 'PRESENT'|'ABSENT'|'LATE'|'EXCUSED'; notes?: string }> }) {
+    const { examinationListId, roomId, examDate, session: requestedSession, sessionCode: requestedSessionCode, records } = body || ({} as any);
+    if (!examinationListId || !roomId || !examDate || (!requestedSession && !requestedSessionCode)) throw new AppError(400, 'examinationListId, roomId, examDate and sessionCode are required');
     if (!Array.isArray(records)) throw new AppError(400, 'records array is required');
     const list = await prisma.examinationList.findFirst({ where: { id: examinationListId, organizationId }, include: { rooms: { include: { allocations: true } }, examinationTimetable: { include: { slots: true } } } });
     if (!list) throw new AppError(404, 'Examination list not found');
     const room = (list.rooms || []).find((r: any) => r.id === roomId);
     if (!room) throw new AppError(404, 'Room not found');
     const dateKey = toDateKey(examDate);
-    const slot = (list.examinationTimetable?.slots || []).find((sl: any) => toDateKey(sl.examDate) === dateKey && sl.session === session);
+    const timetableSlots = list.examinationTimetable?.slots || [];
+    const slot = findSessionSlot(timetableSlots, dateKey, requestedSession, requestedSessionCode);
+    if (requestedSessionCode && timetableSlots.some((item: any) => toDateKey(item.examDate) === dateKey) && !slot) {
+      throw new AppError(404, 'Examination session not found');
+    }
+    const sessionCode = requestedSessionCode || (slot ? sessionCodeOf(slot) : requestedSession!);
+    const session = slot?.session || requestedSession;
+    if (!session) throw new AppError(404, 'Examination session not found');
+    const sessionName = slot ? sessionNameOf(slot) : session === 'MORNING' ? 'Morning' : 'Afternoon';
     const startTime = slot?.startTime || (session === 'MORNING' ? '08:00' : '14:00');
     const endTime = slot?.endTime || (session === 'MORNING' ? '10:00' : '16:00');
     // enforce time window on exam date
@@ -732,13 +774,13 @@ export class ExaminationInvigilatorService {
       const alloc = ((room as any).allocations || []).find((a: any) => a.studentId === rec.studentId);
       const status = ['PRESENT','ABSENT','LATE','EXCUSED'].includes(rec.status) ? rec.status : 'PRESENT';
       ops.push(prisma.examinationAttendance.upsert({
-        where: { examinationListId_roomId_examDate_session_studentId: { examinationListId, roomId, examDate: atNoonUtc(dateKey), session, studentId: rec.studentId } },
-        update: { status: status as any, notes: rec.notes || null, markedByUserId: actor?.id || null, markedByName: actor?.name || null, markedAt: nowDate },
-        create: { organizationId, examinationListId, roomId, studentId: rec.studentId, studentCode: alloc?.studentCode || null, studentName: alloc?.studentName || 'Student', classId: alloc?.classId || null, className: alloc?.className || null, examDate: atNoonUtc(dateKey), session, status: status as any, markedByUserId: actor?.id || null, markedByName: actor?.name || null, markedAt: nowDate, notes: rec.notes || null },
+        where: { examinationListId_roomId_examDate_sessionCode_studentId: { examinationListId, roomId, examDate: atNoonUtc(dateKey), sessionCode, studentId: rec.studentId } },
+        update: { status: status as any, sessionName, notes: rec.notes || null, markedByUserId: actor?.id || null, markedByName: actor?.name || null, markedAt: nowDate },
+        create: { organizationId, examinationListId, roomId, studentId: rec.studentId, studentCode: alloc?.studentCode || null, studentName: alloc?.studentName || 'Student', classId: alloc?.classId || null, className: alloc?.className || null, examDate: atNoonUtc(dateKey), session, sessionCode, sessionName, status: status as any, markedByUserId: actor?.id || null, markedByName: actor?.name || null, markedAt: nowDate, notes: rec.notes || null },
       }));
     }
     if (ops.length) await prisma.$transaction(ops);
-    return this.getExamAttendance(organizationId, { examinationListId, roomId, examDate: dateKey, session });
+    return this.getExamAttendance(organizationId, { examinationListId, roomId, examDate: dateKey, session, sessionCode });
   }
 
   async listExamAttendance(organizationId: string, query: any = {}) {
@@ -763,7 +805,8 @@ export class ExaminationInvigilatorService {
       ];
     }
     if (query.examDate) where.examDate = atNoonUtc(toDateKey(query.examDate));
-    if (query.session && ['MORNING','AFTERNOON'].includes(String(query.session))) where.session = String(query.session);
+    if (query.sessionCode) where.sessionCode = String(query.sessionCode);
+    else if (query.session && ['MORNING','AFTERNOON'].includes(String(query.session))) where.session = String(query.session);
 
     const [total, rows, grouped, roomRows, classRows] = await Promise.all([
       prisma.examinationAttendance.count({ where }),
@@ -773,7 +816,7 @@ export class ExaminationInvigilatorService {
           room: { select: { id: true, roomName: true, roomNumber: true } },
           examinationList: { select: { id: true, listCode: true, examinationName: true, academicYear: true, term: true, examinationTypeId: true, examinationType: { select: { id: true, name: true } } } },
         },
-        orderBy: [{ examDate: 'desc' }, { session: 'asc' }, { className: 'asc' }, { studentName: 'asc' }],
+        orderBy: [{ examDate: 'desc' }, { sessionCode: 'asc' }, { className: 'asc' }, { studentName: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -835,15 +878,15 @@ export class ExaminationInvigilatorService {
       examinationListId: r.examinationListId,
       roomId: r.roomId,
       examDate: r.examDate,
-      session: r.session,
+      sessionCode: r.sessionCode,
     }));
     const siblings = await prisma.examinationInvigilatorAssignment.findMany({
       where: { organizationId, OR: or },
-      select: { id: true, examinationListId: true, roomId: true, examDate: true, session: true, teacherUserId: true, teacherName: true, teacherEmail: true, status: true },
+      select: { id: true, examinationListId: true, roomId: true, examDate: true, session: true, sessionCode: true, sessionName: true, teacherUserId: true, teacherName: true, teacherEmail: true, status: true },
     });
     const sibMap = new Map<string, typeof siblings>();
     for (const s of siblings) {
-      const k = `${s.examinationListId}|${s.roomId}|${toDateKey(s.examDate)}|${s.session}`;
+      const k = `${s.examinationListId}|${s.roomId}|${toDateKey(s.examDate)}|${s.sessionCode}`;
       if (!sibMap.has(k)) sibMap.set(k, [] as any);
       sibMap.get(k)!.push(s);
     }
@@ -871,7 +914,7 @@ export class ExaminationInvigilatorService {
     const base = (v: any) => norm(v).replace(/\s+[a-z0-9]+$/i, '').trim();
 
     return rows.map((r) => {
-      const k = `${r.examinationListId}|${r.roomId}|${toDateKey(r.examDate)}|${r.session}`;
+      const k = `${r.examinationListId}|${r.roomId}|${toDateKey(r.examDate)}|${r.sessionCode}`;
       const dk = toDateKey(r.examDate);
       const roomAlloc = (r.room?.allocations || (r.examinationList as any)?.rooms?.find((rm: any) => rm.id === r.roomId)?.allocations || []) as any[];
       const classKeys = [...new Set(roomAlloc.map((a) => `${a.classId || ''}|||${a.className || ''}`))];
@@ -879,7 +922,7 @@ export class ExaminationInvigilatorService {
       const relevantSlots = timetableRows
         .filter((t) => !ctx || (t.academicYear === ctx.year && t.term === ctx.term && (!ctx.examTypeId || t.examinationTypeId === ctx.examTypeId)))
         .flatMap((t) => (t.slots || []).map((sl: any) => ({ ...sl, __ttClassId: t.classId, __ttClassName: t.className })))
-        .filter((sl: any) => toDateKey(sl.examDate) === dk && sl.session === r.session);
+        .filter((sl: any) => toDateKey(sl.examDate) === dk && sessionCodeOf(sl) === r.sessionCode);
 
       const examSlots = classKeys.map((ck) => {
         const [classId, className] = ck.split('|||');
@@ -899,7 +942,7 @@ export class ExaminationInvigilatorService {
         };
       });
 
-      return { ...r, coInvigilators: sibMap.get(k) || [], examSlots };
+      return { ...r, sessionName: r.sessionName || (r.session === 'MORNING' ? 'Morning' : 'Afternoon'), coInvigilators: sibMap.get(k) || [], examSlots };
     });
   }
 }

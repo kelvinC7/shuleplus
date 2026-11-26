@@ -477,15 +477,24 @@ function openToday() {
   const rec =
     (k.attendance || []).find((r) => r.date === todayKey) ||
     (k.attendance || []).slice(-1)[0];
-  const label = rec ? ATT_STATUS_LABEL[rec.status] || String(rec.status) : "No record";
+  const label = rec
+    ? ATT_STATUS_LABEL[rec.status] || String(rec.status)
+    : "No record";
   const detailColor =
-    rec && rec.status === "ABSENT" ? "red" : rec && rec.status === "LATE" ? "amber" : "";
-  const dateLabel = new Date(todayKey + "T00:00:00").toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+    rec && rec.status === "ABSENT"
+      ? "red"
+      : rec && rec.status === "LATE"
+        ? "amber"
+        : "";
+  const dateLabel = new Date(todayKey + "T00:00:00").toLocaleDateString(
+    "en-GB",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    },
+  );
   const lessons = k.todayLessons || [];
   const rows = lessons.map((l) => [
     ["P" + l.period, l.startTime].filter(Boolean).join(" "),
@@ -548,7 +557,10 @@ function learnBody(k) {
         : trend.map((_, i) => "Term " + (i + 1));
     const trendMin = trend.length ? Math.max(0, Math.min(...trend) - 5) : 0;
     const trendMax = trend.length ? Math.min(100, Math.max(...trend) + 5) : 100;
-    const hasCls = Array.isArray(k.cls_avg) && k.cls_avg.length === trend.length && trend.length > 0;
+    const hasCls =
+      Array.isArray(k.cls_avg) &&
+      k.cls_avg.length === trend.length &&
+      trend.length > 0;
     const trendCard =
       trend.length >= 2
         ? line(trend, trendLabels, {
@@ -560,7 +572,9 @@ function learnBody(k) {
           `<div class="legend"><span><i style="background:var(--navy)"></i>${k.first}</span>${hasCls ? `<span><i style="background:#C9D1E3"></i>Class average</span>` : ""}</div>`
         : `<p class="qlnote">Not enough published terms to chart a trend yet.</p>`;
     const delta = k.prev
-      ? (k.avg >= k.prev ? "▲ " : "▼ ") + Math.abs(k.avg - k.prev).toFixed(1) + " pts"
+      ? (k.avg >= k.prev ? "▲ " : "▼ ") +
+        Math.abs(k.avg - k.prev).toFixed(1) +
+        " pts"
       : "";
     return `${src("Academic, TichaPortal and Digital Attendance")}
   ${card("Term average across the year", trendCard, k.rank === "—" ? "" : k.rank + " in class")}
@@ -617,7 +631,8 @@ function academicsBody(k) {
       ? (k.reportCards || [])
           .map((r, i) => {
             const title =
-              [r.term, r.academicYear].filter(Boolean).join(" ") || "Report card";
+              [r.term, r.academicYear].filter(Boolean).join(" ") ||
+              "Report card";
             const kindLabel =
               r.reportKind === "midterm"
                 ? "Mid-term report"
@@ -626,7 +641,8 @@ function academicsBody(k) {
                   : "End-of-term report";
             const meta = [kindLabel, r.className].filter(Boolean).join(" · ");
             const ready = r.allowed;
-            const note = r.message || (r.publishedAt ? "Published " + r.publishedAt : "");
+            const note =
+              r.message || (r.publishedAt ? "Published " + r.publishedAt : "");
             const icon = svgI(
               '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
             ).replace(
@@ -647,7 +663,9 @@ function academicsBody(k) {
 function openSubject(i) {
   const k = kid(),
     [n, v, t] = k.subj[i];
-  const key = String(n || "").trim().toLowerCase();
+  const key = String(n || "")
+    .trim()
+    .toLowerCase();
   const marks = (k.subjectMarks && k.subjectMarks[key]) || [];
   const rows = marks.map((m) => [
     m.title + (m.date ? ` · ${m.date}` : ""),
@@ -702,7 +720,11 @@ function renderReport(report) {
       ? `${report.position} of ${report.classSize || "?"}`
       : "—";
   return `${src("Academic · published report card")}${dk([
-    [overall, "Overall", report && report.overallGrade ? "Grade " + report.overallGrade : ""],
+    [
+      overall,
+      "Overall",
+      report && report.overallGrade ? "Grade " + report.overallGrade : "",
+    ],
     [pos, "Position", ""],
   ])}${
     rows.length
@@ -714,11 +736,14 @@ async function openReportCard(i) {
   const k = kid();
   const rc = (k.reportCards || [])[i];
   if (!rc) return;
-  const title = [rc.term, rc.academicYear].filter(Boolean).join(" ") || "Report card";
+  const title =
+    [rc.term, rc.academicYear].filter(Boolean).join(" ") || "Report card";
   const el = pushPanel({
     k: k.n + " · " + k.cls,
     t: title,
-    s: reportKindLabel(rc.reportKind) + (rc.className ? " · " + rc.className : ""),
+    s:
+      reportKindLabel(rc.reportKind) +
+      (rc.className ? " · " + rc.className : ""),
     b: `<p class="qlnote">Loading report…</p>`,
   });
   try {
@@ -816,16 +841,22 @@ function attDay(dateStr) {
     return;
   }
   const esc = (v) =>
-    String(v ?? "").replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    })[c]);
+    String(v ?? "").replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
   const bits = [
     rec.checkInTime ? "Gate in " + String(rec.checkInTime).slice(11, 16) : "",
-    rec.checkOutTime ? "Gate out " + String(rec.checkOutTime).slice(11, 16) : "",
+    rec.checkOutTime
+      ? "Gate out " + String(rec.checkOutTime).slice(11, 16)
+      : "",
     rec.notes ? esc(rec.notes) : "",
   ].filter(Boolean);
   const label = ATT_STATUS_LABEL[rec.status] || esc(rec.status);
@@ -1290,10 +1321,16 @@ function kitSel(x: any): string[] {
 function kitSelTotal(x: any): number {
   if (!x) return 0;
   const sel = kitSel(x);
-  return kitLines(x).reduce((a: number, l: any) => (sel.includes(l.id) ? a + l.price : a), 0);
+  return kitLines(x).reduce(
+    (a: number, l: any) => (sel.includes(l.id) ? a + l.price : a),
+    0,
+  );
 }
 function kitToggle(childOrId: any, itemId: string) {
-  const child = typeof childOrId === "string" ? KIDS.find((y) => y.id === childOrId) : childOrId;
+  const child =
+    typeof childOrId === "string"
+      ? KIDS.find((y) => y.id === childOrId)
+      : childOrId;
   if (!child) return;
   const sel = kitSel(child);
   const at = sel.indexOf(itemId);
@@ -1305,7 +1342,10 @@ function kitToggle(childOrId: any, itemId: string) {
   kitStep();
 }
 function kitSelectAll(childOrId: any, selectAll: boolean) {
-  const child = typeof childOrId === "string" ? KIDS.find((y) => y.id === childOrId) : childOrId;
+  const child =
+    typeof childOrId === "string"
+      ? KIDS.find((y) => y.id === childOrId)
+      : childOrId;
   if (!child) return;
   KW.items[child.id] = selectAll ? kitLineIds(child) : [];
   kitStep();
@@ -1398,7 +1438,8 @@ function kitStep() {
               : "";
             return `<div class="lbl2" style="margin-top:10px">${x.first} · ${x.kit.for}</div>${shoe}${uni}`;
           })
-          .join("")],
+          .join(""),
+    ],
     [
       "Choose items",
       () =>
@@ -1624,7 +1665,10 @@ let DOCS = [
 const docFmtSize = (bytes) => {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
   const v = bytes / Math.pow(1024, i);
   return `${v >= 10 || i === 0 ? v.toFixed(1).replace(/\.0$/, "") : v.toFixed(1)} ${units[i]}`;
 };
@@ -1675,7 +1719,7 @@ function renderDocumentsBody() {
           <button onclick="downloadDocItem('${d.id}')" style="border:1px solid #DCE3EF;background:#fff;color:#13213D;border-radius:12px;padding:8px 12px;font:700 12px Montserrat,system-ui;cursor:pointer">Download</button>
           <button onclick="deleteDocItem('${d.id}')" style="border:1px solid #F3D4D7;background:#FFF7F7;color:#B42318;border-radius:12px;padding:8px 12px;font:700 12px Montserrat,system-ui;cursor:pointer">Delete</button>
         </div>
-      </div>`
+      </div>`,
   ).join("");
   const list = `
     <div style="background:#fff;border:1px solid #E5E8EF;border-radius:24px;padding:18px;box-shadow:0 8px 24px rgba(19,33,61,.04)">
@@ -1699,10 +1743,19 @@ function openDocuments() {
     </div>
     ${renderDocumentsBody()}
   </div>`;
-  if (PST.length && PST[PST.length - 1].o && PST[PST.length - 1].o.t === "Documents") {
+  if (
+    PST.length &&
+    PST[PST.length - 1].o &&
+    PST[PST.length - 1].o.t === "Documents"
+  ) {
     repaint(PST[PST.length - 1].el, b);
   } else {
-    pushPanel({ k: "Student files", t: "Documents", s: kid().n + " · " + kid().cls, b });
+    pushPanel({
+      k: "Student files",
+      t: "Documents",
+      s: kid().n + " · " + kid().cls,
+      b,
+    });
   }
 }
 function handleDocFiles(files) {
@@ -1711,7 +1764,13 @@ function handleDocFiles(files) {
   const now = new Date().toISOString();
   arr.forEach((f, i) => {
     DOCS.unshift({
-      id: "doc-" + Date.now() + "-" + i + "-" + Math.random().toString(36).slice(2, 6),
+      id:
+        "doc-" +
+        Date.now() +
+        "-" +
+        i +
+        "-" +
+        Math.random().toString(36).slice(2, 6),
       name: f.name,
       size: f.size || 0,
       uploadedAt: now,
@@ -1719,7 +1778,9 @@ function handleDocFiles(files) {
     });
   });
   DOC_TAB = "list";
-  toast(arr.length === 1 ? "Document uploaded" : arr.length + " documents uploaded");
+  toast(
+    arr.length === 1 ? "Document uploaded" : arr.length + " documents uploaded",
+  );
   openDocuments();
 }
 function deleteDocItem(id) {
@@ -1826,7 +1887,7 @@ function openMore_p9() {
 }
 function _old_addChild() {
   openSheet(
-    `<h3>Add a child</h3><p class="lead">Enter the SDMS code or ShuleCard number. The school confirms the link with the phone number on the child’s profile.</p><div class="sdmsin" style="margin-top:12px"><span class="ic">${svgI('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}</span><input placeholder="SDMS code / ShuleCard no."><button class="go2" onclick="closeSheet();toast('Link request sent to the school')">${svgI('<path d="M5 12h14M13 6l6 6-6 6"/>')}</button></div><button class="go" style="margin-top:14px;background:var(--bg);color:var(--navy)" onclick="toast('Camera opens to scan the ShuleCard QR')">Scan ShuleCard QR instead</button>`,
+    `<h3>Add a child</h3><p class="lead">Enter the SDMS code or ShuleCard number. The school confirms the link with the phone number on the child’s profile.</p><div class="sdmsin" style="margin-top:12px"><span class="ic">${svgI('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}</span><input placeholder="SDMS code / ShuleCard no."><button class="go2" onclick="closeSheet();toast('Link request sent to the school')">${svgI('<path d="M5 12h14M13 6l6 6-6 6"/>')}</button></div>`,
   );
 }
 function _x_openProfile() {
@@ -1956,7 +2017,13 @@ function leaveStatusBadge(status) {
       : "amber";
   return `<span class="chip ${tone}">${escapeLinkValue(label)}</span>`;
 }
-function leavePanelMarkup(requests, permissions, loading = false, requestError = "", permissionError = "") {
+function leavePanelMarkup(
+  requests,
+  permissions,
+  loading = false,
+  requestError = "",
+  permissionError = "",
+) {
   const today = new Date().toISOString().slice(0, 10);
   const requestRows = requests.map((request) => [
     leaveDateLabel(request.date),
@@ -1964,27 +2031,39 @@ function leavePanelMarkup(requests, permissions, loading = false, requestError =
     leaveStatusBadge(request.status),
   ]);
   const permissionRows = permissions.map((permission) => {
-    const departure = leaveDateLabel(permission.departureAt, permission.departureTime);
+    const departure = leaveDateLabel(
+      permission.departureAt,
+      permission.departureTime,
+    );
     const returnAt = permission.actualReturnAt || permission.expectedReturnAt;
     const returnTime = permission.actualReturnAt
       ? leaveDateLabel(returnAt, permission.actualReturnTime)
       : leaveStatusBadge(permission.status);
-    return [departure, escapeLinkValue(permission.reason || permission.destination || permission.type || "Permission"), returnTime];
+    return [
+      departure,
+      escapeLinkValue(
+        permission.reason ||
+          permission.destination ||
+          permission.type ||
+          "Permission",
+      ),
+      returnTime,
+    ];
   });
   const requestsContent = loading
     ? '<p class="qlnote">Loading leave requests…</p>'
     : requestError
       ? `<p class="leave-section-error">${escapeLinkValue(requestError)}</p><button type="button" class="leave-retry">Retry</button>`
       : requestRows.length
-      ? tbl(["Date", "Type", "Status"], requestRows)
-      : '<p class="qlnote">No leave requests found.</p>';
+        ? tbl(["Date", "Type", "Status"], requestRows)
+        : '<p class="qlnote">No leave requests found.</p>';
   const permissionsContent = loading
     ? '<p class="qlnote">Loading permission passes…</p>'
     : permissionError
       ? `<p class="leave-section-error">${escapeLinkValue(permissionError)}</p><button type="button" class="leave-retry">Retry</button>`
       : permissionRows.length
-      ? tbl(["Date", "Reason", "Status / back"], permissionRows)
-      : '<p class="qlnote">No permission passes found.</p>';
+        ? tbl(["Date", "Reason", "Status / back"], permissionRows)
+        : '<p class="qlnote">No permission passes found.</p>';
   return `
     <form id="leave-request-form" class="leave-request-form" hidden>
       <label for="leave-date">Leave date</label><input id="leave-date" name="date" type="date" min="${today}" required>
@@ -1996,8 +2075,25 @@ function leavePanelMarkup(requests, permissions, loading = false, requestError =
     ${card("Requests", requestsContent)}
     ${card("Permission passes", permissionsContent)}`;
 }
-function renderLeavePanel(panel, studentId, requests, permissions, loading = false, requestError = "", permissionError = "") {
-  repaint(panel, leavePanelMarkup(requests, permissions, loading, requestError, permissionError));
+function renderLeavePanel(
+  panel,
+  studentId,
+  requests,
+  permissions,
+  loading = false,
+  requestError = "",
+  permissionError = "",
+) {
+  repaint(
+    panel,
+    leavePanelMarkup(
+      requests,
+      permissions,
+      loading,
+      requestError,
+      permissionError,
+    ),
+  );
   const requestButton = panel.querySelector("#leave-request-open");
   const form = panel.querySelector("#leave-request-form");
   if (requestButton && form) {
@@ -2025,13 +2121,16 @@ function renderLeavePanel(panel, studentId, requests, permissions, loading = fal
           reason: String(formData.get("reason") || "").trim(),
         });
         if (!result || result.success === false || result.simulated) {
-          throw new Error(result?.message || "Could not submit the leave request.");
+          throw new Error(
+            result?.message || "Could not submit the leave request.",
+          );
         }
         toast("Leave request submitted to school");
         await loadLeavePanel(panel, studentId);
       } catch (submitError) {
         if (errorText) {
-          errorText.textContent = submitError?.message || "Could not submit the leave request.";
+          errorText.textContent =
+            submitError?.message || "Could not submit the leave request.";
           errorText.hidden = false;
         }
         if (submit) {
@@ -2042,7 +2141,10 @@ function renderLeavePanel(panel, studentId, requests, permissions, loading = fal
     });
   }
   panel.querySelectorAll(".leave-retry").forEach((retry) => {
-    retry.addEventListener("click", () => void loadLeavePanel(panel, studentId));
+    retry.addEventListener(
+      "click",
+      () => void loadLeavePanel(panel, studentId),
+    );
   });
 }
 async function loadLeavePanel(panel, studentId) {
@@ -2063,13 +2165,18 @@ async function loadLeavePanel(panel, studentId) {
     unwrapList(leaveResponse),
     unwrapList(permissionResponse),
     false,
-    leaveResponse == null ? "Could not load leave requests. Check your connection and retry." : "",
-    permissionResponse == null ? "Could not load permission passes. Check your connection and retry." : "",
+    leaveResponse == null
+      ? "Could not load leave requests. Check your connection and retry."
+      : "",
+    permissionResponse == null
+      ? "Could not load permission passes. Check your connection and retry."
+      : "",
   );
 }
 function openNotifSettings() {
   const granted =
-    typeof Notification !== "undefined" && Notification.permission === "granted";
+    typeof Notification !== "undefined" &&
+    Notification.permission === "granted";
   openSheet(
     `<h3>Notifications</h3>${!granted ? `<div class="found" style="border-color:var(--amber);background:var(--amber-soft);margin-bottom:10px"><small style="color:#9A5B00;font-size:11px;line-height:1.5"><b style="display:block;font-size:12px;color:#9A5B00">Turn on phone notifications</b>Allow yoShule to send school alerts and module updates to this device.</small><button class="go" style="margin-top:8px" onclick="registerPushNotifications()">Enable notifications</button></div>` : '<div class="srcline" style="margin-bottom:10px"><i></i>Phone notifications are enabled</div>'}${[
       ["Arrival, departure and attendance", 1],
@@ -2082,17 +2189,33 @@ function openNotifSettings() {
     ]
       .map(
         ([t, o]) =>
-          `<div class="chan ${o ? "on" : ""}" onclick="this.classList.toggle('on');try{const p=JSON.parse(localStorage.getItem('yoshule_notification_prefs_v1')||'{}');p['${String(t).replace(/[^a-z]/gi,'_')}']=this.classList.contains('on');localStorage.setItem('yoshule_notification_prefs_v1',JSON.stringify(p));}catch(e){}"><div><b>${t}</b></div><span class="sw"></span></div>`,
+          `<div class="chan ${o ? "on" : ""}" onclick="this.classList.toggle('on');try{const p=JSON.parse(localStorage.getItem('yoshule_notification_prefs_v1')||'{}');p['${String(t).replace(/[^a-z]/gi, "_")}']=this.classList.contains('on');localStorage.setItem('yoshule_notification_prefs_v1',JSON.stringify(p));}catch(e){}"><div><b>${t}</b></div><span class="sw"></span></div>`,
       )
-      .join("")}<button class="go" onclick="closeSheet();toast('Preferences saved')">Save</button>`,
+      .join(
+        "",
+      )}<button class="go" onclick="closeSheet();toast('Preferences saved')">Save</button>`,
   );
 }
 function openNotif() {
   const colorFor = (n: any) => {
     const t = String(n?.type || "").toLowerCase();
     const title = String(n?.title || "").toLowerCase();
-    if (t.includes("discipline") || t.includes("fee") || t.includes("wallet") || title.includes("due") || title.includes("low")) return "amber";
-    if (t.includes("attendance") || t.includes("gate") || t.includes("academic") || t.includes("merit") || title.includes("arrived")) return "green";
+    if (
+      t.includes("discipline") ||
+      t.includes("fee") ||
+      t.includes("wallet") ||
+      title.includes("due") ||
+      title.includes("low")
+    )
+      return "amber";
+    if (
+      t.includes("attendance") ||
+      t.includes("gate") ||
+      t.includes("academic") ||
+      t.includes("merit") ||
+      title.includes("arrived")
+    )
+      return "green";
     return "navy";
   };
   const render = (list: any[]) => {
@@ -2102,7 +2225,9 @@ function openNotif() {
             const c = colorFor(n);
             const title = n?.title || "School notification";
             const msg = n?.body || n?.message || "";
-            const when = n?.time || (n?.createdAt ? new Date(n.createdAt).toLocaleString() : "");
+            const when =
+              n?.time ||
+              (n?.createdAt ? new Date(n.createdAt).toLocaleString() : "");
             return `<div class="ni"><span class="av" style="background:${c === "green" ? "#E3F6EE" : c === "amber" ? "#FFF3DC" : "#E7ECF7"}"><svg viewBox="0 0 24 24" stroke="${c === "green" ? "#12784F" : c === "amber" ? "#9A5B00" : "#13213D"}">${BELL}</svg></span><div class="t"><b>${title}</b><p>${msg}</p><small>${when}</small></div></div>`;
           })
           .join("")
@@ -2115,7 +2240,9 @@ function openNotif() {
     .then((m) => {
       const list = (m.getStoredNotifications?.() || []).slice(0, 50);
       render(list);
-      try { m.markAllNotificationsReadLocal?.(); } catch {}
+      try {
+        m.markAllNotificationsReadLocal?.();
+      } catch {}
     })
     .catch(() => render([]));
 }
@@ -2213,6 +2340,11 @@ const SVC = [
     '<path d="M4 16v-4a4 4 0 0 1 4-4h1l3 4h6a3 3 0 0 1 3 3v1z"/><path d="M4 16h17v2H4z"/>',
   ],
   [
+    "goals",
+    "My goals",
+    '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+  ],
+  [
     "help",
     "Help",
     '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
@@ -2271,7 +2403,7 @@ function renderLanding0() {
       : ""
   }
   <div class="lsec">What do you need?${LSEL != null ? `<small>For ${KIDS[LSEL].first}</small>` : ""}</div>
-  <div class="sgrid">${SVC.map(([a, l, ic, m]) => `<button class="sg ${m ? "main" : ""}" onclick="landDo('${a}')"><i>${svgI(ic)}</i>${l}</button>`).join("")}</div>
+  <div class="sgrid">${SVC.map(([a, l, ic, m]) => `<button class="sghjjh ${m ? "main" : ""}" onclick="landDo('${a}')"><i>${svgI(ic)}</i>${l}</button>`).join("")}</div>
   <button class="console" onclick="enterConsole()"><span class="ic">${svgI('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>')}</span><div><b>Enter parent console</b><small>Marks, attendance, homework, messages and more</small></div>${svgI('<path d="m9 18 6-6-6-6"/>')}</button>
   <div class="lfoot">powered by Shule+</div>
  </div>`;
@@ -2813,12 +2945,17 @@ async function lkFind() {
     const f = await resolveLearner(v);
     if (!f) {
       const error = $("#lk-error");
-      if (error) error.textContent = "No student found. Check the code and try again.";
+      if (error)
+        error.textContent = "No student found. Check the code and try again.";
       return;
     }
-    if (LOGGED && KIDS.some((kid) => kid.id === f.id || (kid.code && kid.code === f.code))) {
+    if (
+      LOGGED &&
+      KIDS.some((kid) => kid.id === f.id || (kid.code && kid.code === f.code))
+    ) {
       const error = $("#lk-error");
-      if (error) error.textContent = `${f.first} is already linked to your account.`;
+      if (error)
+        error.textContent = `${f.first} is already linked to your account.`;
       return;
     }
     let j = POOL.indexOf(f);
@@ -2831,7 +2968,9 @@ async function lkFind() {
     lkStep();
   } catch (e) {
     const error = $("#lk-error");
-    if (error) error.textContent = e?.message || "Student lookup failed. Check your connection.";
+    if (error)
+      error.textContent =
+        e?.message || "Student lookup failed. Check your connection.";
   }
 }
 function addChild() {
@@ -2878,15 +3017,18 @@ function kitPay() {
      <button class="go" id="kitpaygo">Send payment request</button>`,
   );
   const button = $("#kitpaygo");
-  if (button) button.onclick = () => {
-    const amountInput = $("#kit-amount");
-    const amount = Number(String((amountInput && amountInput.value) || "").replace(/\D/g, ""));
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      toast("Enter a valid payment amount");
-      return;
-    }
-    kitStartPayment(amount, firstChild);
-  };
+  if (button)
+    button.onclick = () => {
+      const amountInput = $("#kit-amount");
+      const amount = Number(
+        String((amountInput && amountInput.value) || "").replace(/\D/g, ""),
+      );
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        toast("Enter a valid payment amount");
+        return;
+      }
+      kitStartPayment(amount, firstChild);
+    };
 }
 async function kitStartPayment(amount, child) {
   const input = $("#kit-phone");
@@ -2915,7 +3057,8 @@ async function kitStartPayment(amount, child) {
       description: `ShuleKit Term 1 2027 · ${(child && child.first) || "learner"}`,
       metadata: { kids: KW.kids, plan: KW.plan, items: KW.items },
     });
-    if (!result || !result.reference) throw new Error("No payment reference returned");
+    if (!result || !result.reference)
+      throw new Error("No payment reference returned");
     const billedPhone = result.phone || phone;
     kitPaymentWaiting(amount, billedPhone, result.reference);
     kitPaymentPoll(result.reference, amount, billedPhone, 0);
@@ -2938,7 +3081,8 @@ function kitPaymentWaiting(amount, phone, reference) {
   );
   if (reference) {
     const check = $("#kitpaycheck");
-    if (check) check.onclick = () => kitPaymentPoll(reference, amount, phone, 60);
+    if (check)
+      check.onclick = () => kitPaymentPoll(reference, amount, phone, 60);
   } else {
     const done = $("#kitpaydone");
     if (done) done.onclick = () => kitDone();
@@ -3694,7 +3838,7 @@ function pfStep() {
     if (box && !box.querySelector(".scanbtn"))
       box.insertAdjacentHTML(
         "beforeend",
-        `<button class="go scanbtn" style="margin-top:10px;background:var(--bg);color:var(--navy);height:42px;font-size:12px" onclick="pfScan()">Scan ShuleCard QR</button>`,
+        ``,
       );
   }
 }
@@ -3714,16 +3858,22 @@ function pfScan() {
 }
 /* ---- 3. Add a child using the public lookup and claim APIs ---- */
 const escapeLinkValue = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[char]);
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char],
+  );
 function lkStep() {
   if (LK.step === 0) {
-    openSheet(`<div class="wzh"><small>Add a child · Step 1 of 3</small><button onclick="closeSheet()">✕</button></div><h3 style="margin-top:4px">Find your child</h3><p class="lead">Enter the student’s SDMS code or ShuleCode. We’ll check the school’s live records.</p><div class="sdmsin" style="margin-top:12px"><span class="ic">${svgI('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}</span><input id="lkq" placeholder="SDMS code / ShuleCode" value="${escapeLinkValue(LK.q)}" onkeydown="if(event.key==='Enter')lkFind()"><button class="go2" onclick="lkFind()" aria-label="Search">${svgI('<path d="M5 12h14M13 6l6 6-6 6"/>')}</button></div><div id="lk-error" role="alert"></div>`);
+    openSheet(
+      `<div class="wzh"><small>Add a child · Step 1 of 3</small><button onclick="closeSheet()">✕</button></div><h3 style="margin-top:4px">Find your child</h3><p class="lead">Enter the student’s SDMS code or ShuleCode. We’ll check the school’s live records.</p><div class="sdmsin" style="margin-top:12px"><span class="ic">${svgI('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>')}</span><input id="lkq" placeholder="SDMS code / ShuleCode" value="${escapeLinkValue(LK.q)}" onkeydown="if(event.key==='Enter')lkFind()"><button class="go2" onclick="lkFind()" aria-label="Search">${svgI('<path d="M5 12h14M13 6l6 6-6 6"/>')}</button></div><div id="lk-error" role="alert"></div>`,
+    );
     return;
   }
   const child = POOL[LK.hit];
@@ -3733,13 +3883,19 @@ function lkStep() {
     return;
   }
   if (LK.step === 1) {
-    const parentName = String(PARENT?.n || "").trim().split(/\s+/);
+    const parentName = String(PARENT?.n || "")
+      .trim()
+      .split(/\s+/);
     const firstName = LOGGED ? PARENT?.first || parentName[0] || "" : "";
     const lastName = parentName.slice(1).join(" ");
-    openSheet(`<div class="wzh"><small>Add a child · Step 2 of 3</small><button onclick="closeSheet()">✕</button></div><h3 style="margin-top:4px">Confirm guardian details</h3><div class="found" style="margin-top:12px"><div class="r"><span class="av">${escapeLinkValue(ini(child.first, child.n))}</span><div><b>${escapeLinkValue(child.n)}</b><small>${escapeLinkValue(child.cls)} · ${escapeLinkValue(child.schoolName || "School record")}</small></div></div></div><p class="lead">These details will be used to create or match your guardian record at the school.</p><div class="lbl2">First name</div><input id="lk-first" class="txt" value="${escapeLinkValue(firstName)}" autocomplete="given-name"><div class="lbl2">Last name</div><input id="lk-last" class="txt" value="${escapeLinkValue(LOGGED ? lastName : "")}" autocomplete="family-name"><div class="lbl2">Phone number</div><input id="lk-phone" class="txt" type="tel" inputmode="tel" autocomplete="tel" value="${escapeLinkValue(LOGGED ? PARENT?.ph || "" : "")}" placeholder="Phone saved at school"><div class="lbl2">Email <small>Optional</small></div><input id="lk-email" class="txt" type="email" autocomplete="email" value="${escapeLinkValue(LOGGED ? PARENT?.email || "" : "")}" placeholder="name@example.com"><div class="lbl2">Relationship</div><select id="lk-role" class="txt"><option value="GUARDIAN">Parent / guardian</option><option value="FATHER">Father</option><option value="MOTHER">Mother</option></select><label class="qlnote" style="display:flex;gap:8px;align-items:flex-start"><input id="lk-confirm" type="checkbox" style="margin-top:2px"> I confirm I am this student’s parent or guardian.</label><div id="lk-error" role="alert"></div><button class="go" id="lk-submit" onclick="lkDone()">Confirm and add child</button>`);
+    openSheet(
+      `<div class="wzh"><small>Add a child · Step 2 of 3</small><button onclick="closeSheet()">✕</button></div><h3 style="margin-top:4px">Confirm guardian details</h3><div class="found" style="margin-top:12px"><div class="r"><span class="av">${escapeLinkValue(ini(child.first, child.n))}</span><div><b>${escapeLinkValue(child.n)}</b><small>${escapeLinkValue(child.cls)} · ${escapeLinkValue(child.schoolName || "School record")}</small></div></div></div><p class="lead">These details will be used to create or match your guardian record at the school.</p><div class="lbl2">First name</div><input id="lk-first" class="txt" value="${escapeLinkValue(firstName)}" autocomplete="given-name"><div class="lbl2">Last name</div><input id="lk-last" class="txt" value="${escapeLinkValue(LOGGED ? lastName : "")}" autocomplete="family-name"><div class="lbl2">Phone number</div><input id="lk-phone" class="txt" type="tel" inputmode="tel" autocomplete="tel" value="${escapeLinkValue(LOGGED ? PARENT?.ph || "" : "")}" placeholder="Phone saved at school"><div class="lbl2">Email <small>Optional</small></div><input id="lk-email" class="txt" type="email" autocomplete="email" value="${escapeLinkValue(LOGGED ? PARENT?.email || "" : "")}" placeholder="name@example.com"><div class="lbl2">Relationship</div><select id="lk-role" class="txt"><option value="GUARDIAN">Parent / guardian</option><option value="FATHER">Father</option><option value="MOTHER">Mother</option></select><label class="qlnote" style="display:flex;gap:8px;align-items:flex-start"><input id="lk-confirm" type="checkbox" style="margin-top:2px"> I confirm I am this student’s parent or guardian.</label><div id="lk-error" role="alert"></div><button class="go" id="lk-submit" onclick="lkDone()">Confirm and add child</button>`,
+    );
     return;
   }
-  openSheet(`<div class="wzh"><small>Add a child · Step 3 of 3</small><button onclick="closeSheet()">✕</button></div><div class="wdone" style="padding:16px 10px 8px"><div class="em">${svgI('<path d="M20 6 9 17l-5-5"/>').replace("<svg", '<svg width="34" height="34" fill="none" stroke="#13213D" stroke-width="2.6"')}</div><h3>${escapeLinkValue(child.first)}’s guardian record was saved</h3><p>${LK.synced ? "The child is now available in your account." : `Sign in to Parent Portal using ${escapeLinkValue(LK.phone)} to access this child’s information.`}</p></div><button class="go" onclick="closeSheet()">Done</button>`);
+  openSheet(
+    `<div class="wzh"><small>Add a child · Step 3 of 3</small><button onclick="closeSheet()">✕</button></div><div class="wdone" style="padding:16px 10px 8px"><div class="em">${svgI('<path d="M20 6 9 17l-5-5"/>').replace("<svg", '<svg width="34" height="34" fill="none" stroke="#13213D" stroke-width="2.6"')}</div><h3>${escapeLinkValue(child.first)}’s guardian record was saved</h3><p>${LK.synced ? "The child is now available in your account." : `Sign in to Parent Portal using ${escapeLinkValue(LK.phone)} to access this child’s information.`}</p></div><button class="go" onclick="closeSheet()">Done</button>`,
+  );
 }
 /* landing: Find a child · Add child runs the full process */
 const _renderLanding = renderLanding0;
@@ -4252,16 +4408,16 @@ function _toggleLandingRow(id: string) {
     if (L) {
       const selector = `.acc .ar .h[onclick*="toggleChildRow('${id}')"], .acc .ar .h[onclick*="toggleQuickRow('${id}')"]`;
       const btn = L.querySelector(selector) as HTMLElement | null;
-      const row = btn?.closest('.ar') as HTMLElement | null;
+      const row = btn?.closest(".ar") as HTMLElement | null;
       if (row) {
         const scrollBefore = L.scrollTop;
         const headerTopBefore = btn!.getBoundingClientRect().top;
 
         // Close any other open rows in landing accordions
-        L.querySelectorAll('.acc .ar.open').forEach((el) => {
-          if (el !== row) el.classList.remove('open');
+        L.querySelectorAll(".acc .ar.open").forEach((el) => {
+          if (el !== row) el.classList.remove("open");
         });
-        row.classList.toggle('open', willOpen);
+        row.classList.toggle("open", willOpen);
 
         // Keep header fixed in viewport so details expand downward (not upward)
         const headerTopAfter = btn!.getBoundingClientRect().top;
@@ -4273,13 +4429,13 @@ function _toggleLandingRow(id: string) {
         if (willOpen) {
           requestAnimationFrame(() => {
             try {
-              const details = row.querySelector('.d') as HTMLElement | null;
+              const details = row.querySelector(".d") as HTMLElement | null;
               if (!details) return;
               const cRect = L.getBoundingClientRect();
               const dRect = details.getBoundingClientRect();
               const bottomLimit = cRect.bottom - 140; // keep clear of sticky find area
               if (dRect.bottom > bottomLimit) {
-                L.scrollTop += (dRect.bottom - bottomLimit);
+                L.scrollTop += dRect.bottom - bottomLimit;
               }
             } catch {}
           });
@@ -4294,8 +4450,12 @@ function _toggleLandingRow(id: string) {
   let headerOffset = 0;
   try {
     if (L) {
-      const btn = L.querySelector(`.acc .ar .h[onclick*="toggleChildRow('${id}')"], .acc .ar .h[onclick*="toggleQuickRow('${id}')"]`) as HTMLElement | null;
-      if (btn) headerOffset = btn.getBoundingClientRect().top - L.getBoundingClientRect().top;
+      const btn = L.querySelector(
+        `.acc .ar .h[onclick*="toggleChildRow('${id}')"], .acc .ar .h[onclick*="toggleQuickRow('${id}')"]`,
+      ) as HTMLElement | null;
+      if (btn)
+        headerOffset =
+          btn.getBoundingClientRect().top - L.getBoundingClientRect().top;
     }
   } catch {}
   renderLanding();
@@ -4303,9 +4463,12 @@ function _toggleLandingRow(id: string) {
     try {
       const L2 = $("#login") as HTMLElement | null;
       if (!L2) return;
-      const btn2 = L2.querySelector(`.acc .ar .h[onclick*="toggleChildRow('${id}')"], .acc .ar .h[onclick*="toggleQuickRow('${id}')"]`) as HTMLElement | null;
+      const btn2 = L2.querySelector(
+        `.acc .ar .h[onclick*="toggleChildRow('${id}')"], .acc .ar .h[onclick*="toggleQuickRow('${id}')"]`,
+      ) as HTMLElement | null;
       if (btn2) {
-        const newOffset = btn2.getBoundingClientRect().top - L2.getBoundingClientRect().top;
+        const newOffset =
+          btn2.getBoundingClientRect().top - L2.getBoundingClientRect().top;
         L2.scrollTop = Math.max(0, L2.scrollTop + (newOffset - headerOffset));
       } else {
         L2.scrollTop = prevScroll;
@@ -4324,21 +4487,25 @@ function toggleQuickRow(id: string) {
 
 const chev =
   '<span class="cv"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>';
-function childRowLinked(k) {
-  const isOpen = LAND_CHILDREN_EXPANDED;
-  return `<article class="lm-child-card ${isOpen ? "open" : ""}">
+function childRowLinked(k, inSheet = false, index = -1) {
+  const isOpen = inSheet ? false : LAND_CHILDREN_EXPANDED;
+  const id = escapeLinkValue(k.id);
+  const viewing = inSheet && index === LSEL ? " · Viewing" : "";
+  return `<article class="lm-child-card ${isOpen ? "open" : ""}"${inSheet ? ` onclick="openLandingConsole('${id}')" style="cursor:pointer"` : ""}>
     <div class="lm-child-header">
-      <button type="button" class="lm-child-toggle" aria-expanded="${isOpen}" onclick="toggleLandingChildren()">
-      <span class="lm-child-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+      <button type="button" class="lm-child-toggle" aria-expanded="${isOpen}" ${inSheet ? `onclick="event.stopPropagation();openLandingConsole('${id}')"` : `onclick="toggleLandingChildren()"`}>
       <span class="lm-child-avatar">${avatar(k)}</span>
-      <span class="lm-child-info"><b>${escapeLinkValue(k.n)}</b><small>${escapeLinkValue(k.cls)} · ${escapeLinkValue(k.type)}</small></span>
+      <span class="lm-child-info"><b>${escapeLinkValue(k.n)}</b><small>${escapeLinkValue(k.cls)} · ${escapeLinkValue(k.type)}${viewing}</small></span>
       </button>
-      <button type="button" class="lm-console-button lm-child-console" onclick="openLandingConsole('${escapeLinkValue(k.id)}')">Open console</button>
+    </div>
+    ${inSheet ? "" : `<div class="lm-child-action-row">
+      <button type="button" class="lm-children-button" onclick="openLandingChildren()">My children <b>${myKids().length}</b></button>
+      <button type="button" class="lm-console-button" onclick="openLandingConsole('${id}')">Open console</button>
     </div>
     <div class="lm-child-details"><div class="lm-child-details-inner">
       <div class="lm-child-detail-row"><span>Class</span><b>${escapeLinkValue(k.cls)}</b></div>
       ${k.fees ? `<div class="lm-child-detail-row"><span>Outstanding fees</span><b>${LAND_FEES_VISIBLE ? `RWF ${fmt(k.fees)}` : "RWF •••••"}<button type="button" class="lm-fee-toggle" onclick="toggleLandingFees()" aria-label="${LAND_FEES_VISIBLE ? "Hide" : "Show"} fee balance">${svgI(LAND_FEES_VISIBLE ? '<path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c5 0 8.5 4.5 9 7-.2 1.1-.9 2.2-1.8 3.2"/><path d="M6.2 6.2C3.9 7.7 2.3 10 2 12c.5 2.5 4 7 10 7 1.1 0 2.1-.2 3-.5"/>' : '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>')}</button></b></div>` : ""}
-    </div></div>
+    </div></div>`}
   </article>`;
 }
 
@@ -4357,6 +4524,7 @@ function openLandingConsole(id) {
   if (index < 0) return;
   K = index;
   LSEL = index;
+  closeSheet();
   renderAll();
   enterConsole();
 }
@@ -4371,10 +4539,9 @@ function selectLandingChild(id) {
 }
 function openLandingChildren() {
   const childIndices = myKids();
-  openSheet(`<div class="wzh"><small>Parent account</small><button onclick="closeSheet()" aria-label="Close">✕</button></div><h3 style="margin-top:4px">My children</h3><div class="lm-child-list">${childIndices.map((index) => {
-    const child = KIDS[index];
-    return `<button type="button" class="lm-child-option ${index === LSEL ? "on" : ""}" onclick="selectLandingChild('${escapeLinkValue(child.id)}')"><span class="lm-child-avatar">${avatar(child)}</span><span><b>${escapeLinkValue(child.n)}</b><small>${escapeLinkValue(child.cls)} · ${escapeLinkValue(child.type)}</small></span>${index === LSEL ? '<span class="lm-child-current">Viewing</span>' : ""}</button>`;
-  }).join("")}<button type="button" class="addrow lm-addrow" onclick="closeSheet();linkChild()"><span>+</span>Add a child to my account</button></div>`);
+  openSheet(
+    `<div class="wzh"><small>Parent account</small><button onclick="closeSheet()" aria-label="Close">✕</button></div><h3 style="margin-top:4px">My children</h3><div class="lm-child-list">${childIndices.map((index) => childRowLinked(KIDS[index], true, index)).join("")}<button type="button" class="addrow lm-addrow" onclick="closeSheet();linkChild()"><span>+</span>Add a child to my account</button></div>`,
+  );
 }
 function childRowQuick(q) {
   const open = OPENID === q.id;
@@ -4408,18 +4575,33 @@ function renderLanding() {
   <div class="lhead lm-hero">
     <div class="lm-hero-copy">
       <span class="lm-eyebrow">Parent Portal</span>
-      <h1>Equitable School Readiness</h1>
+      <h1>Welcome back${LOGGED && PARENT?.first ? `, ${PARENT.first}` : ""}</h1>
     </div>
     <div class="lm-hero-art">${DECO}</div>
   </div>
   <div class="body lm-body">
     <section class="lm-section lm-kids-section">
-      <div class="lsec lm-sec-head"><span>${LOGGED ? "" : ""}</span><small>${CHILDREN_LOADING ? "Loading children linked to your account…" : sv.length ? "" : LOGGED ? "" : ""}</small></div>
-      ${CHILDREN_LOADING ? '<div class="lm-children-loading" role="status" aria-live="polite"><span class="lm-spinner" aria-hidden="true"></span><span>Loading your children…</span></div>' : sv.length ? `<div class="lm-child-accordion">${childRowLinked(KIDS[currentChildIndex])}${LAND_CHILDREN_EXPANDED && sv.length > 1 ? `<div class="lm-child-options" role="list">${sv.filter((i) => i !== currentChildIndex).map((i) => { const child = KIDS[i]; return `<button type="button" class="lm-child-option" role="listitem" onclick="openLandingConsole('${escapeLinkValue(child.id)}')"><span class="lm-child-avatar">${avatar(child)}</span><span class="lm-child-option-info"><b>${escapeLinkValue(child.n)}</b><small>${escapeLinkValue(child.cls)} · ${escapeLinkValue(child.type)}</small></span><span class="lm-child-option-open">Open console</button>`; }).join("")}</div>` : ""}</div>` : '<button class="lm-empty-add" onclick="linkChild()"><span>+</span>Add a child to my account</button>'}
+      ${
+        CHILDREN_LOADING
+          ? '<div class="lm-children-loading" role="status" aria-live="polite"><span class="lm-spinner" aria-hidden="true"></span><span>Loading your children…</span></div>'
+          : sv.length
+            ? `<div class="lm-child-accordion">${childRowLinked(KIDS[currentChildIndex])}${
+                LAND_CHILDREN_EXPANDED && sv.length > 1
+                  ? `<div class="lm-child-options" role="list">${sv
+                      .filter((i) => i !== currentChildIndex)
+                      .map((i) => {
+                        const child = KIDS[i];
+                        return `<button type="button" class="lm-child-option" role="listitem" onclick="openLandingConsole('${escapeLinkValue(child.id)}')"><span class="lm-child-avatar">${avatar(child)}</span><span class="lm-child-option-info"><b>${escapeLinkValue(child.n)}</b><small>${escapeLinkValue(child.cls)} · ${escapeLinkValue(child.type)}</small></span><span class="lm-child-option-open">Open console</span>`;
+                      })
+                      .join("")}</div>`
+                  : ""
+              }</div>`
+            : '<button class="lm-empty-add" onclick="linkChild()"><span>+</span>Add a child to my account</button>'
+      }
       ${sv.length || CHILDREN_LOADING || LOGGED ? "" : '<button class="signin lm-signin" onclick="enterConsole()">Already linked? Sign in to the parent console</button>'}
     </section>
     ${qs.length ? `<section class="lm-section"><div class="lsec lm-sec-head"><span>Saved for quick use</span><small>Pay fees · Babyeyi · Top up</small></div><div class="acc q lm-acc lm-acc-quick">${qs.map(childRowQuick).join("")}</div></section>` : ""}
-    ${sv.length ? `<section class="lm-section"><div class="lsec lm-sec-head"><span>What do you need?</span></div><div class="sgrid lm-sgrid">${SVC.map(([a, l, ic, m]) => a === "help" ? `<a class="sg" href="tel:+250793903847" aria-label="Call yoShule support at +250 793 903 847"><i>${svgI(ic)}</i><span>${l}</span></a>` : `<button class="sg ${m ? "main" : ""}" onclick="landDo('${a}')"><i>${svgI(ic)}</i><span>${l}</span></button>`).join("")}</div></section>` : ""}
+    ${sv.length ? `<section class="lm-section"><div class="lsec lm-sec-head"><span>What do you need?</span></div><div class="sgrid lm-sgrid">${SVC.map(([a, l, ic, m]) => (a === "help" ? `<a class="sg" href="tel:+250793903847" aria-label="Call yoShule support at +250 793 903 847"><i>${svgI(ic)}</i><span>${l}</span></a>` : `<button class="sg ${m ? "main" : ""}" onclick="landDo('${a}')" style="background:#fff;color: var(--navy);font-style:normal;font-size:14px;font-weight:800;border:1px solid var(--line)"><i>${svgI(ic)}</i><span>${l}</span></button>`)).join("")}</div></section>` : ""}
   </div>
   <div class="ffind lm-ffind">
     <div class="sdms lm-find-card">
@@ -4444,7 +4626,7 @@ function foundPop(f, state) {
   openSheet(`<div class="fpop"><div class="wzh"><small>Child found</small><button onclick="closeSheet()">✕</button></div>
   <div class="who"><span class="av">${ini(f.first, f.n)}</span><div><b>${f.n}</b><small>${f.cls} · Kigali Green Hills School · ${f.sdms}</small></div></div>
   <div class="lbl2" style="margin-top:16px">What would you like to do?</div>
-  <div class="big3"><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','pay'),60)"><i>${svgI(IC.pay)}</i>Pay fees</button><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','bby'),60)"><i>${svgI(IC.doc)}</i>Get Babyeyi</button><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','top'),60)"><i>${svgI(IC.wallet)}</i>Top up card</button></div>
+  <div class="big3"><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','pay'),60)" style="background:var(--navy);color:#fff"><i>${svgI(IC.pay)}</i>Pay fees</button><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','bby'),60)" style="background:var(--navy);color:#fff"><i>${svgI(IC.doc)}</i>Get Babyeyi</button><button onclick="closeSheet();setTimeout(()=>quickDo('${f.id}','top'),60)" style="background:var(--navy);color:#fff"><i>${svgI(IC.wallet)}</i>Top up card</button></div>
   ${state === "saved" ? `<div class="saved">✓<span>${f.first} is saved for quick use. Find ${f.first} under “Saved for quick use” on the start page.</span></div>` : ""}
   <div class="lk">${mine ? "" : `<button style="background:var(--bg);color:var(--navy)" onclick="popSave('${f.id}')">${saved ? "Saved ✓" : "Save for quick use"}</button>`}${mine ? '<button style="background:#E3F6EE;color:#12784F;pointer-events:none">Already in My children ✓</button>' : `<button style="background:var(--navy);color:#fff" onclick="linkChild('${f.sdms}')">Add to my account</button>`}</div>
   ${state === "saved" ? '<button class="go" onclick="closeSheet()">Done</button>' : '<p class="qlnote" style="text-align:center">No account needed for these three. Add the child to your account to see marks, attendance and more.</p>'}</div>`);
@@ -4468,12 +4650,22 @@ async function lkDone() {
   const confirmed = $("#lk-confirm")?.checked;
   const error = $("#lk-error");
   const button = $("#lk-submit");
-  if (!child || !firstName || !lastName || !phone || phone.replace(/\D/g, "").length < 9 || !confirmed) {
-    if (error) error.textContent = "Enter your name and valid phone number, then confirm you are the parent or guardian.";
+  if (
+    !child ||
+    !firstName ||
+    !lastName ||
+    !phone ||
+    phone.replace(/\D/g, "").length < 9 ||
+    !confirmed
+  ) {
+    if (error)
+      error.textContent =
+        "Enter your name and valid phone number, then confirm you are the parent or guardian.";
     return;
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    if (error) error.textContent = "Enter a valid email address or leave it blank.";
+    if (error)
+      error.textContent = "Enter a valid email address or leave it blank.";
     return;
   }
   if (button) {
@@ -4494,12 +4686,17 @@ async function lkDone() {
     LK.synced = false;
     if (parentRealApi.getToken()) {
       await syncRealBackend();
-      LK.synced = KIDS.some((kid) => kid.id === child.id || (kid.code && kid.code === child.code));
+      LK.synced = KIDS.some(
+        (kid) => kid.id === child.id || (kid.code && kid.code === child.code),
+      );
     }
     LK.step = 2;
     lkStep();
   } catch (e) {
-    if (error) error.textContent = e?.message || "Could not add this child. Please check your connection and try again.";
+    if (error)
+      error.textContent =
+        e?.message ||
+        "Could not add this child. Please check your connection and try again.";
     if (button) {
       button.disabled = false;
       button.textContent = "Confirm and add child";
@@ -6620,27 +6817,55 @@ async function registerPushNotifications(silent = false) {
   }
 }
 
-async function showLocalNotification(title: string, body: string, url = "./", extra: any = {}) {
+async function showLocalNotification(
+  title: string,
+  body: string,
+  url = "./",
+  extra: any = {},
+) {
   try {
     // Persist to local push inbox so all modules can consume without notifications module
     try {
       const mod = await import("./services/push");
-      mod.upsertNotification({ title, body, data: { url, ...(extra || {}) }, type: extra?.type || "general" });
+      mod.upsertNotification({
+        title,
+        body,
+        data: { url, ...(extra || {}) },
+        type: extra?.type || "general",
+      });
     } catch {}
     if (isNative()) {
-      const LocalNotifications = (window as any).Capacitor?.Plugins?.LocalNotifications;
+      const LocalNotifications = (window as any).Capacitor?.Plugins
+        ?.LocalNotifications;
       if (LocalNotifications) {
         await LocalNotifications.schedule({
-          notifications: [{ id: Math.floor(Math.random() * 100000), title, body, schedule: { at: new Date(Date.now() + 400) }, iconColor: "#F5A623" }],
+          notifications: [
+            {
+              id: Math.floor(Math.random() * 100000),
+              title,
+              body,
+              schedule: { at: new Date(Date.now() + 400) },
+              iconColor: "#F5A623",
+            },
+          ],
         });
         return;
       }
     }
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
       if ("serviceWorker" in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg && reg.showNotification) {
-          await reg.showNotification(title, { body, icon: "./appLogo.png", badge: "./appLogo.png", tag: "yoshule-" + (title || "").slice(0, 20), data: { url } });
+          await reg.showNotification(title, {
+            body,
+            icon: "./appLogo.png",
+            badge: "./appLogo.png",
+            tag: "yoshule-" + (title || "").slice(0, 20),
+            data: { url },
+          });
           return;
         }
       }
@@ -6653,7 +6878,9 @@ async function showLocalNotification(title: string, body: string, url = "./", ex
 
 async function pollNotifications() {
   // Legacy API retained for compatibility; push store + service worker now deliver notifications.
-  try { await (await import("./services/push")).initPush(); } catch {}
+  try {
+    await (await import("./services/push")).initPush();
+  } catch {}
 }
 function startNotificationPolling() {
   // No polling: web push + local store replace notifications module.
@@ -6664,9 +6891,14 @@ try {
   import("./services/push").then((mod) => {
     mod.initPush?.();
     mod.listenForPushMessages?.();
-    window.addEventListener(mod.PUSH_UPDATED_EVENT || "yoshule:notifications-updated", () => {
-      try { renderAll?.(); } catch {}
-    });
+    window.addEventListener(
+      mod.PUSH_UPDATED_EVENT || "yoshule:notifications-updated",
+      () => {
+        try {
+          renderAll?.();
+        } catch {}
+      },
+    );
   });
 } catch {}
 

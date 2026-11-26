@@ -38,6 +38,7 @@ function resolveTitle(pathname, title) {
   if (pathname.startsWith('/assessments/')) return 'Assessment marks';
   if (pathname.startsWith('/marks')) return 'Marks';
   if (pathname === '/period-attendance') return 'Period attendance';
+  if (pathname === '/round-roll-call') return 'Round roll call';
   if (pathname === '/console') return 'Console';
   if (pathname === '/profile') return 'My Profile';
   if (pathname === '/' || pathname === '/dashboard') return 'Dashboard';

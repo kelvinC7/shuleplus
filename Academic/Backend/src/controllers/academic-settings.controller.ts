@@ -8,6 +8,10 @@ import {
 } from '../clients/iam.client';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/error.middleware';
+import {
+  parseReportAnalysisSettings,
+  validateReportAnalysisSettings,
+} from '../utils/report-analysis-settings';
 
 const reportFooterSchema = z.object({
   mode: z.enum(['head_teacher', 'custom']),
@@ -55,6 +59,31 @@ export class AcademicSettingsController {
         data: { reportFooterSettings: reportFooter },
       });
       res.json({ success: true, data: reportFooter });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getReportAnalysisSettings(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { organizationId: req.organizationRef! },
+        select: { reportAnalysisSettings: true },
+      });
+      res.json({ success: true, data: parseReportAnalysisSettings(tenant?.reportAnalysisSettings) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async saveReportAnalysisSettings(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const settings = validateReportAnalysisSettings(req.body);
+      await prisma.tenant.update({
+        where: { organizationId: req.organizationRef! },
+        data: { reportAnalysisSettings: settings },
+      });
+      res.json({ success: true, data: settings });
     } catch (error) {
       next(error);
     }

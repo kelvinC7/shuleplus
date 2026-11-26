@@ -327,6 +327,8 @@ export interface ReportCardData {
   }>;
   totalPercentage: number;
   averagePercentage: number;
+  position: number | null;
+  classSize: number;
 }
 
 export interface GrowthData {
@@ -526,6 +528,7 @@ export interface ReportCardDataV2 {
     rank: number | null;
     classSize: number | null;
     marksEntered?: boolean;
+    assessedInReportPeriod?: boolean;
     courseComplete?: boolean;
     missingComponents?: string[];
     isCore?: boolean;

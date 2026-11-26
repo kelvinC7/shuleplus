@@ -148,10 +148,10 @@ export default function ActionPlanPage() {
     const create = params.get('create');
     const wantsMeetings = params.get('tab') === 'meetings' || create === 'meeting';
     if (wantsMeetings) setTab('meetings');
-    if (create === 'meeting') setCreatingMeeting(true);
+    if (create === 'meeting') setCreating('meeting');
     if (create === 'task') {
       setTab('tasks');
-      setCreatingTask(true);
+      setCreating('task');
     }
     if (wantsMeetings || create) router.replace('/director/action-plan', { scroll: false });
   }, [router]);

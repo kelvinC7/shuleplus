@@ -8,6 +8,7 @@ import {
   verifyReportCard,
 } from '../services/report-card.service';
 import { reportCardPublicationService } from '../services/report-card-publication.service';
+import { nurseryService } from '../services/nursery.service';
 import { normalizeReportKind, type ReportKind } from '../utils/report-kind';
 
 function orgIdOf(req: Request) {
@@ -206,7 +207,9 @@ export class ReportCardController {
         return;
       }
 
-      const data = await verifyReportCard(ref, org);
+      const data = /^NRC-/i.test(ref.trim())
+        ? await nurseryService.verifyPublic(ref)
+        : await verifyReportCard(ref, org);
       res.json({ data });
     } catch (err) {
       next(err);

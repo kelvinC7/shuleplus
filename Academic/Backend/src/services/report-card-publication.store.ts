@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/database';
+import { normalizeReportKind } from '../utils/report-kind';
 
 export type PublicationAccessPolicyValue = 'PAID_ONLY' | 'ALL_PARENTS';
 
@@ -79,7 +80,7 @@ export async function upsertReportCardPublicationRow(input: {
   accessPolicy?: PublicationAccessPolicyValue;
   status?: string;
 }): Promise<ReportCardPublicationRow> {
-  const reportKind = (input.reportKind?.trim() || 'standard').toLowerCase() === 'midterm' ? 'midterm' : 'standard';
+  const reportKind = normalizeReportKind(input.reportKind);
   const accessPolicy: PublicationAccessPolicyValue = input.accessPolicy === 'ALL_PARENTS' ? 'ALL_PARENTS' : 'PAID_ONLY';
   const status = input.status || 'PUBLISHED';
   const id = randomUUID();
@@ -145,8 +146,7 @@ export async function findReportCardPublicationRow(input: {
   term: string;
   reportKind?: string;
 }): Promise<ReportCardPublicationRow | null> {
-  const reportKind =
-    (input.reportKind?.trim() || 'standard').toLowerCase() === 'midterm' ? 'midterm' : 'standard';
+  const reportKind = normalizeReportKind(input.reportKind);
   const rows = await prisma.$queryRaw<DbRow[]>`
     SELECT id, organization_id, student_id, class_id, class_name, student_name, student_code,
            academic_year, term, report_kind, published_at, published_by, published_by_name,

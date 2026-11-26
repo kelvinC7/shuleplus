@@ -361,20 +361,6 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     return list;
   }, [report.subjects]);
 
-  const coreSubjects = useMemo(
-    () => sortedSubjects.filter((s) => s.isCore !== false),
-    [sortedSubjects],
-  );
-  const nonCoreSubjects = useMemo(
-    () => sortedSubjects.filter((s) => s.isCore === false),
-    [sortedSubjects],
-  );
-
-  const singleTermColCount = useMemo(
-    () => 2 + 1 + componentColumns.length + 2,
-    [componentColumns.length],
-  );
-
   const positionDisplay =
     report.position && report.classSize ? `${report.position}/${report.classSize}` : NOT_RECORDED;
 
@@ -400,9 +386,17 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
   const footerName = footerSettings.selectedUserName?.trim() || (footerSettings.mode === 'head_teacher' ? 'Head Teacher' : 'Authorized Signatory');
   const classTeacherComment = report.comments?.classTeacher?.trim();
   const headTeacherComment = report.comments?.headTeacher?.trim();
+  const subjectTotals = report.subjects
+    .map((subject) => getSubjectTotalAmounts(subject, termColumns, useTermResults))
+    .filter((total): total is { score: number; max: number; grade: string } => total != null);
+  const totalMarksEarned = subjectTotals.reduce((sum, total) => sum + total.score, 0);
+  const totalMarksPossible = subjectTotals.reduce((sum, total) => sum + total.max, 0);
+  const overallPercentage = totalMarksPossible > 0
+    ? Math.round((totalMarksEarned / totalMarksPossible) * 10000) / 100
+    : report.overallScore;
   const overallGradeDisplay =
+    gradeFromLegend(overallPercentage, gradingLegend) ||
     report.overallGrade?.trim() ||
-    gradeFromLegend(report.overallScore, gradingLegend) ||
     NOT_RECORDED;
 
   const profileCells = useMemo(() => {
@@ -458,14 +452,6 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
     });
   }
 
-  function renderSectionHeader(label: string) {
-    return (
-      <tr key={label} className="section-row">
-        <td colSpan={singleTermColCount}>{label}</td>
-      </tr>
-    );
-  }
-
   function renderSubjectRow(s: ReportSubject) {
     if (isSingleTermReport) {
       const gradeCell = subjectGradeDisplay(s);
@@ -495,14 +481,11 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
   }
 
   const overallAverageDisplay = report.subjects.some((s) => s.marksEntered)
-    ? `${report.overallScore.toFixed(2)}%`
+    ? `${overallPercentage.toFixed(2)}%`
     : NOT_RECORDED;
-  const subjectTotals = report.subjects
-    .map((subject) => getSubjectTotalAmounts(subject, termColumns, useTermResults))
-    .filter((total): total is { score: number; max: number; grade: string } => total != null);
   const overallMarksDisplay = formatMarkRatio(
-    subjectTotals.reduce((sum, total) => sum + total.score, 0),
-    subjectTotals.reduce((sum, total) => sum + total.max, 0)
+    totalMarksEarned,
+    totalMarksPossible
   );
 
   return (
@@ -722,19 +705,7 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
               )}
             </thead>
             <tbody>
-              {isSingleTermReport ? (
-                <>
-                  {coreSubjects.length ? renderSectionHeader('CORE COURSES') : null}
-                  {coreSubjects.map((s) => renderSubjectRow(s))}
-                  {nonCoreSubjects.length ? renderSectionHeader('NON-CORE COURSES') : null}
-                  {nonCoreSubjects.map((s) => renderSubjectRow(s))}
-                  {!coreSubjects.length && !nonCoreSubjects.length
-                    ? sortedSubjects.map((s) => renderSubjectRow(s))
-                    : null}
-                </>
-              ) : (
-                sortedSubjects.map((s) => renderSubjectRow(s))
-              )}
+              {sortedSubjects.map((s) => renderSubjectRow(s))}
             </tbody>
             <tfoot>
               <tr>
@@ -795,8 +766,8 @@ export default function ModernStudentReportCard({ report, documentRef }: Props) 
           }}
         >
           <Box className="report-overview-stats" sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, alignContent: 'start' }}>
-            <OverviewStatCard label="Class position" value={positionDisplay} />
-            <OverviewStatCard label="Percentage" value={overallAverageDisplay} />
+            <OverviewStatCard label="Class position (by %)" value={positionDisplay} />
+            <OverviewStatCard label="Overall Percentage" value={overallAverageDisplay} />
           </Box>
           <Box
             className="report-overview-chart"

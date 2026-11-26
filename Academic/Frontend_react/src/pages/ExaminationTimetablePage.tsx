@@ -52,6 +52,7 @@ import {
   deleteExaminationTimetable,
   smListClasses,
   type ClassExaminationTimetable,
+  type ExaminationSessionDefinition,
   type ExaminationSessionPeriod,
   type ExaminationType,
 } from '@/services/api';
@@ -62,10 +63,17 @@ const AMBER = '#FCB038';
 type SlotDraft = {
   examDate: string;
   session: ExaminationSessionPeriod;
+  sessionCode: string;
+  sessionName: string;
   courseName: string;
   startTime: string;
   endTime: string;
 };
+
+const DEFAULT_SESSIONS: ExaminationSessionDefinition[] = [
+  { id: 'MORNING', name: 'Morning', startTime: '08:00', endTime: '10:00' },
+  { id: 'AFTERNOON', name: 'Afternoon', startTime: '14:00', endTime: '16:00' },
+];
 
 type ClassOption = { id: string; label: string; classIds: string[] };
 type ClassApiRow = { id: string; name?: string | null; label?: string | null; stream?: string | null };
@@ -129,6 +137,32 @@ function parseMins(t: string) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
+function sessionPeriod(startTime: string): ExaminationSessionPeriod {
+  return (parseMins(startTime) ?? 0) < 12 * 60 ? 'MORNING' : 'AFTERNOON';
+}
+
+function validateSessionDefinitions(sessionDefinitions: ExaminationSessionDefinition[]) {
+  if (!sessionDefinitions.length) return 'Add at least one examination session';
+  if (sessionDefinitions.length > 12) return 'A timetable can have at most 12 examination sessions';
+  const names = new Set<string>();
+  const sorted = [...sessionDefinitions].sort((a, b) => (parseMins(a.startTime) ?? 0) - (parseMins(b.startTime) ?? 0));
+  for (const session of sorted) {
+    const name = session.name.trim().toLocaleLowerCase();
+    const start = parseMins(session.startTime);
+    const end = parseMins(session.endTime);
+    if (!name) return 'Enter a name for every examination session';
+    if (names.has(name)) return `Session name "${session.name.trim()}" is used more than once`;
+    names.add(name);
+    if (start == null || end == null || end <= start) return `Set a valid time range for ${session.name.trim()}`;
+  }
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (parseMins(sorted[index - 1].endTime)! > parseMins(sorted[index].startTime)!) {
+      return `${sorted[index - 1].name} and ${sorted[index].name} sessions overlap`;
+    }
+  }
+  return '';
+}
+
 export default function ExaminationTimetablePage() {
   const { settings, ready, academicYear: orgYear, term: orgTerm } = useOrgAcademicPeriod();
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -146,6 +180,7 @@ export default function ExaminationTimetablePage() {
   const [timetableId, setTimetableId] = useState<string | null>(null);
   const [examinationCode, setExaminationCode] = useState<string | null>(null);
   const [courses, setCourses] = useState<Array<{ subjectName: string; courseCode?: string | null }>>([]);
+  const [sessions, setSessions] = useState<ExaminationSessionDefinition[]>(DEFAULT_SESSIONS);
   const [slots, setSlots] = useState<SlotDraft[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [loadingContext, setLoadingContext] = useState(false);
@@ -160,6 +195,7 @@ export default function ExaminationTimetablePage() {
   const [createStartDate, setCreateStartDate] = useState('');
   const [createEndDate, setCreateEndDate] = useState('');
   const [createExcludeWeekends, setCreateExcludeWeekends] = useState(false);
+  const [createSessions, setCreateSessions] = useState<ExaminationSessionDefinition[]>(DEFAULT_SESSIONS);
   const [createProgress, setCreateProgress] = useState('');
   const [savedSearch, setSavedSearch] = useState('');
   const [examinationTypes, setExaminationTypes] = useState<ExaminationType[]>([]);
@@ -170,7 +206,7 @@ export default function ExaminationTimetablePage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState('');
-  const [dialogSession, setDialogSession] = useState<ExaminationSessionPeriod>('MORNING');
+  const [dialogSessionCode, setDialogSessionCode] = useState('MORNING');
   const [dialogCourse, setDialogCourse] = useState('');
   const [dialogStart, setDialogStart] = useState('08:00');
   const [dialogEnd, setDialogEnd] = useState('10:00');
@@ -257,9 +293,14 @@ export default function ExaminationTimetablePage() {
           setStartDate(toDateKey(ctx.timetable.startDate));
           setEndDate(toDateKey(ctx.timetable.endDate));
           setExcludeWeekends(!!ctx.timetable.excludeWeekends);
+          setSessions(Array.isArray(ctx.timetable.sessions) && ctx.timetable.sessions.length
+            ? ctx.timetable.sessions
+            : DEFAULT_SESSIONS);
           setSlots((ctx.timetable.slots || []).map((s) => ({
             examDate: toDateKey(s.examDate),
             session: s.session,
+            sessionCode: s.sessionCode || s.session,
+            sessionName: s.sessionName || (s.session === 'MORNING' ? 'Morning' : 'Afternoon'),
             courseName: s.courseName,
             startTime: s.startTime,
             endTime: s.endTime,
@@ -267,6 +308,7 @@ export default function ExaminationTimetablePage() {
         } else {
           setTimetableId(null);
           setExaminationCode(null);
+          setSessions(DEFAULT_SESSIONS);
           setSlots([]);
         }
       })
@@ -281,17 +323,21 @@ export default function ExaminationTimetablePage() {
   }, [classId, editorClassIds, editorReloadToken, academicYear, term, editorExamTypeId]);
 
   const days = useMemo(() => buildDays(startDate, endDate, excludeWeekends), [startDate, endDate, excludeWeekends]);
+  const orderedSessions = useMemo(
+    () => [...sessions].sort((a, b) => (parseMins(a.startTime) ?? 0) - (parseMins(b.startTime) ?? 0)),
+    [sessions],
+  );
 
   const slotMap = useMemo(() => {
     const m = new Map<string, SlotDraft>();
-    for (const s of slots) m.set(`${s.examDate}|${s.session}`, s);
+    for (const s of slots) m.set(`${s.examDate}|${s.sessionCode}`, s);
     return m;
   }, [slots]);
 
   const scheduledCourseNames = useMemo(() => {
     const set = new Set<string>();
     for (const s of slots) {
-      if (editingKey && editingKey === `${s.examDate}|${s.session}`) continue;
+      if (editingKey && editingKey === `${s.examDate}|${s.sessionCode}`) continue;
       set.add(s.courseName.trim().toLowerCase());
     }
     return set;
@@ -322,6 +368,7 @@ export default function ExaminationTimetablePage() {
     setCreateStartDate('');
     setCreateEndDate('');
     setCreateExcludeWeekends(false);
+    setCreateSessions(DEFAULT_SESSIONS);
     setCreateProgress('');
     setCreateOpen(true);
   }
@@ -393,6 +440,11 @@ export default function ExaminationTimetablePage() {
   async function handleCreateTimetables() {
     const selectedGroups = classes.filter((item) => createClassIds.includes(item.id));
     const daysInRange = buildDays(createStartDate, createEndDate, createExcludeWeekends);
+    const sessionError = validateSessionDefinitions(createSessions);
+    if (sessionError) {
+      toast.error(sessionError);
+      return;
+    }
     if (!createTypeId) {
       toast.error('Select an examination type first');
       return;
@@ -439,6 +491,7 @@ export default function ExaminationTimetablePage() {
                 startDate: createStartDate,
                 endDate: createEndDate,
                 excludeWeekends: createExcludeWeekends,
+                sessions: createSessions,
                 slots: [],
               });
             }
@@ -451,6 +504,7 @@ export default function ExaminationTimetablePage() {
               startDate: createStartDate,
               endDate: createEndDate,
               excludeWeekends: createExcludeWeekends,
+              sessions: createSessions,
             });
             const saveProposal = (confirmImpact = false) => saveExaminationTimetable({
               id: proposal.id || undefined,
@@ -462,6 +516,7 @@ export default function ExaminationTimetablePage() {
               startDate: createStartDate,
               endDate: createEndDate,
               excludeWeekends: createExcludeWeekends,
+              sessions: proposal.sessions || createSessions,
               confirmImpact,
               slots: proposal.slots,
             });
@@ -507,15 +562,15 @@ export default function ExaminationTimetablePage() {
     }
   }
 
-  function openSlotDialog(day: string, session: ExaminationSessionPeriod) {
-    const key = `${day}|${session}`;
+  function openSlotDialog(day: string, session: ExaminationSessionDefinition) {
+    const key = `${day}|${session.id}`;
     const existing = slotMap.get(key);
     setDialogDate(day);
-    setDialogSession(session);
+    setDialogSessionCode(session.id);
     setEditingKey(existing ? key : null);
     setDialogCourse(existing?.courseName || courses[0]?.subjectName || '');
-    setDialogStart(existing?.startTime || (session === 'MORNING' ? '08:00' : '14:00'));
-    setDialogEnd(existing?.endTime || (session === 'MORNING' ? '10:00' : '16:00'));
+    setDialogStart(existing?.startTime || session.startTime);
+    setDialogEnd(existing?.endTime || session.endTime);
     setDialogOpen(true);
   }
 
@@ -535,46 +590,147 @@ export default function ExaminationTimetablePage() {
       toast.error('End time must be after start time');
       return;
     }
+    const dialogSession = sessions.find((session) => session.id === dialogSessionCode);
+    if (!dialogSession) {
+      toast.error('Select a valid examination session');
+      return;
+    }
     const duplicateCourse = slots.some((slot) =>
-      !(slot.examDate === dialogDate && slot.session === dialogSession) &&
+      !(slot.examDate === dialogDate && slot.sessionCode === dialogSessionCode) &&
       slot.courseName.trim().toLowerCase() === dialogCourse.trim().toLowerCase()
     );
     if (duplicateCourse) {
       toast.error('This course is already scheduled on another examination date');
       return;
     }
-    const _key = `${dialogDate}|${dialogSession}`; void _key;
     const next: SlotDraft = {
       examDate: dialogDate,
-      session: dialogSession,
+      session: sessionPeriod(dialogStart),
+      sessionCode: dialogSession.id,
+      sessionName: dialogSession.name,
       courseName: dialogCourse.trim(),
       startTime: dialogStart,
       endTime: dialogEnd,
     };
-    // validate overlap with other session same day
-    const otherSession: ExaminationSessionPeriod = dialogSession === 'MORNING' ? 'AFTERNOON' : 'MORNING';
-    const other = slotMap.get(`${dialogDate}|${otherSession}`);
-    if (other) {
-      const os = parseMins(other.startTime)!;
-      const oe = parseMins(other.endTime)!;
-      if (dialogSession === 'MORNING' && e > os) {
-        toast.error('Morning session overlaps afternoon session on this day');
-        return;
-      }
-      if (dialogSession === 'AFTERNOON' && s < oe) {
-        toast.error('Afternoon session overlaps morning session on this day');
-        return;
-      }
+    const overlaps = slots.some((other) => {
+      if (other.examDate !== dialogDate || other.sessionCode === dialogSession.id) return false;
+      const otherStart = parseMins(other.startTime);
+      const otherEnd = parseMins(other.endTime);
+      return otherStart != null && otherEnd != null && s < otherEnd && otherStart < e;
+    });
+    if (overlaps) {
+      toast.error('This session overlaps another session on the same day');
+      return;
     }
     setSlots((prev) => {
-      const filtered = prev.filter((x) => !(x.examDate === dialogDate && x.session === dialogSession));
+      const filtered = prev.filter((x) => !(x.examDate === dialogDate && x.sessionCode === dialogSession.id));
       return [...filtered, next];
     });
     closeDialog();
   }
 
-  function removeSlot(day: string, session: ExaminationSessionPeriod) {
-    setSlots((prev) => prev.filter((x) => !(x.examDate === day && x.session === session)));
+  function removeSlot(day: string, sessionCode: string) {
+    setSlots((prev) => prev.filter((x) => !(x.examDate === day && x.sessionCode === sessionCode)));
+  }
+
+  function updateSessionDefinition(
+    current: ExaminationSessionDefinition[],
+    setCurrent: (next: ExaminationSessionDefinition[]) => void,
+    id: string,
+    changes: Partial<ExaminationSessionDefinition>,
+  ) {
+    setCurrent(current.map((session) => session.id === id ? { ...session, ...changes } : session));
+  }
+
+  function addSessionDefinition(
+    current: ExaminationSessionDefinition[],
+    setCurrent: (next: ExaminationSessionDefinition[]) => void,
+  ) {
+    let suffix = current.length + 1;
+    while (current.some((session) => session.id === `SESSION_${suffix}`)) suffix += 1;
+    const id = `SESSION_${suffix}`;
+    setCurrent([...current, {
+      id,
+      name: current.length === 2 ? 'Second session' : `Session ${current.length + 1}`,
+      startTime: '10:30',
+      endTime: '12:30',
+    }]);
+  }
+
+  function renderSessionSettings(
+    current: ExaminationSessionDefinition[],
+    setCurrent: (next: ExaminationSessionDefinition[]) => void,
+    lockedSessionCodes: Set<string> = new Set(),
+  ) {
+    return (
+      <Stack spacing={1.25}>
+        {[...current].sort((a, b) => (parseMins(a.startTime) ?? 0) - (parseMins(b.startTime) ?? 0)).map((session) => (
+          <Box
+            key={session.id}
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1.4fr 1fr 1fr auto' },
+              gap: 1,
+              alignItems: 'center',
+              p: 1.25,
+              border: '1px solid #e2e8f0',
+              borderRadius: 2,
+              bgcolor: '#fff',
+            }}
+          >
+            <TextField
+              size="small"
+              label="Session name"
+              value={session.name}
+              onChange={(event) => updateSessionDefinition(current, setCurrent, session.id, { name: event.target.value })}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="From"
+              type="time"
+              value={session.startTime}
+              onChange={(event) => updateSessionDefinition(current, setCurrent, session.id, { startTime: event.target.value })}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="To"
+              type="time"
+              value={session.endTime}
+              onChange={(event) => updateSessionDefinition(current, setCurrent, session.id, { endTime: event.target.value })}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+            />
+            <Tooltip title={lockedSessionCodes.has(session.id) ? 'Remove this session’s scheduled courses first' : 'Remove session'}>
+              <span>
+                <IconButton
+                  aria-label={`Remove ${session.name} session`}
+                  color="error"
+                  disabled={current.length <= 1 || lockedSessionCodes.has(session.id)}
+                  onClick={() => setCurrent(current.filter((item) => item.id !== session.id))}
+                >
+                  <DeleteOutlineIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        ))}
+        <Button
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={() => addSessionDefinition(current, setCurrent)}
+          disabled={current.length >= 12}
+          sx={{ alignSelf: 'flex-start', textTransform: 'none', borderRadius: 2 }}
+        >
+          Add session
+        </Button>
+        <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+          Set each session’s label and time range. Sessions are shown in time order and cannot overlap.
+        </Typography>
+      </Stack>
+    );
   }
 
   async function handleSave() {
@@ -585,6 +741,11 @@ export default function ExaminationTimetablePage() {
     }
     if (!days.length) {
       toast.error('Select a valid date range');
+      return;
+    }
+    const sessionError = validateSessionDefinitions(sessions);
+    if (sessionError) {
+      toast.error(sessionError);
       return;
     }
     setSaving(true);
@@ -604,6 +765,7 @@ export default function ExaminationTimetablePage() {
           startDate,
           endDate,
           excludeWeekends,
+          sessions,
           confirmImpact: allowImpact,
           slots,
         });
@@ -641,8 +803,8 @@ export default function ExaminationTimetablePage() {
     }
   }
 
-  const sessionCell = (day: string, session: ExaminationSessionPeriod) => {
-    const slot = slotMap.get(`${day}|${session}`);
+  const sessionCell = (day: string, session: ExaminationSessionDefinition) => {
+    const slot = slotMap.get(`${day}|${session.id}`);
     if (!slot) {
       return (
         <Box
@@ -670,6 +832,7 @@ export default function ExaminationTimetablePage() {
     return (
       <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2, borderColor: '#dbe4f0', bgcolor: '#f8fbff', minHeight: 92 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: NAVY, lineHeight: 1.3 }}>{slot.courseName}</Typography>
+        <Typography sx={{ mt: 0.4, fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>{session.name}</Typography>
         <Typography sx={{ mt: 0.5, fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
           {slot.startTime} - {slot.endTime}
         </Typography>
@@ -678,7 +841,7 @@ export default function ExaminationTimetablePage() {
             <IconButton size="small" aria-label={`Edit ${slot.courseName} examination session`} onClick={() => openSlotDialog(day, session)} sx={{ color: '#0369a1' }}>
               <EditOutlinedIcon fontSize="small" />
             </IconButton>
-            <IconButton size="small" aria-label={`Delete ${slot.courseName} examination session`} onClick={() => removeSlot(day, session)} sx={{ color: '#dc2626' }}>
+            <IconButton size="small" aria-label={`Delete ${slot.courseName} examination session`} onClick={() => removeSlot(day, session.id)} sx={{ color: '#dc2626' }}>
               <DeleteOutlineIcon fontSize="small" />
             </IconButton>
           </Stack>
@@ -769,7 +932,7 @@ export default function ExaminationTimetablePage() {
               <TableBody>
                 {filteredSavedGroups.length ? filteredSavedGroups.map((group) => {
                   const record = group.records[0];
-                  const sessionCount = record?.slots?.length || 0;
+                  const sessionCount = record?.sessions?.length || new Set((record?.slots || []).map((slot) => slot.sessionCode || slot.session)).size;
                   const dateRange = record?.startDate && record?.endDate
                     ? `${toDateKey(record.startDate)} – ${toDateKey(record.endDate)}`
                     : '—';
@@ -870,8 +1033,17 @@ export default function ExaminationTimetablePage() {
             </Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.5, flexWrap: 'wrap' }}>
               {slots.length ? <Chip size="small" label={`${slots.length} scheduled exam${slots.length === 1 ? '' : 's'}`} /> : null}
+              <Chip size="small" label={`${sessions.length} session${sessions.length === 1 ? '' : 's'} configured`} variant="outlined" />
               {loadingClasses || loadingContext ? <CircularProgress size={16} /> : null}
             </Stack>
+            {!editorReadOnly ? (
+              <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e2e8f0' }}>
+                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.25 }}>
+                  Examination sessions
+                </Typography>
+                {renderSessionSettings(sessions, setSessions, new Set(slots.map((slot) => slot.sessionCode)))}
+              </Box>
+            ) : null}
           </Paper>
 
           {(!classId || !academicYear || !term) ? (
@@ -885,15 +1057,21 @@ export default function ExaminationTimetablePage() {
               <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid #e2e8f0', bgcolor: '#fff', display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <CalendarMonthOutlinedIcon sx={{ color: NAVY }} />
                 <Typography sx={{ fontWeight: 700, color: NAVY }}>Exam Schedule</Typography>
-                <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>Morning and afternoon sessions per exam day. Click a cell to add or edit.</Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>All configured sessions appear for every exam day. Click a cell to add or edit a course.</Typography>
               </Box>
               <TableContainer sx={{ maxHeight: 'calc(100vh - 320px)' }}>
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 800, bgcolor: '#f8fafc', minWidth: 220 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#f8fafc', minWidth: 280 }}>Morning Session</TableCell>
-                      <TableCell sx={{ fontWeight: 800, bgcolor: '#f8fafc', minWidth: 280 }}>Afternoon Session</TableCell>
+                      {orderedSessions.map((session) => (
+                        <TableCell key={session.id} sx={{ fontWeight: 800, bgcolor: '#f8fafc', minWidth: 260 }}>
+                          <Typography sx={{ fontWeight: 800, color: NAVY }}>{session.name}</Typography>
+                          <Typography sx={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            {session.startTime} – {session.endTime}
+                          </Typography>
+                        </TableCell>
+                      ))}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -903,8 +1081,11 @@ export default function ExaminationTimetablePage() {
                           <Typography sx={{ fontWeight: 700, color: NAVY, fontSize: '0.9rem' }}>{fmtDate(day)}</Typography>
                           <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{day}</Typography>
                         </TableCell>
-                        <TableCell sx={{ verticalAlign: 'top', py: 1.25 }}>{sessionCell(day, 'MORNING')}</TableCell>
-                        <TableCell sx={{ verticalAlign: 'top', py: 1.25 }}>{sessionCell(day, 'AFTERNOON')}</TableCell>
+                        {orderedSessions.map((session) => (
+                          <TableCell key={`${day}-${session.id}`} sx={{ verticalAlign: 'top', py: 1.25 }}>
+                            {sessionCell(day, session)}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -980,6 +1161,13 @@ export default function ExaminationTimetablePage() {
               </RadioGroup>
             </Box>
 
+            <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: '#fff' }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 1.25 }}>
+                Session setup
+              </Typography>
+              {renderSessionSettings(createSessions, setCreateSessions)}
+            </Paper>
+
             <Autocomplete
               multiple
               options={classes}
@@ -1039,7 +1227,7 @@ export default function ExaminationTimetablePage() {
             {editingKey ? 'Edit Examination Session' : 'Add Examination Session'}
           </Typography>
           <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mt: 0.25 }}>
-            {dialogDate ? fmtDate(dialogDate) : ''} · {dialogSession === 'MORNING' ? 'Morning' : 'Afternoon'} session
+            {dialogDate ? fmtDate(dialogDate) : ''} · {sessions.find((session) => session.id === dialogSessionCode)?.name || 'Examination'} session
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 3, bgcolor: '#f8fafc' }}>

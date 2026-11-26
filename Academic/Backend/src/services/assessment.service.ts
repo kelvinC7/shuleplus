@@ -143,13 +143,13 @@ export class AssessmentService {
     }
 
     let inferredStage = data.reportingStage || 'UNASSIGNED';
-    const category = String((data as any).assessmentCategory || '').toUpperCase();
+    const category = String(data.assessmentCategory || '').trim().toUpperCase();
     if (!data.reportingStage && category) {
       if (category === 'BEGINNING_TEST' || category === 'BEGINNING_TERM') inferredStage = 'BEGINNING_TERM';
       else if (category === 'MIDTERM_TEST' || category === 'MID_TERM_TEST' || category === 'MID_TERM') inferredStage = 'MID_TERM';
       else if (category === 'END_OF_TERM_EXAM' || category === 'END_TERM_EXAM' || category === 'TERM_FINAL') inferredStage = 'TERM_FINAL';
-      else if ((category === 'CAT' || category === 'CONTINUOUS' || category === 'CONTINUOUS_ASSESSMENT') && (data as any).catAllocationStage) {
-        inferredStage = String((data as any).catAllocationStage).toUpperCase() as any;
+      else if ((category === 'CAT' || category === 'CONTINUOUS' || category === 'CONTINUOUS_ASSESSMENT') && data.catAllocationStage) {
+        inferredStage = String(data.catAllocationStage).toUpperCase() as any;
       }
     }
     // Template component is the central source: a configured component stage overrides client input.
@@ -177,6 +177,7 @@ export class AssessmentService {
         assessmentDate,
         maxMark: data.maxMark,
         duration: data.duration ?? null,
+        assessmentCategory: category || null,
         status: 'OPEN',
         reportingStage: inferredStage as any,
         createdBy: data.createdBy ?? null,
@@ -262,12 +263,16 @@ export class AssessmentService {
       assessmentTime?: string;
       maxMark?: number;
       duration?: string;
+      assessmentCategory?: string;
+      catAllocationStage?: 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
       reportingStage?: 'UNASSIGNED' | 'BEGINNING_TERM' | 'MID_TERM' | 'TERM_FINAL';
+      templateId?: string | null;
+      componentId?: string | null;
     }
   ) {
     const assessment = await prisma.assessment.findFirst({ where: { id, organizationId } });
     if (!assessment) throw new AppError(404, 'Assessment not found');
-    if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status) && data.reportingStage === undefined) {
+    if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
       throw new AppError(400, 'Only scheduled assessments that are not yet submitted can be edited');
     }
 
@@ -288,10 +293,53 @@ export class AssessmentService {
       throw new AppError(400, 'Maximum mark must be greater than 0');
     }
 
+    let templateId: string | null | undefined = undefined;
+    if (data.templateId !== undefined) {
+      if (!data.templateId) {
+        templateId = null;
+      } else {
+        const template = await prisma.assessmentTemplate.findFirst({
+          where: { id: data.templateId, organizationId },
+          select: { id: true },
+        });
+        if (!template) throw new AppError(400, 'Assessment template not found');
+        templateId = template.id;
+      }
+    }
+
+    let componentId: string | null | undefined = undefined;
+    if (data.componentId !== undefined) {
+      if (!data.componentId) {
+        componentId = null;
+      } else {
+        const component = await prisma.assessmentComponent.findFirst({
+          where: { id: data.componentId, template: { organizationId } },
+          select: { id: true, templateId: true },
+        });
+        if (!component) throw new AppError(400, 'Assessment component not found');
+        componentId = component.id;
+        if (templateId === undefined || templateId === null) templateId = component.templateId;
+      }
+    }
+
     let reportingStage: string | undefined = data.reportingStage;
-    if (assessment.componentId) {
+    const category = data.assessmentCategory !== undefined
+      ? String(data.assessmentCategory || '').trim().toUpperCase()
+      : undefined;
+    if (category) {
+      if (category === 'BEGINNING_TEST' || category === 'BEGINNING_TERM_TEST') reportingStage = 'BEGINNING_TERM';
+      else if (category === 'MIDTERM_TEST' || category === 'MID_TERM_TEST') reportingStage = 'MID_TERM';
+      else if (category === 'END_OF_TERM_EXAM' || category === 'TERM_FINAL' || category === 'FINAL_EXAM') reportingStage = 'TERM_FINAL';
+      else if ((category === 'CAT' || category === 'CAT_CONTINUOUS' || category === 'CONTINUOUS' || category === 'CONTINUOUS_ASSESSMENT') && data.catAllocationStage) {
+        reportingStage = String(data.catAllocationStage).toUpperCase() as any;
+      } else if (category && !reportingStage) {
+        reportingStage = 'UNASSIGNED';
+      }
+    }
+    const effectiveComponentId = componentId === undefined ? assessment.componentId : componentId;
+    if (effectiveComponentId) {
       const comp = await prisma.assessmentComponent.findFirst({
-        where: { id: assessment.componentId, template: { organizationId } },
+        where: { id: effectiveComponentId, template: { organizationId } },
         select: { reportingStage: true },
       });
       const compStage = String(comp?.reportingStage || 'UNASSIGNED').toUpperCase();
@@ -306,7 +354,10 @@ export class AssessmentService {
         ...(assessmentDate !== undefined ? { assessmentDate } : {}),
         ...(data.maxMark != null ? { maxMark: data.maxMark } : {}),
         ...(data.duration !== undefined ? { duration: data.duration?.trim() || null } : {}),
+        ...(category !== undefined ? { assessmentCategory: category || null } : {}),
         ...(reportingStage ? { reportingStage: reportingStage as any } : {}),
+        ...(templateId !== undefined ? { templateId } : {}),
+        ...(componentId !== undefined ? { componentId } : {}),
       },
       include: { subject: true, class: true, component: true, template: true },
     });

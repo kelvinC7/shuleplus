@@ -6,6 +6,7 @@ import { loanController } from '../controllers/loan.controller';
 import {
   authenticate,
   requireModuleLicense,
+  requirePaymentIntegrationAuth,
   requireServiceAuth,
 } from '../middleware/auth.middleware';
 import { requireTenant, requireServiceTenant } from '../middleware/tenant.middleware';
@@ -44,6 +45,37 @@ router.get('/public/payments/:reference/status', (req, res, next) =>
 
 router.get('/public/receipts/:receiptNumber', (req, res, next) =>
   feesController.publicReceipt(req, res, next)
+);
+
+router.post(
+  '/integrations/payments/validate',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.validatePaymentCallback(req, res, next)
+);
+router.post(
+  '/integrations/payments/notify',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.notifyPaymentCallback(req, res, next)
+);
+router.post(
+  '/integrations/payments/notification',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.notifyPaymentCallback(req, res, next)
+);
+router.post(
+  '/integrations/payments/callback',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.notifyPaymentCallback(req, res, next)
+);
+router.post(
+  '/integrations/payments/reverse',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.reversePaymentCallback(req, res, next)
+);
+router.post(
+  '/integrations/payments/reversal',
+  requirePaymentIntegrationAuth,
+  (req, res, next) => feesController.reversePaymentCallback(req, res, next)
 );
 
 router.get('/public/loans/types', (req, res, next) =>

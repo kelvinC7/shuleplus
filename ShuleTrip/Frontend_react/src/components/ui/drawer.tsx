@@ -41,10 +41,15 @@ export function Drawer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:justify-end sm:p-0">
-      <button type="button" className="absolute inset-0 bg-navy/45 backdrop-blur-[3px]" aria-label="Close panel" onClick={onClose} />
+      <button
+        type="button"
+        className="absolute inset-0 bg-navy/45 backdrop-blur-[3px]"
+        aria-label="Close panel"
+        onClick={onClose}
+      />
       <aside
         className={cn(
-          'relative flex h-full max-h-[100dvh] w-full max-w-full flex-col bg-white shadow-2xl shadow-navy/25',
+          'relative flex h-full max-h-[100dvh] w-full max-w-full flex-col overflow-hidden bg-white shadow-2xl shadow-navy/25 sm:rounded-l-3xl',
           width === 'full' && 'sm:w-[min(1040px,100vw)] lg:w-[min(1120px,94vw)]',
           width === 'xl' && 'sm:w-[min(920px,96vw)]',
           width === 'lg' && 'sm:w-[560px]',
@@ -55,7 +60,7 @@ export function Drawer({
           className={cn(
             'flex items-start justify-between gap-4 border-b px-4 py-4 sm:px-6',
             variant === 'brand'
-              ? 'border-white/10 bg-gradient-to-r from-[#000435] to-[#001a5c] text-white'
+              ? 'border-white/10 bg-gradient-to-r from-[#000435] via-[#000435] to-[#0a1150] text-white'
               : 'border-line bg-white'
           )}
         >
@@ -68,7 +73,12 @@ export function Drawer({
             >
               Trip application
             </p>
-            <h2 className={cn('mt-1 truncate text-lg font-extrabold sm:text-xl', variant === 'brand' ? 'text-white' : 'text-navy')}>
+            <h2
+              className={cn(
+                'mt-1 truncate text-lg font-extrabold tracking-tight sm:text-xl',
+                variant === 'brand' ? 'text-white' : 'text-navy'
+              )}
+            >
               {title}
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -92,7 +102,7 @@ export function Drawer({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto bg-[#f8fafc] px-4 py-4 sm:px-6 sm:py-5">{children}</div>
+        <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 py-4 sm:px-6 sm:py-5">{children}</div>
         {footer ? (
           <div className="shrink-0 border-t border-line bg-white/95 px-4 py-3 backdrop-blur-sm sm:px-6">{footer}</div>
         ) : null}

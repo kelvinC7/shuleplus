@@ -128,6 +128,8 @@ model Tenant {
   district         String?
   schoolCode       String?      @map("school_code")
   reportFooterSettings Json?    @map("report_footer_settings")
+  reportAnalysisSettings Json?  @map("report_analysis_settings")
+  nurseryReportSettings Json?   @map("nursery_report_settings")
   status           TenantStatus @default(ACTIVE)
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
@@ -173,6 +175,9 @@ model Tenant {
   marksSubmissionEvents     MarksSubmissionEvent[]
   academicAuditLogs         AcademicAuditLog[]
   academicNotificationOutbox AcademicNotificationOutbox[]
+  nurseryClassConfigs       NurseryClassConfig[]
+  nurserySubjectConfigs     NurserySubjectConfig[]
+  nurseryReports            NurseryReport[]
 
   @@map("tenants")
 }
@@ -688,6 +693,7 @@ model GradingScale {
   grade          String
   description    String?
   remarks        String?
+  color          String?
   sortOrder      Int             @default(0) @map("sort_order")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
@@ -717,6 +723,7 @@ model Assessment {
   assessmentDate DateTime?                @map("assessment_date")
   maxMark        Decimal                  @map("max_mark")
   duration       String?
+  assessmentCategory String?              @map("assessment_category")
   status         AssessmentLifecycle      @default(DRAFT)
   reportingStage AssessmentReportingStage @default(UNASSIGNED) @map("reporting_stage")
   createdBy      String?                  @map("created_by")
@@ -1408,6 +1415,7 @@ model ClassExaminationTimetable {
   startDate         DateTime @map("start_date")
   endDate           DateTime @map("end_date")
   excludeWeekends   Boolean  @default(false) @map("exclude_weekends")
+  sessions          Json?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -1429,6 +1437,8 @@ model ClassExaminationSlot {
   timetableId String                   @map("timetable_id")
   examDate    DateTime                 @map("exam_date")
   session     ExaminationSessionPeriod
+  sessionCode String                   @default("MORNING") @map("session_code")
+  sessionName String                   @default("Morning") @map("session_name")
   courseName  String                   @map("course_name")
   startTime   String                   @map("start_time")
   endTime     String                   @map("end_time")
@@ -1437,7 +1447,7 @@ model ClassExaminationSlot {
 
   timetable ClassExaminationTimetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
 
-  @@unique([timetableId, examDate, session])
+  @@unique([timetableId, examDate, sessionCode])
   @@index([timetableId, examDate])
   @@map("class_examination_slots")
 }
@@ -1573,6 +1583,8 @@ model ExaminationInvigilatorAssignment {
   roomNumber             String?                                @map("room_number")
   examDate               DateTime                               @map("exam_date")
   session                ExaminationSessionPeriod
+  sessionCode            String                                 @default("MORNING") @map("session_code")
+  sessionName            String                                 @default("Morning") @map("session_name")
   startTime              String?                                @map("start_time")
   endTime                String?                                @map("end_time")
   teacherUserId          String                                 @map("teacher_user_id")
@@ -1589,9 +1601,9 @@ model ExaminationInvigilatorAssignment {
   examinationList      ExaminationList            @relation(fields: [examinationListId], references: [id], onDelete: Cascade)
   room                 ExaminationListRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@unique([examinationListId, roomId, examDate, session, teacherUserId])
-  @@index([organizationId, examinationListId, examDate, session])
-  @@index([teacherUserId, examDate, session])
+  @@unique([examinationListId, roomId, examDate, sessionCode, teacherUserId], map: "exam_invig_session_identity_unique")
+  @@index([organizationId, examinationListId, examDate, sessionCode], map: "exam_invig_list_session_code_idx")
+  @@index([teacherUserId, examDate, sessionCode], map: "exam_invig_teacher_session_code_idx")
   @@index([examinationCode])
   @@map("examination_invigilator_assignments")
 }
@@ -1615,6 +1627,8 @@ model ExaminationAttendance {
   className         String?                     @map("class_name")
   examDate          DateTime                    @map("exam_date")
   session           ExaminationSessionPeriod
+  sessionCode       String                      @default("MORNING") @map("session_code")
+  sessionName       String                      @default("Morning") @map("session_name")
   status            ExaminationAttendanceStatus @default(PRESENT)
   markedByUserId    String?                     @map("marked_by_user_id")
   markedByName      String?                     @map("marked_by_name")
@@ -1626,8 +1640,82 @@ model ExaminationAttendance {
   examinationList ExaminationList     @relation(fields: [examinationListId], references: [id], onDelete: Cascade)
   room            ExaminationListRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@unique([examinationListId, roomId, examDate, session, studentId])
-  @@index([organizationId, examinationListId, examDate, session])
-  @@index([roomId, examDate, session])
+  @@unique([examinationListId, roomId, examDate, sessionCode, studentId], map: "exam_attendance_session_identity_unique")
+  @@index([organizationId, examinationListId, examDate, sessionCode], map: "exam_attendance_list_session_code_idx")
+  @@index([roomId, examDate, sessionCode], map: "exam_attendance_room_session_code_idx")
   @@map("examination_attendance")
+}
+
+// Nursery academic reports
+
+model NurseryClassConfig {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  classId        String   @map("class_id")
+  className      String?  @map("class_name")
+  academicYear   String   @map("academic_year")
+  templateKey    String   @default("nursery-standard") @map("template_key")
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, classId, academicYear])
+  @@index([organizationId, academicYear])
+  @@map("nursery_class_configs")
+}
+
+model NurserySubjectConfig {
+  id                 String   @id @default(uuid())
+  organizationId     String   @map("organization_id")
+  classId            String   @map("class_id")
+  subjectId          String   @map("subject_id")
+  subjectName        String?  @map("subject_name")
+  learningArea       String   @map("learning_area")
+  maxMark            Float    @default(100) @map("max_mark")
+  isVisible          Boolean  @default(true) @map("is_visible")
+  contributesToTotal Boolean  @default(true) @map("contributes_to_total")
+  sortOrder          Int      @default(0) @map("sort_order")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, classId, subjectId])
+  @@index([organizationId, classId])
+  @@map("nursery_subject_configs")
+}
+
+model NurseryReport {
+  id                 String    @id @default(uuid())
+  organizationId     String    @map("organization_id")
+  studentId          String    @map("student_id")
+  classId            String    @map("class_id")
+  academicYear       String    @map("academic_year")
+  term               String
+  reportKind         String    @default("standard") @map("report_kind")
+  status             String    @default("GENERATED")
+  studentName        String?   @map("student_name")
+  className          String?   @map("class_name")
+  totalScore         Float?    @map("total_score")
+  average            Float?
+  classAverage       Float?    @map("class_average")
+  teacherComment     String?   @map("teacher_comment") @db.Text
+  headTeacherComment String?   @map("head_teacher_comment") @db.Text
+  verificationCode   String    @unique @map("verification_code")
+  snapshot           Json
+  generatedAt        DateTime  @default(now()) @map("generated_at")
+  generatedBy        String?   @map("generated_by")
+  publishedAt        DateTime? @map("published_at")
+  publishedBy        String?   @map("published_by")
+  publishedByName    String?   @map("published_by_name")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [organizationId], references: [organizationId])
+
+  @@unique([organizationId, studentId, classId, academicYear, term, reportKind], map: "nursery_reports_student_term_kind_key")
+  @@index([organizationId, classId, academicYear, term, reportKind])
+  @@index([organizationId, academicYear, term, reportKind])
+  @@map("nursery_reports")
 }

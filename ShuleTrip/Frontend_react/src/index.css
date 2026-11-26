@@ -2,12 +2,16 @@
 
 @theme {
   --color-navy: #000435;
-  --color-navy-muted: #1a2458;
+  --color-navy-muted: #141a4d;
   --color-amber: #fcb038;
   --color-amber-soft: #fff4dc;
   --color-surface: #f4f6fb;
   --color-line: #e4e8f1;
   --font-sans: 'Montserrat', system-ui, sans-serif;
+
+  /* Soft, layered elevation used across cards and panels */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 14px 32px -24px rgba(0, 4, 53, 0.28);
+  --shadow-elevated: 0 18px 44px -20px rgba(0, 4, 53, 0.28);
 }
 
 html,
@@ -16,15 +20,51 @@ body,
   min-height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   @apply bg-surface text-slate-900 antialiased;
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(252, 176, 56, 0.08), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 0%, rgba(0, 4, 53, 0.06), transparent 55%);
+  background-attachment: fixed;
 }
 
 *,
 *::before,
 *::after {
   font-family: inherit;
+}
+
+::selection {
+  background: rgba(252, 176, 56, 0.35);
+  color: #000435;
+}
+
+/* Brand-tinted scrollbars (WebKit) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 4, 53, 0.22) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  background-color: rgba(0, 4, 53, 0.22);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 4, 53, 0.35);
 }
 
 @keyframes toast-in {
@@ -35,6 +75,31 @@ body {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-fade-up {
+    animation: none;
   }
 }
 
