@@ -10,11 +10,16 @@ export interface JwtPayload {
   sessionId: string;
   roles: string[];
   modules: string[];
+  /** IAM per-module access: HEAD sees all, USER sees own. */
+  moduleAccess?: Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }>;
+  position?: string | null;
 }
 
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
   organizationRef?: string;
+  /** Resolved by `attachAcademicScope`. */
+  academicScope?: import('./academic-scope').AcademicScope;
 }
 
 export function authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {

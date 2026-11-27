@@ -8,6 +8,7 @@ import {
   requireServiceAuth,
 } from '../middleware/auth.middleware';
 import { requireTenant, requireServiceTenant } from '../middleware/tenant.middleware';
+import { attachAcademicScope, requireAcademicOrgWideForWrites, scopeSummary } from '../middleware/academic-scope';
 import studentRoutes from './student.routes';
 import classRoutes from './class.routes';
 import enrollmentRoutes from './enrollment.routes';
@@ -128,21 +129,42 @@ router.get('/service/report-card/parent', requireServiceAuth, requireServiceTena
 /** Unauthenticated landing / payment-portal routes */
 router.use('/public', publicRoutes);
 
+/**
+ * Part-1 IAM data isolation: resolve HEAD/USER access for Academic once per
+ * request and expose it through AsyncLocalStorage to every service query.
+ */
+const academicScopeRouter = Router();
+academicScopeRouter.use(authenticate, requireModuleLicense, requireTenant, attachAcademicScope);
+router.use(academicScopeRouter);
+
+/** Current caller's Academic access, used by the UI to label own vs organization data. */
+router.get('/me/scope', (req, res) => {
+  const scope = (req as any).academicScope;
+  if (!scope) {
+    res.status(401).json({ success: false, message: 'Authentication required' });
+    return;
+  }
+  res.json({ success: true, data: scopeSummary(scope) });
+});
+
 router.use('/students', studentRoutes);
-router.use('/classes', classRoutes);
+router.use('/classes', requireAcademicOrgWideForWrites, classRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/parents', parentRoutes);
-router.use('/combinations', combinationRoutes);
-router.use('/grades', gradeRoutes);
-router.use('/subjects', subjectRoutes);
+router.use('/combinations', requireAcademicOrgWideForWrites, combinationRoutes);
+router.use('/grades', requireAcademicOrgWideForWrites, gradeRoutes);
+router.use('/subjects', requireAcademicOrgWideForWrites, subjectRoutes);
 router.use('/exams', examRoutes);
 router.use('/marks', markRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/assessment-templates', assessmentTemplateRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/results', resultsRoutes);
-router.use('/academic-settings', academicSettingsRoutes);
+router.use('/academic-settings', requireAcademicOrgWideForWrites, academicSettingsRoutes);
 router.use('/assessments', assessmentRoutes);
+router.use('/grading/grading-scale', requireAcademicOrgWideForWrites);
+router.use('/grading/course-default-marks', requireAcademicOrgWideForWrites);
+router.use('/results/grading-scales', requireAcademicOrgWideForWrites);
 router.use('/grading', gradingRoutes);
 router.use('/competency', competencyRoutes);
 router.use('/sm', studentManagementRoutes);

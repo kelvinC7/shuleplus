@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Box } from '@mui/material';
+import { Box, Alert } from '@mui/material';
 import { useAuth } from '@/contexts/auth-context';
 import { clearToken } from '@/shared/auth-token';
 import { AcademicSidebar, ACADEMIC_SIDEBAR_WIDTH } from '@/components/academic-sidebar';
@@ -10,7 +10,7 @@ import { pageTitleFromPath } from '@/config/academic-nav';
 
 export function MainLayout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const { summary } = useAuth();
+  const { summary, seeAll, accessLevel, deskOnly } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -58,6 +58,17 @@ export function MainLayout({ children }: { children: ReactNode }) {
             py: { xs: 2, sm: 3 },
           }}
         >
+          {!deskOnly && (
+            <Alert
+              severity={seeAll ? 'success' : 'info'}
+              variant="outlined"
+              sx={{ mb: 2, borderRadius: 2 }}
+            >
+              {seeAll
+                ? 'Organization-wide view: you can see every user’s academic data.'
+                : `Showing your data only (${accessLevel}): you can see and edit the records you created.`}
+            </Alert>
+          )}
           {children}
         </Box>
       </Box>

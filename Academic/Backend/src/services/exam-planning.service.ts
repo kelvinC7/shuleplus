@@ -4,6 +4,11 @@ import { smListClasses, smListStudents } from '../clients/student-management.cli
 import { fetchTimetableClassCatalog } from '../clients/timetable.client';
 import { fetchIamOrgUsers, resolveOrgAcademicPeriod } from '../clients/iam.client';
 import { lookupExamEligibility } from '../clients/school-fees.client';
+import {
+  assertOwnRecord,
+  currentAcademicScope,
+  mergeOwnData,
+} from '../middleware/academic-scope';
 
 const MAJOR = new Set([
   'mathematics', 'math', 'physics', 'chemistry', 'biology', 'english', 'science',
@@ -243,12 +248,12 @@ export class ExamPlanningService {
 
   async listSessions(organizationId: string, filters?: { academicYear?: string; term?: string; status?: string }) {
     return prisma.examSession.findMany({
-      where: {
+      where: mergeOwnData({
         organizationId,
         ...(filters?.academicYear ? { academicYear: filters.academicYear } : {}),
         ...(filters?.term ? { term: filters.term } : {}),
         ...(filters?.status ? { status: filters.status as any } : {}),
-      },
+      }),
       include: { _count: { select: { schedules: true, conflicts: true, classes: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -256,7 +261,7 @@ export class ExamPlanningService {
 
   async getSession(id: string, organizationId: string) {
     const session = await prisma.examSession.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
       include: includeSession(),
     });
     if (!session) throw new AppError(404, 'Examination session not found');
@@ -298,7 +303,7 @@ export class ExamPlanningService {
         timeSlots: DEFAULT_SLOTS,
         days,
         invigilatorSettings: DEFAULT_INVIGILATOR,
-        createdBy: actorId ?? null,
+        createdBy: currentAcademicScope()?.userId ?? actorId ?? null,
       },
     });
 
@@ -343,8 +348,9 @@ export class ExamPlanningService {
     days?: DayCfg[];
     invigilatorSettings?: Partial<InvigilatorSettings>;
   }) {
-    const existing = await prisma.examSession.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.examSession.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Examination session not found');
+    assertOwnRecord(existing.createdBy, 'examination session');
 
     await prisma.examSession.update({
       where: { id },
@@ -1502,11 +1508,12 @@ export class ExamPlanningService {
   async dashboard(organizationId: string, filters?: { academicYear?: string; term?: string }) {
     const sessions = await this.listSessions(organizationId, filters);
     const published = sessions.filter((s) => s.status === 'PUBLISHED').length;
+    const sessionIds = sessions.map((s) => s.id);
     const live = await prisma.examSchedule.count({
-      where: { organizationId, status: 'IN_PROGRESS' },
+      where: { organizationId, status: 'IN_PROGRESS', sessionId: { in: sessionIds } },
     });
     const conflicts = await prisma.examConflict.count({
-      where: { organizationId, resolved: false },
+      where: { organizationId, resolved: false, sessionId: { in: sessionIds } },
     });
     return {
       sessions: sessions.length,

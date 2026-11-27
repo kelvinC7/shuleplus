@@ -4,6 +4,11 @@ import { fetchIamOrgUsers, fetchIamUser, iamUserDisplayName } from '../clients/i
 import { AppError } from '../middleware/error.middleware';
 import { resolveAcademicClass, resolveAcademicSubject } from './sm-resolve.service';
 import { buildAssessmentCode, buildAssessmentTitle } from '../utils/assessment-code';
+import {
+  assertOwnRecord,
+  currentAcademicScope,
+  mergeOwnData,
+} from '../middleware/academic-scope';
 
 async function resolveTeacherNameMap(organizationId: string, userIds: string[]) {
   const map = new Map<string, string>();
@@ -216,7 +221,7 @@ export class AssessmentService {
     if (filters?.reportingStage) where.reportingStage = filters.reportingStage;
 
     const rows = await prisma.assessment.findMany({
-      where,
+      where: mergeOwnData(where),
       include: {
         subject: true,
         class: true,
@@ -270,8 +275,9 @@ export class AssessmentService {
       componentId?: string | null;
     }
   ) {
-    const assessment = await prisma.assessment.findFirst({ where: { id, organizationId } });
+    const assessment = await prisma.assessment.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!assessment) throw new AppError(404, 'Assessment not found');
+    assertOwnRecord(assessment.createdBy, 'assessment');
     if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
       throw new AppError(400, 'Only scheduled assessments that are not yet submitted can be edited');
     }
@@ -570,7 +576,7 @@ export class AssessmentService {
 
   async getById(id: string, organizationId: string) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
       include: {
         subject: true,
         class: true,
@@ -781,24 +787,69 @@ export class AssessmentService {
     };
   }
 
-  async delete(id: string, organizationId: string) {
-    const assessment = await prisma.assessment.findFirst({
-      where: { id, organizationId },
+  async delete(
+    id: string,
+    organizationId: string,
+    actor: { id?: string; roles?: string[]; canDeleteAny?: boolean }
+  ) {
+    const scope = currentAcademicScope();
+    const canDeleteAny = scope ? scope.seeAll : !!actor.canDeleteAny;
+    const result = await prisma.$transaction(async (tx) => {
+      const assessment = await tx.assessment.findFirst({
+        where: { id, organizationId },
+      });
+      if (!assessment) throw new AppError(404, 'Assessment not found');
+      if (!canDeleteAny && assessment.createdBy !== actor.id) {
+        throw new AppError(403, 'You can only delete assessments you created');
+      }
+      if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
+        throw new AppError(400, 'Only assessments that have not been submitted can be deleted');
+      }
+
+      const marksRemoved = await tx.assessmentMark.count({
+        where: { assessmentId: id, organizationId },
+      });
+      const deleted = await tx.assessment.deleteMany({
+        where: {
+          id,
+          organizationId,
+          status: { in: ['DRAFT', 'OPEN', 'MARK_ENTRY'] },
+          ...(canDeleteAny ? {} : { createdBy: actor.id }),
+        },
+      });
+      if (!deleted.count) {
+        throw new AppError(409, 'Assessment status changed. Refresh and try again.');
+      }
+
+      return { assessment, marksRemoved };
     });
-    if (!assessment) throw new AppError(404, 'Assessment not found');
-    if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
-      throw new AppError(400, 'Only scheduled assessments that are not submitted can be deleted');
+
+    try {
+      await prisma.academicAuditLog.create({
+        data: {
+          organizationId,
+          action: 'ASSESSMENT_DELETED',
+          entityType: 'ASSESSMENT',
+          entityId: id,
+          classId: result.assessment.classId,
+          academicYear: result.assessment.academicYear,
+          term: result.assessment.term,
+          actorId: actor.id || null,
+          actorRoles: (actor.roles ?? []).join(',') || null,
+          beforeState: {
+            title: result.assessment.title,
+            status: result.assessment.status,
+            marksRemoved: result.marksRemoved,
+          } as any,
+          afterState: null as any,
+          details: { title: result.assessment.title, marksRemoved: result.marksRemoved } as any,
+        },
+      });
+    } catch (err) {
+      console.warn('[assessment] delete audit failed:', err instanceof Error ? err.message : err);
     }
 
-    const scored = await prisma.assessmentMark.count({
-      where: { assessmentId: id, score: { not: null } },
-    });
-    if (scored > 0) {
-      throw new AppError(400, 'Cannot delete an assessment that already has marks entered');
-    }
-
-    await prisma.assessment.delete({ where: { id } });
-    return { message: 'Assessment deleted' };
+    return { message: 'Assessment deleted', marksRemoved: result.marksRemoved };
   }
 
   /** Admin: remove an assessment (course) together with every mark entered for it. */

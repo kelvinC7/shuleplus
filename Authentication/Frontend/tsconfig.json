@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -13,13 +17,31 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@shuleplus/id-photo-config": ["../../packages/id-photo-config/index.ts"],
-      "@shuleplus/id-photo-browser": ["../../packages/id-photo-browser/index.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@shuleplus/id-photo-config": [
+        "../../packages/id-photo-config/index.ts"
+      ],
+      "@shuleplus/id-photo-browser": [
+        "../../packages/id-photo-browser/index.ts"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-staging-1819629/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

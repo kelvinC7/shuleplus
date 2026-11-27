@@ -5,6 +5,8 @@ export interface JwtUser {
   sessionId: string;
   roles: string[];
   modules: string[];
+  /** IAM per-module access: HEAD sees all, USER sees own. */
+  moduleAccess?: Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }>;
   position?: string | null;
 }
 

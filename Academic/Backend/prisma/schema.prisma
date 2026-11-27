@@ -481,6 +481,8 @@ model Exam {
   description    String?
   totalMarks     Int?       @map("total_marks")
   passingMarks   Int?       @map("passing_marks")
+  /** IAM user who created the exam (own-data isolation). */
+  createdBy      String?    @map("created_by")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
@@ -1387,9 +1389,12 @@ model ExaminationType {
   id             String   @id @default(uuid())
   organizationId String   @map("organization_id")
   name           String
+  code           String?
+  status         String   @default("ACTIVE")
   academicYear   String   @map("academic_year")
   term           String
   description    String?
+  createdBy      String?  @map("created_by")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -1398,6 +1403,7 @@ model ExaminationType {
   examinationLists ExaminationList[]
 
   @@unique([organizationId, academicYear, term, name])
+  @@unique([organizationId, code])
   @@index([organizationId, academicYear, term])
   @@map("examination_types")
 }
@@ -1416,11 +1422,13 @@ model ClassExaminationTimetable {
   endDate           DateTime @map("end_date")
   excludeWeekends   Boolean  @default(false) @map("exclude_weekends")
   sessions          Json?
+  /** IAM user who created the timetable (own-data isolation). */
+  createdBy         String?  @map("created_by")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   tenant          Tenant                     @relation(fields: [organizationId], references: [organizationId])
-  examinationType ExaminationType?           @relation(fields: [examinationTypeId], references: [id], onDelete: SetNull)
+  examinationType ExaminationType?           @relation(fields: [examinationTypeId], references: [id], onDelete: Cascade)
   slots           ClassExaminationSlot[]
   examinationLists ExaminationList[]
   invigilatorAssignments ExaminationInvigilatorAssignment[]
@@ -1446,10 +1454,29 @@ model ClassExaminationSlot {
   updatedAt   DateTime                 @updatedAt @map("updated_at")
 
   timetable ClassExaminationTimetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  courses   ClassExaminationSlotCourse[]
 
   @@unique([timetableId, examDate, sessionCode])
   @@index([timetableId, examDate])
   @@map("class_examination_slots")
+}
+
+// Part-3: separate course-session relationship; one session can hold many courses.
+model ClassExaminationSlotCourse {
+  id          String   @id @default(uuid())
+  slotId      String   @map("slot_id")
+  courseName  String   @map("course_name")
+  subjectId   String?  @map("subject_id")
+  courseCode  String?  @map("course_code")
+  teacherName String?  @map("teacher_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  slot ClassExaminationSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@unique([slotId, courseName])
+  @@index([slotId])
+  @@map("class_examination_slot_courses")
 }
 
 enum ExaminationDistributionMethod {
@@ -1482,12 +1509,14 @@ model ExaminationList {
   status                 ExaminationListStatus         @default(DRAFT)
   generatedAt            DateTime?                     @map("generated_at")
   publishedAt            DateTime?                     @map("published_at")
+  /** IAM user who generated/created the list (own-data isolation). */
+  createdBy              String?                       @map("created_by")
   createdAt              DateTime                      @default(now()) @map("created_at")
   updatedAt              DateTime                      @updatedAt @map("updated_at")
 
   tenant                Tenant                        @relation(fields: [organizationId], references: [organizationId])
   examinationTimetable  ClassExaminationTimetable?    @relation(fields: [examinationTimetableId], references: [id], onDelete: SetNull)
-  examinationType       ExaminationType?              @relation(fields: [examinationTypeId], references: [id], onDelete: SetNull)
+  examinationType       ExaminationType?              @relation(fields: [examinationTypeId], references: [id], onDelete: Cascade)
   rooms                 ExaminationListRoom[]
   classes               ExaminationListClass[]
   allocations           ExaminationAllocation[]
@@ -1546,6 +1575,7 @@ model ExaminationAllocation {
   studentName String   @map("student_name")
   classId     String   @map("class_id")
   className   String   @map("class_name")
+  classLevel  String?  @map("class_level")
   gender      String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -1719,3 +1749,5 @@ model NurseryReport {
   @@index([organizationId, academicYear, term, reportKind])
   @@map("nursery_reports")
 }
+
+

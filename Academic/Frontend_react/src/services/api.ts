@@ -1424,6 +1424,8 @@ export async function marksDemoRemove(classId?: string) {
 // ─── Examination Timetable (class exam schedule) ────────────────────────
 export type ExaminationSessionPeriod = 'MORNING' | 'AFTERNOON';
 
+export type ClassExaminationSlotCourse = { id: string; slotId: string; courseName: string; subjectId?: string | null; courseCode?: string | null; teacherName?: string | null; };
+
 export type ClassExaminationSlot = {
   id: string;
   timetableId: string;
@@ -1434,6 +1436,7 @@ export type ClassExaminationSlot = {
   courseName: string;
   startTime: string;
   endTime: string;
+  courses?: ClassExaminationSlotCourse[];
 };
 
 export type ExaminationSessionDefinition = {
@@ -1443,7 +1446,7 @@ export type ExaminationSessionDefinition = {
   endTime: string;
 };
 
-export type ExaminationType = { id: string; organizationId: string; name: string; academicYear: string; term: string; description?: string | null; createdAt?: string; updatedAt?: string; };
+export type ExaminationType = { id: string; organizationId: string; name: string; code?: string | null; status?: string; academicYear: string; term: string; description?: string | null; createdBy?: string | null; createdAt?: string; updatedAt?: string; };
 
 export type ClassExaminationTimetable = {
   id: string;
@@ -1480,14 +1483,48 @@ export async function getExaminationTimetableContext(params: { classId: string; 
   return res.data.data as ExaminationTimetableContext;
 }
 
-export async function listExaminationTypes(params?: { academicYear?: string; term?: string }) {
+export async function listExaminationTypes(params?: { academicYear?: string; term?: string; name?: string; status?: string }) {
   const res = await api.get('/examination-timetables/types', { params });
   return (res.data.data ?? []) as ExaminationType[];
 }
 
-export async function createExaminationType(data: { name: string; academicYear: string; term: string; description?: string }) {
+export async function createExaminationType(data: { name: string; code?: string; academicYear: string; term: string; description?: string; status?: string }) {
   const res = await api.post('/examination-timetables/types', data);
   return res.data.data as ExaminationType;
+}
+
+export async function updateExaminationType(id: string, data: { name?: string; code?: string | null; description?: string | null; academicYear?: string; term?: string; status?: string }) {
+  const res = await api.put('/examination-timetables/types/' + id, data);
+  return res.data.data as ExaminationType;
+}
+
+export async function deleteExaminationType(id: string) {
+  const res = await api.delete('/examination-timetables/types/' + id);
+  return res.data.data as { deleted: boolean; id: string };
+}
+
+export async function getExaminationType(id: string) {
+  const res = await api.get('/examination-timetables/types/' + id);
+  return res.data.data as ExaminationType & { counts?: { timetables: number; sessions: number; examinationLists: number } };
+}
+
+export type ExaminationTypeStats = { totalExaminationTypes: number; activeExaminationTypes: number; totalExaminationTimetables: number; totalExaminationSessions: number; totalExaminationLists: number; academicYearsCovered: number; };
+
+export async function getExaminationTypeStats(params?: { academicYear?: string; term?: string; name?: string }) {
+  const res = await api.get('/examination-timetables/types/stats', { params });
+  return res.data.data as ExaminationTypeStats;
+}
+
+export type ExaminationTypeRow = { id: string; name: string; code: string | null; description: string | null; academicYear: string; term: string; status: string; createdBy: string | null; createdAt: string; numberOfTimetables: number; numberOfExaminationSessions: number; numberOfExaminationLists: number; };
+
+export async function listExaminationTypeRows(params?: { academicYear?: string; term?: string; name?: string }) {
+  const res = await api.get('/examination-timetables/types/rows', { params });
+  return (res.data.data ?? []) as ExaminationTypeRow[];
+}
+
+export async function copyExaminationTimetable(id: string, data: { classId: string; className?: string; name?: string; academicYear?: string; term?: string; startDate?: string; endDate?: string; examinationTypeId?: string | null; excludeWeekends?: boolean; sessions?: ExaminationSessionDefinition[]; slots?: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; courseNames?: string[]; startTime: string; endTime: string }>; }) {
+  const res = await api.post('/examination-timetables/' + id + '/copy', data);
+  return res.data.data as ClassExaminationTimetable;
 }
 
 export async function listExaminationTimetables(params?: { classId?: string; academicYear?: string; term?: string; examinationTypeId?: string }) {
@@ -1512,7 +1549,7 @@ export type ExaminationTimetableProposal = {
   endDate: string;
   excludeWeekends: boolean;
   sessions?: ExaminationSessionDefinition[];
-  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; startTime: string; endTime: string }>;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; courseNames?: string[]; courses?: Array<{ courseName: string; subjectId?: string | null; courseCode?: string | null; teacherName?: string | null }>; startTime: string; endTime: string }>;
   generated?: boolean;
   persisted?: boolean;
 };
@@ -1545,7 +1582,7 @@ export async function saveExaminationTimetable(data: {
   excludeWeekends?: boolean;
   sessions?: ExaminationSessionDefinition[];
   confirmImpact?: boolean;
-  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; startTime: string; endTime: string }>;
+  slots: Array<{ examDate: string; session: ExaminationSessionPeriod; sessionCode?: string; sessionName?: string; courseName: string; courseNames?: string[]; courses?: Array<{ courseName: string; subjectId?: string | null; courseCode?: string | null; teacherName?: string | null }>; startTime: string; endTime: string }>;
 }) {
   if (data.id) {
     const res = await api.put(`/examination-timetables/${data.id}`, data);
@@ -1985,3 +2022,4 @@ export async function publishNurseryReports(body: {
   const res = await api.post('/nursery/reports/publish', body);
   return res.data.data as { published: number };
 }
+

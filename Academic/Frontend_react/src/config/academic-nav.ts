@@ -84,6 +84,7 @@ export const ACADEMIC_NAV: AcademicNavItem[] = [
     label: 'Examination',
     icon: 'exams',
     children: [
+      { label: 'Examination Types', href: '/examination-types' },
       { label: 'Examination Timetable', href: '/examination-timetable' },
       { label: 'Examination Lists', href: '/examination-lists' },
       { label: 'Invigilators', href: '/examination-invigilators' },
@@ -146,7 +147,8 @@ export function isAssessmentGroupActive(pathname: string): boolean {
 }
 
 export function isExaminationsGroupActive(pathname: string): boolean {
-  return pathname.startsWith('/examination-timetable') || pathname.startsWith('/examination-lists') || pathname.startsWith('/examination-invigilators') || pathname.startsWith('/examination-attendance') || pathname.startsWith('/exams');
+  return pathname.startsWith('/examination-types') ||
+    pathname.startsWith('/examination-timetable') || pathname.startsWith('/examination-lists') || pathname.startsWith('/examination-invigilators') || pathname.startsWith('/examination-attendance') || pathname.startsWith('/exams');
 }
 
 export function isResultsGroupActive(pathname: string): boolean {
@@ -195,6 +197,7 @@ export function isAcademicNavActive(pathname: string, href: string): boolean {
   if (href === '/courses') return pathname.startsWith('/courses') || pathname.startsWith('/subjects');
   if (href === '/subjects') return pathname.startsWith('/subjects') || pathname.startsWith('/courses');
   if (href === '/examinations') return pathname.startsWith('/examinations');
+  if (href === '/examination-types') return pathname.startsWith('/examination-types');
   if (href === '/examination-timetable') return pathname.startsWith('/examination-timetable');
   if (href === '/examination-lists') return pathname.startsWith('/examination-lists');
   if (href === '/examination-invigilators') return pathname.startsWith('/examination-invigilators');
@@ -238,6 +241,7 @@ export function pageTitleFromPath(pathname: string): string {
   if (pathname.startsWith('/courses/catalog') || pathname === '/courses') return 'Course catalog';
   if (pathname.startsWith('/courses/by-class')) return 'Class courses';
   if (pathname.startsWith('/courses') || pathname.startsWith('/subjects')) return 'Courses';
+  if (pathname.startsWith('/examination-types')) return 'Examination Types';
   if (pathname.startsWith('/examination-timetable')) return 'Examination Timetable';
   if (pathname.startsWith('/examination-lists')) return 'Examination Lists';
   if (pathname.startsWith('/examination-invigilators')) return 'Invigilators';
@@ -266,3 +270,4 @@ export function pageTitleFromPath(pathname: string): string {
   if (pathname.startsWith('/exams')) return 'Examinations';
   return 'Academic';
 }
+

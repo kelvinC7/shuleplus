@@ -12,11 +12,26 @@ interface AuthContextValue {
   summary: DashboardSummary | null;
   user: JwtUser | null;
   isOrgAdmin: boolean;
+  /** true = module head / organization user: sees the whole organization. */
+  seeAll: boolean;
+  accessLevel: 'USER' | 'HEAD';
   deskOnly: boolean;
   reload: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const ACADEMIC_SLUGS = ['academic', 'academic-1', 'academics'];
+
+function claimSeeAll(user: JwtUser | null): boolean {
+  if (!user) return false;
+  if ((user.roles ?? []).includes('organization_admin')) return true;
+  for (const slug of ACADEMIC_SLUGS) {
+    const access = user.moduleAccess?.[slug];
+    if (access) return access.accessLevel === 'HEAD';
+  }
+  return false;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -25,17 +40,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [user, setUser] = useState<JwtUser | null>(null);
   const [deskOnly, setDeskOnly] = useState(false);
+  const [seeAll, setSeeAll] = useState(false);
+  const [accessLevel, setAccessLevel] = useState<'USER' | 'HEAD'>('USER');
 
   async function load() {
     captureTokenFromUrl();
     const token = getToken();
     const parsed = token ? parseJwtPayload(token) : null;
     setUser(parsed);
+    setSeeAll(claimSeeAll(parsed));
+    setAccessLevel(claimSeeAll(parsed) ? 'HEAD' : 'USER');
 
     if (!token) {
       setError('Missing access token. Open this module from your organization dashboard.');
       setReady(true);
       return;
+    }
+
+    // IAM is the source of truth; the JWT claim is only a fast first guess for
+    // sessions issued before the moduleAccess claim existed.
+    async function loadScope() {
+      try {
+        const { data } = await api.get('/me/scope');
+        const scope = data?.data as { seeAll?: boolean; accessLevel?: 'USER' | 'HEAD' } | undefined;
+        if (scope) {
+          setSeeAll(!!scope.seeAll);
+          setAccessLevel(scope.accessLevel === 'HEAD' ? 'HEAD' : 'USER');
+        }
+      } catch {
+        // Keep the JWT-derived value when the endpoint is unavailable.
+      }
     }
 
     const isInvigilator =
@@ -72,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await openDesk();
         }
       }
+      await loadScope();
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -97,6 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         summary,
         user,
         isOrgAdmin: user?.roles?.includes('organization_admin') ?? false,
+        seeAll,
+        accessLevel,
         deskOnly,
         reload: load,
       }}

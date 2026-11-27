@@ -3,6 +3,11 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { smListClasses, smListStudents } from '../clients/student-management.client';
 import { fetchTimetableClassrooms } from '../clients/timetable.client';
+import {
+  assertOwnRecord,
+  currentAcademicScope,
+  mergeOwnData,
+} from '../middleware/academic-scope';
 
 type RoomInput = {
   sourceRoomId?: string | null;
@@ -19,8 +24,23 @@ type StudentRow = {
   fullName: string;
   classId: string;
   className: string;
+  /** class level WITHOUT stream, e.g. S1 for S1A/S1B/S1C. */
+  classLevel: string;
+  stream?: string | null;
+  parentClassId?: string | null;
   gender?: string | null;
 };
+
+function norm(s: string) { return s.trim().toLowerCase().replace(/[\s_\-\.]+/g, ' '); }
+
+/** Common class-level key: parent class id if present, else raw class name (not the stream). */
+function classLevelKeyOf(s: { classLevel?: string | null; className?: string | null; classId?: string | null; parentClassId?: string | null }): string {
+  return norm(s.classLevel || s.parentClassId || s.className || s.classId || '');
+}
+
+function classLevelOfClass(c: any): string {
+  return norm(c?.name || c?.classLevel || c?.level || c?.label || c?.id || '');
+}
 
 function classLabelOf(c: any) {
   return c?.label || [c?.name, c?.stream].filter(Boolean).join(' ').trim() || c?.id || '';
@@ -36,18 +56,28 @@ async function generateUniqueListCode() {
 }
 
 async function getAllActiveStudents(organizationId: string): Promise<StudentRow[]> {
-  const raw = await smListStudents(organizationId, { status: 'ACTIVE' }).catch(() => [] as any[]);
+  const [raw, classRows] = await Promise.all([
+    smListStudents(organizationId, { status: 'ACTIVE' }).catch(() => [] as any[]),
+    smListClasses(organizationId).catch(() => [] as any[]),
+  ]);
   const rows = Array.isArray(raw) ? raw : [];
+  const classInfo = new Map<string, any>();
+  for (const c of classRows) classInfo.set(String(c.id), c);
   return rows.map((s: any) => {
     const fullName = s.fullName || [s.firstName, s.lastName].filter(Boolean).join(' ').trim() || s.studentCode || s.id;
     const classId = String(s.classId || s.enrollments?.[0]?.classId || s.enrollments?.[0]?.class?.id || '');
-    const className = s.className || s.enrollments?.[0]?.class?.label || [s.enrollments?.[0]?.class?.name, s.enrollments?.[0]?.class?.stream].filter(Boolean).join(' ').trim() || 'Unassigned';
+    const klass = s.enrollments?.[0]?.class ?? classInfo.get(classId) ?? {};
+    const className = s.className || klass.label || [klass.name, klass.stream].filter(Boolean).join(' ').trim() || 'Unassigned';
+    const classLevel = norm(klass.name || klass.classLevel || klass.level || s.classLevel || klass.label || className);
     return {
       id: String(s.id),
       studentCode: s.studentCode ?? null,
       fullName,
       classId,
       className,
+      classLevel,
+      stream: klass.stream ?? s.stream ?? null,
+      parentClassId: klass.parentClassId ?? klass.parent_class_id ?? null,
       gender: s.gender ?? null,
     };
   }).filter((s) => s.id && s.classId);
@@ -121,6 +151,69 @@ function fillRoomsSequentially(students: StudentRow[], rooms: Array<{ id: string
   return out;
 }
 
+/** Part-5: no room may contain two students from the same class level (streams of one level count as the same class). */
+function assertRoomNoSameLevel(roomName: string, studentsInRoom: Array<{ classLevel?: string | null; className?: string | null; classId?: string | null; parentClassId?: string | null; studentName?: string; fullName?: string }>) {
+  const seen = new Map<string, string>();
+  for (const s of studentsInRoom) {
+    const key = classLevelKeyOf(s);
+    if (!key) continue;
+    const who = s.studentName || s.fullName || '';
+    if (seen.has(key)) {
+      throw new AppError(
+        409,
+        `Room allocation not allowed. Room ${roomName} already has a student from class ${seen.get(key)}; ` +
+          `cannot also add ${who} (class ${key}). Students from the same class level (including different streams) must be in different rooms.`,
+      );
+    }
+    seen.set(key, key);
+  }
+}
+
+/** Part-5 automatic distribution: no room gets two students of the same class level; respects capacity. */
+function assignRoomsNoSameLevel(
+  students: StudentRow[],
+  rooms: Array<{ id: string; capacity: number }>,
+): Array<StudentRow & { roomKey: string }> {
+  // interleave by class level so streams of one level are spread across rooms
+  const byLevel = new Map<string, StudentRow[]>();
+  for (const s of students) {
+    const k = classLevelKeyOf(s);
+    if (!byLevel.has(k)) byLevel.set(k, []);
+    byLevel.get(k)!.push(s);
+  }
+  const queues = [...byLevel.values()].map((q) => [...q].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+  const ordered: StudentRow[] = [];
+  let remaining = true;
+  while (remaining) {
+    remaining = false;
+    for (const q of queues) {
+      if (q.length) { ordered.push(q.shift()!); remaining = true; }
+    }
+  }
+
+  const roomState = rooms.map((r) => ({ id: r.id, capacity: r.capacity, count: 0, levels: new Set<string>() }));
+  const assigned: Array<StudentRow & { roomKey: string }> = [];
+  for (const s of ordered) {
+    const key = classLevelKeyOf(s);
+    const eligible = roomState
+      .filter((r) => r.count < r.capacity && !r.levels.has(key))
+      .sort((a, b) => a.count - b.count || a.id.localeCompare(b.id));
+    if (!eligible.length) {
+      const totalCapacity = roomState.reduce((n, r) => n + r.capacity, 0);
+      const maxPerLevel = Math.max(1, ...[...byLevel.values()].map((v) => v.length));
+      throw new AppError(
+        400,
+        `Not enough examination rooms. No room can take ${s.fullName} (class ${key}) without putting two students of class ${key} together. ` +
+          `Add more rooms or capacity. Total capacity ${totalCapacity}, largest class level ${maxPerLevel} student(s), total students ${students.length}.`,
+      );
+    }
+    const room = eligible[0];
+    room.count += 1;
+    room.levels.add(key);
+    assigned.push({ ...s, roomKey: room.id });
+  }
+  return assigned;
+}
 function toDateOnly(value?: Date | string | null) {
   if (!value) return null;
   const d = new Date(value);
@@ -132,12 +225,12 @@ export class ExaminationListService {
   async dashboard(organizationId: string, params: { academicYear?: string; term?: string; examinationTypeId?: string }) {
     const { academicYear, term, examinationTypeId } = params;
     const lists = await prisma.examinationList.findMany({
-      where: {
+      where: mergeOwnData({
         organizationId,
         ...(academicYear ? { academicYear } : {}),
         ...(term ? { term } : {}),
         ...(examinationTypeId ? { examinationTypeId } : {}),
-      },
+      }),
       include: {
         rooms: { include: { allocations: true }, orderBy: { sortOrder: 'asc' } },
         classes: true,
@@ -176,27 +269,27 @@ export class ExaminationListService {
       getAllActiveStudents(organizationId).catch(() => [] as StudentRow[]),
       fetchTimetableClassrooms(organizationId).catch(() => [] as any[]),
       prisma.classExaminationTimetable.findMany({
-        where: {
+        where: mergeOwnData({
           organizationId,
           ...(params.academicYear ? { academicYear: params.academicYear } : {}),
           ...(params.term ? { term: params.term } : {}),
           ...(params.examinationTypeId ? { examinationTypeId: params.examinationTypeId } : {}),
-        },
-        include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] }, examinationType: true },
+        }),
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }], include: { courses: true } }, examinationType: true },
         orderBy: [{ academicYear: 'desc' }, { term: 'asc' }, { className: 'asc' }],
       }),
       prisma.examinationType.findMany({
-        where: {
+        where: mergeOwnData({
           organizationId,
           ...(params.academicYear ? { academicYear: params.academicYear } : {}),
           ...(params.term ? { term: params.term } : {}),
-        },
+        }),
         orderBy: [{ academicYear: 'desc' }, { term: 'asc' }, { name: 'asc' }],
       }),
       params.examinationTimetableId
         ? prisma.classExaminationTimetable.findFirst({
-            where: { id: params.examinationTimetableId, organizationId },
-            include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] }, examinationType: true },
+            where: mergeOwnData({ id: params.examinationTimetableId, organizationId }),
+            include: { slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }], include: { courses: true } }, examinationType: true },
           })
         : Promise.resolve(null),
     ]);
@@ -269,20 +362,20 @@ export class ExaminationListService {
         term: timetable.term,
         startDate: toDateOnly(timetable.startDate),
         endDate: toDateOnly(timetable.endDate),
-        slots: timetable.slots.map((s: any) => ({ examDate: toDateOnly(s.examDate), session: s.session, sessionCode: s.sessionCode, sessionName: s.sessionName, courseName: s.courseName, startTime: s.startTime, endTime: s.endTime })),
+        slots: timetable.slots.map((s: any) => ({ examDate: toDateOnly(s.examDate), session: s.session, sessionCode: s.sessionCode, sessionName: s.sessionName, courseName: s.courseName, startTime: s.startTime, endTime: s.endTime, courses: (s.courses ?? []).map((c: any) => ({ courseName: c.courseName, subjectId: c.subjectId ?? null, courseCode: c.courseCode ?? null, teacherName: c.teacherName ?? null })) })),
       } : null,
     };
   }
 
   async list(organizationId: string, params: { academicYear?: string; term?: string; examinationTimetableId?: string; examinationTypeId?: string }) {
     return prisma.examinationList.findMany({
-      where: {
+      where: mergeOwnData({
         organizationId,
         ...(params.academicYear ? { academicYear: params.academicYear } : {}),
         ...(params.term ? { term: params.term } : {}),
         ...(params.examinationTimetableId ? { examinationTimetableId: params.examinationTimetableId } : {}),
         ...(params.examinationTypeId ? { examinationTypeId: params.examinationTypeId } : {}),
-      },
+      }),
       include: {
         examinationTimetable: { select: { id: true, examinationCode: true, examinationTypeId: true, examinationType: { select: { id: true, name: true } }, name: true, className: true, startDate: true, endDate: true } },
         rooms: { orderBy: { sortOrder: 'asc' }, include: { _count: { select: { allocations: true } } } },
@@ -295,11 +388,11 @@ export class ExaminationListService {
 
   async getById(id: string, organizationId: string) {
     const row = await prisma.examinationList.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
       include: {
         examinationTimetable: {
           include: {
-            slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }] },
+            slots: { orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }, { sessionCode: 'asc' }], include: { courses: true } },
           },
         },
         rooms: {
@@ -317,7 +410,7 @@ export class ExaminationListService {
   }
 
   async impact(id: string, organizationId: string) {
-    const list = await prisma.examinationList.findFirst({ where: { id, organizationId }, select: { id: true, status: true, listCode: true } });
+    const list = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }), select: { id: true, status: true, listCode: true } });
     if (!list) throw new AppError(404, 'Examination list not found');
     const invigilatorAssignments = await prisma.examinationInvigilatorAssignment.count({ where: { organizationId, examinationListId: id } });
     const warnings: string[] = [];
@@ -335,7 +428,7 @@ export class ExaminationListService {
   }
 
   async publish(id: string, organizationId: string) {
-    const list = await prisma.examinationList.findFirst({ where: { id, organizationId } });
+    const list = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status === 'PUBLISHED') return prisma.examinationList.findUnique({ where: { id }, include: { rooms: { orderBy: { sortOrder: 'asc' } }, classes: true } });
     const allocCount = await prisma.examinationAllocation.count({ where: { listId: id } });
@@ -348,7 +441,7 @@ export class ExaminationListService {
   }
 
   async unpublish(id: string, organizationId: string) {
-    const list = await prisma.examinationList.findFirst({ where: { id, organizationId } });
+    const list = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status !== 'PUBLISHED') return prisma.examinationList.findUnique({ where: { id }, include: { rooms: { orderBy: { sortOrder: 'asc' } }, classes: true } });
     return prisma.examinationList.update({
@@ -371,7 +464,7 @@ export class ExaminationListService {
     mixQuantity?: number | null;
   }) {
     const timetable = body.examinationTimetableId
-      ? await prisma.classExaminationTimetable.findFirst({ where: { id: body.examinationTimetableId, organizationId }, include: { examinationType: true } })
+      ? await prisma.classExaminationTimetable.findFirst({ where: mergeOwnData({ id: body.examinationTimetableId, organizationId }), include: { examinationType: true } })
       : null;
     if (body.examinationTimetableId && !timetable) throw new AppError(404, 'Selected examination timetable not found');
 
@@ -421,14 +514,9 @@ export class ExaminationListService {
     const roomKeys = roomsInput.map((_, i) => `room_${i}`);
     const roomDefs = roomsInput.map((r, i) => ({ id: roomKeys[i], capacity: r.capacity }));
 
-    let assigned: Array<StudentRow & { roomKey: string }>;
-    if (body.distributionMethod === 'KEEP_CLASS') {
-      assigned = distributeKeepClass(studentsByClass, classIds, roomDefs);
-    } else {
-      const qty = body.mixQuantity && body.mixQuantity > 0 ? Math.floor(body.mixQuantity) : null;
-      const mixed = qty ? interleaveByQuantity(studentsByClass, classIds, qty) : interleaveAuto(studentsByClass, classIds);
-      assigned = fillRoomsSequentially(mixed, roomDefs);
-    }
+    // Part-5: never place two students of the same class level in one room.
+    const allParticipants = [...studentsByClass.values()].flatMap((l) => l);
+    const assigned: Array<StudentRow & { roomKey: string }> = assignRoomsNoSameLevel(allParticipants, roomDefs);
 
     const seenStudent = new Set<string>();
     const roomCounts = new Map<string, number>();
@@ -464,6 +552,7 @@ export class ExaminationListService {
           defaultCapacity: Math.max(1, Number(body.defaultCapacity) || 40),
           status: 'GENERATED',
           generatedAt: new Date(),
+          createdBy: currentAcademicScope()?.userId ?? null,
         },
       });
       const roomRows = await Promise.all(roomsInput.map((r, i) => tx.examinationListRoom.create({
@@ -497,6 +586,7 @@ export class ExaminationListService {
         studentName: a.fullName,
         classId: a.classId,
         className: a.className,
+        classLevel: a.classLevel ?? classLevelKeyOf(a) ?? null,
         gender: a.gender ?? null,
         updatedAt: new Date(),
       }));
@@ -516,8 +606,9 @@ export class ExaminationListService {
   }
 
   async remove(id: string, organizationId: string, opts?: { confirmImpact?: boolean }) {
-    const existing = await prisma.examinationList.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Examination list not found');
+    assertOwnRecord(existing.createdBy, 'examination list');
     if (existing.status === 'PUBLISHED') throw new AppError(409, 'Published examination lists cannot be deleted. Unpublish or create a new list instead.');
     if (!opts?.confirmImpact) {
       const invigilatorAssignments = await prisma.examinationInvigilatorAssignment.count({ where: { organizationId, examinationListId: id } });
@@ -533,8 +624,8 @@ export class ExaminationListService {
 
   async moveStudent(id: string, organizationId: string, body: { allocationId: string; targetRoomId: string }) {
     const list = await prisma.examinationList.findFirst({
-      where: { id, organizationId },
-      include: { rooms: { include: { _count: { select: { allocations: true } } } } },
+      where: mergeOwnData({ id, organizationId }),
+      include: { rooms: { include: { allocations: true } } },
     });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status === 'PUBLISHED') throw new AppError(409, 'Published examination lists cannot be modified');
@@ -542,23 +633,29 @@ export class ExaminationListService {
     if (!alloc) throw new AppError(404, 'Allocation not found');
     const target = list.rooms.find((r) => r.id === body.targetRoomId);
     if (!target) throw new AppError(404, 'Target room not found');
-    const currentCount = target._count.allocations;
+    const othersInTarget = target.allocations.filter((a) => a.id !== alloc.id);
+    const currentCount = target.allocations.length;
     const effectiveCount = target.id === alloc.roomId ? currentCount : currentCount + 1;
     if (effectiveCount > target.capacity) throw new AppError(409, `Room ${target.roomName} is at full capacity`);
+    // Part-5 backend validation
+    assertRoomNoSameLevel(target.roomName, [
+      ...othersInTarget.map((a) => ({ classLevel: (a as any).classLevel ?? null, className: a.className, classId: a.classId, studentName: a.studentName })),
+      { classLevel: (alloc as any).classLevel ?? null, className: alloc.className, classId: alloc.classId, studentName: alloc.studentName },
+    ]);
     await prisma.examinationAllocation.update({ where: { id: alloc.id }, data: { roomId: target.id } });
     return this.getById(id, organizationId);
   }
 
   async addStudentToRoom(id: string, organizationId: string, body: { roomId: string; studentId: string }) {
     const list = await prisma.examinationList.findFirst({
-      where: { id, organizationId },
-      include: { rooms: { include: { _count: { select: { allocations: true } } } } },
+      where: mergeOwnData({ id, organizationId }),
+      include: { rooms: { include: { allocations: true } } },
     });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status === 'PUBLISHED') throw new AppError(409, 'Published examination lists cannot be modified');
     const room = list.rooms.find((r) => r.id === body.roomId);
     if (!room) throw new AppError(404, 'Room not found');
-    if (room._count.allocations >= room.capacity) throw new AppError(409, `Room ${room.roomName} is at full capacity`);
+    if (room.allocations.length >= room.capacity) throw new AppError(409, `Room ${room.roomName} is at full capacity`);
 
     const existing = await prisma.examinationAllocation.findFirst({ where: { listId: id, studentId: body.studentId } });
     if (existing) throw new AppError(409, 'This student is already allocated to a room in this examination list');
@@ -566,6 +663,12 @@ export class ExaminationListService {
     const students = await getAllActiveStudents(organizationId);
     const student = students.find((s) => s.id === body.studentId);
     if (!student) throw new AppError(404, 'Student not found or not active');
+
+    // Part-5 backend validation: no two students of the same class level in one room
+    assertRoomNoSameLevel(room.roomName, [
+      ...room.allocations.map((a) => ({ classLevel: (a as any).classLevel ?? null, className: a.className, classId: a.classId, studentName: a.studentName })),
+      { classLevel: student.classLevel ?? classLevelKeyOf(student) ?? null, className: student.className, classId: student.classId, studentName: student.fullName },
+    ]);
 
     await prisma.examinationAllocation.create({
       data: {
@@ -576,6 +679,7 @@ export class ExaminationListService {
         studentName: student.fullName,
         classId: student.classId,
         className: student.className,
+        classLevel: student.classLevel ?? classLevelKeyOf(student) ?? null,
         gender: student.gender ?? null,
       },
     });
@@ -583,7 +687,7 @@ export class ExaminationListService {
   }
 
   async removeAllocation(id: string, organizationId: string, allocationId: string) {
-    const list = await prisma.examinationList.findFirst({ where: { id, organizationId } });
+    const list = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!list) throw new AppError(404, 'Examination list not found');
     if (list.status === 'PUBLISHED') throw new AppError(409, 'Published examination lists cannot be modified');
     const alloc = await prisma.examinationAllocation.findFirst({ where: { id: allocationId, listId: id } });
@@ -593,7 +697,7 @@ export class ExaminationListService {
   }
 
   async availableStudents(id: string, organizationId: string, q?: string) {
-    const list = await prisma.examinationList.findFirst({ where: { id, organizationId }, select: { id: true } });
+    const list = await prisma.examinationList.findFirst({ where: mergeOwnData({ id, organizationId }), select: { id: true } });
     if (!list) throw new AppError(404, 'Examination list not found');
     const [students, allocated] = await Promise.all([
       getAllActiveStudents(organizationId),
@@ -610,3 +714,15 @@ export class ExaminationListService {
 }
 
 export const examinationListService = new ExaminationListService();
+
+
+
+
+
+
+
+
+
+
+
+

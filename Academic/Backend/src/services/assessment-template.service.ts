@@ -4,6 +4,10 @@ import { smListClasses } from '../clients/student-management.client';
 import { resolveAcademicClass } from './sm-resolve.service';
 import { classCategoryMatchesTemplateLevel } from '../utils/education-level';
 import { rankStudentResults } from '../utils/student-result-ranking';
+import {
+  assertOwnRecord,
+  mergeOwnData,
+} from '../middleware/academic-scope';
 
 function applyTemplateTermFilter(where: Record<string, unknown>, term: string) {
   const t = term.trim();
@@ -167,7 +171,7 @@ export class AssessmentTemplateService {
     if (filters?.academicLevel) where.academicLevel = filters.academicLevel;
 
     return prisma.assessmentTemplate.findMany({
-      where,
+      where: mergeOwnData(where),
       include: {
         components: { orderBy: { sortOrder: 'asc' } },
         assignments: {
@@ -180,7 +184,7 @@ export class AssessmentTemplateService {
 
   async getById(id: string, organizationId: string) {
     const template = await prisma.assessmentTemplate.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
       include: {
         components: { orderBy: { sortOrder: 'asc' } },
         assignments: {
@@ -204,8 +208,9 @@ export class AssessmentTemplateService {
     status?: string;
     defaultCourseMarks?: number;
   }) {
-    const existing = await prisma.assessmentTemplate.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.assessmentTemplate.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Assessment template not found');
+    assertOwnRecord(existing.createdBy, 'assessment template');
     if (existing.status === 'ARCHIVED' || existing.status === 'REJECTED') {
       throw new AppError(400, 'Cannot modify an archived or rejected template');
     }
@@ -336,8 +341,9 @@ export class AssessmentTemplateService {
   }
 
   async delete(id: string, organizationId: string) {
-    const existing = await prisma.assessmentTemplate.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.assessmentTemplate.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Assessment template not found');
+    assertOwnRecord(existing.createdBy, 'assessment template');
 
     if (existing.status === 'ACTIVE') {
       throw new AppError(400, 'Cannot delete an active template. Archive it first.');

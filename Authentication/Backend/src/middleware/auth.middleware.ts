@@ -3,6 +3,16 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { AppError } from './error.middleware';
 
+/**
+ * Per-module access resolved from IAM `UserModule`.
+ * HEAD = sees every user's work in the module; USER = only their own.
+ * Organization admins are always HEAD with ORGANIZATION scope.
+ */
+export interface JwtModuleAccess {
+  accessLevel: 'USER' | 'HEAD';
+  dataScope: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -10,6 +20,8 @@ export interface JwtPayload {
   sessionId: string;
   roles: string[];
   modules: string[];
+  /** Map of module slug → access level/data scope (IAM source of truth). */
+  moduleAccess?: Record<string, JwtModuleAccess>;
   position?: string | null;
   name?: string;
   district?: string;

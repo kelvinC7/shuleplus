@@ -1,4 +1,4 @@
-﻿import { Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { examinationTimetableService } from '../services/examination-timetable.service';
 
@@ -12,14 +12,59 @@ export class ExaminationTimetableController {
       const data = await examinationTimetableService.listExaminationTypes(org(req), {
         academicYear: typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined,
         term: typeof req.query.term === 'string' ? req.query.term : undefined,
+        name: typeof req.query.name === 'string' ? req.query.name : (typeof req.query.typeName === 'string' ? req.query.typeName : undefined),
+        status: typeof req.query.status === 'string' ? req.query.status : undefined,
       });
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async examinationTypeStats(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.examinationTypeStats(org(req), {
+        academicYear: typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined,
+        term: typeof req.query.term === 'string' ? req.query.term : undefined,
+        name: typeof req.query.name === 'string' ? req.query.name : undefined,
+      });
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async examinationTypeRows(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.examinationTypeRows(org(req), {
+        academicYear: typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined,
+        term: typeof req.query.term === 'string' ? req.query.term : undefined,
+        name: typeof req.query.name === 'string' ? req.query.name : undefined,
+      });
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async getExaminationType(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.getExaminationType(String(req.params.id), org(req));
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async updateExaminationType(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.updateExaminationType(String(req.params.id), org(req), req.body ?? {});
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async deleteExaminationType(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.deleteExaminationType(String(req.params.id), org(req));
       res.json({ success: true, data });
     } catch (e) { next(e); }
   }
 
   async createExaminationType(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const data = await examinationTimetableService.createExaminationType(org(req), req.body);
+      const data = await examinationTimetableService.createExaminationType(org(req), req.body, req.user?.sub ? String(req.user.sub) : undefined);
       res.status(201).json({ success: true, data });
     } catch (e) { next(e); }
   }
@@ -79,6 +124,12 @@ export class ExaminationTimetableController {
     } catch (e) { next(e); }
   }
 
+  async copy(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationTimetableService.copy(String(req.params.id), org(req), req.body ?? {});
+      res.status(201).json({ success: true, data });
+    } catch (e) { next(e); }
+  }
   async remove(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const confirmImpact = String(req.query.confirmImpact || req.body?.confirmImpact || '') === 'true';
@@ -89,3 +140,4 @@ export class ExaminationTimetableController {
 }
 
 export const examinationTimetableController = new ExaminationTimetableController();
+

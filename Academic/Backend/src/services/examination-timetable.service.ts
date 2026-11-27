@@ -1,8 +1,16 @@
-﻿import { randomBytes } from 'crypto';
+import { randomBytes } from 'crypto';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { fetchTimetableClassCatalog } from '../clients/timetable.client';
 import { smListClasses } from '../clients/student-management.client';
+import {
+  assertCanSeeAll,
+  assertOwnRecord,
+  currentAcademicScope,
+  mergeOwnData,
+} from '../middleware/academic-scope';
+
+type SlotCourseInput = { courseName: string; subjectId?: string | null; courseCode?: string | null; teacherName?: string | null };
 
 type SlotInput = {
   examDate: string;
@@ -10,6 +18,10 @@ type SlotInput = {
   sessionCode?: string;
   sessionName?: string;
   courseName: string;
+  /** Part-3 multi-course: simple list of course names for one session. */
+  courseNames?: string[];
+  /** Part-3 multi-course: rich course list for one session. */
+  courses?: SlotCourseInput[];
   startTime: string;
   endTime: string;
 };
@@ -142,6 +154,27 @@ function sessionPeriod(startTime: string): 'MORNING' | 'AFTERNOON' {
   return parseMinutes(startTime) < 12 * 60 ? 'MORNING' : 'AFTERNOON';
 }
 
+function normalizeSlotCourses(slot: SlotInput): SlotCourseInput[] {
+  let courses: SlotCourseInput[] = [];
+  if (Array.isArray(slot.courses) && slot.courses.length) {
+    courses = slot.courses.map((c) => ({ courseName: String(c?.courseName || '').trim(), subjectId: c?.subjectId ?? null, courseCode: c?.courseCode ?? null, teacherName: c?.teacherName ?? null })).filter((c) => c.courseName);
+  } else if (Array.isArray(slot.courseNames) && slot.courseNames.length) {
+    courses = slot.courseNames.map((n) => ({ courseName: String(n || '').trim() })).filter((c) => c.courseName);
+  } else if (slot.courseName && String(slot.courseName).trim()) {
+    courses = [{ courseName: String(slot.courseName).trim() }];
+  }
+  const seen = new Set<string>();
+  const out: SlotCourseInput[] = [];
+  for (const c of courses) {
+    const k = c.courseName.toLowerCase();
+    if (seen.has(k)) throw new AppError(409, `Duplicate course in the same session: ` + c.courseName);
+    seen.add(k);
+    out.push(c);
+  }
+  if (!out.length) throw new AppError(400, 'At least one course is required for each scheduled session');
+  return out;
+}
+
 function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: string, endDate: string, excludeWeekends: boolean) {
   const start = toDateKey(startDate);
   const end = toDateKey(endDate);
@@ -159,13 +192,16 @@ function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: 
       const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
       if (weekday === 0 || weekday === 6) throw new AppError(400, `Weekend examination is not allowed for ${day}`);
     }
-    if (!slot.courseName?.trim()) throw new AppError(400, 'Course is required for each scheduled session');
-    const courseKey = slot.courseName.trim().toLowerCase();
-    if (scheduledCourses.has(courseKey)) throw new AppError(409, `Duplicate examination course: ${slot.courseName.trim()}`);
-    scheduledCourses.add(courseKey);
+    const courses = normalizeSlotCourses(slot);
+    for (const course of courses) {
+      const courseKey = course.courseName.toLowerCase();
+      if (scheduledCourses.has(courseKey)) throw new AppError(409, `Duplicate examination course: ${course.courseName}`);
+      scheduledCourses.add(courseKey);
+    }
+    const courseLabel = courses.map((c) => c.courseName).join(', ');
     const startMinutes = parseMinutes(slot.startTime);
     const endMinutes = parseMinutes(slot.endTime);
-    if (endMinutes <= startMinutes) throw new AppError(400, `End time must be after start time for ${slot.courseName} on ${day}`);
+    if (endMinutes <= startMinutes) throw new AppError(400, `End time must be after start time for ${courseLabel} on ${day}`);
     const daySlots = byDay.get(day) || [];
     if (daySlots.some((existing) => (existing.sessionCode || existing.session) === sessionCode)) {
       throw new AppError(409, `Duplicate ${session.name} session on ${day}`);
@@ -183,40 +219,212 @@ function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: 
   }
   return slots.map((slot) => {
     const session = sessionsById.get(slot.sessionCode || slot.session)!;
+    const courses = normalizeSlotCourses(slot);
     return {
       ...slot,
       session: sessionPeriod(slot.startTime),
       sessionCode: session.id,
       sessionName: session.name,
+      courseName: courses[0].courseName,
+      courses,
     };
   });
 }
 
 export class ExaminationTimetableService {
-  async listExaminationTypes(organizationId: string, params: { academicYear?: string; term?: string }) {
+  async listExaminationTypes(organizationId: string, params: { academicYear?: string; term?: string; name?: string; status?: string }) {
+    const name = params.name?.trim();
+    const where: any = {
+      organizationId,
+      ...(params.academicYear ? { academicYear: params.academicYear } : {}),
+      ...(params.term ? { term: params.term } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(name ? { OR: [{ name: { contains: name, mode: 'insensitive' } }, { code: { contains: name, mode: 'insensitive' } }] } : {}),
+    };
     return prisma.examinationType.findMany({
-      where: {
-        organizationId,
-        ...(params.academicYear ? { academicYear: params.academicYear } : {}),
-        ...(params.term ? { term: params.term } : {}),
-      },
+      where: mergeOwnData(where),
       orderBy: [{ academicYear: 'desc' }, { term: 'asc' }, { name: 'asc' }],
     });
   }
 
-  async createExaminationType(organizationId: string, body: { name: string; academicYear: string; term: string; description?: string }) {
+  async createExaminationType(
+    organizationId: string,
+    body: { name: string; code?: string; description?: string; academicYear: string; term: string; status?: string },
+    createdBy?: string,
+  ) {
     const name = String(body.name || '').trim();
+    const code = body.code != null && String(body.code).trim() !== '' ? String(body.code).trim() : null;
     const academicYear = String(body.academicYear || '').trim();
     const term = String(body.term || '').trim();
+    const status = body.status ? String(body.status).trim().toUpperCase() : 'ACTIVE';
     if (!name || !academicYear || !term) throw new AppError(400, 'name, academicYear and term are required');
+    if (status !== 'ACTIVE' && status !== 'INACTIVE') throw new AppError(400, 'status must be ACTIVE or INACTIVE');
     try {
       return await prisma.examinationType.create({
-        data: { organizationId, name, academicYear, term, description: body.description?.trim() || null },
+        data: {
+          organizationId,
+          name,
+          code,
+          status,
+          academicYear,
+          term,
+          description: body.description?.trim() || null,
+          createdBy: createdBy || null,
+        },
       });
     } catch (e: any) {
-      if (e?.code === 'P2002') throw new AppError(409, 'An examination type with this name already exists for the selected academic year and term');
+      if (e?.code === 'P2002') throw new AppError(409, 'An examination type with this name/code already exists for the selected academic year and term');
       throw e;
     }
+  }
+
+  async getExaminationType(id: string, organizationId: string) {
+    const row = await prisma.examinationType.findFirst({ where: mergeOwnData({ id, organizationId }) });
+    if (!row) throw new AppError(404, 'Examination type not found');
+    const [timetableCount, sessionCount, listCount] = await Promise.all([
+      prisma.classExaminationTimetable.count({ where: { examinationTypeId: id, organizationId } }),
+      prisma.classExaminationSlot.count({ where: { timetable: { examinationTypeId: id, organizationId } } }),
+      prisma.examinationList.count({ where: { examinationTypeId: id, organizationId } }),
+    ]);
+    return { ...row, counts: { timetables: timetableCount, sessions: sessionCount, examinationLists: listCount } };
+  }
+
+  async updateExaminationType(
+    id: string,
+    organizationId: string,
+    body: { name?: string; code?: string | null; description?: string | null; academicYear?: string; term?: string; status?: string },
+  ) {
+    const existing = await prisma.examinationType.findFirst({ where: mergeOwnData({ id, organizationId }) });
+    if (!existing) throw new AppError(404, 'Examination type not found');
+    assertOwnRecord(existing.createdBy, 'examination type');
+    const data: Record<string, unknown> = {};
+    if (body.name != null) {
+      const name = String(body.name).trim();
+      if (!name) throw new AppError(400, 'name cannot be empty');
+      data.name = name;
+    }
+    if (body.code !== undefined) data.code = body.code != null && String(body.code).trim() !== '' ? String(body.code).trim() : null;
+    if (body.description !== undefined) data.description = body.description != null && String(body.description).trim() !== '' ? String(body.description).trim() : null;
+    if (body.academicYear != null) {
+      const y = String(body.academicYear).trim();
+      if (!y) throw new AppError(400, 'academicYear cannot be empty');
+      data.academicYear = y;
+    }
+    if (body.term != null) {
+      const t = String(body.term).trim();
+      if (!t) throw new AppError(400, 'term cannot be empty');
+      data.term = t;
+    }
+    if (body.status != null) {
+      const status = String(body.status).trim().toUpperCase();
+      if (status !== 'ACTIVE' && status !== 'INACTIVE') throw new AppError(400, 'status must be ACTIVE or INACTIVE');
+      data.status = status;
+    }
+    try {
+      return await prisma.examinationType.update({ where: { id }, data });
+    } catch (e: any) {
+      if (e?.code === 'P2002') throw new AppError(409, 'An examination type with this name/code already exists for the selected academic year and term');
+      throw e;
+    }
+  }
+
+  /** Part-2.4/2.5 dashboard stats. */
+  async examinationTypeStats(organizationId: string, params: { academicYear?: string; term?: string; name?: string }) {
+    const types = await this.listExaminationTypes(organizationId, params);
+    const ids = types.map((t) => t.id);
+    const [timetables, sessions, lists] = await Promise.all([
+      prisma.classExaminationTimetable.count({ where: { organizationId, ...(ids.length ? { examinationTypeId: { in: ids } } : { examinationTypeId: { in: [] } }) } }),
+      ids.length ? prisma.classExaminationSlot.count({ where: { timetable: { organizationId, examinationTypeId: { in: ids } } } }) : 0,
+      ids.length ? prisma.examinationList.count({ where: { organizationId, examinationTypeId: { in: ids } } }) : 0,
+    ]);
+    const years = new Set(types.map((t) => t.academicYear).filter(Boolean));
+    return {
+      totalExaminationTypes: types.length,
+      activeExaminationTypes: types.filter((t) => String(t.status).toUpperCase() === 'ACTIVE').length,
+      totalExaminationTimetables: timetables,
+      totalExaminationSessions: sessions,
+      totalExaminationLists: lists,
+      academicYearsCovered: years.size,
+    };
+  }
+
+  /** Part-2.4 table rows incl. dependent-record counts. */
+  async examinationTypeRows(organizationId: string, params: { academicYear?: string; term?: string; name?: string }) {
+    const types = await this.listExaminationTypes(organizationId, params);
+    return Promise.all(
+      types.map(async (t) => {
+        const [timetableCount, sessionCount, listCount] = await Promise.all([
+          prisma.classExaminationTimetable.count({ where: { examinationTypeId: t.id, organizationId } }),
+          prisma.classExaminationSlot.count({ where: { timetable: { examinationTypeId: t.id, organizationId } } }),
+          prisma.examinationList.count({ where: { examinationTypeId: t.id, organizationId } }),
+        ]);
+        return {
+          id: t.id,
+          name: t.name,
+          code: t.code ?? null,
+          description: t.description ?? null,
+          academicYear: t.academicYear,
+          term: t.term,
+          status: String(t.status || 'ACTIVE').toUpperCase(),
+          createdBy: t.createdBy ?? null,
+          createdAt: t.createdAt,
+          numberOfTimetables: timetableCount,
+          numberOfExaminationSessions: sessionCount,
+          numberOfExaminationLists: listCount,
+        };
+      }),
+    );
+  }
+
+  /**
+   * Part-2.5 / requirement 5: cascading deletion in ONE transaction.
+   * Deletes examination timetables, slots(sessions), slot-courses, examination lists,
+   * rooms, allocations, classes, invigilator assignments, attendance, then the type.
+   */
+  async deleteExaminationType(id: string, organizationId: string) {
+    // Deleting a type cascades to every user's timetables/lists for that type.
+    assertCanSeeAll('delete examination types');
+    return prisma.$transaction(async (tx) => {
+      const type = await tx.examinationType.findFirst({ where: { id, organizationId }, select: { id: true } });
+      if (!type) throw new AppError(404, 'Examination type not found');
+
+      const timetables = await tx.classExaminationTimetable.findMany({ where: { examinationTypeId: id, organizationId }, select: { id: true } });
+      const timetableIds = timetables.map((t) => t.id);
+
+      const lists = await tx.examinationList.findMany({
+        where: { organizationId, OR: [{ examinationTypeId: id }, ...(timetableIds.length ? [{ examinationTimetableId: { in: timetableIds } }] : [])] },
+        select: { id: true },
+      });
+      const listIds = lists.map((l) => l.id);
+
+      const removed = {
+        timetables: timetableIds.length,
+        sessions: 0,
+        examinationLists: listIds.length,
+        roomAllocations: 0,
+        invigilatorAssignments: 0,
+      };
+
+      if (listIds.length) {
+        removed.invigilatorAssignments += await tx.examinationInvigilatorAssignment.deleteMany({ where: { examinationListId: { in: listIds } } }).then((r) => r.count);
+        await tx.examinationAttendance.deleteMany({ where: { examinationListId: { in: listIds } } });
+        removed.roomAllocations += await tx.examinationAllocation.deleteMany({ where: { listId: { in: listIds } } }).then((r) => r.count);
+        await tx.examinationListRoom.deleteMany({ where: { listId: { in: listIds } } });
+        await tx.examinationListClass.deleteMany({ where: { listId: { in: listIds } } });
+        await tx.examinationList.deleteMany({ where: { id: { in: listIds } } });
+      }
+
+      if (timetableIds.length) {
+        removed.invigilatorAssignments += await tx.examinationInvigilatorAssignment.deleteMany({ where: { examinationTimetableId: { in: timetableIds } } }).then((r) => r.count);
+        removed.sessions += await tx.classExaminationSlot.deleteMany({ where: { timetableId: { in: timetableIds } } }).then((r) => r.count);
+        // Clear dangling list links on any lists still referencing removed timetables.
+        await tx.examinationList.updateMany({ where: { examinationTimetableId: { in: timetableIds } }, data: { examinationTimetableId: null } });
+        await tx.classExaminationTimetable.deleteMany({ where: { id: { in: timetableIds } } });
+      }
+
+      await tx.examinationType.delete({ where: { id } });
+      return { deleted: true, id, ...removed };
+    });
   }
 
   async context(organizationId: string, params: { classId: string; academicYear: string; term: string; examinationTypeId?: string }) {
@@ -227,14 +435,14 @@ export class ExaminationTimetableService {
     const [examinationTypes, timetable] = await Promise.all([
       this.listExaminationTypes(organizationId, { academicYear: params.academicYear, term: params.term }),
       prisma.classExaminationTimetable.findFirst({
-        where: {
+        where: mergeOwnData({
           organizationId,
           classId: params.classId,
           academicYear: params.academicYear,
           term: params.term,
           ...(params.examinationTypeId ? { examinationTypeId: params.examinationTypeId } : {}),
-        },
-        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+        }),
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
         orderBy: { updatedAt: 'desc' },
       }),
     ]);
@@ -243,22 +451,22 @@ export class ExaminationTimetableService {
 
   async list(organizationId: string, params: { academicYear?: string; term?: string; classId?: string; examinationTypeId?: string }) {
     return prisma.classExaminationTimetable.findMany({
-      where: {
+      where: mergeOwnData({
         organizationId,
         ...(params.academicYear ? { academicYear: params.academicYear } : {}),
         ...(params.term ? { term: params.term } : {}),
         ...(params.classId ? { classId: params.classId } : {}),
         ...(params.examinationTypeId ? { examinationTypeId: params.examinationTypeId } : {}),
-      },
-      include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+      }),
+      include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
       orderBy: [{ className: 'asc' }],
     });
   }
 
   async getById(id: string, organizationId: string) {
     const row = await prisma.classExaminationTimetable.findFirst({
-      where: { id, organizationId },
-      include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+      where: mergeOwnData({ id, organizationId }),
+      include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
     });
     if (!row) throw new AppError(404, 'Examination timetable not found');
     return row;
@@ -266,7 +474,7 @@ export class ExaminationTimetableService {
 
   async impact(id: string, organizationId: string) {
     const tt = await prisma.classExaminationTimetable.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
       select: { id: true, examinationCode: true },
     });
     if (!tt) throw new AppError(404, 'Examination timetable not found');
@@ -321,16 +529,16 @@ export class ExaminationTimetableService {
       throw new AppError(400, `Not enough examination sessions for all courses. ${courses.length - i} course(s) could not be scheduled.`);
     }
 
-    const examType = body.examinationTypeId ? await prisma.examinationType.findFirst({ where: { id: body.examinationTypeId, organizationId } }) : null;
+    const examType = body.examinationTypeId ? await prisma.examinationType.findFirst({ where: mergeOwnData({ id: body.examinationTypeId, organizationId }) }) : null;
     if (body.examinationTypeId && !examType) throw new AppError(404, 'Examination type not found');
     const existing = await prisma.classExaminationTimetable.findFirst({
-      where: {
+      where: mergeOwnData({
         organizationId,
         classId: body.classId,
         academicYear: body.academicYear,
         term: body.term,
         examinationTypeId: body.examinationTypeId || null,
-      },
+      }),
       select: { id: true, examinationCode: true },
     });
 
@@ -382,20 +590,21 @@ export class ExaminationTimetableService {
     }
     if (!className) throw new AppError(400, 'Class not found');
 
-    const examType = body.examinationTypeId ? await prisma.examinationType.findFirst({ where: { id: body.examinationTypeId, organizationId } }) : null;
+    const examType = body.examinationTypeId ? await prisma.examinationType.findFirst({ where: mergeOwnData({ id: body.examinationTypeId, organizationId }) }) : null;
     if (body.examinationTypeId && !examType) throw new AppError(404, 'Examination type not found');
     const existing = body.id
-      ? await prisma.classExaminationTimetable.findFirst({ where: { id: body.id, organizationId } })
+      ? await prisma.classExaminationTimetable.findFirst({ where: mergeOwnData({ id: body.id, organizationId }) })
       : await prisma.classExaminationTimetable.findFirst({
-          where: {
+          where: mergeOwnData({
             organizationId,
             classId: body.classId,
             academicYear: body.academicYear,
             term: body.term,
             examinationTypeId: body.examinationTypeId || null,
-          },
+          }),
         });
     if (body.id && !existing) throw new AppError(404, 'Examination timetable not found');
+    if (existing) assertOwnRecord(existing.createdBy, 'examination timetable');
 
     if (existing && !body.confirmImpact) {
       const [linkedLists, linkedAssignments] = await Promise.all([
@@ -420,13 +629,21 @@ export class ExaminationTimetableService {
     const startDate = atNoonUtc(body.startDate);
     const endDate = atNoonUtc(body.endDate);
     const slotsData = validSlots.map((s) => ({
-      examDate: atNoonUtc(s.examDate),
-      session: s.session,
-      sessionCode: s.sessionCode!,
-      sessionName: s.sessionName!,
-      courseName: s.courseName.trim(),
-      startTime: s.startTime.trim(),
-      endTime: s.endTime.trim(),
+      slot: {
+        examDate: atNoonUtc(s.examDate),
+        session: s.session,
+        sessionCode: s.sessionCode!,
+        sessionName: s.sessionName!,
+        courseName: s.courseName.trim(),
+        startTime: s.startTime.trim(),
+        endTime: s.endTime.trim(),
+      },
+      courses: (s.courses ?? []).map((c) => ({
+        courseName: c.courseName.trim(),
+        subjectId: c.subjectId ?? null,
+        courseCode: c.courseCode ?? null,
+        teacherName: c.teacherName ?? null,
+      })),
     }));
     const name = (body.name || `${className} ${examType ? examType.name + ' ' : ''}${body.term} ${body.academicYear} Examination`).trim();
 
@@ -447,9 +664,9 @@ export class ExaminationTimetableService {
           },
         });
         await tx.classExaminationSlot.deleteMany({ where: { timetableId: existing.id } });
-        if (slotsData.length) {
-          await tx.classExaminationSlot.createMany({
-            data: slotsData.map((s) => ({ timetableId: existing.id, ...s })),
+        for (const s of slotsData) {
+          await tx.classExaminationSlot.create({
+            data: { timetableId: existing.id, ...s.slot, courses: { create: s.courses } },
           });
         }
         // keep linked list snapshots in sync (basic); invigilator assignments may need review after schedule changes
@@ -459,35 +676,155 @@ export class ExaminationTimetableService {
         });
         return tx.classExaminationTimetable.findUnique({
           where: { id: existing.id },
-          include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+          include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
         });
       });
     }
 
     const examinationCode = await generateUniqueExaminationCode(organizationId);
-    return prisma.classExaminationTimetable.create({
-      data: {
-        organizationId,
-        examinationCode,
-        name,
-        classId: body.classId,
-        className,
-        examinationTypeId: body.examinationTypeId || null,
-        academicYear: body.academicYear,
-        term: body.term,
-        startDate,
-        endDate,
-        excludeWeekends: !!body.excludeWeekends,
-        sessions,
-        slots: { create: slotsData },
-      },
-      include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }] }, examinationType: true },
+    return prisma.$transaction(async (tx) => {
+      const created = await tx.classExaminationTimetable.create({
+        data: {
+          organizationId,
+          examinationCode,
+          name,
+          classId: body.classId,
+          className,
+          examinationTypeId: body.examinationTypeId || null,
+          academicYear: body.academicYear,
+          term: body.term,
+          startDate,
+          endDate,
+          excludeWeekends: !!body.excludeWeekends,
+          sessions,
+          createdBy: currentAcademicScope()?.userId ?? null,
+        },
+      });
+      for (const s of slotsData) {
+        await tx.classExaminationSlot.create({
+          data: { timetableId: created.id, ...s.slot, courses: { create: s.courses } },
+        });
+      }
+      return tx.classExaminationTimetable.findUnique({
+        where: { id: created.id },
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
+      });
     });
   }
 
+  /**
+   * Part-4: copy an existing timetable to a new class in ONE transaction.
+   * Original is preserved; new timetable gets a fresh id + examination code.
+   * Caller may review/modify sessions, courses, dates before saving.
+   */
+  async copy(id: string, organizationId: string, body: {
+    classId: string;
+    className?: string;
+    name?: string;
+    academicYear?: string;
+    term?: string;
+    startDate?: string;
+    endDate?: string;
+    examinationTypeId?: string | null;
+    excludeWeekends?: boolean;
+    sessions?: SessionInput[];
+    slots?: SlotInput[];
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const src = await tx.classExaminationTimetable.findFirst({
+        where: mergeOwnData({ id, organizationId }),
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } } },
+      });
+      if (!src) throw new AppError(404, 'Examination timetable not found');
+
+      const classId = String(body.classId || '').trim();
+      if (!classId) throw new AppError(400, 'A destination classId is required');
+      if (classId === src.classId) throw new AppError(400, 'Destination class must be different from the original class');
+
+      let className = body.className?.trim() || '';
+      if (!className) {
+        const classes = await smListClasses(organizationId).catch(() => [] as any[]);
+        const cls = (Array.isArray(classes) ? classes : []).find((c: any) => c.id === classId);
+        className = cls?.label || [cls?.name, cls?.stream].filter(Boolean).join(' ').trim() || '';
+      }
+      if (!className) throw new AppError(400, 'Destination class not found');
+
+      const academicYear = (body.academicYear ?? src.academicYear).trim();
+      const term = (body.term ?? src.term).trim();
+      const startDate = body.startDate ?? toDateKey(src.startDate);
+      const endDate = body.endDate ?? toDateKey(src.endDate);
+      const excludeWeekends = body.excludeWeekends ?? src.excludeWeekends;
+      const examinationTypeId = body.examinationTypeId !== undefined ? (body.examinationTypeId || null) : (src.examinationTypeId || null);
+      if (examinationTypeId) {
+        const t = await tx.examinationType.findFirst({ where: { id: examinationTypeId, organizationId }, select: { id: true } });
+        if (!t) throw new AppError(404, 'Examination type not found');
+      }
+
+      const sessions = normalizeSessions(
+        body.sessions ?? (Array.isArray(src.sessions) ? (src.sessions as unknown as SessionInput[]) : DEFAULT_SESSIONS),
+      );
+
+      const sourceSlots: SlotInput[] = body.slots?.length
+        ? body.slots
+        : src.slots.map((s) => ({
+            examDate: toDateKey(s.examDate),
+            session: s.session,
+            sessionCode: s.sessionCode,
+            sessionName: s.sessionName,
+            courseName: s.courseName,
+            courses: (s.courses ?? []).map((c) => ({ courseName: c.courseName, subjectId: c.subjectId, courseCode: c.courseCode, teacherName: c.teacherName })),
+            startTime: s.startTime,
+            endTime: s.endTime,
+          }));
+
+      const validSlots = validateSlots(sourceSlots, sessions, startDate, endDate, !!excludeWeekends);
+      const examinationCode = await generateUniqueExaminationCode(organizationId);
+      const name = (body.name ?? `${className} ${src.name ?? `${src.term} ${src.academicYear} Examination`}`).trim();
+
+      const created = await tx.classExaminationTimetable.create({
+        data: {
+          organizationId,
+          examinationCode,
+          name,
+          classId,
+          className,
+          examinationTypeId,
+          academicYear,
+          term,
+          startDate: atNoonUtc(startDate),
+          endDate: atNoonUtc(endDate),
+          excludeWeekends: !!excludeWeekends,
+          sessions,
+          createdBy: currentAcademicScope()?.userId ?? null,
+        },
+      });
+
+      for (const s of validSlots) {
+        await tx.classExaminationSlot.create({
+          data: {
+            timetableId: created.id,
+            examDate: atNoonUtc(s.examDate),
+            session: s.session,
+            sessionCode: s.sessionCode!,
+            sessionName: s.sessionName!,
+            courseName: s.courseName.trim(),
+            startTime: s.startTime.trim(),
+            endTime: s.endTime.trim(),
+            courses: { create: (s.courses ?? []).map((c) => ({ courseName: c.courseName.trim(), subjectId: c.subjectId ?? null, courseCode: c.courseCode ?? null, teacherName: c.teacherName ?? null })) },
+          },
+        });
+      }
+
+      return tx.classExaminationTimetable.findUnique({
+        where: { id: created.id },
+        include: { slots: { orderBy: [{ examDate: 'asc' }, { session: 'asc' }], include: { courses: true } }, examinationType: true },
+      });
+    });
+  }
   async remove(id: string, organizationId: string, opts?: { confirmImpact?: boolean }) {
-    const existing = await prisma.classExaminationTimetable.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.classExaminationTimetable.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Examination timetable not found');
+    assertOwnRecord(existing.createdBy, 'examination timetable');
     const impact = await this.impact(id, organizationId);
     const hasImpact = (impact.linkedLists || 0) > 0 || (impact.linkedInvigilatorAssignments || 0) > 0;
     if (hasImpact && !opts?.confirmImpact) {
@@ -501,3 +838,6 @@ export class ExaminationTimetableService {
 }
 
 export const examinationTimetableService = new ExaminationTimetableService();
+
+
+

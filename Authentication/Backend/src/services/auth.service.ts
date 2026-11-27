@@ -458,6 +458,7 @@ export class AuthService {
     const roles = user.userRoles.map((ur) => ur.role.slug);
 
     const modules = await this.resolveModulesForJwt(user.id, user.organizationId, roles);
+    const moduleAccess = await this.resolveModuleAccessForJwt(user.id, user.organizationId, roles, modules);
 
     const session = await prisma.session.create({
       data: {
@@ -478,6 +479,7 @@ export class AuthService {
       sessionId: session.id,
       roles,
       modules,
+      moduleAccess,
       position: user.position ?? null,
     };
     const { withShuleTripJwtScope } = await import('../utils/jwt-trip-scope');
@@ -684,6 +686,42 @@ export class AuthService {
     return expandModuleSlugsForJwt(slugs);
   }
 
+  /**
+   * Resolve per-module access (HEAD/USER + data scope) for the JWT.
+   * This is the IAM source of truth every module uses for data isolation:
+   * HEAD and organization admins see everything, USER sees only their own work.
+   */
+  private async resolveModuleAccessForJwt(
+    userId: string,
+    organizationId: string,
+    roles: string[],
+    modules: string[]
+  ): Promise<Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }>> {
+    const isOrgAdmin = roles.includes(ROLES.ORGANIZATION_ADMIN);
+    const out: Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }> = {};
+
+    const rows = await prisma.userModule.findMany({
+      where: { userId, organizationId },
+      include: { module: { select: { slug: true } } },
+    });
+    for (const row of rows) {
+      out[row.module.slug] = {
+        accessLevel: isOrgAdmin ? 'HEAD' : (row.accessLevel as 'USER' | 'HEAD'),
+        dataScope: isOrgAdmin ? 'ORGANIZATION' : String(row.dataScope),
+      };
+    }
+
+    // Organization admins are HEAD on every licensed module even without an explicit
+    // UserModule row; module operators keep their assigned access level above.
+    if (isOrgAdmin) {
+      for (const slug of modules) {
+        if (!out[slug]) out[slug] = { accessLevel: 'HEAD', dataScope: 'ORGANIZATION' };
+      }
+    }
+
+    return out;
+  }
+
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const policyError = validatePasswordPolicy(newPassword);
     if (policyError) throw new AppError(400, policyError);
@@ -777,6 +815,12 @@ export class AuthService {
       stored.user.organizationId,
       roles
     );
+    const moduleAccess = await this.resolveModuleAccessForJwt(
+      stored.userId,
+      stored.user.organizationId,
+      roles,
+      modules
+    );
 
     let jwtPayload: JwtPayload = {
       sub: stored.userId,
@@ -785,6 +829,7 @@ export class AuthService {
       sessionId: stored.sessionId,
       roles,
       modules,
+      moduleAccess,
       position: stored.user.position ?? null,
     };
     const { withShuleTripJwtScope } = await import('../utils/jwt-trip-scope');

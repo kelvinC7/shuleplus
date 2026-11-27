@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { ensureAcademicStudent } from './sm-resolve.service';
 import { parentMisAcademicClient } from '../clients/parent-mis.client';
+import { assertOwnRecord, mergeOwnData } from '../middleware/academic-scope';
 
 const LOCKED_ASSESSMENT_STATUSES = new Set(['SUBMITTED', 'REVIEWED', 'APPROVED', 'LOCKED']);
 
@@ -74,9 +75,10 @@ export class AssessmentMarkService {
     enteredBy?: string;
   }) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id: assessmentId, organizationId },
+      where: mergeOwnData({ id: assessmentId, organizationId }),
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');
+    assertOwnRecord(assessment.createdBy, 'assessment');
     if (LOCKED_ASSESSMENT_STATUSES.has(assessment.status)) {
       throw new AppError(
         400,
@@ -154,7 +156,7 @@ export class AssessmentMarkService {
 
   async getMarks(assessmentId: string, organizationId: string) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id: assessmentId, organizationId },
+      where: mergeOwnData({ id: assessmentId, organizationId }),
       include: {
         subject: true,
         class: true,
@@ -179,9 +181,10 @@ export class AssessmentMarkService {
     requestedBy?: string;
   }) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id: assessmentId, organizationId },
+      where: mergeOwnData({ id: assessmentId, organizationId }),
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');
+    assertOwnRecord(assessment.createdBy, 'assessment');
     if (assessment.status === 'DRAFT' || assessment.status === 'OPEN' || assessment.status === 'MARK_ENTRY') {
       throw new AppError(400, 'You can edit marks directly while the assessment is still a draft.');
     }

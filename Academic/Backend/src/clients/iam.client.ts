@@ -120,6 +120,28 @@ export async function fetchIamUser(userId: string): Promise<IamUserBrief | null>
   return iamFetch<IamUserBrief>(`/internal/users/${encodeURIComponent(userId)}`);
 }
 
+export type IamModuleVisibility = {
+  accessLevel: 'USER' | 'HEAD';
+  dataScope: string;
+  canViewAll: boolean;
+};
+
+/**
+ * IAM source of truth for the caller's access to this module.
+ * `HEAD` (or an organization admin) sees every record in the organization;
+ * `USER` sees only records they own.
+ */
+export async function fetchIamModuleVisibility(
+  accessToken: string,
+  moduleSlug: string = env.MODULE_SLUG,
+): Promise<IamModuleVisibility | null> {
+  if (!accessToken) return null;
+  return iamFetch<IamModuleVisibility>(
+    `/iam/me/modules/${encodeURIComponent(moduleSlug)}/visibility`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+}
+
 export function iamUserDisplayName(user: {
   name?: string | null;
   firstName?: string | null;

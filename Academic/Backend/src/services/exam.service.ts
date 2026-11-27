@@ -1,5 +1,10 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import {
+  assertOwnRecord,
+  currentAcademicScope,
+  mergeOwnData,
+} from '../middleware/academic-scope';
 
 export class ExamService {
   async create(organizationId: string, data: {
@@ -32,6 +37,7 @@ export class ExamService {
         description: data.description ?? null,
         totalMarks: data.totalMarks ?? null,
         passingMarks: data.passingMarks ?? null,
+        createdBy: currentAcademicScope()?.userId ?? null,
       },
     });
   }
@@ -43,14 +49,14 @@ export class ExamService {
     if (filters?.type) where.type = filters.type;
 
     return prisma.exam.findMany({
-      where,
+      where: mergeOwnData(where),
       orderBy: [{ academicYear: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
   async getById(id: string, organizationId: string) {
     const exam = await prisma.exam.findFirst({
-      where: { id, organizationId },
+      where: mergeOwnData({ id, organizationId }),
     });
     if (!exam) throw new AppError(404, 'Exam not found');
     return exam;
@@ -68,8 +74,9 @@ export class ExamService {
     totalMarks?: number;
     passingMarks?: number;
   }) {
-    const existing = await prisma.exam.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.exam.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Exam not found');
+    assertOwnRecord(existing.createdBy, 'exam');
 
     if (data.name && data.academicYear) {
       const duplicate = await prisma.exam.findFirst({
@@ -94,8 +101,9 @@ export class ExamService {
   }
 
   async delete(id: string, organizationId: string) {
-    const existing = await prisma.exam.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.exam.findFirst({ where: mergeOwnData({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Exam not found');
+    assertOwnRecord(existing.createdBy, 'exam');
 
     await prisma.exam.delete({ where: { id } });
     return { message: 'Exam deleted' };
@@ -104,7 +112,7 @@ export class ExamService {
   async listAcademicYears(organizationId: string) {
     const result = await prisma.exam.groupBy({
       by: ['academicYear'],
-      where: { organizationId },
+      where: mergeOwnData({ organizationId }),
       _count: { id: true },
       orderBy: { academicYear: 'desc' },
     });

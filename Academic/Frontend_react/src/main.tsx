@@ -37,6 +37,7 @@ import GradingScalePage from '@/pages/GradingScalePage';
 import ReportCardV2Page from '@/pages/ReportCardV2Page';
 import ReportAnalysisPage from '@/pages/ReportAnalysisPage';
 import AcademicPerformancePage from '@/pages/AcademicPerformancePage';
+import ExaminationTypesPage from '@/pages/ExaminationTypesPage';
 import NurseryReportsPage from '@/pages/NurseryReportsPage';
 import NurserySettingsPage from '@/pages/NurserySettingsPage';
 import ReportVerifyPage from '@/pages/ReportVerifyPage';
@@ -65,6 +66,7 @@ import ExaminationTimetablePage from '@/pages/ExaminationTimetablePage';
 import ExaminationListsPage from '@/pages/ExaminationListsPage';
 import ExaminationInvigilatorsPage from '@/pages/ExaminationInvigilatorsPage';
 import ExaminationAttendancePage from '@/pages/ExaminationAttendancePage';
+import { OrgWideOnly } from '@/components/org-wide-only';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -84,15 +86,16 @@ const router = createBrowserRouter([
           { path: 'students/:id/edit', element: <EditStudentPage /> },
           { path: 'students/promotion', element: <PromotionPage /> },
           { path: 'students', element: <StudentsPage /> },
-          { path: 'classes/new', element: <NewClassPage /> },
-          { path: 'classes/:id/edit', element: <EditClassPage /> },
+          { path: 'classes/new', element: <OrgWideOnly><NewClassPage /></OrgWideOnly> },
+          { path: 'classes/:id/edit', element: <OrgWideOnly><EditClassPage /></OrgWideOnly> },
           { path: 'classes', element: <ClassesPage /> },
           { path: 'courses', element: <Navigate to="/courses/catalog" replace /> },
           { path: 'courses/catalog', element: <CourseCatalogPage /> },
           { path: 'courses/by-class', element: <CoursesPage /> },
-          { path: 'subjects/new', element: <NewSubjectPage /> },
-          { path: 'subjects/:id/edit', element: <EditSubjectPage /> },
+          { path: 'subjects/new', element: <OrgWideOnly><NewSubjectPage /></OrgWideOnly> },
+          { path: 'subjects/:id/edit', element: <OrgWideOnly><EditSubjectPage /></OrgWideOnly> },
           { path: 'subjects', element: <Navigate to="/courses" replace /> },
+          { path: 'examination-types', element: <ExaminationTypesPage /> },
           { path: 'examination-timetable', element: <ExaminationTimetablePage /> },
           { path: 'examination-lists', element: <ExaminationListsPage /> },
           { path: 'examination-invigilators', element: <ExaminationInvigilatorsPage /> },
@@ -126,13 +129,13 @@ const router = createBrowserRouter([
           { path: 'report-analysis', element: <ReportAnalysisPage /> },
           { path: 'academic-performance', element: <AcademicPerformancePage /> },
           { path: 'nursery/reports', element: <NurseryReportsPage /> },
-          { path: 'nursery/settings', element: <NurserySettingsPage /> },
+          { path: 'nursery/settings', element: <OrgWideOnly><NurserySettingsPage /></OrgWideOnly> },
           { path: 'marks-demo', element: <MarksDemoPage /> },
-          { path: 'grading-scales', element: <GradingScalePage /> },
+          { path: 'grading-scales', element: <OrgWideOnly><GradingScalePage /></OrgWideOnly> },
           { path: 'academic-dashboard', element: <AcademicDashboardPage /> },
           { path: 'competency', element: <CompetencyPage /> },
           { path: 'mark-corrections', element: <MarkCorrectionsPage /> },
-          { path: 'teachers-permission', element: <TeachersPermissionPage /> },
+          { path: 'teachers-permission', element: <OrgWideOnly><TeachersPermissionPage /></OrgWideOnly> },
           { path: 'round-roll-call', element: <RoundRollCallPage /> },
           { path: 'assessment-templates', element: <AssessmentTemplatesPage /> },
           { path: 'assessment-templates/new', element: <NewAssessmentTemplatePage /> },
@@ -142,7 +145,7 @@ const router = createBrowserRouter([
           { path: 'mark-entry/:assessmentId', element: <MarkEntryPage /> },
           { path: 'assignments', element: <AssignmentPage /> },
           { path: 'analytics', element: <AnalyticsPage /> },
-          { path: 'analytics/report-footer', element: <AcademicReportFooterSettingsPage /> },
+          { path: 'analytics/report-footer', element: <OrgWideOnly><AcademicReportFooterSettingsPage /></OrgWideOnly> },
           { path: 'graduation', element: <GraduationPage /> },
           { path: 'teacher', element: <TeacherPortalPage /> },
           { path: 'teacher/create-assessment', element: <TeacherCreateAssessmentPage /> },
@@ -159,3 +162,4 @@ createRoot(document.getElementById('root')!).render(
     <RouterProvider router={router} />
   </StrictMode>,
 );
+

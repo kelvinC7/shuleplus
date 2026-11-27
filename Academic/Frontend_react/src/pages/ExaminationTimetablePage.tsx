@@ -33,6 +33,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
@@ -50,6 +51,7 @@ import {
   createExaminationType,
   saveExaminationTimetable,
   deleteExaminationTimetable,
+  copyExaminationTimetable,
   smListClasses,
   type ClassExaminationTimetable,
   type ExaminationSessionDefinition,
@@ -66,6 +68,9 @@ type SlotDraft = {
   sessionCode: string;
   sessionName: string;
   courseName: string;
+  /** Part-3 multi-course: selected course names for this session. */
+  courses?: string[];
+  courseNames?: string[];
   startTime: string;
   endTime: string;
 };
@@ -207,10 +212,14 @@ export default function ExaminationTimetablePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState('');
   const [dialogSessionCode, setDialogSessionCode] = useState('MORNING');
-  const [dialogCourse, setDialogCourse] = useState('');
+  const [dialogCourses, setDialogCourses] = useState<string[]>([]);
   const [dialogStart, setDialogStart] = useState('08:00');
   const [dialogEnd, setDialogEnd] = useState('10:00');
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySource, setCopySource] = useState<any>(null);
+  const [copyDestClassId, setCopyDestClassId] = useState('');
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     if (!ready || initialized) return;
@@ -302,6 +311,8 @@ export default function ExaminationTimetablePage() {
             sessionCode: s.sessionCode || s.session,
             sessionName: s.sessionName || (s.session === 'MORNING' ? 'Morning' : 'Afternoon'),
             courseName: s.courseName,
+            courses: (s.courses && s.courses.length ? s.courses.map((c) => c.courseName || (c as unknown as string)) : (s.courseName ? [s.courseName] : [])),
+            courseNames: (s.courses && s.courses.length ? s.courses.map((c) => c.courseName || (c as unknown as string)) : (s.courseName ? [s.courseName] : [])),
             startTime: s.startTime,
             endTime: s.endTime,
           })));
@@ -339,6 +350,7 @@ export default function ExaminationTimetablePage() {
     for (const s of slots) {
       if (editingKey && editingKey === `${s.examDate}|${s.sessionCode}`) continue;
       set.add(s.courseName.trim().toLowerCase());
+      for (const cn of (s.courses ?? s.courseNames ?? [])) { const name = typeof cn === 'string' ? cn : (cn?.courseName || ''); if (name) set.add(String(name).trim().toLowerCase()); }
     }
     return set;
   }, [slots, editingKey]);
@@ -568,7 +580,13 @@ export default function ExaminationTimetablePage() {
     setDialogDate(day);
     setDialogSessionCode(session.id);
     setEditingKey(existing ? key : null);
-    setDialogCourse(existing?.courseName || courses[0]?.subjectName || '');
+    setDialogCourses(
+      existing
+        ? (existing.courses && existing.courses.length
+          ? existing.courses.map((c: any) => c.courseName || c)
+          : (existing.courseName ? [existing.courseName] : []))
+        : (courses[0]?.subjectName ? [courses[0].subjectName] : [])
+    );
     setDialogStart(existing?.startTime || session.startTime);
     setDialogEnd(existing?.endTime || session.endTime);
     setDialogOpen(true);
@@ -580,8 +598,8 @@ export default function ExaminationTimetablePage() {
   }
 
   function applySlot() {
-    if (!dialogCourse.trim()) {
-      toast.error('Select a course');
+    if (!dialogCourses.length || !dialogCourses.some((c) => c.trim())) {
+      toast.error('Select at least one course');
       return;
     }
     const s = parseMins(dialogStart);
@@ -595,9 +613,15 @@ export default function ExaminationTimetablePage() {
       toast.error('Select a valid examination session');
       return;
     }
+    const chosen = dialogCourses.map((c) => c.trim()).filter(Boolean);
+    // no duplicate course within the same session
+    if (new Set(chosen.map((c) => c.toLowerCase())).size !== chosen.length) {
+      toast.error('Duplicate course in the same session');
+      return;
+    }
     const duplicateCourse = slots.some((slot) =>
       !(slot.examDate === dialogDate && slot.sessionCode === dialogSessionCode) &&
-      slot.courseName.trim().toLowerCase() === dialogCourse.trim().toLowerCase()
+      chosen.some((c) => slot.courseName.trim().toLowerCase() === c.toLowerCase())
     );
     if (duplicateCourse) {
       toast.error('This course is already scheduled on another examination date');
@@ -608,7 +632,9 @@ export default function ExaminationTimetablePage() {
       session: sessionPeriod(dialogStart),
       sessionCode: dialogSession.id,
       sessionName: dialogSession.name,
-      courseName: dialogCourse.trim(),
+      courseName: chosen[0],
+      courses: chosen,
+      courseNames: chosen,
       startTime: dialogStart,
       endTime: dialogEnd,
     };
@@ -966,6 +992,11 @@ export default function ExaminationTimetablePage() {
                               <EditOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title="Copy timetable">
+                            <IconButton size="small" onClick={() => { setCopySource(record as any); setCopyDestClassId(''); setCopyOpen(true); }} sx={{ color: '#16a34a', bgcolor: '#f0fdf4', '&:hover': { bgcolor: '#dcfce7' } }}>
+                              <ContentCopyOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Delete schedule">
                             <IconButton size="small" onClick={() => void handleDeleteTimetable(group)} sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}>
                               <DeleteOutlineIcon fontSize="small" />
@@ -1236,13 +1267,17 @@ export default function ExaminationTimetablePage() {
               <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5 }}>Session Details</Typography>
               <Stack spacing={2}>
                 <Autocomplete
+                  multiple
                   freeSolo
                   size="small"
-                  options={courses.map((c) => c.subjectName).filter((name) => !scheduledCourseNames.has(name.trim().toLowerCase()))}
-                  value={dialogCourse}
-                  onChange={(_, v) => setDialogCourse(v || '')}
-                  onInputChange={(_, v) => setDialogCourse(v)}
-                  renderInput={(params) => <TextField {...params} label="Course / Subject" placeholder="Select or type course name" helperText="Already-scheduled courses are hidden from other slots." />}
+                  options={courses.map((c) => c.subjectName).filter((name) => !scheduledCourseNames.has(name.trim().toLowerCase()) || dialogCourses.includes(name))}
+                  value={dialogCourses}
+                  onChange={(_, v) => setDialogCourses((v as string[]).map((x) => (typeof x === 'string' ? x : '')).filter(Boolean))}
+                  renderTags={(value, getTagProps) => value.map((option, index) => {
+                    const { key, ...tagProps } = getTagProps({ index });
+                    return <Chip key={key} {...tagProps} label={option} size="small" />;
+                  })}
+                  renderInput={(params) => <TextField {...params} label="Courses / Subjects" placeholder="Select one or more courses" helperText="Select multiple courses for this session. Already-scheduled courses are hidden." />}
                 />
                 <Stack direction={{ xs: 'column', sm: 'row' } as any} spacing={1.5}>
                   <TextField label="Start time" type="time" size="small" value={dialogStart} onChange={(e) => setDialogStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} fullWidth />
@@ -1276,6 +1311,56 @@ export default function ExaminationTimetablePage() {
           <Button variant="contained" onClick={handleCreateType} disabled={creatingType || !newTypeName.trim()} sx={{ textTransform: 'none', bgcolor: NAVY, borderRadius: 2 }}>{creatingType ? 'Saving...' : 'Save Type'}</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Part-4 Copy Timetable */}
+      <Dialog open={copyOpen} onClose={() => setCopyOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800, color: NAVY }}>Copy timetable</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: NAVY }}>{copySource?.name || copySource?.examinationCode || 'Timetable'}</Typography>
+              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>Original class: {copySource?.className}. Structure, sessions and courses are copied; the original is unchanged.</Typography>
+            </Box>
+            <FormControl fullWidth size="small">
+              <InputLabel id="copy-dest">Destination class</InputLabel>
+              <Select labelId="copy-dest" label="Destination class" value={copyDestClassId} onChange={(e) => setCopyDestClassId(e.target.value as string)}>
+                {classes.flatMap((c) => c.classIds.map((id) => ({ id, label: c.label }))).map((c) => (
+                  <MenuItem key={c.id} value={c.id}>{c.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography sx={{ fontSize: '0.78rem', color: '#64748b' }}>You can review and modify sessions and courses after copying via Edit. Backend supports per-session course changes on copy.</Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCopyOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={copying || !copyDestClassId}
+            onClick={async () => {
+              if (!copySource) return;
+              if (copyDestClassId === copySource.classId) { toast.error('Destination class must be different'); return; }
+              setCopying(true);
+              try {
+                await copyExaminationTimetable(copySource.id, { classId: copyDestClassId });
+                toast.success('Timetable copied to the destination class.');
+                setCopyOpen(false);
+                // reload saved timetables
+                const ts = await listExaminationTimetables({ academicYear, term });
+                setSavedTimetables(ts as any);
+              } catch (e) {
+                const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                toast.error(msg || 'Could not copy timetable.');
+              } finally { setCopying(false); }
+            }}
+            sx={{ textTransform: 'none', fontWeight: 800, bgcolor: NAVY }}
+          >{copying ? 'Copying...' : 'Copy'}</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
+
+
+
+
