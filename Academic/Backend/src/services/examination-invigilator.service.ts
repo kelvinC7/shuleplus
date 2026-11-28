@@ -293,8 +293,9 @@ export class ExaminationInvigilatorService {
     };
   }
 
-  async generate(organizationId: string, body: {
+  private async generateForLists(organizationId: string, listIds: string[], body: {
     examinationListId?: string;
+    examinationListIds?: string[];
     examinationTypeId?: string;
     teacherIds: string[];
     mode: 'AUTO' | 'MANUAL';
@@ -303,19 +304,50 @@ export class ExaminationInvigilatorService {
     manual?: { rooms: ManualRoomConfig[] };
     replaceExisting?: boolean;
   }) {
-    if (body.examinationTypeId && !body.examinationListId) {
-      const lists = await prisma.examinationList.findMany({ where: { organizationId, examinationTypeId: body.examinationTypeId }, select: { id: true } });
-      if (!lists.length) throw new AppError(400, 'No examination lists found for the selected examination type');
-      let created = 0;
-      const unassigned: any[] = [];
-      const assignments: any[] = [];
-      for (const l of lists) {
-        const res = await this.generate(organizationId, { ...body, examinationListId: l.id, examinationTypeId: undefined });
+    const ids = [...new Set(listIds.filter(Boolean))];
+    if (!ids.length) throw new AppError(400, 'No examination lists selected');
+    const valid = await prisma.examinationList.findMany({ where: { organizationId, id: { in: ids } }, select: { id: true } });
+    if (valid.length !== ids.length) throw new AppError(404, 'One or more selected examination lists were not found');
+    let created = 0;
+    let success = 0;
+    const unassigned: any[] = [];
+    const assignments: any[] = [];
+    const failures: Array<{ examinationListId: string; message: string }> = [];
+    for (const id of valid.map((l) => l.id)) {
+      try {
+        const res = await this.generate(organizationId, { ...body, examinationListId: id, examinationListIds: undefined });
+        success += 1;
         created += res.created || 0;
         if (Array.isArray(res.unassigned)) unassigned.push(...res.unassigned);
         if (Array.isArray(res.assignments)) assignments.push(...res.assignments);
+      } catch (e: any) {
+        failures.push({ examinationListId: id, message: e?.message || 'Generation failed' });
       }
-      return { created, unassigned, assignments, generatedLists: lists.length };
+    }
+    if (!success && failures.length) {
+      throw new AppError(400, `Invigilator generation failed for all selected lists: ${failures.slice(0, 3).map((f) => f.message).join('; ')}`);
+    }
+    return { created, unassigned, assignments, generatedLists: success, failures };
+  }
+
+  async generate(organizationId: string, body: {
+    examinationListId?: string;
+    examinationListIds?: string[];
+    examinationTypeId?: string;
+    teacherIds: string[];
+    mode: 'AUTO' | 'MANUAL';
+    rotationMode?: 'PER_SESSION' | 'DAILY' | 'NONE';
+    defaultPerRoom?: number;
+    manual?: { rooms: ManualRoomConfig[] };
+    replaceExisting?: boolean;
+  }) {
+    if (Array.isArray(body.examinationListIds) && body.examinationListIds.length) {
+      return this.generateForLists(organizationId, body.examinationListIds, body);
+    }
+    if (body.examinationTypeId && !body.examinationListId) {
+      const lists = await prisma.examinationList.findMany({ where: { organizationId, examinationTypeId: body.examinationTypeId }, select: { id: true } });
+      if (!lists.length) throw new AppError(400, 'No examination lists found for the selected examination type');
+      return this.generateForLists(organizationId, lists.map((l) => l.id), body);
     }
     if (!body.examinationListId) throw new AppError(400, 'examinationListId or examinationTypeId is required');
     const list = await loadExamAndList(organizationId, body.examinationListId);
@@ -480,8 +512,20 @@ export class ExaminationInvigilatorService {
     const rotationMode = body.rotationMode || 'PER_SESSION';
     // teacher load tracking and conflict avoidance per date+session
     const assignedInSlot = new Map<string, Set<string>>(); // slot -> teacherIds
+    const otherAssignments = await prisma.examinationInvigilatorAssignment.findMany({
+      where: { organizationId, examinationListId: { not: list.id } },
+      select: { teacherUserId: true, examDate: true, session: true, sessionCode: true },
+    });
+    for (const a of otherAssignments) {
+      const slot = sessionKey(a.examDate, sessionCodeOf(a));
+      if (!assignedInSlot.has(slot)) assignedInSlot.set(slot, new Set());
+      assignedInSlot.get(slot)!.add(a.teacherUserId);
+    }
     const teacherLoad = new Map<string, number>();
-    for (const t of teachers) teacherLoad.set(t.id, 0);
+    for (const t of teachers) {
+      const load = otherAssignments.reduce((n, a) => n + (a.teacherUserId === t.id ? 1 : 0), 0);
+      teacherLoad.set(t.id, load);
+    }
     // sticky assignments for NONE/DAILY
     const stickyByRoom = new Map<string, string[]>(); // roomId -> teacherIds
     const stickyByRoomDay = new Map<string, string[]>(); // roomId|date -> teacherIds
@@ -575,51 +619,73 @@ export class ExaminationInvigilatorService {
     });
   }
 
-  async updateAssignment(organizationId: string, id: string, body: { teacherUserId?: string; status?: string; roomId?: string }) {
+  async updateAssignment(organizationId: string, id: string, body: { teacherUserId?: string; status?: string; roomId?: string; examDate?: string; session?: 'MORNING' | 'AFTERNOON'; sessionCode?: string }) {
     const existing = await prisma.examinationInvigilatorAssignment.findFirst({ where: { id, organizationId } });
     if (!existing) throw new AppError(404, 'Assignment not found');
-    const list = await prisma.examinationList.findFirst({ where: { id: existing.examinationListId, organizationId } });
-    if (list?.status === 'PUBLISHED') {
-      // allow replacement updates? be cautious but permit status/teacher changes for operations
-    }
-    const data: any = {};
-    if (body.teacherUserId) {
-      const teachers = await getTeachers(organizationId);
-      const t = teachers.find((x) => x.id === body.teacherUserId);
-      if (!t) throw new AppError(404, 'Teacher not found');
-      // conflict check: same teacher in another room same date+session
-      const conflict = await prisma.examinationInvigilatorAssignment.findFirst({
-        where: {
-          organizationId,
-          examinationListId: existing.examinationListId,
-          examDate: existing.examDate,
-          sessionCode: existing.sessionCode,
-          teacherUserId: body.teacherUserId,
-          NOT: { id: existing.id },
-        },
-      });
-      if (conflict) throw new AppError(409, 'Selected teacher is already assigned to another room in this session');
-      data.teacherUserId = t.id;
-      data.teacherName = t.name;
-      data.teacherEmail = t.email ?? null;
-      data.assignmentType = 'MANUAL';
-      data.status = 'ASSIGNED';
-    }
+    const list = await prisma.examinationList.findFirst({
+      where: { id: existing.examinationListId, organizationId },
+      include: { rooms: true, examinationTimetable: { include: { slots: true } } },
+    });
+    if (!list) throw new AppError(404, 'Examination list not found');
+
+    const targetTeacherId = body.teacherUserId || existing.teacherUserId;
+    const targetRoomId = body.roomId || existing.roomId;
+    const targetSessionCode = body.sessionCode || body.session || existing.sessionCode;
+    const targetDate = body.examDate ? atNoonUtc(body.examDate) : existing.examDate;
+    const targetDateKey = toDateKey(targetDate);
+    const targetSessionInfo = deriveSessions(list).find((s: any) => s.examDate === targetDateKey && s.sessionCode === targetSessionCode);
+    if (!targetSessionInfo) throw new AppError(404, 'Target examination session not found');
+
+    const room = list.rooms.find((r) => r.id === targetRoomId);
+    if (!room) throw new AppError(404, 'Room not found');
+
+    const teachers = await getTeachers(organizationId);
+    const t = teachers.find((x: any) => x.id === targetTeacherId);
+    if (!t) throw new AppError(404, 'Teacher not found');
+
+    const conflict = await prisma.examinationInvigilatorAssignment.findFirst({
+      where: {
+        organizationId,
+        examinationListId: existing.examinationListId,
+        examDate: targetDate,
+        sessionCode: targetSessionCode,
+        teacherUserId: targetTeacherId,
+        NOT: { id: existing.id },
+      },
+    });
+    if (conflict) throw new AppError(409, 'Selected teacher is already assigned to another room in this session');
+
+    const dup = await prisma.examinationInvigilatorAssignment.findFirst({
+      where: {
+        organizationId,
+        examinationListId: existing.examinationListId,
+        roomId: room.id,
+        examDate: targetDate,
+        sessionCode: targetSessionCode,
+        teacherUserId: targetTeacherId,
+        NOT: { id: existing.id },
+      },
+    });
+    if (dup) throw new AppError(409, 'Teacher already assigned to this room/session');
+
+    const data: any = {
+      teacherUserId: t.id,
+      teacherName: t.name,
+      teacherEmail: t.email ?? null,
+      roomId: room.id,
+      roomName: room.roomName,
+      roomNumber: room.roomNumber ?? null,
+      examDate: targetDate,
+      session: targetSessionInfo.session,
+      sessionCode: targetSessionInfo.sessionCode,
+      sessionName: targetSessionInfo.sessionName,
+      startTime: targetSessionInfo.startTime ?? null,
+      endTime: targetSessionInfo.endTime ?? null,
+      assignmentType: 'MANUAL',
+    };
     if (body.status && ['ASSIGNED', 'PENDING', 'CHECKED_IN', 'REPLACED'].includes(body.status)) data.status = body.status;
-    if (body.roomId) {
-      const room = await prisma.examinationListRoom.findFirst({ where: { id: body.roomId, listId: existing.examinationListId } });
-      if (!room) throw new AppError(404, 'Room not found');
-      // prevent duplicate teacher-room-session
-      const dup = await prisma.examinationInvigilatorAssignment.findFirst({
-        where: { examinationListId: existing.examinationListId, roomId: body.roomId, examDate: existing.examDate, sessionCode: existing.sessionCode, teacherUserId: body.teacherUserId || existing.teacherUserId, NOT: { id: existing.id } },
-      });
-      if (dup) throw new AppError(409, 'Teacher already assigned to this room/session');
-      data.roomId = room.id;
-      data.roomName = room.roomName;
-      data.roomNumber = room.roomNumber ?? null;
-      data.assignmentType = 'MANUAL';
-    }
-    if (Object.keys(data).length === 0) return existing;
+    else data.status = 'ASSIGNED';
+
     return prisma.examinationInvigilatorAssignment.update({ where: { id: existing.id }, data });
   }
 
@@ -705,6 +771,13 @@ export class ExaminationInvigilatorService {
     }
     const res = await prisma.examinationInvigilatorAssignment.deleteMany({ where });
     return { deleted: res.count };
+  }
+
+  async deleteAssignment(organizationId: string, id: string) {
+    const existing = await prisma.examinationInvigilatorAssignment.findFirst({ where: { id, organizationId } });
+    if (!existing) throw new AppError(404, 'Assignment not found');
+    await prisma.examinationInvigilatorAssignment.delete({ where: { id } });
+    return { id };
   }
 
   async getExamAttendance(organizationId: string, params: { examinationListId: string; roomId: string; examDate: string; session?: 'MORNING'|'AFTERNOON'; sessionCode?: string }) {

@@ -104,6 +104,8 @@ export class PlatformUsersService {
         shortName: um.module.shortName,
         accessLevel: um.accessLevel,
         dataScope: um.dataScope,
+        wide: um.wide,
+        academicCategory: um.academicCategory,
       })),
       createdAt: u.createdAt,
     }));
@@ -504,6 +506,8 @@ export class PlatformUsersService {
         shortName: um.module.shortName,
         accessLevel: um.accessLevel,
         dataScope: um.dataScope,
+        wide: um.wide,
+        academicCategory: um.academicCategory,
       })),
       createdAt: u.createdAt,
     }));

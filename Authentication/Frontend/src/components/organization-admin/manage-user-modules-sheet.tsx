@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import {
+  type AcademicCategory,
   type DataScope,
   type LicensedModule,
   type ModuleAccessLevel,
@@ -27,7 +28,15 @@ type AssignmentDraft = {
   slug: string;
   accessLevel: ModuleAccessLevel;
   dataScope: DataScope;
+  wide: boolean;
+  academicCategory: AcademicCategory;
 };
+
+const ACADEMIC_MODULE_SLUGS = new Set(['academic', 'academic-1', 'academics']);
+
+function isAcademicModule(slug: string) {
+  return ACADEMIC_MODULE_SLUGS.has(slug);
+}
 
 interface ManageUserModulesSheetProps {
   user: OrgUser | null;
@@ -61,6 +70,8 @@ export function ManageUserModulesSheet({
         slug: m.slug,
         accessLevel: m.accessLevel,
         dataScope: m.dataScope,
+        wide: m.wide !== false,
+        academicCategory: (m.academicCategory === 'TVET' ? 'TVET' : 'GENERAL_REB') as AcademicCategory,
       }))
     );
     setAccountActive(user.status === 'ACTIVE');
@@ -78,7 +89,16 @@ export function ManageUserModulesSheet({
     setAssignments((prev) => {
       if (!enabled) return prev.filter((a) => a.slug !== slug);
       if (prev.some((a) => a.slug === slug)) return prev;
-      return [...prev, { slug, accessLevel: 'USER', dataScope: 'SELF' }];
+      return [
+        ...prev,
+        {
+          slug,
+          accessLevel: 'USER',
+          dataScope: 'SELF',
+          wide: true,
+          academicCategory: 'GENERAL_REB' as AcademicCategory,
+        },
+      ];
     });
   }
 
@@ -104,6 +124,8 @@ export function ManageUserModulesSheet({
             slug: a.slug,
             accessLevel: a.accessLevel,
             dataScope: a.dataScope,
+            wide: a.wide,
+            academicCategory: a.academicCategory,
           })),
         });
       }
@@ -303,10 +325,55 @@ export function ManageUserModulesSheet({
                                   <option value="ORGANIZATION">Entire organization</option>
                                 </select>
                               </div>
+                              {isAcademicModule(mod.slug) ? (
+                                <div className="rounded-lg border border-border bg-slate-50/80 p-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs font-medium text-navy">Wide marks access</p>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        On: can submit marks for any class and see marks across categories.
+                                      </p>
+                                    </div>
+                                    <Switch
+                                      checked={assigned.wide}
+                                      onCheckedChange={(checked) =>
+                                        patchAssignment(mod.slug, { wide: Boolean(checked) })
+                                      }
+                                      aria-label={`Wide marks access for ${mod.name}`}
+                                    />
+                                  </div>
+                                  {!assigned.wide ? (
+                                    <div className="mt-3">
+                                      <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                                        Academic category
+                                      </label>
+                                      <select
+                                        className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-navy outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                        value={assigned.academicCategory}
+                                        onChange={(e) =>
+                                          patchAssignment(mod.slug, {
+                                            academicCategory: e.target.value as AcademicCategory,
+                                          })
+                                        }
+                                      >
+                                        <option value="GENERAL_REB">GENERAL (Nursery / Primary / Secondary)</option>
+                                        <option value="TVET">TVET</option>
+                                      </select>
+                                      <p className="mt-1 text-[11px] text-muted-foreground">
+                                        This user will only see and submit marks for {assigned.academicCategory === 'TVET' ? 'TVET' : 'Nursery, Primary and Secondary'} classes.
+                                      </p>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
                               <p className="text-[11px] text-muted-foreground">
                                 {assigned.accessLevel === 'HEAD'
                                   ? `Head can manage and view work across ${moduleLookup.get(mod.slug)?.name ?? mod.slug}.`
-                                  : 'User can open this module and work within the selected data scope.'}
+                                  : isAcademicModule(mod.slug)
+                                    ? assigned.wide
+                                      ? 'User can submit marks for any class in this school; category filter is off.'
+                                      : `User is limited to ${assigned.academicCategory === 'TVET' ? 'TVET' : 'GENERAL_REB'} category data and marks.`
+                                    : 'User can open this module and work within the selected data scope.'}
                               </p>
                             </div>
                           ) : (

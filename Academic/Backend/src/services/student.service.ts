@@ -1,6 +1,7 @@
 import { Prisma, StudentStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { mergeClassCategory, mergeStudentCategory } from '../middleware/academic-scope';
 import { getDistrictCode, formatStudentUid, previewStudentCodeParts, parseSchoolCodeNumeric } from '../utils/student-code';
 
 export type ImportRowInput = {
@@ -101,7 +102,7 @@ export class StudentService {
     }
 
     const klass = await prisma.class.findFirst({
-      where: { id: data.classId, organizationId },
+      where: mergeClassCategory({ id: data.classId, organizationId }),
     });
     if (!klass) {
       throw new AppError(400, 'Selected class was not found for this school. Open Academic tab and pick a valid class.');
@@ -671,7 +672,7 @@ export class StudentService {
     }
 
     const students = await prisma.student.findMany({
-      where,
+      where: mergeStudentCategory(where),
       include: {
         enrollments: {
           where: { isCurrent: true },
@@ -689,7 +690,7 @@ export class StudentService {
 
   async getById(id: string, organizationId: string) {
     const student = await prisma.student.findFirst({
-      where: { id, organizationId },
+      where: mergeStudentCategory({ id, organizationId }),
       include: {
         enrollments: {
           include: { class: true },
@@ -734,7 +735,7 @@ export class StudentService {
     }>
   ) {
     const existing = await prisma.student.findFirst({
-      where: { id, organizationId },
+      where: mergeStudentCategory({ id, organizationId }),
     });
     if (!existing) throw new AppError(404, 'Student not found');
 
@@ -779,7 +780,7 @@ export class StudentService {
 
     if (data.classId?.trim()) {
       const klass = await prisma.class.findFirst({
-        where: { id: data.classId, organizationId },
+        where: mergeClassCategory({ id: data.classId, organizationId }),
       });
       if (!klass) {
         throw new AppError(400, 'Selected class was not found for this school.');
@@ -822,7 +823,7 @@ export class StudentService {
   }
 
   async delete(id: string, organizationId: string) {
-    const existing = await prisma.student.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.student.findFirst({ where: mergeStudentCategory({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Student not found');
 
     await prisma.studentParent.deleteMany({ where: { studentId: id } });

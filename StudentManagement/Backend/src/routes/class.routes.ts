@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { classController } from '../controllers/class.controller';
 import { authenticate, requireModuleLicense } from '../middleware/auth.middleware';
+import { attachStudentScope } from '../middleware/student-scope';
 import { requireTenant } from '../middleware/tenant.middleware';
 
 const router = Router();
 
-router.use(authenticate, requireModuleLicense, requireTenant);
+router.use(authenticate, requireModuleLicense, requireTenant, attachStudentScope);
 
 router.get('/', (req, res, next) => classController.list(req, res, next));
 router.get('/teacher-candidates', (req, res, next) => classController.teacherCandidates(req, res, next));

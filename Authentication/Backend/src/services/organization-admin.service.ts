@@ -32,7 +32,35 @@ export type ModuleAssignmentInput = {
   slug: string;
   accessLevel?: 'USER' | 'HEAD';
   dataScope?: DataScope;
+  /** Marks/records access: true = all academic categories (default). */
+  wide?: boolean;
+  /** GENERAL_REB | TVET (ignored when wide). */
+  academicCategory?: string;
 };
+
+export type NormalizedModuleAssignment = {
+  slug: string;
+  accessLevel: ModuleAccessLevel;
+  dataScope: DataScope;
+  wide: boolean;
+  academicCategory: string;
+};
+
+/** Only Academic currently uses the category partition. */
+const ACADEMIC_MODULE_SLUGS = new Set(['academic', 'academic-1', 'academics']);
+const ACADEMIC_CATEGORIES = new Set(['GENERAL_REB', 'TVET']);
+
+function normalizeAcademicCategory(value: unknown): string {
+  const category = String(value ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (category === 'GENERAL' || category === 'REB' || category === 'GENERAL_REB') return 'GENERAL_REB';
+  if (category === 'TVET') return 'TVET';
+  return 'GENERAL_REB';
+}
+
+function assignmentWide(slug: string, value: unknown): boolean {
+  if (!ACADEMIC_MODULE_SLUGS.has(slug)) return true;
+  return value === undefined || value === null ? true : Boolean(value);
+}
 
 export class OrganizationAdminService {
   async listLicensedModules(organizationId: string) {
@@ -82,6 +110,8 @@ export class OrganizationAdminService {
         shortName: um.module.shortName,
         accessLevel: um.accessLevel,
         dataScope: um.dataScope,
+        wide: um.wide,
+        academicCategory: um.academicCategory,
       })),
       supervisor: u.supervisor
         ? {
@@ -244,6 +274,8 @@ export class OrganizationAdminService {
               moduleId,
               accessLevel: assignment.accessLevel,
               dataScope: assignment.dataScope,
+              wide: assignment.wide,
+              academicCategory: assignment.academicCategory,
               assignedById: actorId,
             },
           });
@@ -358,6 +390,8 @@ export class OrganizationAdminService {
             moduleId,
             accessLevel: assignment.accessLevel,
             dataScope: assignment.dataScope,
+            wide: assignment.wide,
+            academicCategory: assignment.academicCategory,
             assignedById: actorId,
           },
         });
@@ -821,12 +855,20 @@ export class OrganizationAdminService {
     organizationId: string,
     roles: string[],
     moduleSlug: string
-  ): Promise<{ accessLevel: ModuleAccessLevel; dataScope: DataScope; canViewAll: boolean }> {
+  ): Promise<{
+    accessLevel: ModuleAccessLevel;
+    dataScope: DataScope;
+    canViewAll: boolean;
+    wide: boolean;
+    academicCategory: string;
+  }> {
     if (roles.includes(ROLES.ORGANIZATION_ADMIN)) {
       return {
         accessLevel: ModuleAccessLevel.HEAD,
         dataScope: DataScope.ORGANIZATION,
         canViewAll: true,
+        wide: true,
+        academicCategory: 'ALL',
       };
     }
 
@@ -836,7 +878,7 @@ export class OrganizationAdminService {
         organizationId,
         module: { slug: moduleSlug },
       },
-      select: { accessLevel: true, dataScope: true },
+      select: { accessLevel: true, dataScope: true, wide: true, academicCategory: true },
     });
 
     if (!row) {
@@ -847,13 +889,61 @@ export class OrganizationAdminService {
       accessLevel: row.accessLevel,
       dataScope: row.dataScope,
       canViewAll: row.accessLevel === ModuleAccessLevel.HEAD,
+      wide: row.wide,
+      academicCategory: row.academicCategory || 'GENERAL_REB',
     };
+  }
+
+  /**
+   * Self-service Academic marks preference (TichaPortal → My Profile).
+   * Teachers may widen/narrow their own marks access; org admins may also
+   * adjust their own row when one exists.
+   */
+  async updateMyModulePreferences(
+    userId: string,
+    organizationId: string,
+    moduleSlug: string,
+    input: { wide?: boolean; academicCategory?: string }
+  ) {
+    if (!ACADEMIC_MODULE_SLUGS.has(moduleSlug)) {
+      throw new AppError(400, 'Marks preferences are only available for the Academic module');
+    }
+    const row = await prisma.userModule.findFirst({
+      where: { userId, organizationId, module: { slug: moduleSlug } },
+      select: { id: true, wide: true, academicCategory: true },
+    });
+    if (!row) throw new AppError(403, 'You do not have access to this module');
+
+    const wide = input.wide === undefined ? row.wide : Boolean(input.wide);
+    const academicCategory =
+      input.academicCategory === undefined
+        ? row.academicCategory || 'GENERAL_REB'
+        : normalizeAcademicCategory(input.academicCategory);
+
+    const updated = await prisma.userModule.update({
+      where: { id: row.id },
+      data: { wide, academicCategory },
+      select: { wide: true, academicCategory: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId,
+        action: AuditAction.PERMISSION_CHANGED,
+        resource: 'user_modules',
+        resourceId: row.id,
+        metadata: { slug: moduleSlug, wide: updated.wide, academicCategory: updated.academicCategory },
+      },
+    });
+
+    return { slug: moduleSlug, wide: updated.wide, academicCategory: updated.academicCategory };
   }
 
   private normalizeAssignments(
     data: { moduleSlugs?: string[]; moduleAssignments?: ModuleAssignmentInput[]; dataScope?: DataScope },
     licensedSlugs: string[]
-  ): Array<{ slug: string; accessLevel: ModuleAccessLevel; dataScope: DataScope }> {
+  ): NormalizedModuleAssignment[] {
     if (data.moduleAssignments?.length) {
       return data.moduleAssignments
         .filter((a) => licensedSlugs.includes(a.slug))
@@ -861,6 +951,8 @@ export class OrganizationAdminService {
           slug: a.slug,
           accessLevel: a.accessLevel === 'HEAD' ? ModuleAccessLevel.HEAD : ModuleAccessLevel.USER,
           dataScope: a.dataScope ?? (a.accessLevel === 'HEAD' ? DataScope.ORGANIZATION : DataScope.SELF),
+          wide: assignmentWide(a.slug, a.wide),
+          academicCategory: normalizeAcademicCategory(a.academicCategory),
         }));
     }
 
@@ -870,6 +962,8 @@ export class OrganizationAdminService {
         slug,
         accessLevel: ModuleAccessLevel.USER,
         dataScope: data.dataScope ?? DataScope.SELF,
+        wide: true,
+        academicCategory: 'GENERAL_REB',
       }));
   }
 

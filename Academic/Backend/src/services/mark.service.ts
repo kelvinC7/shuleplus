@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { parentMisAcademicClient } from '../clients/parent-mis.client';
+import { mergeClassCategory, mergeRelatedClassCategory } from '../middleware/academic-scope';
 
 export class MarkService {
   private async notifyMarksSaved(
@@ -58,31 +59,37 @@ export class MarkService {
   }
   async getStudentsForEntry(organizationId: string, classId: string, academicYear: string) {
     const enrollments = await prisma.enrollment.findMany({
-      where: {
-        organizationId,
-        classId,
-        academicYear,
-        isCurrent: true,
-        status: 'ACTIVE',
-      },
+      where: mergeRelatedClassCategory(
+        {
+          organizationId,
+          classId,
+          academicYear,
+          isCurrent: true,
+          status: 'ACTIVE' as any,
+        },
+        'class',
+      ) as any,
       include: {
         student: {
           select: { id: true, firstName: true, lastName: true, studentUid: true },
         },
       },
-      orderBy: { student: { firstName: 'asc' } },
+      orderBy: { student: { firstName: 'asc' } } as any,
     });
-    return enrollments.map(e => e.student);
+    return enrollments.map((e: any) => e.student);
   }
 
   async getMarksForEntry(organizationId: string, examId: string, classId: string, subjectId: string) {
     return prisma.markEntry.findMany({
-      where: {
-        organizationId,
-        examId,
-        classId,
-        subjectId,
-      },
+      where: mergeRelatedClassCategory(
+        {
+          organizationId,
+          examId,
+          classId,
+          subjectId,
+        },
+        'class',
+      ),
       include: {
         student: {
           select: { id: true, firstName: true, lastName: true, studentUid: true },
@@ -103,7 +110,9 @@ export class MarkService {
     const subject = await prisma.subject.findFirst({ where: { id: data.subjectId, organizationId } });
     if (!subject) throw new AppError(404, 'Subject not found');
 
-    const classRecord = await prisma.class.findFirst({ where: { id: data.classId, organizationId } });
+    const classRecord = await prisma.class.findFirst({
+      where: mergeClassCategory({ id: data.classId, organizationId }),
+    });
     if (!classRecord) throw new AppError(404, 'Class not found');
 
     const results = await Promise.all(
@@ -148,7 +157,7 @@ export class MarkService {
 
   async listByExamAndClass(organizationId: string, examId: string, classId: string) {
     return prisma.markEntry.findMany({
-      where: { organizationId, examId, classId },
+      where: mergeRelatedClassCategory({ organizationId, examId, classId }, 'class'),
       include: {
         student: {
           select: { id: true, firstName: true, lastName: true, studentUid: true },
@@ -162,7 +171,9 @@ export class MarkService {
   }
 
   async delete(organizationId: string, id: string) {
-    const existing = await prisma.markEntry.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.markEntry.findFirst({
+      where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
+    });
     if (!existing) throw new AppError(404, 'Mark entry not found');
     await prisma.markEntry.delete({ where: { id } });
     return { message: 'Mark entry deleted' };
@@ -170,7 +181,7 @@ export class MarkService {
 
   async deleteByEntry(organizationId: string, examId: string, classId: string, subjectId: string) {
     const result = await prisma.markEntry.deleteMany({
-      where: { organizationId, examId, classId, subjectId },
+      where: mergeRelatedClassCategory({ organizationId, examId, classId, subjectId }, 'class'),
     });
     return { deleted: result.count };
   }

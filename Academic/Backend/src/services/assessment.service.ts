@@ -6,8 +6,10 @@ import { resolveAcademicClass, resolveAcademicSubject } from './sm-resolve.servi
 import { buildAssessmentCode, buildAssessmentTitle } from '../utils/assessment-code';
 import {
   assertOwnRecord,
+  assertOwnRecordUnlessWide,
   currentAcademicScope,
   mergeOwnData,
+  mergeRelatedClassCategory,
 } from '../middleware/academic-scope';
 
 async function resolveTeacherNameMap(organizationId: string, userIds: string[]) {
@@ -221,7 +223,7 @@ export class AssessmentService {
     if (filters?.reportingStage) where.reportingStage = filters.reportingStage;
 
     const rows = await prisma.assessment.findMany({
-      where: mergeOwnData(where),
+      where: mergeRelatedClassCategory(where, 'class'),
       include: {
         subject: true,
         class: true,
@@ -275,9 +277,11 @@ export class AssessmentService {
       componentId?: string | null;
     }
   ) {
-    const assessment = await prisma.assessment.findFirst({ where: mergeOwnData({ id, organizationId }) });
+    const assessment = await prisma.assessment.findFirst({
+      where: mergeRelatedClassCategory(mergeOwnData({ id, organizationId }), 'class'),
+    });
     if (!assessment) throw new AppError(404, 'Assessment not found');
-    assertOwnRecord(assessment.createdBy, 'assessment');
+    assertOwnRecordUnlessWide(assessment.createdBy, 'assessment');
     if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
       throw new AppError(400, 'Only scheduled assessments that are not yet submitted can be edited');
     }
@@ -384,14 +388,19 @@ export class AssessmentService {
       reportingStage?: string;
     }
   ) {
-    const assessmentWhere: any = { organizationId };
+    const assessmentWhere: any = mergeRelatedClassCategory({ organizationId }, 'class');
     if (filters.academicYear) assessmentWhere.academicYear = filters.academicYear;
     if (filters.term) assessmentWhere.term = filters.term;
     if (filters.classId) assessmentWhere.classId = filters.classId;
     if (filters.subjectId) assessmentWhere.subjectId = filters.subjectId;
     if (filters.componentId) assessmentWhere.componentId = filters.componentId;
     if (filters.reportingStage) assessmentWhere.reportingStage = filters.reportingStage;
-    if (filters.stream) assessmentWhere.class = { stream: { equals: filters.stream, mode: 'insensitive' } };
+    if (filters.stream) {
+      assessmentWhere.class = {
+        ...(assessmentWhere.class && typeof assessmentWhere.class === 'object' ? assessmentWhere.class : {}),
+        stream: { equals: filters.stream, mode: 'insensitive' },
+      };
+    }
 
     if (filters.dateFrom || filters.dateTo) {
       assessmentWhere.assessmentDate = {};
@@ -576,7 +585,7 @@ export class AssessmentService {
 
   async getById(id: string, organizationId: string) {
     const assessment = await prisma.assessment.findFirst({
-      where: mergeOwnData({ id, organizationId }),
+      where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
       include: {
         subject: true,
         class: true,
@@ -644,7 +653,9 @@ export class AssessmentService {
   }
 
   async rejectByAcademic(id: string, organizationId: string, reason?: string) {
-    const assessment = await prisma.assessment.findFirst({ where: { id, organizationId } });
+    const assessment = await prisma.assessment.findFirst({
+      where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
+    });
     if (!assessment) throw new AppError(404, 'Assessment not found');
     if (!['DRAFT', 'OPEN'].includes(assessment.status)) {
       throw new AppError(400, 'Only scheduled or open assessments can be rejected');
@@ -666,7 +677,7 @@ export class AssessmentService {
 
   async updateStatus(id: string, organizationId: string, newStatus: string, userId?: string) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id, organizationId },
+      where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');
 
@@ -796,10 +807,12 @@ export class AssessmentService {
     const canDeleteAny = scope ? scope.seeAll : !!actor.canDeleteAny;
     const result = await prisma.$transaction(async (tx) => {
       const assessment = await tx.assessment.findFirst({
-        where: { id, organizationId },
+        where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
       });
       if (!assessment) throw new AppError(404, 'Assessment not found');
-      if (!canDeleteAny && assessment.createdBy !== actor.id) {
+      const scope = currentAcademicScope();
+      const canDeleteWide = !!scope && (scope.seeAll || scope.wide);
+      if (!canDeleteAny && !canDeleteWide && assessment.createdBy !== actor.id) {
         throw new AppError(403, 'You can only delete assessments you created');
       }
       if (!['DRAFT', 'OPEN', 'MARK_ENTRY'].includes(assessment.status)) {
@@ -859,7 +872,7 @@ export class AssessmentService {
     actor: { id?: string; name?: string; roles?: string[] }
   ) {
     const assessment = await prisma.assessment.findFirst({
-      where: { id, organizationId },
+      where: mergeRelatedClassCategory({ id, organizationId }, 'class'),
       include: { _count: { select: { marks: true } } },
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');

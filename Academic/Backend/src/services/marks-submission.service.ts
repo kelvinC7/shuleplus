@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
-import { currentAcademicScope } from '../middleware/academic-scope';
+import { currentAcademicScope, classCategorySql, classCategoryWhere } from '../middleware/academic-scope';
 
 /**
  * A module USER owns a submission when they submitted it or when they were the
@@ -16,17 +16,17 @@ const OWNER_EXISTS_SQL = `EXISTS (
 
 async function assertSubmissionAccess(organizationId: string, id: string) {
   const scope = currentAcademicScope();
-  if (!scope || scope.seeAll) return;
+  if (!scope || scope.seeAll || scope.wide) return;
+  const categorySql = classCategorySql('$2');
   const rows = await prisma.$queryRawUnsafe<any[]>(
     `SELECT 1 FROM marks_submissions
       WHERE id = $1 AND organization_id = $2
-        AND (submitted_by = $3 OR ${OWNER_EXISTS_SQL.replace('$OWNER$', '$3')})
+        ${categorySql ? `AND (${categorySql})` : ''}
       LIMIT 1`,
     id,
     organizationId,
-    scope.userId,
   );
-  if (!rows.length) throw new AppError(403, 'You can only modify your own marks submissions');
+  if (!rows.length) throw new AppError(403, 'You can only modify marks submissions in your academic category');
 }
 
 export type SubmissionStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'RETURNED' | 'APPROVED' | 'PUBLISHED';
@@ -68,7 +68,10 @@ async function logEvent(input: {
 export const marksSubmissionService = {
   async list(organizationId: string, q: { academicYear?: string; term?: string; classId?: string; status?: string; assessmentId?: string }) {
     const scope = currentAcademicScope();
-    const ownerId = scope && !scope.seeAll ? scope.userId : null;
+    // Category-wide visibility: users in the same category see all marks records
+    // in that category. Category filter is applied below; owner filter is not.
+    const ownerId = null;
+    const categorySql = classCategorySql('$1');
     try {
       return await prisma.$queryRawUnsafe<any[]>(`
         SELECT id, organization_id as "organizationId", assessment_id as "assessmentId", class_id as "classId", class_name as "className",
@@ -85,6 +88,7 @@ export const marksSubmissionService = {
           AND ($5::text IS NULL OR status::text = $5)
           AND ($6::text IS NULL OR assessment_id = $6)
           AND ($7::text IS NULL OR submitted_by = $7 OR ${OWNER_EXISTS_SQL.replace('$OWNER$', '$7')})
+          ${categorySql ? `AND (${categorySql})` : ''}
         ORDER BY updated_at DESC, created_at DESC
         LIMIT 300
       `, organizationId, q.academicYear?.trim() || null, q.term?.trim() || null, q.classId?.trim() || null, q.status?.trim() || null, q.assessmentId?.trim() || null, ownerId);
@@ -96,6 +100,16 @@ export const marksSubmissionService = {
   async createOrUpdate(organizationId: string, actor: { id?: string; name?: string; roles?: string[] }, input: any) {
     const id = input.id || randomUUID();
     if (input.id) await assertSubmissionAccess(organizationId, id);
+    if (input.classId) {
+      const category = classCategoryWhere();
+      if (Object.keys(category).length) {
+        const klass = await prisma.class.findFirst({
+          where: { id: String(input.classId), organizationId, AND: [category] },
+          select: { id: true },
+        });
+        if (!klass) throw new AppError(403, 'This class is outside your academic category');
+      }
+    }
     const academicYear = String(input.academicYear || '').trim();
     const term = String(input.term || '').trim();
     if (!academicYear || !term) throw new AppError(400, 'academicYear and term are required');

@@ -1,4 +1,4 @@
-﻿import { Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { examinationListService } from '../services/examination-list.service';
 
@@ -99,6 +99,27 @@ export class ExaminationListController {
     } catch (e) { next(e); }
   }
 
+  async addStudents(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationListService.addStudentsToRoom(String(req.params.id), org(req), req.body);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async addManualRoom(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationListService.addManualRoom(String(req.params.id), org(req), req.body);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async updateRoom(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationListService.updateRoom(String(req.params.id), org(req), String(req.params.roomId), req.body);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
   async removeAllocation(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const data = await examinationListService.removeAllocation(String(req.params.id), org(req), String(req.params.allocationId));
@@ -108,7 +129,21 @@ export class ExaminationListController {
 
   async availableStudents(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const data = await examinationListService.availableStudents(String(req.params.id), org(req), typeof req.query.q === 'string' ? req.query.q : undefined);
+      const data = await examinationListService.availableStudents(String(req.params.id), org(req), typeof req.query.q === 'string' ? req.query.q : undefined, { fresh: req.query.fresh === '1' });
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async searchStudents(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationListService.searchStudents(String(req.params.id), org(req), typeof req.query.q === 'string' ? req.query.q : undefined, { fresh: req.query.fresh === '1' });
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async publicRoom(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationListService.getPublicRoom(String(req.params.id), String(req.params.roomId));
       res.json({ success: true, data });
     } catch (e) { next(e); }
   }

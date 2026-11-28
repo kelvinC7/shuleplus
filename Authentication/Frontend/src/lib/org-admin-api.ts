@@ -9,12 +9,16 @@ export type UserStatus =
   | 'SUSPENDED'
   | 'PENDING_VERIFICATION';
 
+export type AcademicCategory = 'GENERAL_REB' | 'TVET';
+
 export interface ModuleAssignment {
   slug: string;
   name?: string;
   shortName?: string | null;
   accessLevel: ModuleAccessLevel;
   dataScope: DataScope;
+  wide?: boolean;
+  academicCategory?: AcademicCategory | string;
 }
 
 export type OrgChiefAccountantRow = {
@@ -143,6 +147,8 @@ export interface CreateOrgUserPayload {
     slug: string;
     accessLevel?: ModuleAccessLevel;
     dataScope?: DataScope;
+    wide?: boolean;
+    academicCategory?: string;
   }>;
   moduleSlugs?: string[];
   requirePasswordChange?: boolean;
@@ -239,6 +245,8 @@ export const orgAdminApi = {
         slug: string;
         accessLevel?: ModuleAccessLevel;
         dataScope?: DataScope;
+        wide?: boolean;
+        academicCategory?: string;
       }>;
     }
   ) => api.put(`/iam/org/users/${userId}/modules`, body),

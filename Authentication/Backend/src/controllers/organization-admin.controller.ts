@@ -8,10 +8,25 @@ import { academicSettingsService } from '../services/academic-settings.service';
 import { parseAcademicSettings } from '../utils/academic-settings';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
+const academicCategorySchema = z
+  .string()
+  .trim()
+  .transform((value) => value.toUpperCase().replace(/[\s-]+/g, '_'))
+  .refine((value) => ['GENERAL_REB', 'TVET'].includes(value), {
+    message: 'academicCategory must be GENERAL_REB or TVET',
+  });
+
 const moduleAssignmentSchema = z.object({
   slug: z.string().min(1),
   accessLevel: z.enum(['USER', 'HEAD']).optional(),
   dataScope: z.nativeEnum(DataScope).optional(),
+  wide: z.boolean().optional(),
+  academicCategory: academicCategorySchema.optional(),
+});
+
+const myModulePreferencesSchema = z.object({
+  wide: z.boolean().optional(),
+  academicCategory: academicCategorySchema.optional(),
 });
 
 const createUserSchema = z.object({
@@ -307,6 +322,21 @@ export class OrganizationAdminController {
         req.user!.organizationId,
         req.user!.roles,
         moduleSlug
+      );
+      res.json({ success: true, data });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  async updateMyModulePreferences(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const body = myModulePreferencesSchema.parse(req.body ?? {});
+      const data = await organizationAdminService.updateMyModulePreferences(
+        req.user!.sub,
+        req.user!.organizationId,
+        String(req.params.moduleSlug),
+        body
       );
       res.json({ success: true, data });
     } catch (e) {

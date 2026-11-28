@@ -11,7 +11,10 @@ export interface JwtPayload {
   roles: string[];
   modules: string[];
   /** IAM per-module access: HEAD sees all, USER sees own. */
-  moduleAccess?: Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }>;
+  moduleAccess?: Record<
+    string,
+    { accessLevel: 'USER' | 'HEAD'; dataScope: string; wide?: boolean; academicCategory?: string }
+  >;
   position?: string | null;
 }
 
@@ -107,11 +110,21 @@ const PUBLISH_APPROVE_ROLES = new Set([
   'academic_admin',
   'academics_admin',
   'principal',
+  'module_head',
+  'module-head',
 ]);
+
+const ACADEMIC_MODULE_SLUGS = ['academic', 'academic-1', 'academics', 'teacher-portal'];
 
 export function hasAcademicPublishRole(user?: JwtPayload): boolean {
   if (!user) return false;
   if ((user.roles ?? []).some((r) => PUBLISH_APPROVE_ROLES.has(String(r).toLowerCase()))) return true;
+  if ((user.roles ?? []).some((r) => /module[_-]?head/.test(String(r).toLowerCase()))) return true;
+  for (const slug of ACADEMIC_MODULE_SLUGS) {
+    const m = (user.moduleAccess as Record<string, { accessLevel?: string; wide?: boolean }> | undefined)?.[slug];
+    if (m?.accessLevel === 'HEAD') return true;
+    if (m?.wide) return true;
+  }
   return false;
 }
 
@@ -119,6 +132,11 @@ export function requireAcademicPublishAccess(req: AuthenticatedRequest, _res: Re
   const user = req.user;
   if (!user) throw new AppError(401, 'Authentication required');
   if (hasAcademicPublishRole(user)) {
+    next();
+    return;
+  }
+  // IAM-resolved module heads / organization users are always allowed.
+  if ((req.academicScope?.seeAll)) {
     next();
     return;
   }

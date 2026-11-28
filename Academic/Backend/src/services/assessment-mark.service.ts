@@ -2,7 +2,11 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { ensureAcademicStudent } from './sm-resolve.service';
 import { parentMisAcademicClient } from '../clients/parent-mis.client';
-import { assertOwnRecord, mergeOwnData } from '../middleware/academic-scope';
+import {
+  assertOwnRecordUnlessWide,
+  classCategoryWhere,
+  mergeRelatedClassCategory,
+} from '../middleware/academic-scope';
 
 const LOCKED_ASSESSMENT_STATUSES = new Set(['SUBMITTED', 'REVIEWED', 'APPROVED', 'LOCKED']);
 
@@ -75,10 +79,10 @@ export class AssessmentMarkService {
     enteredBy?: string;
   }) {
     const assessment = await prisma.assessment.findFirst({
-      where: mergeOwnData({ id: assessmentId, organizationId }),
+      where: mergeRelatedClassCategory({ id: assessmentId, organizationId }, 'class'),
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');
-    assertOwnRecord(assessment.createdBy, 'assessment');
+    assertOwnRecordUnlessWide(assessment.createdBy, 'assessment');
     if (LOCKED_ASSESSMENT_STATUSES.has(assessment.status)) {
       throw new AppError(
         400,
@@ -156,7 +160,7 @@ export class AssessmentMarkService {
 
   async getMarks(assessmentId: string, organizationId: string) {
     const assessment = await prisma.assessment.findFirst({
-      where: mergeOwnData({ id: assessmentId, organizationId }),
+      where: mergeRelatedClassCategory({ id: assessmentId, organizationId }, 'class'),
       include: {
         subject: true,
         class: true,
@@ -181,10 +185,10 @@ export class AssessmentMarkService {
     requestedBy?: string;
   }) {
     const assessment = await prisma.assessment.findFirst({
-      where: mergeOwnData({ id: assessmentId, organizationId }),
+      where: mergeRelatedClassCategory({ id: assessmentId, organizationId }, 'class'),
     });
     if (!assessment) throw new AppError(404, 'Assessment not found');
-    assertOwnRecord(assessment.createdBy, 'assessment');
+    assertOwnRecordUnlessWide(assessment.createdBy, 'assessment');
     if (assessment.status === 'DRAFT' || assessment.status === 'OPEN' || assessment.status === 'MARK_ENTRY') {
       throw new AppError(400, 'You can edit marks directly while the assessment is still a draft.');
     }
@@ -288,6 +292,10 @@ export class AssessmentMarkService {
   async listCorrections(organizationId: string, status?: string) {
     const where: any = { organizationId };
     if (status && status !== 'all') where.status = status.toUpperCase();
+    const category = classCategoryWhere();
+    if (Object.keys(category).length) {
+      where.assessment = { class: category };
+    }
 
     return prisma.markCorrectionRequest.findMany({
       where,

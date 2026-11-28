@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { AuthenticatedRequest, hasAcademicPublishRole } from '../middleware/auth.middleware';
 import { assessmentService } from '../services/assessment.service';
 
 export class AssessmentController {
@@ -191,7 +191,11 @@ export class AssessmentController {
   async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const orgId = req.organizationRef!;
-      const result = await assessmentService.delete(req.params.id as string, orgId);
+      const result = await assessmentService.delete(req.params.id as string, orgId, {
+        id: req.user?.sub,
+        roles: req.user?.roles,
+        canDeleteAny: hasAcademicPublishRole(req.user),
+      });
       res.json({ success: true, data: result });
     } catch (err) {
       next(err);

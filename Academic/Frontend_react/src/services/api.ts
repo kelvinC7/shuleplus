@@ -1604,7 +1604,9 @@ export type ExaminationAllocation = {
   studentName: string;
   classId: string;
   className: string;
+  classLevel?: string | null;
   gender?: string | null;
+  isException?: boolean;
 };
 
 export type ExaminationListRoom = {
@@ -1644,6 +1646,9 @@ export type ExaminationList = {
   distributionMethod: ExaminationDistributionMethod;
   mixQuantity?: number | null;
   defaultCapacity: number;
+  allowSameClassExceptions?: boolean;
+  exceptionCount?: number;
+  allocationMeta?: any;
   status: 'DRAFT' | 'GENERATED' | 'PUBLISHED';
   generatedAt?: string | null;
   publishedAt?: string | null;
@@ -1701,6 +1706,40 @@ export async function getExaminationList(id: string) {
   return res.data.data as ExaminationList;
 }
 
+export type ExaminationCollisionReport = {
+  message: string;
+  totalStudents: number;
+  totalRooms: number;
+  totalCapacity: number;
+  allocatedStudents: number;
+  unallocatedStudents: number;
+  remainingSeats: number;
+  largestClassLevel: { key: string; count: number };
+  collisions: Array<{ studentId: string; studentName: string; studentCode?: string | null; className: string; classLevel: string; reason: string }>;
+  classLevelCounts: Array<{ classLevel: string; count: number; roomsNeeded: number }>;
+  roomOccupancy: Array<{ roomKey: string; roomName: string; capacity: number; used: number; remaining: number; classLevels: string[] }>;
+  canResolveWithExceptions: boolean;
+  minimumExceptionStudents: number;
+  exceptionPreview: Array<{ studentId: string; studentName: string; className: string; classLevel: string; roomKey: string; roomName: string }>;
+  suggestions: string[];
+};
+
+export type ExaminationListPreview = {
+  preview: true;
+  listCode: string;
+  examinationName: string;
+  academicYear: string;
+  term: string;
+  distributionMethod: ExaminationDistributionMethod;
+  allowSameClassExceptions: boolean;
+  exceptionCount: number;
+  allocationMeta?: any;
+  totalStudents: number;
+  totalCapacity: number;
+  rooms: Array<{ roomKey: string; roomName: string; roomNumber?: string | null; capacity: number; used: number; allocations: Array<{ studentId: string; studentCode?: string | null; studentName: string; classId: string; className: string; classLevel: string; gender?: string | null; isException?: boolean }> }>;
+  exceptionStudents: Array<{ studentId: string; studentName: string; className: string; classLevel: string; roomName: string }>;
+};
+
 export async function generateExaminationList(data: {
   examinationTimetableId?: string;
   examinationTypeId?: string;
@@ -1712,9 +1751,11 @@ export async function generateExaminationList(data: {
   participatingClassIds: string[];
   distributionMethod: ExaminationDistributionMethod;
   mixQuantity?: number | null;
+  allowSameClassExceptions?: boolean;
+  dryRun?: boolean;
 }) {
-  const res = await api.post('/examination-lists/generate', data);
-  return res.data.data as ExaminationList;
+  const res = await api.post('/examination-lists/generate', data, { skipToast: true } as any);
+  return res.data.data as ExaminationList | ExaminationListPreview;
 }
 
 export async function deleteExaminationList(id: string, opts?: { skipToast?: boolean; confirmImpact?: boolean }) {
@@ -1725,13 +1766,40 @@ export async function deleteExaminationList(id: string, opts?: { skipToast?: boo
   return res.data.data;
 }
 
-export async function moveExaminationListStudent(id: string, data: { allocationId: string; targetRoomId: string }) {
-  const res = await api.post(`/examination-lists/${id}/move-student`, data);
+export async function moveExaminationListStudent(
+  id: string,
+  data: { allocationId: string; targetRoomId: string; allowSameClassException?: boolean },
+  opts?: { skipToast?: boolean },
+) {
+  const res = await api.post(`/examination-lists/${id}/move-student`, data, { skipToast: opts?.skipToast } as any);
   return res.data.data as ExaminationList;
 }
 
-export async function addExaminationListStudent(id: string, data: { roomId: string; studentId: string }) {
-  const res = await api.post(`/examination-lists/${id}/allocations`, data);
+export async function addExaminationListStudent(
+  id: string,
+  data: { roomId: string; studentId: string; allowSameClassException?: boolean },
+  opts?: { skipToast?: boolean },
+) {
+  const res = await api.post(`/examination-lists/${id}/allocations`, data, { skipToast: opts?.skipToast } as any);
+  return res.data.data as ExaminationList;
+}
+
+export async function addExaminationListStudentsBulk(
+  id: string,
+  data: { roomId: string; studentIds: string[]; allowSameClassException?: boolean },
+  opts?: { skipToast?: boolean },
+) {
+  const res = await api.post(`/examination-lists/${id}/allocations/bulk`, data, { skipToast: opts?.skipToast } as any);
+  return res.data.data as ExaminationList;
+}
+
+export async function addManualExaminationRoom(id: string, data: { roomName: string; roomNumber?: string | null; capacity: number; studentIds: string[]; invigilatorIds?: string[] }) {
+  const res = await api.post(`/examination-lists/${id}/rooms/manual`, data);
+  return res.data.data as { list: ExaminationList; roomId: string };
+}
+
+export async function updateExaminationListRoom(id: string, roomId: string, data: { capacity?: number; roomName?: string; roomNumber?: string | null }) {
+  const res = await api.patch(`/examination-lists/${id}/rooms/${roomId}`, data);
   return res.data.data as ExaminationList;
 }
 
@@ -1740,9 +1808,35 @@ export async function removeExaminationListAllocation(id: string, allocationId: 
   return res.data.data as ExaminationList;
 }
 
-export async function getExaminationListAvailableStudents(id: string, q?: string) {
-  const res = await api.get(`/examination-lists/${id}/available-students`, { params: { q } });
+export async function getExaminationListAvailableStudents(id: string, q?: string, fresh?: boolean) {
+  const res = await api.get(`/examination-lists/${id}/available-students`, { params: { q, fresh: fresh ? '1' : undefined } });
   return (res.data.data ?? []) as Array<{ id: string; studentCode?: string | null; fullName: string; classId: string; className: string; gender?: string | null }>;
+}
+
+export type ExaminationMasterStudent = {
+  id: string;
+  studentCode?: string | null;
+  fullName: string;
+  classId: string;
+  className: string;
+  gender?: string | null;
+  allocated: boolean;
+  allocationId: string | null;
+  roomId: string | null;
+  roomName: string | null;
+  roomNumber: string | null;
+};
+
+export async function searchExaminationListStudents(id: string, q?: string, fresh?: boolean) {
+  const res = await api.get(`/examination-lists/${id}/search-students`, { params: { q, fresh: fresh ? '1' : undefined } });
+  return res.data.data as {
+    students: ExaminationMasterStudent[];
+    total: number;
+    totalStudents: number;
+    availableCount: number;
+    allocatedCount: number;
+    classes: Array<{ id: string; name: string; studentCount: number }>;
+  };
 }
 
 export async function getExaminationListImpact(id: string) {
@@ -1858,6 +1952,7 @@ export async function getExaminationInvigilatorsDashboard(examinationListId: str
 
 export async function generateExaminationInvigilators(data: {
   examinationListId?: string;
+  examinationListIds?: string[];
   examinationTypeId?: string;
   teacherIds: string[];
   mode: 'AUTO' | 'MANUAL';
@@ -1867,10 +1962,10 @@ export async function generateExaminationInvigilators(data: {
   replaceExisting?: boolean;
 }) {
   const res = await api.post('/examination-invigilators/generate', data);
-  return res.data.data as { created: number; unassigned: Array<{ roomName: string; date: string; session: string; sessionCode?: string; needed: number; assigned: number }>; assignments: ExaminationInvigilatorAssignment[] };
+  return res.data.data as { created: number; unassigned: Array<{ roomName: string; date: string; session: string; sessionCode?: string; needed: number; assigned: number }>; assignments: ExaminationInvigilatorAssignment[]; generatedLists?: number; failures?: Array<{ examinationListId: string; message: string }> };
 }
 
-export async function updateExaminationInvigilatorAssignment(id: string, data: { teacherUserId?: string; status?: string; roomId?: string }) {
+export async function updateExaminationInvigilatorAssignment(id: string, data: { teacherUserId?: string; status?: string; roomId?: string; examDate?: string; session?: ExaminationSessionPeriod; sessionCode?: string }) {
   const res = await api.put(`/examination-invigilators/${id}`, data);
   return res.data.data as ExaminationInvigilatorAssignment;
 }
@@ -1883,6 +1978,11 @@ export async function getAvailableInvigilatorTeachers(params: { examinationListI
 export async function addExaminationInvigilatorAssignment(data: { examinationListId: string; roomId: string; examDate: string; session?: ExaminationSessionPeriod; sessionCode?: string; teacherUserId: string }) {
   const res = await api.post('/examination-invigilators/assignments', data);
   return res.data.data as ExaminationInvigilatorAssignment;
+}
+
+export async function deleteExaminationInvigilatorAssignment(id: string) {
+  const res = await api.delete(`/examination-invigilators/${id}`);
+  return res.data.data as { id: string };
 }
 
 export async function clearExaminationInvigilatorAssignments(params: { examinationListId?: string; examinationTypeId?: string }) {

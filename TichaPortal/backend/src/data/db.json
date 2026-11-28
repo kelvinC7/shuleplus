@@ -306,5 +306,72 @@
       "updatedAt": "2026-09-28T07:21:47.941Z"
     }
   ],
-  "calendarEvents": []
+  "calendarEvents": [
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-term-1-begins",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "Term 1 Begins",
+      "event_type": "TERM",
+      "event_date": "2026-09-01",
+      "start_date": "2026-09-01",
+      "end_date": "2026-09-01",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    },
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-mid-term-examination",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "Mid-Term Examination",
+      "event_type": "EXAM",
+      "event_date": "2026-10-15",
+      "start_date": "2026-10-15",
+      "end_date": "2026-10-15",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    },
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-staff-meeting",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "Staff Meeting",
+      "event_type": "MEETING",
+      "event_date": "2026-10-14",
+      "start_date": "2026-10-14",
+      "end_date": "2026-10-14",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    },
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-parent-meeting",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "Parent Meeting",
+      "event_type": "MEETING",
+      "event_date": "2026-11-20",
+      "start_date": "2026-11-20",
+      "end_date": "2026-11-20",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    },
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-sports-day",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "Sports Day",
+      "event_type": "SPORT",
+      "event_date": "2026-11-08",
+      "start_date": "2026-11-08",
+      "end_date": "2026-11-08",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    },
+    {
+      "id": "cal-seed-9c21e145-9b3b-4d55-b649-6338d78769a9-school-holiday",
+      "organizationId": "9c21e145-9b3b-4d55-b649-6338d78769a9",
+      "title": "School Holiday",
+      "event_type": "HOLIDAY",
+      "event_date": "2026-12-23",
+      "start_date": "2026-12-23",
+      "end_date": "2026-12-31",
+      "all_day": true,
+      "academicYear": "2026-2027"
+    }
+  ]
 }

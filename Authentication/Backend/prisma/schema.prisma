@@ -588,6 +588,10 @@ model UserModule {
   accessLevel    ModuleAccessLevel @default(USER) @map("access_level")
   /// Effective data scope for this module assignment.
   dataScope      DataScope         @default(SELF) @map("data_scope")
+  /// Marks/records access: true = all academic categories (default).
+  wide           Boolean           @default(true) @map("wide")
+  /// Category partition when wide = false: GENERAL_REB (Nursery/Primary/Secondary) or TVET.
+  academicCategory String          @default("GENERAL_REB") @map("academic_category")
   assignedById   String?           @map("assigned_by_id")
   assignedAt     DateTime          @default(now()) @map("assigned_at")
 
@@ -597,6 +601,7 @@ model UserModule {
   @@unique([userId, moduleId])
   @@index([organizationId])
   @@index([organizationId, moduleId, accessLevel])
+  @@index([organizationId, moduleId, academicCategory])
   @@map("user_modules")
 }
 

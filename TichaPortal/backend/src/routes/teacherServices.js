@@ -777,4 +777,57 @@ router.post('/examinations/attendance', async (req, res) => {
   } catch (err) { fail(res, err); }
 });
 
+const ACADEMIC_MODULE_SLUGS = ['academic', 'academic-1', 'academics'];
+
+async function resolveAcademicPreferenceSlug(authorization) {
+  for (const slug of ACADEMIC_MODULE_SLUGS) {
+    try {
+      const payload = await serviceFetch(env.IAM_API_URL, `/iam/me/modules/${slug}/visibility`, { authorization });
+      const data = unwrap(payload);
+      if (data) return { slug, data };
+    } catch (err) {
+      if (err?.status === 403 || err?.status === 404) continue;
+      throw err;
+    }
+  }
+  const err = new Error('Academic module access not found');
+  err.status = 403;
+  throw err;
+}
+
+router.get('/teacher/academic-preferences', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization;
+    const resolved = await resolveAcademicPreferenceSlug(authorization);
+    return send(res, {
+      slug: resolved.slug,
+      wide: resolved.data?.wide !== false,
+      academicCategory: String(resolved.data?.academicCategory || 'GENERAL_REB').toUpperCase() === 'TVET' ? 'TVET' : 'GENERAL_REB',
+      accessLevel: resolved.data?.accessLevel || 'USER',
+      canViewAll: !!resolved.data?.canViewAll,
+    });
+  } catch (err) {
+    return fail(res, err);
+  }
+});
+
+router.put('/teacher/academic-preferences', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization;
+    const resolved = await resolveAcademicPreferenceSlug(authorization);
+    const body = {
+      ...(req.body?.wide !== undefined ? { wide: Boolean(req.body.wide) } : {}),
+      ...(req.body?.academicCategory !== undefined ? { academicCategory: String(req.body.academicCategory) } : {}),
+    };
+    const payload = await serviceFetch(env.IAM_API_URL, `/iam/me/modules/${resolved.slug}/preferences`, {
+      method: 'PUT',
+      authorization,
+      body,
+    });
+    return send(res, unwrap(payload));
+  } catch (err) {
+    return fail(res, err);
+  }
+});
+
 module.exports = { teacherServicesRouter: router };

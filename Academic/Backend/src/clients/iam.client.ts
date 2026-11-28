@@ -124,6 +124,8 @@ export type IamModuleVisibility = {
   accessLevel: 'USER' | 'HEAD';
   dataScope: string;
   canViewAll: boolean;
+  wide?: boolean;
+  academicCategory?: string;
 };
 
 /**

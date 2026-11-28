@@ -17,6 +17,7 @@ import { fetchIamModuleVisibility } from '../clients/iam.client';
  */
 
 export type AcademicAccessLevel = 'USER' | 'HEAD';
+export type AcademicCategory = 'GENERAL_REB' | 'TVET' | 'ALL';
 
 export interface AcademicScope {
   userId: string;
@@ -25,8 +26,23 @@ export interface AcademicScope {
   seeAll: boolean;
   accessLevel: AcademicAccessLevel;
   dataScope: string;
+  /**
+   * Marks/records access. `true` (default) = all academic categories and any
+   * class; `false` = only the teacher's `academicCategory`.
+   */
+  wide: boolean;
+  /** GENERAL_REB (Nursery/Primary/Secondary) or TVET; ALL when wide. */
+  academicCategory: AcademicCategory;
   /** Where the decision came from (diagnostics). */
   source: 'jwt' | 'iam' | 'fallback';
+}
+
+export function normalizeAcademicCategory(value: unknown, wide = false): AcademicCategory {
+  if (wide) return 'ALL';
+  const key = String(value ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (key === 'TVET') return 'TVET';
+  if (key === 'ALL' || key === 'WIDE') return 'ALL';
+  return 'GENERAL_REB';
 }
 
 /** Roles that always see full organizational academic data. */
@@ -102,7 +118,13 @@ export function academicUserId(user?: JwtPayload | null): string | undefined {
   return user?.sub ? String(user.sub) : undefined;
 }
 
-type CachedScope = { accessLevel: AcademicAccessLevel; dataScope: string; expiresAt: number };
+type CachedScope = {
+  accessLevel: AcademicAccessLevel;
+  dataScope: string;
+  wide: boolean;
+  academicCategory: AcademicCategory;
+  expiresAt: number;
+};
 const visibilityCache = new Map<string, CachedScope>();
 const CACHE_TTL_MS = 60 * 1000;
 
@@ -113,7 +135,15 @@ function fromCache(userId: string): CachedScope | null {
   return null;
 }
 
-function toCache(userId: string, value: { accessLevel: AcademicAccessLevel; dataScope: string }) {
+function toCache(
+  userId: string,
+  value: {
+    accessLevel: AcademicAccessLevel;
+    dataScope: string;
+    wide: boolean;
+    academicCategory: AcademicCategory;
+  },
+) {
   visibilityCache.set(userId, { ...value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
@@ -140,12 +170,15 @@ export async function resolveAcademicScope(req: AuthenticatedRequest): Promise<A
   if (claim) {
     const accessLevel: AcademicAccessLevel =
       claim.accessLevel === 'HEAD' || orgWide ? 'HEAD' : 'USER';
+    const wide = claim.wide !== false;
     return {
       userId,
       organizationId,
       seeAll: accessLevel === 'HEAD',
       accessLevel,
       dataScope: claim.dataScope || (accessLevel === 'HEAD' ? 'ORGANIZATION' : 'SELF'),
+      wide,
+      academicCategory: normalizeAcademicCategory(claim.academicCategory, wide),
       source: 'jwt',
     };
   }
@@ -157,6 +190,8 @@ export async function resolveAcademicScope(req: AuthenticatedRequest): Promise<A
       seeAll: true,
       accessLevel: 'HEAD',
       dataScope: 'ORGANIZATION',
+      wide: true,
+      academicCategory: 'ALL',
       source: 'fallback',
     };
   }
@@ -170,6 +205,8 @@ export async function resolveAcademicScope(req: AuthenticatedRequest): Promise<A
       seeAll: accessLevel === 'HEAD',
       accessLevel,
       dataScope: cached.dataScope,
+      wide: cached.wide,
+      academicCategory: cached.academicCategory,
       source: 'iam',
     };
   }
@@ -182,18 +219,32 @@ export async function resolveAcademicScope(req: AuthenticatedRequest): Promise<A
       const accessLevel: AcademicAccessLevel =
         visibility.canViewAll || visibility.accessLevel === 'HEAD' ? 'HEAD' : 'USER';
       const dataScope = visibility.dataScope || (accessLevel === 'HEAD' ? 'ORGANIZATION' : 'SELF');
-      toCache(userId, { accessLevel, dataScope });
-      return { userId, organizationId, seeAll: accessLevel === 'HEAD', accessLevel, dataScope, source: 'iam' };
+      const wide = visibility.wide !== false;
+      const academicCategory = normalizeAcademicCategory(visibility.academicCategory, wide);
+      toCache(userId, { accessLevel, dataScope, wide, academicCategory });
+      return {
+        userId,
+        organizationId,
+        seeAll: accessLevel === 'HEAD',
+        accessLevel,
+        dataScope,
+        wide,
+        academicCategory,
+        source: 'iam',
+      };
     }
   }
 
-  // IAM unreachable or no assignment row: fail closed to own-data.
+  // IAM unreachable or no assignment row: fail closed to own-data, but keep the
+  // historical wide default so marks keep working for legacy tokens.
   return {
     userId,
     organizationId,
     seeAll: false,
     accessLevel: 'USER',
     dataScope: 'SELF',
+    wide: true,
+    academicCategory: 'ALL',
     source: 'fallback',
   };
 }
@@ -262,6 +313,16 @@ export function assertOwnRecord(ownerId: string | null | undefined, label = 'rec
   }
 }
 
+/**
+ * Marks submission rule: `wide` users may submit for any class in their
+ * category; non-wide users only for their own records. HEAD/org users always.
+ */
+export function assertOwnRecordUnlessWide(ownerId: string | null | undefined, label = 'record'): void {
+  const scope = currentAcademicScope();
+  if (!scope || scope.seeAll || scope.wide) return;
+  assertOwnRecord(ownerId, label);
+}
+
 /** Throw 403 when a USER attempts an organization-wide action. */
 export function assertCanSeeAll(action: string): void {
   const scope = currentAcademicScope();
@@ -271,6 +332,101 @@ export function assertCanSeeAll(action: string): void {
       `Only an Academic module head or organization user can ${action}`,
     );
   }
+}
+
+/** true when the caller may see every academic category (wide, HEAD or org user). */
+export function seesAllAcademicCategories(): boolean {
+  const scope = currentAcademicScope();
+  return !scope || scope.seeAll || scope.wide || scope.academicCategory === 'ALL';
+}
+
+/** Prisma filter for `classes.category` based on the caller's category partition. */
+export function classCategoryWhere(): Record<string, unknown> {
+  if (seesAllAcademicCategories()) return {};
+  const scope = currentAcademicScope();
+  const tvet = scope?.academicCategory === 'TVET';
+  if (tvet) {
+    return {
+      OR: [
+        { category: { equals: 'TVET', mode: 'insensitive' } },
+        { name: { contains: 'TVET', mode: 'insensitive' } },
+      ],
+    };
+  }
+  // GENERAL_REB = Nursery / Primary / Secondary (anything not marked TVET).
+  return {
+    AND: [
+      { OR: [{ category: null }, { category: { not: 'TVET' } }] },
+      { NOT: { name: { contains: 'TVET', mode: 'insensitive' } } },
+    ],
+  };
+}
+
+/** Merge the class-category filter into a Prisma `where` object. */
+export function mergeClassCategory<T extends Record<string, unknown>>(
+  where: T,
+  filter?: Record<string, unknown>,
+): T {
+  const category = classCategoryWhere();
+  if (!Object.keys(category).length) return where;
+  const condition = filter ?? category;
+  const existingAnd = (where as Record<string, unknown>).AND;
+  const AND = Array.isArray(existingAnd)
+    ? [...existingAnd, condition]
+    : existingAnd
+      ? [existingAnd, condition]
+      : [condition];
+  return { ...where, AND } as T;
+}
+
+/**
+ * Prisma filter for students: a current enrollment in a class that belongs to
+ * the caller's category. Empty when the caller sees every category.
+ */
+export function studentCategoryWhere(): Record<string, unknown> {
+  const category = classCategoryWhere();
+  if (!Object.keys(category).length) return {};
+  return {
+    enrollments: {
+      some: {
+        isCurrent: true,
+        class: category,
+      },
+    },
+  };
+}
+
+/** Merge the class-category filter through a relation (e.g. assessment.class). */
+export function mergeRelatedClassCategory<T extends Record<string, unknown>>(
+  where: T,
+  relation: string,
+): T {
+  const category = classCategoryWhere();
+  if (!Object.keys(category).length) return where;
+  return mergeClassCategory(where, { [relation]: category } as Record<string, unknown>);
+}
+
+/** SQL fragment restricting `class_id` to the caller's category (raw queries). */
+export function classCategorySql(organizationParam = '$1'): string {
+  if (seesAllAcademicCategories()) return '';
+  const scope = currentAcademicScope();
+  if (scope?.academicCategory === 'TVET') {
+    return `class_id IN (SELECT id FROM classes WHERE organization_id = ${organizationParam} AND (UPPER(COALESCE(category, '')) = 'TVET' OR name ILIKE '%TVET%'))`;
+  }
+  return `class_id IN (SELECT id FROM classes WHERE organization_id = ${organizationParam} AND (category IS NULL OR UPPER(category) <> 'TVET') AND name NOT ILIKE '%TVET%')`;
+}
+
+/** Merge the student-category filter into a Prisma `where` object. */
+export function mergeStudentCategory<T extends Record<string, unknown>>(where: T): T {
+  const category = studentCategoryWhere();
+  if (!Object.keys(category).length) return where;
+  const existingAnd = (where as Record<string, unknown>).AND;
+  const AND = Array.isArray(existingAnd)
+    ? [...existingAnd, category]
+    : existingAnd
+      ? [existingAnd, category]
+      : [category];
+  return { ...where, AND } as T;
 }
 
 /** Middleware: block when the caller is not an org-wide / module-head academic user. */
@@ -297,6 +453,8 @@ export function scopeSummary(scope: AcademicScope) {
     accessLevel: scope.accessLevel,
     dataScope: scope.dataScope,
     seeAll: scope.seeAll,
+    wide: scope.wide,
+    academicCategory: scope.academicCategory,
   };
 }
 

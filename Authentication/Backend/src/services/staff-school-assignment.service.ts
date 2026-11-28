@@ -224,6 +224,7 @@ export const staffSchoolAssignmentService = {
     }
     if (!assignment) throw new AppError(404, 'Staff assignment not found');
     staffKey = assignment.staffKey;
+    if (!staffKey) throw new AppError(400, 'Staff assignment key missing');
 
     await prisma.staffSchoolAssignment.update({
       where: { id: assignment.id },

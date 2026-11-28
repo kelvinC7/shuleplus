@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { mergeClassCategory } from '../middleware/academic-scope';
 
 const GRADE_ORDER: Record<string, number> = {
   N1: 1, N2: 2, N3: 3,
@@ -58,7 +59,7 @@ export class ClassService {
 
   async list(organizationId: string) {
     return prisma.class.findMany({
-      where: { organizationId },
+      where: mergeClassCategory({ organizationId }),
       include: { grade: true, combination: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { stream: 'asc' }],
     });
@@ -66,7 +67,7 @@ export class ClassService {
 
   async getById(id: string, organizationId: string) {
     const cls = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
       include: {
         grade: true,
         combination: true,
@@ -86,7 +87,7 @@ export class ClassService {
     data: { name?: string; stream?: string; category?: string; gradeId?: string; combinationId?: string }
   ) {
     const existing = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
     });
     if (!existing) throw new AppError(404, 'Class not found');
 
@@ -112,7 +113,7 @@ export class ClassService {
 
   async delete(id: string, organizationId: string) {
     const existing = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
       include: {
         enrollments: { where: { isCurrent: true }, select: { id: true } },
       },

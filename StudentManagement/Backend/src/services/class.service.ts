@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error.middleware';
 import { settingsService } from './settings.service';
 import { parentService } from './parent.service';
 import { purgeTimetableClass } from '../clients/timetable.client';
+import { mergeClassCategory } from '../middleware/student-scope';
 
 function normalizeYear(year: string): string {
   return year.replace(/\s/g, '').replace(/–/g, '-');
@@ -84,10 +85,10 @@ export class ClassService {
     }
 
     return prisma.class.findMany({
-      where: {
+      where: mergeClassCategory({
         organizationId,
         ...(orConditions.length ? { OR: orConditions } : {}),
-      },
+      }),
       include: { grade: true, combination: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { stream: 'asc' }],
     });
@@ -104,7 +105,7 @@ export class ClassService {
       headTeacherSource?: string | null;
     }
   ) {
-    const existing = await prisma.class.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.class.findFirst({ where: mergeClassCategory({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Class not found');
 
     const clearing = !data.headTeacherName?.trim();
@@ -152,7 +153,7 @@ export class ClassService {
     }
 
     const cls = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
       include: {
         grade: true,
         combination: true,
@@ -172,7 +173,7 @@ export class ClassService {
     data: { name?: string; stream?: string; category?: string; gradeId?: string; combinationId?: string }
   ) {
     const existing = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
     });
     if (!existing) throw new AppError(404, 'Class not found');
 
@@ -197,7 +198,7 @@ export class ClassService {
   }
 
   async setStudentAccess(id: string, organizationId: string, canEditStudents: boolean) {
-    const existing = await prisma.class.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.class.findFirst({ where: mergeClassCategory({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Class not found');
     return prisma.class.update({
       where: { id },
@@ -211,7 +212,7 @@ export class ClassService {
     organizationId: string,
     teacher: { userId?: string | null; email?: string | null }
   ) {
-    const cls = await prisma.class.findFirst({ where: { id: classId, organizationId } });
+    const cls = await prisma.class.findFirst({ where: mergeClassCategory({ id: classId, organizationId }) });
     if (!cls) throw new AppError(404, 'Class not found');
     const userId = teacher.userId?.trim();
     const email = teacher.email?.trim().toLowerCase();
@@ -307,7 +308,7 @@ export class ClassService {
 
   async delete(id: string, organizationId: string) {
     const existing = await prisma.class.findFirst({
-      where: { id, organizationId },
+      where: mergeClassCategory({ id, organizationId }),
       include: {
         enrollments: { where: { isCurrent: true }, select: { id: true } },
       },

@@ -66,6 +66,7 @@ import ExaminationTimetablePage from '@/pages/ExaminationTimetablePage';
 import ExaminationListsPage from '@/pages/ExaminationListsPage';
 import ExaminationInvigilatorsPage from '@/pages/ExaminationInvigilatorsPage';
 import ExaminationAttendancePage from '@/pages/ExaminationAttendancePage';
+import PublicExamRoomPage from '@/pages/PublicExamRoomPage';
 import { OrgWideOnly } from '@/components/org-wide-only';
 import './index.css';
 
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
       // IAM default launch path; Academic home is /home
       { path: 'dashboard', element: <HomePage /> },
       { path: 'verify/report', element: <ReportVerifyPage /> },
+      { path: 'exam-room/:listId/:roomId', element: <PublicExamRoomPage /> },
       {
         element: <ModuleLayout />,
         children: [

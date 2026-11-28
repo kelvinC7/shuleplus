@@ -171,7 +171,6 @@ function normalizeSlotCourses(slot: SlotInput): SlotCourseInput[] {
     seen.add(k);
     out.push(c);
   }
-  if (!out.length) throw new AppError(400, 'At least one course is required for each scheduled session');
   return out;
 }
 
@@ -198,7 +197,7 @@ function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: 
       if (scheduledCourses.has(courseKey)) throw new AppError(409, `Duplicate examination course: ${course.courseName}`);
       scheduledCourses.add(courseKey);
     }
-    const courseLabel = courses.map((c) => c.courseName).join(', ');
+    const courseLabel = courses.length ? courses.map((c) => c.courseName).join(', ') : (slot.sessionName?.trim() || 'Free session');
     const startMinutes = parseMinutes(slot.startTime);
     const endMinutes = parseMinutes(slot.endTime);
     if (endMinutes <= startMinutes) throw new AppError(400, `End time must be after start time for ${courseLabel} on ${day}`);
@@ -220,12 +219,13 @@ function validateSlots(slots: SlotInput[], sessions: SessionInput[], startDate: 
   return slots.map((slot) => {
     const session = sessionsById.get(slot.sessionCode || slot.session)!;
     const courses = normalizeSlotCourses(slot);
+    const freeLabel = String(slot.courseName || '').trim() || 'Free Session';
     return {
       ...slot,
       session: sessionPeriod(slot.startTime),
       sessionCode: session.id,
       sessionName: session.name,
-      courseName: courses[0].courseName,
+      courseName: courses[0]?.courseName ?? freeLabel,
       courses,
     };
   });

@@ -14,6 +14,7 @@ router.post('/generate', requireAcademicPublishAccess, (req, res, next) => exami
 router.post('/assignments', requireAcademicPublishAccess, (req, res, next) => examinationInvigilatorController.add(req, res, next));
 router.delete('/assignments', requireAcademicPublishAccess, (req, res, next) => examinationInvigilatorController.clear(req, res, next));
 router.put('/:id', requireAcademicPublishAccess, (req, res, next) => examinationInvigilatorController.update(req, res, next));
+router.delete('/:id', requireAcademicPublishAccess, (req, res, next) => examinationInvigilatorController.remove(req, res, next));
 router.get('/attendance/records', (req, res, next) => examinationInvigilatorController.listAttendance(req, res, next));
 router.get('/attendance', (req, res, next) => examinationInvigilatorController.getAttendance(req, res, next));
 router.post('/attendance', (req, res, next) => examinationInvigilatorController.markAttendance(req, res, next));

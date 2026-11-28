@@ -3,6 +3,13 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { AppError } from './error.middleware';
 
+export interface JwtModuleAccess {
+  accessLevel: 'USER' | 'HEAD';
+  dataScope: string;
+  wide?: boolean;
+  academicCategory?: string;
+}
+
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -10,6 +17,7 @@ export interface JwtPayload {
   sessionId: string;
   roles: string[];
   modules: string[];
+  moduleAccess?: Record<string, JwtModuleAccess>;
 }
 
 export interface AuthenticatedRequest extends Request {

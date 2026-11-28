@@ -184,7 +184,7 @@ declare -A FRONTEND_DIR=(
   [ShuleTrip]=Frontend_react
 )
 
-# Vite modules: Nginx serves dist/ — no PM2 frontend process
+# Vite modules: Nginx serves dist/ â€” no PM2 frontend process
 STATIC_MODULES=(Academic ShuleKitMIS StudentManagement TichaPortal TeacherPortal MiniWebsite InternalChat ShuleTrip SchoolRepresentative DirectorConsole)
 
 is_static() {
@@ -243,7 +243,7 @@ if [ -d "$BDIR" ]; then
   if [ "$MOD" = "Transport" ] && [ -f "$REPO/scripts/fix-transport-db.sh" ]; then
     echo "  [backend] ensure Transport database + DATABASE_URL..." | tee -a "$LOG"
     bash "$REPO/scripts/fix-transport-db.sh" --prepare-only >> "$LOG" 2>&1 || {
-      echo "  [backend] ERROR: fix-transport-db failed — check DATABASE_URL / transport_db" | tee -a "$LOG"
+      echo "  [backend] ERROR: fix-transport-db failed â€” check DATABASE_URL / transport_db" | tee -a "$LOG"
       tail -n 40 "$LOG" | tee -a "$LOG" || true
       exit 1
     }
@@ -257,7 +257,7 @@ if [ -d "$BDIR" ]; then
   if { [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; } && [ -f "$REPO/scripts/fix-ticha-db.sh" ]; then
     echo "  [backend] ensure TichaPortal database + DATABASE_URL (Round Roll Call)..." | tee -a "$LOG"
     bash "$REPO/scripts/fix-ticha-db.sh" --prepare-only >> "$LOG" 2>&1 || {
-      echo "  [backend] WARNING: fix-ticha-db failed — Round Roll Call may fall back to JSON" | tee -a "$LOG"
+      echo "  [backend] WARNING: fix-ticha-db failed â€” Round Roll Call may fall back to JSON" | tee -a "$LOG"
       tail -n 30 "$LOG" | tee -a "$LOG" || true
     }
   fi
@@ -265,7 +265,7 @@ if [ -d "$BDIR" ]; then
   if [ "$MOD" = "BabyeyiWizard" ] && [ -f "$REPO/scripts/fix-babyeyi-db.sh" ]; then
     echo "  [backend] ensure BabyeyiWizard database + schema (tenants)..." | tee -a "$LOG"
     bash "$REPO/scripts/fix-babyeyi-db.sh" --prepare-only >> "$LOG" 2>&1 || {
-      echo "  [backend] ERROR: fix-babyeyi-db failed — tenants table missing" | tee -a "$LOG"
+      echo "  [backend] ERROR: fix-babyeyi-db failed â€” tenants table missing" | tee -a "$LOG"
       tail -n 30 "$LOG" | tee -a "$LOG" || true
       exit 1
     }
@@ -324,7 +324,7 @@ if [ -d "$BDIR" ]; then
         echo "FRONTEND_URL=https://${FEHOST}" >> .env
       fi
     fi
-    # ── Universal cross-service URL patching ──
+    # â”€â”€ Universal cross-service URL patching â”€â”€
     # Maps every known dev-port default to the correct production port.
     # Only patches vars that already exist in .env (avoids adding unused vars).
     declare -A SVC_URL=(
@@ -349,7 +349,7 @@ if [ -d "$BDIR" ]; then
       [TICHA_PORTAL_API_URL]="http://localhost:4003/api"
       [KAZI_API_URL]="http://localhost:4018"
       [PUBLIC_API_URL]="http://localhost:${BPORT}/api"
-      # Fees → ParentMIS in-app reminders (webhook). Default localhost:3048 only works in dev.
+      # Fees â†’ ParentMIS in-app reminders (webhook). Default localhost:3048 only works in dev.
       [PARENT_MIS_API_URL]="http://localhost:4015/api"
     )
     for KEY in "${!SVC_URL[@]}"; do
@@ -368,14 +368,14 @@ if [ -d "$BDIR" ]; then
     elif [ -n "$APIHOST" ]; then
       echo "PUBLIC_BASE_URL=https://${APIHOST}" >> .env
     fi
-    # Fees cross-service URLs MUST exist in .env — older files lack them and env.ts
+    # Fees cross-service URLs MUST exist in .env â€” older files lack them and env.ts
     # falls back to dead dev ports, so every cross-module call fails silently.
     if [ "$MOD" = "SchoolFeesPortal" ] && [ -f .env ]; then
       while IFS='|' read -r KEY VAL WHY; do
         [ -z "$KEY" ] && continue
         if ! grep -q "^${KEY}=" .env; then
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 PARENT_MIS_API_URL|http://localhost:4015/api|in-app reminders were silently dropped
@@ -390,10 +390,10 @@ PAYMENT_REVERSAL_URL|https://fees.shuleplus.rw/api/integrations/payments/reverse
 PAYMENT_CALLBACK_URL|https://fees.shuleplus.rw/api/integrations/payments/callback|provider generic payment callback
 EOF
       if ! grep -q '^PAYMENT_INTEGRATION_API_KEY=' .env; then
-        echo "  [backend] WARNING: PAYMENT_INTEGRATION_API_KEY is missing — payment callbacks will return 503" | tee -a "$LOG"
+        echo "  [backend] WARNING: PAYMENT_INTEGRATION_API_KEY is missing â€” payment callbacks will return 503" | tee -a "$LOG"
       fi
     fi
-    # Academic exam planning reads Config Class courses from Timetable — missing/wrong
+    # Academic exam planning reads Config Class courses from Timetable â€” missing/wrong
     # TIMETABLE_API_URL falls back to dead dev port 3010 and shows "fetch failed" in UI.
     if [ "$MOD" = "Academic" ] && [ -f .env ]; then
       while IFS='|' read -r KEY VAL WHY; do
@@ -402,7 +402,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|IAM users and org context
@@ -417,7 +417,7 @@ REPORT_VERIFY_PUBLIC_URL|https://parents.shuleplus.rw/verify/report|explicit QR 
 ACADEMIC_PUBLIC_FRONTEND_URL|https://academic.shuleplus.rw|fallback verify page if parent URL unset
 EOF
       if ! curl -sf --max-time 3 http://localhost:4014/api/health >/dev/null 2>&1; then
-        echo "  [warn] timetable-api (:4014) not reachable — exam catalog needs Timetable running" | tee -a "$LOG"
+        echo "  [warn] timetable-api (:4014) not reachable â€” exam catalog needs Timetable running" | tee -a "$LOG"
       fi
     fi
     if [ "$MOD" = "PrintCardMIS" ] && [ -f .env ]; then
@@ -427,7 +427,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|school list and org profile
@@ -443,7 +443,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|IAM login and org context
@@ -465,7 +465,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|parent login and student profiles
@@ -494,7 +494,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 BUDGET_API_URL|http://localhost:4004/api|School Budget module for expense lines
@@ -510,7 +510,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|academic year/term and school profile (logo, location, website) from Authentication
@@ -537,7 +537,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|school profile and academic settings from Authentication
@@ -556,7 +556,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|IAM users for eligibility
@@ -578,7 +578,7 @@ EOF
             sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
           else
             echo "${KEY}=${VAL}" >> .env
-            echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+            echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
           fi
         done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|IAM users and academic settings
@@ -603,7 +603,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|Users & Access teaching staff for class teacher picker
@@ -618,12 +618,12 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|IAM academic settings
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|classes and students from SM
-ACADEMIC_API_URL|http://localhost:4024/api|alias — Timetable reads classes from SM
+ACADEMIC_API_URL|http://localhost:4024/api|alias â€” Timetable reads classes from SM
 HR_API_URL|http://localhost:4007/api|HR staff for teacher assignments
 EOF
     fi
@@ -634,7 +634,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 STUDENT_MANAGEMENT_API_URL|http://localhost:4024/api|Smart Access RFID lookup at gate devices
@@ -644,7 +644,7 @@ TIMETABLE_API_URL|http://localhost:4014/api|teacher schedules for staff attendan
 NOTIFICATION_SERVICE_URL|http://localhost:4001/api/v1/notifications|parent SMS on entry/exit taps
 PARENT_MIS_API_URL|http://localhost:4015/api|parent in-app attendance events
 EOF
-      # Sync SMS key to SERVICE/PLATFORM key — never leave literal "dev-service-key"
+      # Sync SMS key to SERVICE/PLATFORM key â€” never leave literal "dev-service-key"
       SHARED_KEY=$(grep -E '^(SERVICE_API_KEY|PLATFORM_SERVICE_KEY)=' .env | head -1 | cut -d= -f2- || true)
       if [ -n "$SHARED_KEY" ] && [ "$SHARED_KEY" != "dev-service-key" ]; then
         if grep -q '^NOTIFICATION_SERVICE_API_KEY=' .env; then
@@ -662,7 +662,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 ATTENDANCE_API_URL|http://localhost:4008/api|Super Admin gate device provisioning
@@ -678,7 +678,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|org directory and JWT validation
@@ -702,7 +702,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|SSO and org provisioning
@@ -745,7 +745,7 @@ EOF
           sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" .env
         else
           echo "${KEY}=${VAL}" >> .env
-          echo "  [backend] added ${KEY} (was missing — ${WHY})" | tee -a "$LOG"
+          echo "  [backend] added ${KEY} (was missing â€” ${WHY})" | tee -a "$LOG"
         fi
       done <<'EOF'
 IAM_API_URL|http://localhost:4001/api/v1|regenerate/branding must reach auth-api on loopback
@@ -807,18 +807,18 @@ EOF
     echo "  [backend] skip npm run build (plain Node)" | tee -a "$LOG"
   fi
 
-  # Prisma custom output (e.g. Academic) lands in src/generated — copy into dist for node
+  # Prisma custom output (e.g. Academic) lands in src/generated â€” copy into dist for node
   if [ -d src/generated ]; then
     mkdir -p dist/generated
     cp -a src/generated/. dist/generated/ 2>/dev/null || true
-    echo "  [backend] copied src/generated → dist/generated" | tee -a "$LOG"
+    echo "  [backend] copied src/generated â†’ dist/generated" | tee -a "$LOG"
   fi
 
   ENTRY=""
   for f in dist/server.js dist/index.js dist/main.js dist/app.js; do
     [ -f "$f" ] && ENTRY="$f" && break
   done
-  # TichaPortal BFF is plain Node (server.js) — never a stale dist/ from another module.
+  # TichaPortal BFF is plain Node (server.js) â€” never a stale dist/ from another module.
   if { [ "$MOD" = "TichaPortal" ] || [ "$MOD" = "TeacherPortal" ]; } && [ -f server.js ]; then
     ENTRY="server.js"
   fi
@@ -826,7 +826,7 @@ EOF
   if [ "$MOD" = "InternalChat" ] && [ -f "$REPO/scripts/fix-internal-chat-db.sh" ]; then
     echo "  [backend] ensure InternalChat DATABASE_URL (after env patch)..." | tee -a "$LOG"
     bash "$REPO/scripts/fix-internal-chat-db.sh" --prepare-only >> "$LOG" 2>&1 || {
-      echo "  [backend] ERROR: fix-internal-chat-db failed — check DATABASE_URL / chat_module_db" | tee -a "$LOG"
+      echo "  [backend] ERROR: fix-internal-chat-db failed â€” check DATABASE_URL / chat_module_db" | tee -a "$LOG"
       tail -n 40 "$LOG" | tee -a "$LOG" || true
       exit 1
     }
@@ -837,7 +837,7 @@ EOF
     pm2 delete teachers-api teachers-web >/dev/null 2>&1 || true
   fi
 
-  # Authentication bootstrap imports prisma/seed (TS source paths) — run via tsx
+  # Authentication bootstrap imports prisma/seed (TS source paths) â€” run via tsx
   if [ "$MOD" = "Authentication" ] && [ -f src/server.ts ]; then
     echo "  [backend] prisma generate (required for tsx src/server.ts)..." | tee -a "$LOG"
     npx prisma generate >> "$LOG" 2>&1 || {
@@ -845,7 +845,7 @@ EOF
       tail -n 40 "$LOG" | tee -a "$LOG" || true
       exit 1
     }
-    echo "  [backend] pm2 start tsx src/server.ts → $PMBACK (NODE_ENV=production)" | tee -a "$LOG"
+    echo "  [backend] pm2 start tsx src/server.ts â†’ $PMBACK (NODE_ENV=production)" | tee -a "$LOG"
     # Ensure Auth .env forces production catalog URLs (not localhost:3004)
     if [ -f .env ]; then
       if grep -q '^NODE_ENV=' .env; then
@@ -875,12 +875,12 @@ EOF
       if curl -sf "${ATT_CFG%/}/health" >/dev/null 2>&1; then
         echo "  [backend] attendance upstream ok (${ATT_CFG%/}/health)" | tee -a "$LOG"
       else
-        echo "  [backend] WARNING: attendance unreachable at ${ATT_CFG} — Gate Devices will return 503" | tee -a "$LOG"
+        echo "  [backend] WARNING: attendance unreachable at ${ATT_CFG} â€” Gate Devices will return 503" | tee -a "$LOG"
         echo "  [backend] FIX: ensure attendance-api on :4008, then pm2 restart auth-api --update-env" | tee -a "$LOG"
       fi
     fi
   elif [ -n "$ENTRY" ]; then
-    echo "  [backend] pm2 start $ENTRY → $PMBACK" | tee -a "$LOG"
+    echo "  [backend] pm2 start $ENTRY â†’ $PMBACK" | tee -a "$LOG"
     pm2 start "$ENTRY" --name "$PMBACK" --cwd "$BDIR" --update-env --env NODE_ENV=production >> "$LOG" 2>&1
     if [ -n "$BPORT" ]; then
       if [ "$MOD" = "MiniWebsite" ]; then
@@ -910,12 +910,12 @@ EOF
         sleep 2
       done
       if [ "$HEALTH_OK" -eq 0 ]; then
-        echo "  [backend] HEALTH CHECK FAILED on :${BPORT} after 24s (tried /api/health and /health) — last logs:" | tee -a "$LOG"
+        echo "  [backend] HEALTH CHECK FAILED on :${BPORT} after 24s (tried /api/health and /health) â€” last logs:" | tee -a "$LOG"
         pm2 logs "$PMBACK" --lines 30 --nostream | tee -a "$LOG" || true
       fi
     fi
   elif [ -f server.js ]; then
-    echo "  [backend] pm2 start server.js → $PMBACK" | tee -a "$LOG"
+    echo "  [backend] pm2 start server.js â†’ $PMBACK" | tee -a "$LOG"
     pm2 start server.js --name "$PMBACK" --cwd "$BDIR" --update-env --env NODE_ENV=production >> "$LOG" 2>&1
     if [ -n "$BPORT" ]; then
       sleep 3
@@ -930,12 +930,12 @@ EOF
         sleep 2
       done
       if [ "$HEALTH_OK" -eq 0 ]; then
-        echo "  [backend] HEALTH CHECK FAILED on :${BPORT} — last logs:" | tee -a "$LOG"
+        echo "  [backend] HEALTH CHECK FAILED on :${BPORT} â€” last logs:" | tee -a "$LOG"
         pm2 logs "$PMBACK" --lines 30 --nostream | tee -a "$LOG" || true
       fi
     fi
   else
-    echo "  [backend] no dist entry — fallback tsx src/server.ts" | tee -a "$LOG"
+    echo "  [backend] no dist entry â€” fallback tsx src/server.ts" | tee -a "$LOG"
     if [ -f src/server.ts ]; then
       pm2 start "npx tsx src/server.ts" --name "$PMBACK" --interpreter none \
         --update-env --env NODE_ENV=production >> "$LOG" 2>&1
@@ -947,7 +947,7 @@ EOF
     fi
   fi
 else
-  echo "  [backend] $BDIR not found — skipping" | tee -a "$LOG"
+  echo "  [backend] $BDIR not found â€” skipping" | tee -a "$LOG"
 fi
 
 # ---------------- Frontend ----------------
@@ -957,7 +957,7 @@ _skip_frontend() {
 }
 
 if _skip_frontend && [ -d "$FDIR" ]; then
-  echo "  [frontend] SKIP_FRONTEND — no build (nginx serves existing dist)" | tee -a "$LOG"
+  echo "  [frontend] SKIP_FRONTEND â€” no build (nginx serves existing dist)" | tee -a "$LOG"
   if [ "$MOD" = "ShuleTrip" ]; then
     cd "$FDIR" || exit 1
     cat > .env.production <<EOF
@@ -971,7 +971,7 @@ EOF
   if [ -f "$FDIR/dist/index.html" ]; then
     echo "  [frontend] dist ok: $FDIR/dist" | tee -a "$LOG"
   else
-    echo "  [frontend] WARN: $FDIR/dist/index.html missing — upload dist or run full redeploy" | tee -a "$LOG"
+    echo "  [frontend] WARN: $FDIR/dist/index.html missing â€” upload dist or run full redeploy" | tee -a "$LOG"
   fi
 elif [ -d "$FDIR" ]; then
   cd "$FDIR" || exit 1
@@ -995,7 +995,7 @@ elif [ -d "$FDIR" ]; then
 
   if [ -f vite.config.ts ] || [ -f vite.config.js ]; then
     if [ "$MOD" = "InternalChat" ] && [ -f dist/index.html ]; then
-      echo "  [frontend] ShuleChat dist ready — skip duplicate Vite build" | tee -a "$LOG"
+      echo "  [frontend] ShuleChat dist ready â€” skip duplicate Vite build" | tee -a "$LOG"
       if [ -n "$PMFRONT" ]; then
         pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
       fi
@@ -1042,15 +1042,15 @@ EOF
     if [ "$MOD" = "InternalChat" ]; then
       VITE_BUILD_NODE_OPTS="--max-old-space-size=6144"
     fi
-    # Academic (and similar) may fail tsc -b on unused/MUI typings — still emit dist
+    # Academic (and similar) may fail tsc -b on unused/MUI typings â€” still emit dist
     if NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" npm run build >> "$LOG" 2>&1; then
       :
     else
-      echo "  [frontend] npm run build failed — trying vite-only (may take 10–20 min on small VPS)" | tee -a "$LOG"
+      echo "  [frontend] npm run build failed â€” trying vite-only (may take 10â€“20 min on small VPS)" | tee -a "$LOG"
       NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" npx vite build >> "$LOG" 2>&1 \
         || NODE_OPTIONS="${NODE_OPTIONS:-} ${VITE_BUILD_NODE_OPTS}" node ./node_modules/vite/bin/vite.js build >> "$LOG" 2>&1 || true
     fi
-    # Drop any leftover PM2 web process — Nginx serves dist/
+    # Drop any leftover PM2 web process â€” Nginx serves dist/
     if [ -n "$PMFRONT" ]; then
       pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
     fi
@@ -1064,18 +1064,18 @@ EOF
       fi
     fi
     if [ -f dist/index.html ]; then
-      echo "  [frontend] static build → $FDIR/dist" | tee -a "$LOG"
+      echo "  [frontend] static build â†’ $FDIR/dist" | tee -a "$LOG"
     else
-      echo "  [frontend] ERROR: dist/index.html missing — build failed. Last 60 log lines:" | tee -a "$LOG"
+      echo "  [frontend] ERROR: dist/index.html missing â€” build failed. Last 60 log lines:" | tee -a "$LOG"
       tail -n 60 "$LOG" | tee -a "$LOG" || true
       exit 1
     fi
     fi
   else
-    # CRITICAL: Next.js loads .env.local OVER .env.production — leftover localhost
+    # CRITICAL: Next.js loads .env.local OVER .env.production â€” leftover localhost
     # files on the server bake Access Denied (browser calls localhost APIs).
     rm -f .env.local .env.development.local
-    # Auth IAM expects /api/v1; apex Nginx proxies /api/ → auth-api
+    # Auth IAM expects /api/v1; apex Nginx proxies /api/ â†’ auth-api
     if [ "$MOD" = "Authentication" ]; then
       cat > .env.production <<EOF
 NEXT_PUBLIC_API_URL=https://shuleplus.rw/api/v1
@@ -1149,7 +1149,7 @@ NEXT_PUBLIC_IAM_URL=https://shuleplus.rw
 NEXT_PUBLIC_IAM_API_URL=https://shuleplus.rw/api/v1
 EOF
     fi
-    # Highest Next priority — wins even if someone recreates .env.local
+    # Highest Next priority â€” wins even if someone recreates .env.local
     cp -f .env.production .env.production.local
     if [ ! -f next.config.js ] && [ ! -f next.config.ts ] && [ ! -f next.config.mjs ]; then
       cat > next.config.js <<'EOF'
@@ -1180,7 +1180,7 @@ EOF
       if NEXT_IGNORE_INCORRECT_LOCKFILE=true npx next build >> "$LOG" 2>&1; then
         FRONT_BUILD_OK=true
       else
-        echo "  [frontend] next build failed — last 60 log lines:" | tee -a "$LOG"
+        echo "  [frontend] next build failed â€” last 60 log lines:" | tee -a "$LOG"
         tail -n 60 "$LOG" | tee -a "$LOG" || true
       fi
 
@@ -1188,9 +1188,9 @@ EOF
         rm -rf out
         if [ -d out.prev ]; then
           mv out.prev out
-          echo "  [frontend] build failed — restored previous out/ (site stays up)" | tee -a "$LOG"
+          echo "  [frontend] build failed â€” restored previous out/ (site stays up)" | tee -a "$LOG"
         fi
-        echo "  [frontend] ERROR: static export failed — out/index.html missing (see $LOG)" | tee -a "$LOG"
+        echo "  [frontend] ERROR: static export failed â€” out/index.html missing (see $LOG)" | tee -a "$LOG"
         exit 1
       fi
       rm -rf out.prev
@@ -1200,16 +1200,16 @@ EOF
         echo "  [frontend] free port :${FPORT}..." | tee -a "$LOG"
         fuser -k "${FPORT}/tcp" 2>/dev/null || true
         sleep 2
-        echo "  [frontend] pm2 serve out/ on :$FPORT → $PMFRONT" | tee -a "$LOG"
+        echo "  [frontend] pm2 serve out/ on :$FPORT â†’ $PMFRONT" | tee -a "$LOG"
         pm2 start npx --name "$PMFRONT" --cwd "$FDIR" --interpreter none \
           -- --yes serve@latest -s out -l "tcp://0.0.0.0:${FPORT}" >> "$LOG" 2>&1
         sleep 4
-        if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+│\s+online'; then
+        if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+â”‚\s+online'; then
           echo "  [frontend] ERROR: $PMFRONT failed to stay online. Last logs:" | tee -a "$LOG"
           pm2 logs "$PMFRONT" --lines 40 --nostream | tee -a "$LOG" || true
           exit 1
         fi
-        # npx may need to download serve@latest on first run — retry instead of failing once.
+        # npx may need to download serve@latest on first run â€” retry instead of failing once.
         FRONT_OK=false
         for _ in $(seq 1 12); do
           if curl -sf "http://127.0.0.1:${FPORT}/" >/dev/null 2>&1 \
@@ -1222,7 +1222,7 @@ EOF
         if [ "$FRONT_OK" = true ]; then
           echo "  [frontend] ok on :${FPORT} ($MOD static export)" | tee -a "$LOG"
         else
-          echo "  [frontend] ERROR: :${FPORT} not responding — ${FEHOST:-frontend} will 502" | tee -a "$LOG"
+          echo "  [frontend] ERROR: :${FPORT} not responding â€” ${FEHOST:-frontend} will 502" | tee -a "$LOG"
           pm2 logs "$PMFRONT" --lines 30 --nostream | tee -a "$LOG" || true
           exit 1
         fi
@@ -1230,7 +1230,7 @@ EOF
     else
       # Build into a staging dir while auth-web keeps serving the previous .next (avoids unstyled apex during build).
       STAGING=".next-staging-$$"
-      echo "  [frontend] Next.js build → $STAGING (live .next kept until swap)..." | tee -a "$LOG"
+      echo "  [frontend] Next.js build â†’ $STAGING (live .next kept until swap)..." | tee -a "$LOG"
       rm -rf "$STAGING"
       export NEXT_IGNORE_INCORRECT_LOCKFILE=true
       export NEXT_DIST_DIR="$STAGING"
@@ -1238,7 +1238,7 @@ EOF
       if NEXT_IGNORE_INCORRECT_LOCKFILE=true NEXT_DIST_DIR="$STAGING" npx next build >> "$LOG" 2>&1; then
         FRONT_BUILD_OK=true
       else
-        echo "  [frontend] next build failed — last 60 log lines:" | tee -a "$LOG"
+        echo "  [frontend] next build failed â€” last 60 log lines:" | tee -a "$LOG"
         tail -n 60 "$LOG" | tee -a "$LOG" || true
         rm -rf "$STAGING"
       fi
@@ -1248,8 +1248,25 @@ EOF
           pm2 stop "$PMFRONT" >/dev/null 2>&1 || true
           rm -rf .next
           mv "$STAGING" .next
+          # Prevent stale NEXT_DIST_DIR from leaking into pm2 restart/start.
+          unset NEXT_DIST_DIR
+          export NEXT_DIST_DIR=.next
+          find "$FDIR" -maxdepth 1 -type d -name '.next-staging-*' -exec rm -rf {} + 2>/dev/null || true
+        else
+          unset NEXT_DIST_DIR || true
+          rm -rf "$STAGING" 2>/dev/null || true
         fi
-        pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+        # If build failed but previous .next exists, keep serving previous build instead of causing 502.
+        if [ "$FRONT_BUILD_OK" != true ] || [ ! -f .next/BUILD_ID ]; then
+          if [ -f .next/BUILD_ID ]; then
+            echo "  [frontend] WARNING: new build unavailable; keeping/restarting previous .next to avoid 502" | tee -a "$LOG"
+          else
+            echo "  [frontend] ERROR: no usable .next build for $PMFRONT (see $LOG)" | tee -a "$LOG"
+            pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+            exit 1
+          fi
+        fi
+
         if [ "$MOD" = "Authentication" ] || [ "$MOD" = "BabyeyiWizard" ] || [ "$MOD" = "ParentMIS" ]; then
           if [ "$MOD" = "BabyeyiWizard" ]; then
             pm2 delete academic-web >/dev/null 2>&1 || true
@@ -1258,40 +1275,41 @@ EOF
           fuser -k "${FPORT}/tcp" 2>/dev/null || true
           sleep 2
         fi
-        if [ "$FRONT_BUILD_OK" != true ] || [ ! -f .next/BUILD_ID ]; then
-          echo "  [frontend] ERROR: next build failed — not starting $PMFRONT (see $LOG)" | tee -a "$LOG"
-          exit 1
+        if [ "$MOD" = "Authentication" ]; then
+          echo "  [frontend] restart auth-web (kill stale :${FPORT}, nginx apex, verify CSS)..." | tee -a "$LOG"
+          bash "$REPO/scripts/restart-auth-web.sh" >> "$LOG" 2>&1 || {
+            echo "  [frontend] ERROR: restart-auth-web failed - see $LOG" | tee -a "$LOG"
+            exit 1
+          }
         else
-          if [ "$MOD" = "Authentication" ]; then
-            echo "  [frontend] restart auth-web (kill stale :${FPORT}, nginx apex, verify CSS)..." | tee -a "$LOG"
-            bash "$REPO/scripts/restart-auth-web.sh" >> "$LOG" 2>&1 || {
-              echo "  [frontend] ERROR: restart-auth-web failed — see $LOG" | tee -a "$LOG"
-              exit 1
-            }
-          else
-            echo "  [frontend] pm2 start next start -H 0.0.0.0 -p $FPORT → $PMFRONT" | tee -a "$LOG"
-            pm2 start "npx next start -H 0.0.0.0 -p $FPORT" --name "$PMFRONT" --interpreter none \
-              --cwd "$FDIR" --update-env \
-              --env NEXT_IGNORE_INCORRECT_LOCKFILE=true --env HOSTNAME=0.0.0.0 >> "$LOG" 2>&1
-            sleep 4
-            if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+│\s+online'; then
-              echo "  [frontend] ERROR: $PMFRONT failed to stay online (port conflict or bad .next). Last errors:" | tee -a "$LOG"
-              pm2 logs "$PMFRONT" --err --lines 35 --nostream | tee -a "$LOG" || true
-              exit 1
-            fi
+          pm2 delete "$PMFRONT" >/dev/null 2>&1 || true
+          if [ ! -f .next/BUILD_ID ]; then
+            echo "  [frontend] ERROR: next build failed - not starting $PMFRONT (see $LOG)" | tee -a "$LOG"
+            exit 1
           fi
+          echo "  [frontend] pm2 start next start -H 0.0.0.0 -p $FPORT -> $PMFRONT" | tee -a "$LOG"
+          pm2 start "npx next start -H 0.0.0.0 -p $FPORT" --name "$PMFRONT" --interpreter none \
+            --cwd "$FDIR" --update-env \
+            --env NEXT_IGNORE_INCORRECT_LOCKFILE=true --env HOSTNAME=0.0.0.0 >> "$LOG" 2>&1
+          sleep 4
+          if ! pm2 describe "$PMFRONT" 2>/dev/null | grep -qE 'status\s+\|\s+online'; then
+            echo "  [frontend] ERROR: $PMFRONT failed to stay online (port conflict or bad .next). Last errors:" | tee -a "$LOG"
+            pm2 logs "$PMFRONT" --err --lines 35 --nostream | tee -a "$LOG" || true
+            exit 1
+          fi
+        fi
           if [ "$MOD" = "BabyeyiWizard" ]; then
             sleep 3
             BW_HTML=$(curl -sf "http://127.0.0.1:${FPORT}/" 2>/dev/null || true)
             if echo "$BW_HTML" | grep -qi 'Academic Dashboard\|>Academic<\|Subjects.*Examinations'; then
-              echo "  [frontend] ERROR: :${FPORT} is serving Academic — wrong app on Babyeyi port" | tee -a "$LOG"
+              echo "  [frontend] ERROR: :${FPORT} is serving Academic â€” wrong app on Babyeyi port" | tee -a "$LOG"
               pm2 describe "$PMFRONT" | tee -a "$LOG" || true
               exit 1
             fi
             if echo "$BW_HTML" | grep -qi 'Babyeyi Wizard\|Create, manage and publish\|Missing access token\|Verifying license'; then
               echo "  [frontend] ok on :${FPORT} (BabyeyiWizard)" | tee -a "$LOG"
             else
-              echo "  [frontend] WARNING: :${FPORT} content unexpected — verify manually" | tee -a "$LOG"
+              echo "  [frontend] WARNING: :${FPORT} content unexpected â€” verify manually" | tee -a "$LOG"
             fi
           fi
           if [ "$MOD" = "ParentMIS" ]; then
@@ -1299,7 +1317,7 @@ EOF
             if curl -sf "http://127.0.0.1:${FPORT}/login" >/dev/null 2>&1; then
               echo "  [frontend] ok on :${FPORT}/login (ParentMIS)" | tee -a "$LOG"
             else
-              echo "  [frontend] ERROR: :${FPORT}/login not responding — parents.shuleplus.rw will 502" | tee -a "$LOG"
+              echo "  [frontend] ERROR: :${FPORT}/login not responding â€” parents.shuleplus.rw will 502" | tee -a "$LOG"
               pm2 logs "$PMFRONT" --err --lines 25 --nostream | tee -a "$LOG" || true
               exit 1
             fi
@@ -1308,20 +1326,19 @@ EOF
             sleep 3
             TR_HTML=$(curl -sf "http://127.0.0.1:${FPORT}/dashboard" 2>/dev/null || true)
             if echo "$TR_HTML" | grep -qi 'Academic Dashboard\|>Academic<\|Subjects.*Examinations'; then
-              echo "  [frontend] ERROR: :${FPORT} is serving Academic — wrong app on Transport port" | tee -a "$LOG"
+              echo "  [frontend] ERROR: :${FPORT} is serving Academic â€” wrong app on Transport port" | tee -a "$LOG"
               exit 1
             fi
             if [ -f "$REPO/scripts/generate-nginx-modules.sh" ]; then
-              echo "  [frontend] regenerate nginx (transport.shuleplus.rw → :${FPORT})..." | tee -a "$LOG"
+              echo "  [frontend] regenerate nginx (transport.shuleplus.rw â†’ :${FPORT})..." | tee -a "$LOG"
               sudo bash "$REPO/scripts/generate-nginx-modules.sh" >> "$LOG" 2>&1 || true
             fi
           fi
         fi
       fi
     fi
-  fi
 else
-  echo "  [frontend] $FDIR not found — skipping" | tee -a "$LOG"
+  echo "  [frontend] $FDIR not found â€” skipping" | tee -a "$LOG"
 fi
 
 echo "===== DONE $MOD =====" | tee -a "$LOG"

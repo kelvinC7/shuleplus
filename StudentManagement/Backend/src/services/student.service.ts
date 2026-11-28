@@ -1,6 +1,7 @@
 import { Prisma, StudentStatus } from '../generated/prisma';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { mergeStudentCategory } from '../middleware/student-scope';
 import { settingsService } from './settings.service';
 import { getDistrictCode, formatStudentUid, previewStudentCodeParts, parseSchoolCodeNumeric } from '../utils/student-code';
 import { normalizePhotoPath, withResolvedStudentPhoto } from '../utils/photo-url';
@@ -912,7 +913,7 @@ export class StudentService {
     }
 
     const students = await prisma.student.findMany({
-      where,
+      where: mergeStudentCategory(where),
       include: {
         enrollments: {
           where: enrollmentIncludeWhere,
@@ -930,7 +931,7 @@ export class StudentService {
 
   async getById(id: string, organizationId: string) {
     const student = await prisma.student.findFirst({
-      where: { id, organizationId },
+      where: mergeStudentCategory({ id, organizationId }),
       include: {
         enrollments: {
           include: { class: true },
@@ -984,7 +985,7 @@ export class StudentService {
     }>
   ) {
     const existing = await prisma.student.findFirst({
-      where: { id, organizationId },
+      where: mergeStudentCategory({ id, organizationId }),
     });
     if (!existing) throw new AppError(404, 'Student not found');
 
@@ -1151,7 +1152,7 @@ export class StudentService {
   }
 
   async delete(id: string, organizationId: string) {
-    const existing = await prisma.student.findFirst({ where: { id, organizationId } });
+    const existing = await prisma.student.findFirst({ where: mergeStudentCategory({ id, organizationId }) });
     if (!existing) throw new AppError(404, 'Student not found');
 
     await prisma.studentParent.deleteMany({ where: { studentId: id } });

@@ -35,6 +35,11 @@ import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined';
 import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import UpcomingOutlinedIcon from '@mui/icons-material/UpcomingOutlined';
 import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
+import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import AssignmentLateOutlinedIcon from '@mui/icons-material/AssignmentLateOutlined';
+import { useTpToast } from '../components/TpToast.jsx';
 import { fetchMyExaminationInvigilatorAssignments, fetchExaminationAttendance, markExaminationAttendance } from '../services/teacherPortalApi';
 
 const NAVY = '#000435';
@@ -57,17 +62,27 @@ function nowKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function isPast(a) {
-  const dk = toDateKey(a.examDate);
+function getExamSessionStatus(a) {
+  const dk = toDateKey(a?.examDate);
   const today = nowKey();
-  if (dk < today) return true;
-  if (dk > today) return false;
-  // Use the assigned session's actual end time for same-day status.
-  const end = a.endTime || (a.session === 'MORNING' ? '12:00' : '18:00');
-  const [hh, mm] = String(end).split(':').map(Number);
+  if (!dk) return 'UPCOMING';
+  const start = a?.startTime || (a?.session === 'MORNING' ? '08:00' : '14:00');
+  const end = a?.endTime || (a?.session === 'MORNING' ? '12:00' : '18:00');
+  const [sh, sm] = String(start).split(':').map(Number);
+  const [eh, em] = String(end).split(':').map(Number);
+  const startMins = (Number(sh || 0) * 60) + Number(sm || 0);
+  const endMins = (Number(eh || 0) * 60) + Number(em || 0);
+  if (dk < today) return 'COMPLETED';
+  if (dk > today) return 'UPCOMING';
   const now = new Date();
   const mins = now.getHours() * 60 + now.getMinutes();
-  return mins > (Number(hh || 0) * 60 + Number(mm || 0));
+  if (mins > endMins) return 'COMPLETED';
+  if (mins >= startMins) return 'ONGOING';
+  return 'UPCOMING';
+}
+
+function isPast(a) {
+  return getExamSessionStatus(a) === 'COMPLETED';
 }
 
 function downloadCsv(filename, rows) {
@@ -121,6 +136,7 @@ function StatCard({ label, value, icon, tone }) {
 }
 
 export default function ExaminationLists() {
+  const toast = useTpToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [assignments, setAssignments] = useState([]);
@@ -198,24 +214,133 @@ export default function ExaminationLists() {
   async function downloadAssignmentPdf(a) {
     const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const margin = 40; const pageWidth = doc.internal.pageSize.getWidth(); let y = 44;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('Examination Room List', margin, y); y += 20;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    const lines = [`Examination: ${a.examName}`, `Examination Code: ${a.examCode}   Examination List Code: ${a.listCode}`, `Academic Year / Term: ${a.year} ${a.term}`, `Date / Session: ${fmtDate(a.examDate)}  ${a.sessionName}${a.startTime || a.endTime ? ` (${a.startTime || ''} - ${a.endTime || ''})` : ''}`, `Room: ${a.roomName}${a.roomNumber ? ` (${a.roomNumber})` : ''}`, `Class(es): ${(a.classAssigned||[]).join(', ') || '—'}`, `Invigilator(s): ${(a.invigilators || []).join(', ') || '—'}`, `Total Students: ${(a.roomStudents || []).length}`];
-    for (const line of lines) { const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2); doc.text(wrapped, margin, y); y += wrapped.length * 14; }
-    y += 8; doc.setFont('helvetica', 'bold');
-    const cols = [margin, margin + 36, margin + 130, margin + 360];
-    ['No.','Student ID','Student Name','Class'].forEach((h,i)=>doc.text(h,cols[i],y)); y+=8; doc.setDrawColor(200); doc.line(margin,y,pageWidth-margin,y); y+=14; doc.setFont('helvetica','normal');
-    const students = a.roomStudents || [];
-    if (!students.length) doc.text('No students allocated to this room.', margin, y);
-    else for (let i=0;i<students.length;i++){ const st=students[i]; if(y>doc.internal.pageSize.getHeight()-50){doc.addPage(); y=44;} const row=[String(i+1), String(st.studentCode||'—'), String(st.studentName||''), String(st.className||'—')]; const nameWrapped=doc.splitTextToSize(row[2], cols[3]-cols[2]-8); const classWrapped=doc.splitTextToSize(row[3], pageWidth-margin-cols[3]); doc.text(row[0],cols[0],y); doc.text(row[1],cols[1],y); doc.text(nameWrapped,cols[2],y); doc.text(classWrapped,cols[3],y); y+=Math.max(nameWrapped.length,classWrapped.length,1)*14; }
+    const margin = 36;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const navy = [0, 4, 53];
+    const amber = [252, 176, 56];
+    const palette = [[37,99,235],[5,150,105],[217,119,6],[124,58,237],[220,38,38],[8,145,178],[79,70,229],[15,118,110]];
+
+    const drawHeader = () => {
+      doc.setFillColor(...navy); doc.rect(0, 0, pageWidth, 70, 'F');
+      doc.setFillColor(...amber); doc.rect(0, 70, pageWidth, 4, 'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(16);
+      doc.text('Examination Room List', margin, 28);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(226,232,240);
+      doc.text(`${a.examName || 'Examination'} • ${a.examCode || ''} / ${a.listCode || ''} • ${a.year || ''} ${a.term || ''}`, margin, 45);
+      doc.text(`${fmtDate(a.examDate)} • ${a.sessionName || ''} • Room: ${a.roomName || ''}${a.roomNumber ? ` (${a.roomNumber})` : ''}`, margin, 58);
+    };
+
+    const groups = [];
+    const map = new Map();
+    for (const st of (a.roomStudents || [])) {
+      const k = st.classId || st.className || 'unknown';
+      if (!map.has(k)) { map.set(k, { className: st.className || '—', students: [] }); groups.push(map.get(k)); }
+      map.get(k).students.push(st);
+    }
+
+    drawHeader();
+    let y = 90;
+    doc.setFillColor(248,250,252); doc.roundedRect(margin, y, pageWidth - margin * 2, 34, 6, 6, 'F');
+    doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.text(`Classes: ${(a.classAssigned||[]).join(', ') || '—'}`, margin + 10, y + 13);
+    doc.setFont('helvetica','normal'); doc.setTextColor(71,85,105);
+    doc.text(`Invigilators: ${(a.invigilators||[]).join(', ') || '—'}   |   Students: ${(a.roomStudents||[]).length}`, margin + 10, y + 25);
+    y += 46;
+
+    const cols = [margin, margin + 34, margin + 122, margin + 360];
+    const drawTableHead = () => {
+      doc.setFillColor(241,245,249); doc.rect(margin, y - 10, pageWidth - margin * 2, 20, 'F');
+      doc.setTextColor(15,23,42); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      ['No.','Student ID','Student Name','Class'].forEach((h, i) => doc.text(h, cols[i], y + 3));
+      y += 18;
+    };
+    drawTableHead();
+
+    let rowNo = 0;
+    for (let gi = 0; gi < groups.length; gi++) {
+      const g = groups[gi];
+      const accent = palette[gi % palette.length];
+      if (y > pageHeight - 70) { doc.addPage(); drawHeader(); y = 90; drawTableHead(); }
+      doc.setFillColor(accent[0], accent[1], accent[2]); doc.rect(margin, y - 10, 4, 20, 'F');
+      doc.setFillColor(Math.min(255, accent[0] + 210), Math.min(255, accent[1] + 210), Math.min(255, accent[2] + 210));
+      doc.rect(margin + 4, y - 10, pageWidth - margin * 2 - 4, 20, 'F');
+      doc.setTextColor(accent[0], accent[1], accent[2]); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text(`${g.className}`, margin + 12, y + 3);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(71,85,105);
+      doc.text(`${g.students.length} student${g.students.length === 1 ? '' : 's'}`, pageWidth - margin - 8, y + 3, { align: 'right' });
+      y += 18;
+
+      for (const st of g.students) {
+        rowNo += 1;
+        const nameLines = doc.splitTextToSize(String(st.studentName || ''), cols[3] - cols[2] - 10);
+        const classLines = doc.splitTextToSize(String(st.className || '—'), pageWidth - margin - cols[3] - 6);
+        const rowH = Math.max(16, nameLines.length * 11, classLines.length * 11) + 6;
+        if (y + rowH > pageHeight - 40) { doc.addPage(); drawHeader(); y = 90; drawTableHead(); }
+        doc.setFillColor(accent[0], accent[1], accent[2]); doc.rect(margin, y - 10, 2, rowH, 'F');
+        if (rowNo % 2 === 0) { doc.setFillColor(248,250,252); doc.rect(margin + 2, y - 10, pageWidth - margin * 2 - 2, rowH, 'F'); }
+        doc.setTextColor(51,65,85); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+        doc.text(String(rowNo), cols[0], y + 2);
+        doc.text(String(st.studentCode || '—'), cols[1], y + 2);
+        doc.text(nameLines, cols[2], y + 2);
+        doc.text(classLines, cols[3], y + 2);
+        doc.setDrawColor(226,232,240); doc.line(margin, y - 10 + rowH, pageWidth - margin, y - 10 + rowH);
+        y += rowH;
+      }
+      y += 4;
+    }
+
+    if (!groups.length) {
+      doc.setTextColor(100,116,139); doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text('No students allocated to this room.', margin, y + 10);
+    }
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8); doc.setTextColor(100,116,139);
+      doc.text('Generated from TichaPortal', margin, pageHeight - 18);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 18, { align: 'right' });
+    }
+
     doc.save(`exam-list-${String(a.listCode||'list').replace(/[^a-z0-9_-]+/gi,'_')}-${String(a.roomName||'room').replace(/[^a-z0-9_-]+/gi,'_')}-${toDateKey(a.examDate)}-${a.sessionCode}.pdf`);
   }
 
   function printAssignment(a) {
-    const studentRows = (a.roomStudents || []).map((s, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(s.studentCode || '—')}</td><td>${escapeHtml(s.studentName || '')}</td><td>${escapeHtml(s.className || '')}</td></tr>`).join('');
-    const body = `<h1>Examination Room List</h1><div class="meta"><b>Examination:</b> ${escapeHtml(a.examName)}<br/><b>Examination Code:</b> ${escapeHtml(a.examCode)} &nbsp; <b>Examination List Code:</b> ${escapeHtml(a.listCode)}<br/><b>Academic Year / Term:</b> ${escapeHtml(a.year)} ${escapeHtml(a.term)}<br/><b>Date / Session:</b> ${escapeHtml(fmtDate(a.examDate))} · ${escapeHtml(a.sessionName)} ${a.startTime || a.endTime ? `(${escapeHtml(a.startTime || '')} - ${escapeHtml(a.endTime || '')})` : ''}<br/><b>Room:</b> ${escapeHtml(a.roomName)}${a.roomNumber ? ` (${a.roomNumber})` : ''}<br/><b>Class(es):</b> ${escapeHtml((a.classAssigned||[]).join(', ') || '—')}<br/><b>Invigilator(s):</b> ${escapeHtml((a.invigilators || []).join(', ') || '—')}<br/><b>Total Students:</b> ${(a.roomStudents || []).length}</div><table><thead><tr><th style="width:48px">No.</th><th>Student ID</th><th>Student Name</th><th>Class</th></tr></thead><tbody>${studentRows || '<tr><td colspan="4">No students allocated to this room.</td></tr>'}</tbody></table>`;
-    printHtml(`Examination List - ${a.roomName}`, body);
+    const groups = [];
+    const map = new Map();
+    for (const st of (a.roomStudents || [])) {
+      const k = st.classId || st.className || 'unknown';
+      if (!map.has(k)) { map.set(k, { className: st.className || '—', students: [] }); groups.push(map.get(k)); }
+      map.get(k).students.push(st);
+    }
+    const palette = ['#2563eb','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#4f46e5','#0f766e'];
+    let rowNo = 0;
+    const rows = groups.map((g, gi) => {
+      const accent = palette[gi % palette.length];
+      const head = `<tr class="class-head"><td colspan="4" style="background:${accent}18;color:${accent};font-weight:800;border-left:5px solid ${accent};padding:10px 8px">${escapeHtml(g.className)} <span style="float:right;font-weight:600;color:#64748b">${g.students.length} student${g.students.length===1?'':'s'}</span></td></tr>`;
+      const body = g.students.map((st) => { rowNo += 1; return `<tr><td style="border-left:4px solid ${accent}">${rowNo}</td><td>${escapeHtml(st.studentCode || '—')}</td><td style="font-weight:600">${escapeHtml(st.studentName || '')}</td><td>${escapeHtml(st.className || '—')}</td></tr>`; }).join('');
+      return head + body;
+    }).join('');
+    const body = `
+      <div class="hero">
+        <h1>Examination Room List</h1>
+        <div class="sub">${escapeHtml(a.examName || 'Examination')} • ${escapeHtml(a.examCode || '')} / ${escapeHtml(a.listCode || '')} • ${escapeHtml(a.year || '')} ${escapeHtml(a.term || '')}</div>
+      </div>
+      <div class="meta">
+        <div><b>Date / Session:</b> ${escapeHtml(fmtDate(a.examDate))} · ${escapeHtml(a.sessionName || '')} ${a.startTime || a.endTime ? `(${escapeHtml(a.startTime || '')} - ${escapeHtml(a.endTime || '')})` : ''}</div>
+        <div><b>Room:</b> ${escapeHtml(a.roomName || '')}${a.roomNumber ? ` (${escapeHtml(a.roomNumber)})` : ''}</div>
+        <div><b>Class(es):</b> ${escapeHtml((a.classAssigned||[]).join(', ') || '—')}</div>
+        <div><b>Invigilator(s):</b> ${escapeHtml((a.invigilators || []).join(', ') || '—')}</div>
+        <div><b>Total Students:</b> ${(a.roomStudents || []).length}</div>
+      </div>
+      <table><thead><tr><th style="width:48px">No.</th><th>Student ID</th><th>Student Name</th><th>Class</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No students allocated to this room.</td></tr>'}</tbody></table>`;
+    const styles = `body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}.hero{background:#000435;color:#fff;padding:18px 20px;border-radius:12px;margin-bottom:14px}.hero h1{margin:0;font-size:22px}.sub{font-size:12px;color:#cbd5e1;margin-top:4px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:8px;font-size:12px;text-align:left}th{background:#f1f5f9;font-size:11px;text-transform:uppercase;letter-spacing:.03em}tr.class-head td{border-top:2px solid #cbd5e1}`;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>Examination List - ${escapeHtml(a.roomName || '')}</title><style>${styles}</style></head><body>${body}</body></html>`);
+    w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
   }
 
   function withinExamWindow(att) {
@@ -234,7 +359,8 @@ export default function ExaminationLists() {
     try {
       const data = await fetchExaminationAttendance({ examinationListId: opt.examinationListId, roomId: opt.roomId, examDate: opt.examDate, session: opt.session, sessionCode: opt.sessionCode });
       const students = (data?.students || []).map((s) => ({ ...s, status: s.status || 'PRESENT' }));
-      setAttData({ ...data, students });
+      const submitted = !!(data?.submitted || data?.isSubmitted || data?.locked || data?.attendanceSubmitted);
+      setAttData({ ...data, submitted, students });
     } catch (e) {
       setAttError(e?.response?.data?.message || e?.message || 'Failed to load attendance');
     } finally { setAttLoading(false); }
@@ -246,9 +372,12 @@ export default function ExaminationLists() {
     try {
       const payload = { examinationListId: attData.examinationListId, roomId: attData.roomId, examDate: attData.examDate, session: attData.session, sessionCode: attData.sessionCode, records: (attData.students || []).map((s) => ({ studentId: s.studentId, status: s.status || 'PRESENT', notes: s.notes || '' })) };
       const saved = await markExaminationAttendance(payload);
-      setAttData(saved);
+      setAttData({ ...(saved || attData), submitted: true, students: (saved?.students || attData.students || []).map((s) => ({ ...s, status: s.status || 'PRESENT' })) });
+      toast.success('Attendance saved successfully.');
     } catch (e) {
-      setAttError(e?.response?.data?.message || e?.message || 'Failed to save attendance');
+      const msg = e?.response?.data?.message || e?.message || 'Failed to save attendance';
+      setAttError(msg);
+      toast.error(msg);
     } finally { setAttSaving(false); }
   }
 
@@ -296,7 +425,14 @@ export default function ExaminationLists() {
                           <TableCell sx={{ fontSize: '0.8rem', maxWidth: 220 }}>{(a.examsForRoom||[]).length ? (a.examsForRoom||[]).map((e)=>e.courseName).join(', ') : <span style={{color:'#94a3b8'}}>See timetable</span>}</TableCell>
                           <TableCell>{(a.roomStudents||[]).length}</TableCell>
                           <TableCell sx={{ fontSize: '0.8rem' }}>{(a.invigilators||[]).join(', ') || '—'}</TableCell>
-                          <TableCell><Chip size="small" color={a.past ? 'default' : 'success'} label={a.past ? 'Completed' : 'Upcoming'} /></TableCell>
+                          <TableCell>
+                            {(() => {
+                              const st = getExamSessionStatus(a);
+                              const color = st === 'COMPLETED' ? 'default' : st === 'ONGOING' ? 'warning' : 'success';
+                              const label = st === 'COMPLETED' ? 'Completed' : st === 'ONGOING' ? 'Ongoing' : 'Upcoming';
+                              return <Chip size="small" color={color} label={label} />;
+                            })()}
+                          </TableCell>
                           <TableCell><Button size="small" variant="outlined" startIcon={<VisibilityOutlinedIcon />} onClick={()=>setSelected(a)} sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>View</Button></TableCell>
                         </TableRow>
                       ))}
@@ -320,7 +456,7 @@ export default function ExaminationLists() {
                   {attendanceOptions.map((o) => <MenuItem key={o.key} value={o.key}>{fmtDate(o.examDate)} · {o.sessionName} · {o.roomName} · {o.examCode}/{o.listCode}</MenuItem>)}
                 </Select>
               </FormControl>
-              <Button variant="contained" disabled={!attRoomKey} onClick={() => { const opt = attendanceOptions.find((o)=>o.key===attRoomKey); if(opt) openAttendance(opt); }} sx={{ textTransform:'none', bgcolor:NAVY }}>Open Attendance</Button>
+              <Button variant="contained" disabled={!attRoomKey} onClick={() => { const opt = attendanceOptions.find((o)=>o.key===attRoomKey); if(opt) openAttendance(opt); }} sx={{ textTransform:'none', bgcolor:'#059669', color:'#fff', fontWeight:700, px:2.5, boxShadow:'0 6px 16px rgba(5,150,105,0.28)', '&:hover':{ bgcolor:'#047857' }, '&.Mui-disabled':{ bgcolor:'#cbd5e1', color:'#64748b' } }}>Open Attendance</Button>
             </Stack>
           </Paper>
         ) : null}
@@ -388,24 +524,43 @@ export default function ExaminationLists() {
                   if (!map.has(k)) { map.set(k, { className: st.className || '—', exam: examForClass(st.classId, st.className), students: [] }); groups.push(map.get(k)); }
                   map.get(k).students.push(st);
                 }
+                const palette = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#4f46e5', '#0f766e'];
                 let rowNo = 0;
                 return (
-                  <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420, overflowX: 'auto' }}>
-                    <Table size="small" stickyHeader sx={{ minWidth: { xs: 520, sm: 700 } }}>
-                      <TableHead><TableRow>{['No.','Student ID','Student Name','Class','Exam / Course'].map((h)=><TableCell key={h} sx={{ fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</TableCell>)}</TableRow></TableHead>
+                  <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420, overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 2 }}>
+                    <Table size="small" stickyHeader sx={{ minWidth: { xs: 520, sm: 720 } }}>
+                      <TableHead><TableRow>{['No.','Student ID','Student Name','Class','Exam / Course'].map((h)=><TableCell key={h} sx={{ fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase', whiteSpace: 'nowrap', bgcolor: '#f8fafc' }}>{h}</TableCell>)}</TableRow></TableHead>
                       <TableBody>
-                        {groups.length ? groups.flatMap((g) => g.students.map((st, si) => {
-                          rowNo += 1;
-                          return (
-                            <TableRow key={st.id || `${g.className}-${si}`} hover>
-                              <TableCell>{rowNo}</TableCell>
-                              <TableCell sx={{ whiteSpace: 'nowrap' }}>{st.studentCode || '—'}</TableCell>
-                              <TableCell sx={{ fontWeight: 600, minWidth: 160 }}>{st.studentName}</TableCell>
-                              {si === 0 ? <TableCell rowSpan={g.students.length} sx={{ fontWeight: 700, color: NAVY, bgcolor: '#f8fafc', verticalAlign: 'top', minWidth: 120 }}>{g.className}</TableCell> : null}
-                              {si === 0 ? <TableCell rowSpan={g.students.length} sx={{ fontWeight: 600, color: '#334155', bgcolor: '#f8fafc', verticalAlign: 'top', minWidth: 160 }}>{g.exam}</TableCell> : null}
-                            </TableRow>
-                          );
-                        })) : <TableRow><TableCell colSpan={5} sx={{ color: '#64748b', textAlign: 'center', py: 3 }}>No students allocated to this room.</TableCell></TableRow>}
+                        {groups.length ? groups.flatMap((g, gi) => {
+                          const accent = palette[gi % palette.length];
+                          return g.students.map((st, si) => {
+                            rowNo += 1;
+                            const first = si === 0;
+                            const last = si === g.students.length - 1;
+                            const borderColor = `${accent}55`;
+                            return (
+                              <TableRow key={st.id || `${g.className}-${si}`} hover sx={{ '& td': { borderBottom: last ? `2px solid ${borderColor}` : '1px solid #edf2f7' } }}>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', borderLeft: `4px solid ${accent}`, bgcolor: first ? `${accent}08` : undefined }}>{rowNo}</TableCell>
+                                <TableCell sx={{ whiteSpace: 'nowrap', bgcolor: first ? `${accent}08` : undefined }}>{st.studentCode || '—'}</TableCell>
+                                <TableCell sx={{ fontWeight: 600, minWidth: 160, bgcolor: first ? `${accent}08` : undefined }}>{st.studentName}</TableCell>
+                                {first ? (
+                                  <TableCell rowSpan={g.students.length} sx={{ verticalAlign: 'top', minWidth: 140, bgcolor: `${accent}10`, borderLeft: `1px solid ${borderColor}`, borderRight: `1px solid ${borderColor}` }}>
+                                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.4, borderRadius: 1.5, bgcolor: `${accent}18`, color: accent, fontWeight: 800, fontSize: '0.78rem' }}>
+                                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: accent }} />
+                                      {g.className}
+                                    </Box>
+                                    <Typography sx={{ mt: 0.5, fontSize: '0.7rem', color: '#64748b' }}>{g.students.length} student{g.students.length === 1 ? '' : 's'}</Typography>
+                                  </TableCell>
+                                ) : null}
+                                {first ? (
+                                  <TableCell rowSpan={g.students.length} sx={{ fontWeight: 600, color: '#334155', verticalAlign: 'top', minWidth: 170, bgcolor: `${accent}08` }}>
+                                    {g.exam}
+                                  </TableCell>
+                                ) : null}
+                              </TableRow>
+                            );
+                          });
+                        }) : <TableRow><TableCell colSpan={5} sx={{ color: '#64748b', textAlign: 'center', py: 3 }}>No students allocated to this room.</TableCell></TableRow>}
                       </TableBody>
                     </Table>
                   </TableContainer>
@@ -436,8 +591,10 @@ export default function ExaminationLists() {
           {attError ? <Alert severity="error" sx={{ mb: 2 }}>{attError}</Alert> : null}
           {attData ? (
             <Stack spacing={2}>
-              <Alert severity={withinExamWindow(attData) ? 'success' : 'warning'}>
-                {withinExamWindow(attData) ? 'You can mark attendance now (within exam time window).' : `Attendance is allowed only during exam time: ${attData.examDate} ${attData.startTime}-${attData.endTime}. Current time is outside this window.`}
+              <Alert severity={attData?.submitted ? 'info' : (withinExamWindow(attData) ? 'success' : 'warning')}>
+                {attData?.submitted
+                  ? 'Attendance has been submitted and is now locked.'
+                  : (withinExamWindow(attData) ? 'Mark attendance for each student, then save. After saving, attendance cannot be edited.' : `Attendance is allowed only during exam time: ${attData.examDate} ${attData.startTime}-${attData.endTime}. Current time is outside this window.`)}
               </Alert>
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 420 }}>
                 <Table size="small" stickyHeader>
@@ -450,14 +607,51 @@ export default function ExaminationLists() {
                         <TableCell sx={{ fontWeight: 600 }}>{s.studentName}</TableCell>
                         <TableCell>{s.className || '—'}</TableCell>
                         <TableCell>
-                          <FormControl size="small" sx={{ minWidth: 140 }}>
-                            <Select value={s.status || 'PRESENT'} onChange={(e)=>setAttData((prev)=>({ ...prev, students: prev.students.map((x)=>x.studentId===s.studentId?{...x,status:e.target.value}:x) }))} disabled={!withinExamWindow(attData) || attSaving}>
-                              <MenuItem value="PRESENT">Present</MenuItem>
-                              <MenuItem value="ABSENT">Absent</MenuItem>
-                              <MenuItem value="LATE">Late</MenuItem>
-                              <MenuItem value="EXCUSED">Excused</MenuItem>
-                            </Select>
-                          </FormControl>
+                          {(() => {
+                            const locked = !!attData?.submitted;
+                            const disabled = !withinExamWindow(attData) || attSaving || locked;
+                            const current = s.status || 'PRESENT';
+                            const opts = [
+                              { value: 'PRESENT', label: 'Present', icon: <CheckCircleOutlinedIcon sx={{ fontSize: 18 }} />, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+                              { value: 'ABSENT', label: 'Absent', icon: <CancelOutlinedIcon sx={{ fontSize: 18 }} />, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+                              { value: 'LATE', label: 'Late', icon: <AccessTimeOutlinedIcon sx={{ fontSize: 18 }} />, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                              { value: 'EXCUSED', label: 'Excused', icon: <AssignmentLateOutlinedIcon sx={{ fontSize: 18 }} />, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                            ];
+                            return (
+                              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                                {opts.map((o) => {
+                                  const active = current === o.value;
+                                  return (
+                                    <Button
+                                      key={o.value}
+                                      size="small"
+                                      variant={active ? 'contained' : 'outlined'}
+                                      disabled={disabled}
+                                      onClick={() => setAttData((prev) => ({ ...prev, students: prev.students.map((x) => x.studentId === s.studentId ? { ...x, status: o.value } : x) }))}
+                                      startIcon={o.icon}
+                                      sx={{
+                                        textTransform: 'none',
+                                        borderRadius: 2,
+                                        minWidth: 0,
+                                        px: 1.25,
+                                        py: 0.5,
+                                        fontSize: '0.74rem',
+                                        fontWeight: 700,
+                                        color: active ? '#fff' : o.color,
+                                        bgcolor: active ? o.color : o.bg,
+                                        borderColor: active ? o.color : o.border,
+                                        boxShadow: active ? `0 4px 12px ${o.color}33` : 'none',
+                                        '&:hover': { bgcolor: active ? o.color : o.bg, borderColor: o.color },
+                                        '&.Mui-disabled': { color: active ? '#fff' : '#94a3b8', bgcolor: active ? `${o.color}99` : '#f8fafc', borderColor: '#e2e8f0' },
+                                      }}
+                                    >
+                                      {o.label}
+                                    </Button>
+                                  );
+                                })}
+                              </Stack>
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -470,7 +664,7 @@ export default function ExaminationLists() {
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 1.5 }}>
           <Button onClick={() => !attSaving && setAttOpen(false)} sx={{ textTransform:'none' }}>Close</Button>
-          <Button variant="contained" disabled={!attData || attLoading || attSaving || !withinExamWindow(attData)} onClick={() => void saveAttendance()} sx={{ textTransform:'none', bgcolor:NAVY }}>{attSaving ? 'Saving...' : 'Save Attendance'}</Button>
+          <Button variant="contained" disabled={!attData || attLoading || attSaving || !withinExamWindow(attData) || !!attData?.submitted} onClick={() => void saveAttendance()} sx={{ textTransform:'none', bgcolor: attData?.submitted ? '#94a3b8' : NAVY }}>{attSaving ? 'Saving...' : (attData?.submitted ? 'Submitted' : 'Save Attendance')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

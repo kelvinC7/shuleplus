@@ -1509,6 +1509,12 @@ model ExaminationList {
   status                 ExaminationListStatus         @default(DRAFT)
   generatedAt            DateTime?                     @map("generated_at")
   publishedAt            DateTime?                     @map("published_at")
+  /// User explicitly confirmed same-class-level exceptions after strict allocation was impossible.
+  allowSameClassExceptions Boolean                     @default(false) @map("allow_same_class_exceptions")
+  /// Number of allocated students placed as same-class-level exceptions.
+  exceptionCount           Int                         @default(0) @map("exception_count")
+  /// Diagnostic/exception details for audit and UI review.
+  allocationMeta           Json?                       @map("allocation_meta")
   /** IAM user who generated/created the list (own-data isolation). */
   createdBy              String?                       @map("created_by")
   createdAt              DateTime                      @default(now()) @map("created_at")
@@ -1577,6 +1583,8 @@ model ExaminationAllocation {
   className   String   @map("class_name")
   classLevel  String?  @map("class_level")
   gender      String?
+  /// True only when strict same-class-level separation was impossible and the user explicitly allowed an exception.
+  isException Boolean  @default(false) @map("is_exception")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

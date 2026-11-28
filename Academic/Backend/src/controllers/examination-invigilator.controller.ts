@@ -48,6 +48,13 @@ export class ExaminationInvigilatorController {
     } catch (e) { next(e); }
   }
 
+  async remove(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await examinationInvigilatorService.deleteAssignment(org(req), String(req.params.id));
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
   async availableTeachers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const data = await examinationInvigilatorService.availableTeachersForSlot(org(req), {

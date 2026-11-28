@@ -10,6 +10,8 @@ import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Switch from '@mui/material/Switch';
+import MenuItem from '@mui/material/MenuItem';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
@@ -73,6 +75,11 @@ export default function TeacherProfile() {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMsg, setPwMsg] = useState(null);
 
+  const [academicPref, setAcademicPref] = useState(null);
+  const [academicPrefLoading, setAcademicPrefLoading] = useState(true);
+  const [academicPrefSaving, setAcademicPrefSaving] = useState(false);
+  const [academicPrefMsg, setAcademicPrefMsg] = useState(null);
+
   const forceChange = !!teacher?.force_password_change;
   const photoUrl = resolveTeacherPhotoUrl(teacher?.photo);
   const displaySrc = photoPreview || photoUrl;
@@ -94,6 +101,23 @@ export default function TeacherProfile() {
       cancelled = true;
     };
   }, [updateTeacher]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pref = await fetchTeacherAcademicPreferences();
+        if (!cancelled) setAcademicPref(pref);
+      } catch {
+        if (!cancelled) setAcademicPref(null);
+      } finally {
+        if (!cancelled) setAcademicPrefLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -164,6 +188,24 @@ export default function TeacherProfile() {
       setPwMsg({ type: 'err', text: tpApiError(err, 'Failed to change password.') });
     } finally {
       setPwSaving(false);
+    }
+  };
+
+  const handleAcademicPrefSave = async () => {
+    if (!academicPref) return;
+    setAcademicPrefSaving(true);
+    setAcademicPrefMsg(null);
+    try {
+      const saved = await updateTeacherAcademicPreferences({
+        wide: !!academicPref.wide,
+        academicCategory: academicPref.academicCategory || 'GENERAL_REB',
+      });
+      setAcademicPref((prev) => ({ ...(prev || {}), ...(saved || {}), wide: !!(saved?.wide ?? academicPref.wide), academicCategory: saved?.academicCategory || academicPref.academicCategory }));
+      setAcademicPrefMsg({ type: 'ok', text: 'Marks access settings saved.' });
+    } catch (err) {
+      setAcademicPrefMsg({ type: 'err', text: tpApiError(err, 'Could not save marks access settings.') });
+    } finally {
+      setAcademicPrefSaving(false);
     }
   };
 
@@ -359,6 +401,64 @@ export default function TeacherProfile() {
             </Button>
           </Stack>
         </Paper>
+
+        {!academicPrefLoading && academicPref ? (
+          <>
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: brand.navy, mb: 1, mt: 2.5 }}>
+              Assessment & marks access
+            </Typography>
+            <Paper elevation={0} sx={{ p: 2, border: `1px solid ${brand.border}`, borderRadius: 1 }}>
+              <Stack spacing={1.75}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                  <Box>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: brand.navy }}>Wide marks access</Typography>
+                    <Typography sx={{ fontSize: 12, color: brand.muted }}>
+                      On: submit marks for any class and see marks across categories. Off: limit to your academic category.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={!!academicPref.wide}
+                    onChange={(e) => setAcademicPref((prev) => ({ ...(prev || {}), wide: e.target.checked }))}
+                  />
+                </Box>
+
+                {!academicPref.wide ? (
+                  <Box>
+                    <Typography component="label" sx={fieldLabelSx}>
+                      Academic category
+                    </Typography>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      value={academicPref.academicCategory || 'GENERAL_REB'}
+                      onChange={(e) => setAcademicPref((prev) => ({ ...(prev || {}), academicCategory: e.target.value }))}
+                    >
+                      <MenuItem value="GENERAL_REB">GENERAL (Nursery / Primary / Secondary)</MenuItem>
+                      <MenuItem value="TVET">TVET</MenuItem>
+                    </TextField>
+                    <Typography sx={{ fontSize: 12, color: brand.muted, mt: 0.75 }}>
+                      You will only see and submit marks for {academicPref.academicCategory === 'TVET' ? 'TVET' : 'Nursery, Primary and Secondary'} classes.
+                    </Typography>
+                  </Box>
+                ) : null}
+
+                <MessageLine msg={academicPrefMsg} />
+                <Button
+                  fullWidth
+                  disabled={academicPrefSaving}
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => void handleAcademicPrefSave()}
+                  startIcon={academicPrefSaving ? <CircularProgress size={16} color="inherit" /> : null}
+                  sx={{ mt: 0.5, py: 1.25, fontWeight: 700, textTransform: 'none' }}
+                >
+                  {academicPrefSaving ? 'Saving…' : 'Save marks access'}
+                </Button>
+              </Stack>
+            </Paper>
+          </>
+        ) : null}
       </Box>
     </Box>
   );

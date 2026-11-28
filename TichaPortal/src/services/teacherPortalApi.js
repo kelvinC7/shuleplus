@@ -314,3 +314,13 @@ export async function markExaminationAttendance(body) {
   const { data } = await tpApi.post('/examinations/attendance', body);
   return unwrap(data);
 }
+
+export async function fetchTeacherAcademicPreferences() {
+  const { data } = await tpApi.get('/teacher/academic-preferences');
+  return unwrap(data);
+}
+
+export async function updateTeacherAcademicPreferences(body) {
+  const { data } = await tpApi.put('/teacher/academic-preferences', body);
+  return unwrap(data);
+}

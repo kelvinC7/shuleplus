@@ -696,9 +696,17 @@ export class AuthService {
     organizationId: string,
     roles: string[],
     modules: string[]
-  ): Promise<Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }>> {
+  ): Promise<
+    Record<
+      string,
+      { accessLevel: 'USER' | 'HEAD'; dataScope: string; wide: boolean; academicCategory: string }
+    >
+  > {
     const isOrgAdmin = roles.includes(ROLES.ORGANIZATION_ADMIN);
-    const out: Record<string, { accessLevel: 'USER' | 'HEAD'; dataScope: string }> = {};
+    const out: Record<
+      string,
+      { accessLevel: 'USER' | 'HEAD'; dataScope: string; wide: boolean; academicCategory: string }
+    > = {};
 
     const rows = await prisma.userModule.findMany({
       where: { userId, organizationId },
@@ -708,6 +716,8 @@ export class AuthService {
       out[row.module.slug] = {
         accessLevel: isOrgAdmin ? 'HEAD' : (row.accessLevel as 'USER' | 'HEAD'),
         dataScope: isOrgAdmin ? 'ORGANIZATION' : String(row.dataScope),
+        wide: isOrgAdmin ? true : row.wide !== false,
+        academicCategory: isOrgAdmin ? 'ALL' : String(row.academicCategory || 'GENERAL_REB'),
       };
     }
 
@@ -715,7 +725,14 @@ export class AuthService {
     // UserModule row; module operators keep their assigned access level above.
     if (isOrgAdmin) {
       for (const slug of modules) {
-        if (!out[slug]) out[slug] = { accessLevel: 'HEAD', dataScope: 'ORGANIZATION' };
+        if (!out[slug]) {
+          out[slug] = {
+            accessLevel: 'HEAD',
+            dataScope: 'ORGANIZATION',
+            wide: true,
+            academicCategory: 'ALL',
+          };
+        }
       }
     }
 

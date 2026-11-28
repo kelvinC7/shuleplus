@@ -11,6 +11,10 @@ import { AppError } from './error.middleware';
 export interface JwtModuleAccess {
   accessLevel: 'USER' | 'HEAD';
   dataScope: string;
+  /** Marks/records access: true = all academic categories (default). */
+  wide?: boolean;
+  /** GENERAL_REB | TVET | ALL (when wide). */
+  academicCategory?: string;
 }
 
 export interface JwtPayload {

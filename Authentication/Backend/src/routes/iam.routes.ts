@@ -15,6 +15,9 @@ router.get('/me/modules', (req, res, next) => iamController.myModules(req, res, 
 router.get('/me/modules/:moduleSlug/visibility', (req, res, next) =>
   organizationAdminController.moduleVisibility(req, res, next)
 );
+router.put('/me/modules/:moduleSlug/preferences', (req, res, next) =>
+  organizationAdminController.updateMyModulePreferences(req, res, next)
+);
 
 const orgAdminRouter = Router();
 orgAdminRouter.use(requireRole(ROLES.ORGANIZATION_ADMIN, ROLES.ROOT_ADMIN, ROLES.SUPER_ADMIN));
